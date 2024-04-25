@@ -1,28 +1,103 @@
 import { OlImageTileLayer, OlTileLayer, VectorLayer } from './layers/layers';
-import { ArcGISRestTile, OSMWMSTile, TileImageArcGISRest, WMSTile, VectorSourceLayer } from './source/sources';
+import { ArcGISRestTile, OSMWMSTile, TileImageArcGISRest, WMSTile, VectorSourceLayer,ClusterSource } from './source/sources';
 import GeoJSON from 'ol/format/GeoJSON';
+import {
+    Circle as CircleStyle,
+    Fill,
+    Stroke,
+    Style,
+    Text,
+  } from 'ol/style';
+const image = new CircleStyle({
+    radius: 5,
+    fill: null,
+    stroke: new Stroke({color: 'red', width: 1}),
+  });
+  
+const styles = {
+'Point': new Style({
+    image: image,
+}),
+'LineString': new Style({
+    stroke: new Stroke({
+    color: 'green',
+    width: 1,
+    }),
+}),
+'MultiLineString': new Style({
+    stroke: new Stroke({
+    color: 'green',
+    width: 1,
+    }),
+}),
+'MultiPoint': new Style({
+    image: image,
+}),
+'MultiPolygon': new Style({
+    stroke: new Stroke({
+    color: 'yellow',
+    width: 1,
+    }),
+    fill: new Fill({
+    color: 'rgba(255, 255, 0, 0.1)',
+    }),
+}),
+'Polygon': new Style({
+    stroke: new Stroke({
+    color: 'blue',
+    lineDash: [4],
+    width: 3,
+    }),
+    fill: new Fill({
+    color: 'rgba(0, 0, 255, 0.1)',
+    }),
+}),
+'GeometryCollection': new Style({
+    stroke: new Stroke({
+    color: 'magenta',
+    width: 2,
+    }),
+    fill: new Fill({
+    color: 'magenta',
+    }),
+    image: new CircleStyle({
+    radius: 10,
+    fill: null,
+    stroke: new Stroke({
+        color: 'magenta',
+    }),
+    }),
+}),
+'Circle': new Style({
+    stroke: new Stroke({
+    color: 'red',
+    width: 2,
+    }),
+    fill: new Fill({
+    color: 'rgba(255,0,0,0.2)',
+    }),
+}),
+};
 
+const styleFunction = function (feature) {
+    return styles[feature.getGeometry().getType()];
+};
 
 const createVectorLayer = (params) => {
-    const {geojsonLayer, nameLayer, styleLayer, layerEvents, priorityLayer, zIndexLayer} = params;
+    const {geojsonLayer, nameLayer, layerEvents, priorityLayer, zIndexLayer} = params;
     return {
         layerType: 'VectorLayer',
         options: {
           sourceType: 'VectorSourceLayer',
           // all the params for the source goes here
           params: {
-            // format: new GeoJSON(options='EPSG:3857'),
-            // format: new GeoJSON(),
-            features: new GeoJSON().readFeatures(geojsonLayer,{
-                dataProjection: 'EPSG:3857',
-                // featureProjection: 'EPSG:3857'
-            
-            })
+            format: new GeoJSON(),
+            features: new GeoJSON().readFeatures(geojsonLayer,)
           },
           // the rest of the attributes are for the definition of the layer
           zIndex: zIndexLayer,
           name: nameLayer,
-          style: styleLayer      
+          style: styleFunction
         },
         extraProperties: {
             events: layerEvents,
@@ -31,6 +106,62 @@ const createVectorLayer = (params) => {
       }
     
 };
+
+const createClusterVectorLayer = (params) => {
+    const {geojsonLayer, nameLayer, layerEvents, priorityLayer, zIndexLayer} = params;
+    const vectorsource = VectorSourceLayer({
+        params:{
+            format: new GeoJSON(),
+            features: new GeoJSON().readFeatures(geojsonLayer)
+        }
+    })
+    const styleCache = {};
+    return {
+        layerType: 'VectorLayer',
+        options: {
+          sourceType: 'ClusterSource',
+          // all the params for the source goes here
+          params: {
+            distance: 40,
+            minDistance: 20,
+            source: vectorsource
+          },
+          // the rest of the attributes are for the definition of the layer
+          zIndex: zIndexLayer,
+          name: nameLayer,
+          style: function (feature) {
+            const size = feature.get('features').length;
+            let style = styleCache[size];
+            if (!style) {
+              style = new Style({
+                image: new CircleStyle({
+                  radius: 10,
+                  stroke: new Stroke({
+                    color: '#fff',
+                  }),
+                  fill: new Fill({
+                    color: '#2c3e50',
+                  }),
+                }),
+                text: new Text({
+                  text: size.toString(),
+                  fill: new Fill({
+                    color: '#fff',
+                  }),
+                }),
+              });
+              styleCache[size] = style;
+            }
+            return style;
+          },
+        },
+        extraProperties: {
+            events: layerEvents,
+            priority: priorityLayer
+        }
+      }  
+
+}
 
 
 //get the clickable layers: this works for image layers
@@ -131,6 +262,9 @@ const useLayerFactory = (layerType, options,mapAction) => {
           case 'VectorSourceLayer':
               source = VectorSourceLayer(options);
               break;
+          case 'ClusterSource':
+              source = ClusterSource(options);
+              break;
           default:
               console.error('Unsupported source type');
               return;
@@ -217,4 +351,4 @@ const removeLayer = (map,layer) => {
 };  
 
 
-export {onClickHandler, filterLayersNotInMap,addLayer,removeLayer,getLayerToRemove,getClickEventLayers,zoomToLayerbyName, getLayerbyName,createVectorLayer}
+export {onClickHandler, filterLayersNotInMap,addLayer,removeLayer,getLayerToRemove,getClickEventLayers,zoomToLayerbyName, getLayerbyName,createVectorLayer,createClusterVectorLayer}

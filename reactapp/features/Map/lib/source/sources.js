@@ -3,7 +3,16 @@ import TileArcGISRest from "ol/source/TileArcGISRest";
 import OSM from 'ol/source/OSM';
 import ImageArcGISRest from "ol/source/ImageArcGISRest";
 import TileWMS from "ol/source/TileWMS";
-import VectorSource from 'ol/source/Vector.js';
+import VectorSource from 'ol/source/Vector';
+import Cluster from 'ol/source/Cluster';
+
+
+
+const ClusterSource = (options) => {
+  return new Cluster({
+    ...options.params
+  });
+};
 
 const ArcGISRestTile = (url, params) => {
   return new TileArcGISRest({
@@ -40,4 +49,4 @@ const VectorSourceLayer = (options) => {
   });
 };
 
-export { ArcGISRestTile, OSMWMSTile, TileImageArcGISRest, WMSTile, VectorSourceLayer }
+export { ArcGISRestTile, OSMWMSTile, TileImageArcGISRest, WMSTile, VectorSourceLayer,ClusterSource }
