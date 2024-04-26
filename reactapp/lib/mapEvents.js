@@ -1,6 +1,8 @@
 import * as olExtent from 'ol/extent';
 
-const displayFeatureInfo = function (map,pixel,layer,hydroFabricActions) {
+const displayFeatureInfo = function (event,layer,hydroFabricActions) {
+  const pixel = event.map.getEventPixel(event.originalEvent);
+  const map = event.map
     layer.getFeatures(pixel).then(function (features) {
       const feature = features.length ? features[0] : undefined;
       if (feature) {
@@ -23,6 +25,5 @@ const displayFeatureInfo = function (map,pixel,layer,hydroFabricActions) {
   
     });
 };
-
 
 export { displayFeatureInfo };

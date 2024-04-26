@@ -1,12 +1,13 @@
 import React, { useEffect , useRef } from 'react';
 import MapContext from 'features/Map/contexts/MapContext';
-import { MapContainer } from './styles/Map.styled';
+// import { MapContainer } from './styles/Map.styled';
+import './map.css';
 import { onClickHandler,filterLayersNotInMap,addLayer,removeLayer,getLayerToRemove} from '../lib/mapUtils';
 import { useMap } from '../hooks/useMap';
 
 import {LoadingText} from 'components/loader/LoadingComponents';
 
-export const MapProvider = ({ children,layers }) => {
+export const MapProvider = ({ children,layers= [] }) => {
   const {state,actions} = useMap();
 
   const mapRef = useRef();
@@ -73,7 +74,7 @@ export const MapProvider = ({ children,layers }) => {
 
 
   return (
-  <MapContainer>
+  // <MapContainer>
     <MapContext.Provider value={{ ...state, actions }}>
         <div ref={mapRef} className="ol-map" >
           {children}
@@ -88,7 +89,7 @@ export const MapProvider = ({ children,layers }) => {
         }
 
     </MapContext.Provider>
-  </MapContainer>
+  // </MapContainer>
 
   );
 };

@@ -2,7 +2,6 @@
 
 import React,{useEffect} from 'react';
 
-import { HydroFabricContainer } from '../../features/hydroFabric/components/hydroFabric.styled';
 import HydroFabricLinePlot from '../../features/hydroFabric/components/hydroFabricLinePlot';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import appAPI from 'services/api/app';
@@ -10,7 +9,7 @@ import appAPI from 'services/api/app';
 
 
 
-const HydroFabricView = () => {
+const HydroFabricView = (props) => {
   const {state,actions} = useHydroFabricContext();
 
   useEffect(() => {
@@ -22,6 +21,7 @@ const HydroFabricView = () => {
     appAPI.getNexusTimeSeries(params).then((response) => {
       console.log("nexus time series", response);
       actions.set_nexus_series(response);
+      props.toggleSingleRow(false);
 
     }).catch((error) => {
       console.log("Error fetching nexus time series", error);
@@ -34,9 +34,7 @@ const HydroFabricView = () => {
 
 
   return (
-        <HydroFabricContainer>
-            <HydroFabricLinePlot data={state.nexus.series}/>
-        </HydroFabricContainer>
+      <HydroFabricLinePlot data={state.nexus.series}/>
   );
 };
 
