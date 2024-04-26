@@ -18,11 +18,7 @@ def home(request):
 
 @controller(app_workspace=True)
 def getNexuslayer(request, app_workspace):
-    # nexus_file_path = os.path.join(app_workspace.path, "nexus.geojson")
-    # with open(nexus_file_path, "r") as a_file:
-    #     data = json.load(a_file)
-
-    # return JsonResponse(data)
+    response_object = {}
     nexus_file_path = os.path.join(
         app_workspace.path, "ngen-data", "config", "nexus.geojson"
     )
@@ -34,9 +30,14 @@ def getNexuslayer(request, app_workspace):
     gdf = gdf.to_crs("EPSG:3857")
 
     # Convert the DataFrame back to a GeoJSON object
+    # breakpoint()
+    nexus_ids_list = gdf["toid"].tolist()
+    nexus_select_list = [{id: id} for id in nexus_ids_list]
     data = json.loads(gdf.to_json())
 
-    return JsonResponse(data)
+    response_object["geojson"] = data
+    response_object["list_ids"] = nexus_select_list
+    return JsonResponse(response_object)
 
 
 @controller(app_workspace=True)

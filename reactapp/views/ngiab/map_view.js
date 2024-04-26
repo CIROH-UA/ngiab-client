@@ -22,9 +22,10 @@ const MapView = ({props}) => {
         // Define the parameters for the layer
         var nexusLayerParams = nexusLayerParamsCallBack();
 
-        nexusLayerParams['geojsonLayer']=response;
+        nexusLayerParams['geojsonLayer']=response.geojson;
         const nexusClusterLayer = createClusterVectorLayer(nexusLayerParams);
         mapActions.addLayer(nexusClusterLayer);
+        hydroFabricActions.set_nexus_list(response.list_ids);
 
     }).catch(error => {
         console.log(error)

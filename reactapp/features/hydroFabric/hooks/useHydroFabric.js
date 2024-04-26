@@ -13,6 +13,8 @@ const useHydroFabric = () => {
         set_catchment_id: (id) => dispatch({ type: hydroFabricActionsTypes.set_catchment_id, payload: id }),
         set_catchment_variable: (variable) => dispatch({ type: hydroFabricActionsTypes.set_catchment_variable, payload: variable }),
         reset_catchment_series: () => dispatch({ type: hydroFabricActionsTypes.reset_catchment_series }),
+        set_nexus_list: (list) => dispatch({ type: hydroFabricActionsTypes.set_nexus_list, payload: list}),
+        set_catchment_list: (list) => dispatch({ type: hydroFabricActionsTypes.set_catchment_list, payload: list}),
     };
     return { state, actions };
 }

@@ -1,16 +1,32 @@
 
 
-import React,{useEffect} from 'react';
+import React,{useEffect, Fragment} from 'react';
 
 import HydroFabricLinePlot from '../../features/hydroFabric/components/hydroFabricLinePlot';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import appAPI from 'services/api/app';
+import Select from 'react-select'
 
 
-
+const customStyles = {
+  option: provided => ({
+    ...provided,
+    color: 'black'
+  }),
+  control: provided => ({
+    ...provided,
+    color: 'black'
+  }),
+  singleValue: provided => ({
+    ...provided,
+    color: 'black'
+  })
+}
 
 const HydroFabricView = (props) => {
   const {state,actions} = useHydroFabricContext();
+
+
 
   useEffect(() => {
     if (!state.nexus.id) return;
@@ -34,7 +50,13 @@ const HydroFabricView = (props) => {
 
 
   return (
+    <Fragment>
+      <Select options={state.nexus.list} styles={customStyles} />
       <HydroFabricLinePlot data={state.nexus.series}/>
+    </Fragment>
+
+
+
   );
 };
 
