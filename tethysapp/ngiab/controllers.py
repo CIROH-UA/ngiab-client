@@ -23,7 +23,9 @@ def getNexuslayer(request, app_workspace):
     #     data = json.load(a_file)
 
     # return JsonResponse(data)
-    nexus_file_path = os.path.join(app_workspace.path, "nexus.geojson")
+    nexus_file_path = os.path.join(
+        app_workspace.path, "ngen-data", "config", "nexus.geojson"
+    )
 
     # Load the GeoJSON file into a GeoPandas DataFrame
     gdf = gpd.read_file(nexus_file_path)
@@ -33,6 +35,22 @@ def getNexuslayer(request, app_workspace):
 
     # Convert the DataFrame back to a GeoJSON object
     data = json.loads(gdf.to_json())
+
+    return JsonResponse(data)
+
+
+@controller(app_workspace=True)
+def getNexusTimeSeries(request, app_workspace):
+    # breakpoint()
+    nexus_id = request.GET.get("nexus_id")
+    nexus_output_file_path = os.path.join(
+        app_workspace.path, "ngen-data", "outputs", "nex-{}_output.csv".format(nexus_id)
+    )
+    df = pd.read_csv(nexus_output_file_path, header=None)
+    time_col = df.iloc[:, 1]
+    streamflow_cms_col = df.iloc[:, 2]
+    sreamflow_cfs_col = streamflow_cms_col * 35.314  # Convert to cfs
+    data = {"x": time_col.tolist(), "y": sreamflow_cfs_col.tolist()}
 
     return JsonResponse(data)
 

@@ -5,23 +5,21 @@ import { useEffect, useState } from 'react';
 import appAPI from 'services/api/app';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 
-function HydroFabricLinePlot() {
+function HydroFabricLinePlot({ data }) {
   const [ plotData, setPlotData ] = useState(null);
 
   useEffect(() => {
-    appAPI.getPlotData()
-      .then((data) => {
-        // Derived from this example: https://plotly.com/javascript/time-series/#time-series-with-rangeslider
+
+        if (!data) return;
+        
         let traces = [];
-        for (let series of data.series) {
           traces.push({
             type: "scatter",
             mode: "lines",
-            name: series.title,
-            x: series.x,
-            y: series.y,
+            name: 'title',
+            x: data.x,
+            y: data.y,
           })
-        }
 
         let layout = {
           title: 'Time Series with Range Slider',
@@ -59,18 +57,18 @@ function HydroFabricLinePlot() {
           data: traces,
           layout: layout
         });
-      });
-  }, []);
+  }, [data]);
 
   if (!plotData) {
     return (
       <LoadingAnimation />
-    );
-  } else {
+  );
+  } 
+  else {
     return (
-      <Container className="py-5 h-100 d-flex justify-content-center">
+      // <Container className="py-5 h-100 d-flex justify-content-center">
         <Plot data={plotData.data} layout={plotData.layout} />
-      </Container>
+      // </Container>
     );
   }
 }

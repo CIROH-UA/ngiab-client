@@ -4,11 +4,11 @@ const hydroFabricInitialStore = {
     state:{
         nexus:
         {
-            series:[],
+            series:null,
             id:null,
         },
         catchment:{
-            series:[],
+            series:null,
             variable:null,
             id:null,
         },
@@ -21,7 +21,7 @@ const hydroFabricInitialStore = {
 
 const hydroFabricReducer = (state, action) => {
     switch (action.type) {
-        case hydroFabricSeriesActionsTypes.set_nexus_id:
+        case hydroFabricActionsTypes.set_nexus_id:
             return {
                 ...state,
                 state: {
@@ -32,7 +32,7 @@ const hydroFabricReducer = (state, action) => {
                     }
                 }
             };
-        case hydroFabricSeriesActionsTypes.set_nexus_series:
+        case hydroFabricActionsTypes.set_nexus_series:
             return {
                 ...state,
                 state: {
@@ -43,7 +43,7 @@ const hydroFabricReducer = (state, action) => {
                     }
                 }
             };
-        case hydroFabricSeriesActionsTypes.reset_nexus_series:
+        case hydroFabricActionsTypes.reset_nexus_series:
             return {
                 ...state,
                 state: {
@@ -54,7 +54,7 @@ const hydroFabricReducer = (state, action) => {
                     }
                 }
             };
-        case hydroFabricSeriesActionsTypes.set_catchment_series:
+        case hydroFabricActionsTypes.set_catchment_series:
             return {
                 ...state,
                 state: {
@@ -65,7 +65,7 @@ const hydroFabricReducer = (state, action) => {
                     }
                 }
             };
-        case hydroFabricSeriesActionsTypes.set_catchment_id:
+        case hydroFabricActionsTypes.set_catchment_id:
             return {
                 ...state,
                 state: {
@@ -76,7 +76,7 @@ const hydroFabricReducer = (state, action) => {
                     }
                 }
             };
-        case hydroFabricSeriesActionsTypes.set_catchment_variable:
+        case hydroFabricActionsTypes.set_catchment_variable:
             return {
                 ...state,
                 state: {
@@ -87,7 +87,7 @@ const hydroFabricReducer = (state, action) => {
                     }
                 }
             };
-        case hydroFabricSeriesActionsTypes.reset:
+        case hydroFabricActionsTypes.reset:
             return hydroFabricInitialStore;
         default:
             return state;

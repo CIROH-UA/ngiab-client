@@ -9,7 +9,7 @@ export const MapContainer = styled.div`
   order: 1;
   width: 100%;
   overflow-y: hidden;
-  position: absolute;
+  // position: absolute;
   height: 60%;
 
   #progress {

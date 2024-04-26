@@ -9,6 +9,9 @@ const appAPI = {
     getNexusGeoJson: () => {
         return apiClient.get(`${APP_ROOT_URL}getNexuslayer/`);
     },
+    getNexusTimeSeries: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}getNexusTimeSeries/`, { params });
+    },
 };
 
 export default appAPI;

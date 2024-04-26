@@ -14,7 +14,6 @@ const useHydroFabric = () => {
         set_catchment_variable: (variable) => dispatch({ type: hydroFabricActionsTypes.set_catchment_variable, payload: variable }),
         reset_catchment_series: () => dispatch({ type: hydroFabricActionsTypes.reset_catchment_series }),
     };
-    // //console.log(state, actions)
     return { state, actions };
 }
 
