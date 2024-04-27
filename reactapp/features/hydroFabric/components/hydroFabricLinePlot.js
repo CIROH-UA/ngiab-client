@@ -1,76 +1,47 @@
-import Container from 'react-bootstrap/Container';
-import Plot from 'react-plotly.js';
-import { useEffect, useState } from 'react';
+import { useEffect ,useRef } from "react";
+import { useHydroFabricContext } from "../hooks/useHydroFabricContext";
 
-import appAPI from 'services/api/app';
-import LoadingAnimation from 'components/loader/LoadingAnimation';
+import { initializeChart,updateSeries } from "../lib/chartAuxiliary";
+import { initializeLegend, createLegendContainer } from "../lib/legendAuxiliary";
 
-function HydroFabricLinePlot({ data }) {
-  const [ plotData, setPlotData ] = useState(null);
+
+const HydroFabricLinePlot = (props) => {
+  const chartRef = useRef(null);
+  const legendContainerRef = useRef(null);
+  const {state, actions} = useHydroFabricContext();
 
   useEffect(() => {
+    const title = "my nex gen title"
+    const subtitle = "my next gen"
+    chartRef.current = initializeChart('chartdiv',title, subtitle) // initialize the chart
+    // legendContainerRef.current = createLegendContainer(chartRef.current.root,chartRef.current)
+    // initializeLegend(chartRef.current.root,chartRef.current) // add a legend
+    return () => {
+      // if full screen has changed, reset the chart
+      if (chartRef.current && props.singleRowOn ){
+        chartRef.current && chartRef.current.dispose();
+        actions.reset();
+      }      
+    }  
+  }, []);
 
-        if (!data) return;
-        
-        let traces = [];
-          traces.push({
-            type: "scatter",
-            mode: "lines",
-            name: 'title',
-            x: data.x,
-            y: data.y,
-          })
+  useEffect(() => {
+    if (!state.nexus.series) return
+    updateSeries(chartRef.current,state.nexus)
+    return () => {
+      if (chartRef.current && props.singleRowOn) {
+        chartRef.current.dispose();
+        nwpActions.resetProducts();
+      }
+    };
+  }, [state.nexus.series]);
 
-        let layout = {
-          title: 'Time Series with Range Slider',
-          width: '100%', 
-          height: '100%', 
-          xaxis: {
-            autorange: true,
-            range: ['2015-02-17', '2017-02-16'],
-            rangeselector: {buttons: [
-                {
-                  count: 1,
-                  label: '1m',
-                  step: 'month',
-                  stepmode: 'backward'
-                },
-                {
-                  count: 6,
-                  label: '6m',
-                  step: 'month',
-                  stepmode: 'backward'
-                },
-                {step: 'all'}
-              ]},
-            rangeslider: {range: ['2015-02-17', '2017-02-16']},
-            type: 'date'
-          },
-          yaxis: {
-            autorange: true,
-            range: [86.8700008333, 138.870004167],
-            type: 'linear'
-          }
-        };
 
-        setPlotData({
-          data: traces,
-          layout: layout
-        });
-  }, [data]);
+ return (  
+    <div id="chartdiv" style={{ width: "100%", height: "90%" }}></div>
+ )
 
-  if (!plotData) {
-    return (
-      <LoadingAnimation />
-  );
-  } 
-  else {
-    return (
-      // <Container className="py-5 h-100 d-flex justify-content-center">
-        <Plot data={plotData.data} layout={plotData.layout} />
-      // </Container>
-    );
-  }
 }
-
 export default HydroFabricLinePlot;
+
+

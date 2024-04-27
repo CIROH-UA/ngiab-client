@@ -32,7 +32,7 @@ def getNexuslayer(request, app_workspace):
     # Convert the DataFrame back to a GeoJSON object
     # breakpoint()
     nexus_ids_list = gdf["toid"].tolist()
-    nexus_select_list = [{id: id} for id in nexus_ids_list]
+    nexus_select_list = [{"value": id, "label": id} for id in nexus_ids_list]
     data = json.loads(gdf.to_json())
 
     response_object["geojson"] = data
@@ -51,9 +51,15 @@ def getNexusTimeSeries(request, app_workspace):
     time_col = df.iloc[:, 1]
     streamflow_cms_col = df.iloc[:, 2]
     sreamflow_cfs_col = streamflow_cms_col * 35.314  # Convert to cfs
-    data = {"x": time_col.tolist(), "y": sreamflow_cfs_col.tolist()}
 
-    return JsonResponse(data)
+    data = [
+        {"x": time, "y": streamflow}
+        for time, streamflow in zip(time_col.tolist(), sreamflow_cfs_col.tolist())
+    ]
+
+    # data = {"x": time_col.tolist(), "y": sreamflow_cfs_col.tolist()}
+
+    return JsonResponse({"data": data})
 
 
 @controller

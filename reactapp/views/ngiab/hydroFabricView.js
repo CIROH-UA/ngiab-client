@@ -5,8 +5,7 @@ import React,{useEffect, Fragment} from 'react';
 import HydroFabricLinePlot from '../../features/hydroFabric/components/hydroFabricLinePlot';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import appAPI from 'services/api/app';
-import Select from 'react-select'
-
+import SelectComponent from 'features/hydroFabric/components/selectComponent';
 
 const customStyles = {
   option: provided => ({
@@ -23,11 +22,10 @@ const customStyles = {
   })
 }
 
+
 const HydroFabricView = (props) => {
   const {state,actions} = useHydroFabricContext();
-
-
-
+  console.log(actions)
   useEffect(() => {
     if (!state.nexus.id) return;
     console.log("nexus id changed", state.nexus.id)
@@ -36,7 +34,7 @@ const HydroFabricView = (props) => {
     }    
     appAPI.getNexusTimeSeries(params).then((response) => {
       console.log("nexus time series", response);
-      actions.set_nexus_series(response);
+      actions.set_nexus_series(response.data);
       props.toggleSingleRow(false);
 
     }).catch((error) => {
@@ -51,8 +49,10 @@ const HydroFabricView = (props) => {
 
   return (
     <Fragment>
-      <Select options={state.nexus.list} styles={customStyles} />
-      <HydroFabricLinePlot data={state.nexus.series}/>
+      <SelectComponent state={state.nexus} set_id={actions.set_nexus_id} />
+      {/* <Select options={state.nexus.list} styles={customStyles} /> */}
+      {/* <HydroFabricLinePlot data={state.nexus.series}/> */}
+      <HydroFabricLinePlot singleRowOn={props.singleRowOn} />
     </Fragment>
 
 
