@@ -17,7 +17,6 @@ const NGIABView = () => {
                   <MapView  />
               </MapProvider>
             </MapContainer>
-
             <HydroFabricContainer fullScreen={singleRowOn} >
               <HydroFabricView toggleSingleRow = {toggleSingleRow} singleRowOn={singleRowOn} />
             </HydroFabricContainer>

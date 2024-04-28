@@ -14,7 +14,7 @@ let makeNexusLayerParams = (hydroFabricActions) => {
                 }
             }
         ], // This should be an object with any events you want to attach to the layer
-        priorityLayer: 1,
+        priorityLayer: 2,
         zIndexLayer: 3
     }
 }

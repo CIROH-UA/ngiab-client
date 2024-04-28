@@ -43,8 +43,6 @@ const customStyles = {
   
 // Usage of the Select component with the custom Option component
 const SelectComponent = ({ state, set_id }) => {
-  console.log(state.list)
-
  // Handler for when an option is selected, wrapped in useCallback
  const handleChange = useCallback((option) => {
     set_id(`${option.value.split('wb-')[1]}`)

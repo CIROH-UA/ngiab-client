@@ -6,6 +6,7 @@ export const HydroFabricContainer = styled.div`
   width: 100%;
   // overflow-y: hidden;
   height: ${props => props.fullScreen ? '0%' : '40%'};
+  padding:10px;
 `;
 
 export const MapContainer = styled.div`
