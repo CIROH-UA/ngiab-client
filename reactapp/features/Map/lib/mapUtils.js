@@ -295,7 +295,7 @@ const useLayerFactory = (layerType, options,mapAction) => {
               });
               break;
           case 'WMSTile':
-              source = WMSTile(options.url, options.params);
+              source = WMSTile(options.url, options.params, options.source);
               break;
           case 'VectorSourceLayer':
               source = VectorSourceLayer(options);
