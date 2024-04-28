@@ -12,6 +12,9 @@ const appAPI = {
     getNexusTimeSeries: (params) => {
         return apiClient.get(`${APP_ROOT_URL}getNexusTimeSeries/`, { params });
     },
+    getCatchmentTimeSeries: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}getCatchmentTimeSeries/`, { params });
+    },
 };
-
+ 
 export default appAPI;

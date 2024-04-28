@@ -1,6 +1,7 @@
 import React, { useReducer } from 'react';
 import { hydroFabricReducer, hydroFabricInitialStore } from '../store/reducers/hydroFabricReducer';
 import { hydroFabricActionsTypes } from '../store/actions/actionsTypes';
+import { reset } from 'ol/transform';
 
 
 const useHydroFabric = () => {
@@ -15,6 +16,9 @@ const useHydroFabric = () => {
         reset_catchment_series: () => dispatch({ type: hydroFabricActionsTypes.reset_catchment_series }),
         set_nexus_list: (list) => dispatch({ type: hydroFabricActionsTypes.set_nexus_list, payload: list}),
         set_catchment_list: (list) => dispatch({ type: hydroFabricActionsTypes.set_catchment_list, payload: list}),
+        set_catchment_variable_list: (list) => dispatch({ type: hydroFabricActionsTypes.set_catchment_variable_list, payload: list}),
+        reset_nexus: () => dispatch({ type: hydroFabricActionsTypes.reset_nexus }),
+        reset_catchment: () => dispatch({ type: hydroFabricActionsTypes.reset_catchment }),
     };
     return { state, actions };
 }

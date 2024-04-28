@@ -12,7 +12,8 @@ const hydroFabricInitialStore = {
             series:null,
             variable:null,
             id:null,
-            list:null
+            list:null,
+            variable_list:null
         },
 
     },
@@ -112,7 +113,43 @@ const hydroFabricReducer = (state, action) => {
                     }
                 }
             };
-            
+        case hydroFabricActionsTypes.set_catchment_variable_list:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    catchment: {
+                        ...state.state.catchment,
+                        variable_list: action.payload
+                    }
+                }
+            };
+        case hydroFabricActionsTypes.reset_nexus:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    nexus: {
+                        series:null,
+                        id:null,
+                        list:null
+                    }
+                }
+            };
+        case hydroFabricActionsTypes.reset_catchment:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    catchment: {
+                        series:null,
+                        variable:null,
+                        id:null,
+                        list:null,
+                        variable_list:null
+                    }
+                }
+            };
         case hydroFabricActionsTypes.reset:
             return hydroFabricInitialStore;
         default:

@@ -18,6 +18,7 @@ const HydroFabricView = (props) => {
     }    
     appAPI.getNexusTimeSeries(params).then((response) => {
       actions.set_nexus_series(response.data);
+      actions.reset_catchment();
       props.toggleSingleRow(false);
 
     }).catch((error) => {
@@ -30,11 +31,46 @@ const HydroFabricView = (props) => {
   }, [state.nexus.id]);
 
 
+  useEffect(() => {
+    if (!state.catchment.id) return;
+    var params = {
+      catchment_id: state.catchment.id
+    }
+    console.log(params)    
+    appAPI.getCatchmentTimeSeries(params).then((response) => {
+      actions.set_catchment_series(response.data);
+      actions.set_catchment_variable_list(response.list_variables);
+      actions.set_catchment_variable(response.variable);
+      actions.reset_nexus();
+      props.toggleSingleRow(false);
+
+    }).catch((error) => {
+      console.log("Error fetching nexus time series", error);
+    })
+    return  () => {
+
+    }
+
+  }, [state.catchment.id]);
+
+
+
   return (
     <Fragment>
-      <h5>Catchment ID Selection</h5>
-      <SelectComponent state={state.nexus} set_id={actions.set_nexus_id} />
-      <HydroFabricLinePlot singleRowOn={props.singleRowOn} />
+      {state.catchment.id &&
+        <Fragment>
+          <h5>Catchment ID Selection</h5>
+          <SelectComponent state={state.catchment} set_id={actions.set_catchment_id} />
+          <HydroFabricLinePlot singleRowOn={props.singleRowOn} />
+        </Fragment>
+      }
+      {state.nexus.id &&
+        <Fragment>
+          <h5>Nexus ID Selection</h5>
+          <SelectComponent state={state.catchment} set_id={actions.set_catchment_id} />
+          <HydroFabricLinePlot singleRowOn={props.singleRowOn} />
+        </Fragment>
+      }
     </Fragment>
 
 

@@ -26,4 +26,32 @@ const displayFeatureInfo = function (event,layer,hydroFabricActions) {
     });
 };
 
-export { displayFeatureInfo };
+const displayFeatureInfoWMS = function (event,layer,hydroFabricActions) {
+    console.log('wms layer')
+    const wmsSource = layer.getSource();
+    const map = event.map
+
+    const viewResolution =  map.getView().getResolution();
+    const url = wmsSource.getFeatureInfoUrl(
+      event.coordinate,
+      viewResolution,
+      'EPSG:3857',
+      {'INFO_FORMAT': 'application/json'},
+    );
+    if (url) {
+        console.log(url)
+        fetch(url)
+        .then(response => response.json())  // Convert the response to JSON
+        .then((data) => {
+          const data_catchment_id = data.features[0].properties.divide_id;
+          console.log(data_catchment_id)
+          hydroFabricActions.set_catchment_id(data_catchment_id);
+
+        })     // Log the actual JSON data
+        .catch(error => console.error('Error fetching data:', error)); 
+    }
+
+}
+
+
+export { displayFeatureInfo,displayFeatureInfoWMS };

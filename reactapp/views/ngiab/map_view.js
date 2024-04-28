@@ -5,7 +5,7 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
 import {createVectorLayer, createClusterVectorLayer} from 'features/Map/lib/mapUtils';
 // import {displayFeatureInfo} from 'lib/mapEvents'
 import { initialLayersArray } from 'lib/layersData';
-import { makeNexusLayerParams } from 'lib/mapUtils';
+import { makeNexusLayerParams, makeCatchmentLayer } from 'lib/mapUtils';
 
 
 const MapView = ({props}) => {
@@ -16,15 +16,27 @@ const MapView = ({props}) => {
     return makeNexusLayerParams(hydroFabricActions);
   })
 
+  const catchmentLayerCallBack = useCallback(() => {
+    const catchmentLayersURL = 'http://localhost:8181/geoserver/wms'; 
+    return makeCatchmentLayer(catchmentLayersURL,hydroFabricActions);
+  })
+
+
   useEffect(() => {
     appAPI.getNexusGeoJson().then(response => {
         console.log(response)
         // Define the parameters for the layer
         var nexusLayerParams = nexusLayerParamsCallBack();
+        var catchmentLayer = catchmentLayerCallBack();
 
         nexusLayerParams['geojsonLayer']=response.geojson;
+        
         const nexusClusterLayer = createClusterVectorLayer(nexusLayerParams);
+
         mapActions.addLayer(nexusClusterLayer);
+        mapActions.addLayer(catchmentLayer);
+        
+        
         hydroFabricActions.set_nexus_list(response.list_ids);
 
     }).catch(error => {

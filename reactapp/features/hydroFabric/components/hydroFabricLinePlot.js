@@ -31,10 +31,22 @@ const HydroFabricLinePlot = (props) => {
     return () => {
       if (chartRef.current && props.singleRowOn) {
         chartRef.current.dispose();
-        nwpActions.resetProducts();
+        actions.reset_nexus();
       }
     };
   }, [state.nexus.series]);
+
+
+  useEffect(() => {
+    if (!state.catchment.series) return
+    updateSeries(chartRef.current,state.catchment)
+    return () => {
+      if (chartRef.current && props.singleRowOn) {
+        chartRef.current.dispose();
+        actions.reset_catchment();
+      }
+    };
+  }, [state.catchment.series]);
 
 
  return (  
