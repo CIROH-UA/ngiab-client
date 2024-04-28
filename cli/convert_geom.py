@@ -1,5 +1,8 @@
 import geopandas as gpd
 import argparse
+from geo.Geoserver import Geoserver
+import shutil
+import os
 
 
 def convert_gpkg_to_geojson(gpkg_path, layer_name, output_path):
@@ -26,6 +29,46 @@ def get_remove_unimportant_nexus():
     pass
 
 
+def publish_gpkg_layer_to_geoserver(
+    gpkg_path,
+    layer_name,
+    shp_path,
+    geoserver_host,
+    geoserver_port,
+    geoserver_username,
+    geoserver_password,
+):
+    # convert to shapefile to uploaded to geoserver
+    gdf = gpd.read_file(gpkg_path, layer=layer_name)
+
+    gdf.to_crs(f"EPSG:4326").to_file(f"{shp_path}.shp")
+
+    # zip it
+    shp_files = [f"{shp_path}.{ext}" for ext in ["shp", "shx", "dbf", "prj"]]
+
+    # Using shutil to create a zip archive containing all shapefile components
+    with shutil.ZipFile(f"{shp_path}.zip", "w") as zipf:
+        for file in shp_files:
+            zipf.write(file, arcname=os.path.basename(file))
+
+    # Optional: Remove the shapefile files after zipping, if you don't need them
+    for file in shp_files:
+        os.remove(file)
+
+    geo = Geoserver(
+        f"{geoserver_host}:{geoserver_port}/geoserver",
+        username=geoserver_username,
+        password=geoserver_password,
+    )
+    geo.create_workspace(workspace="ngiab")
+
+    geo.create_shp_datastore(
+        path=f"{shp_path}.zip",
+        store_name="hydrofabrics",
+        workspace="ngiab",
+    )
+
+
 def main():
     # Setup argument parser
     parser = argparse.ArgumentParser(
@@ -34,12 +77,16 @@ def main():
     parser.add_argument("gpkg_path", help="Path to the GeoPackage file.")
     parser.add_argument("layer_name", help="Name of the layer to convert.")
     parser.add_argument("output_path", help="Output path for the GeoJSON file.")
-
+    parser.add_argument(
+        "--publish", action="store_true", help="Publish the layer to GeoServer."
+    )
+    parser.add_argument("--shp_path", help="Path to save the shapefile for GeoServer.")
     # Parse arguments
     args = parser.parse_args()
-
     # Call the function with parsed arguments
     convert_gpkg_to_geojson(args.gpkg_path, args.layer_name, args.output_path)
+    if args.publish:
+        publish_gpkg_layer_to_geoserver(args.gpkg_path, args.shp_path)
 
 
 if __name__ == "__main__":
