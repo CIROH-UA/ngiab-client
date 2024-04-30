@@ -6,7 +6,6 @@ import HydroFabricLinePlot from '../../features/hydroFabric/components/hydroFabr
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import appAPI from 'services/api/app';
 import SelectComponent from 'features/hydroFabric/components/selectComponent';
-import LoadingAnimation from 'components/loader/LoadingAnimation';
 
 
 const HydroFabricView = (props) => {
@@ -17,12 +16,12 @@ const HydroFabricView = (props) => {
 
   useEffect(() => {
     if (!state.nexus.id) return;
+    actions.reset_catchment();
     var params = {
       nexus_id: state.nexus.id
     }    
     appAPI.getNexusTimeSeries(params).then((response) => {
       actions.set_nexus_series(response.data);
-      actions.reset_catchment();
       props.toggleSingleRow(false);
 
     }).catch((error) => {
@@ -37,6 +36,7 @@ const HydroFabricView = (props) => {
 
   useEffect(() => {
     if (!state.catchment.id) return;
+    actions.reset_nexus();
     props.setIsLoading(true);
     var params = {
       catchment_id: state.catchment.id
@@ -48,7 +48,6 @@ const HydroFabricView = (props) => {
       subtitle = response.variable
       // actions.set_catchment_variable(response.variable);
       actions.set_catchment_list(response.catchment_ids);
-      actions.reset_nexus();
       props.toggleSingleRow(false);
       props.setIsLoading(false);
 

@@ -35,7 +35,6 @@ const LoadingAnimation = ({delay}) => {
           <div className="outer-moon-a"></div>
           <div className="outer-moon-b"></div>
         </div>
-        <div className="loading-text">Loading...</div>
       </div>
       }
     </>
