@@ -8,7 +8,8 @@ import {
     Text,
   } from 'ol/style';
 import { VectorSourceLayer } from 'features/Map/lib/source/sources';
-  
+import { sldCatchmentStyle } from './layersData';
+
 const image = new CircleStyle({
     radius: 5,
     fill: null,
@@ -136,16 +137,19 @@ const createClusterVectorLayer = (params) => {
                 image: new CircleStyle({
                   radius: 10,
                   stroke: new Stroke({
-                    color: '#fff',
+                    color: '#DA4167',
+                    width: 3
                   }),
                   fill: new Fill({
-                    color: '#2c3e50',
+                    // color: '#ffffff00',
+                    color: '#000000',
+
                   }),
                 }),
                 text: new Text({
                   text: size.toString(),
                   fill: new Fill({
-                    color: '#fff',
+                    color: '#FFFFFF',
                   }),
                 }),
               });
@@ -183,6 +187,7 @@ let makeCatchmentLayer = (catchmentLayersURL) =>{
             params: {
                 LAYERS: 'nextgen:catchments',
                 Tiled: true,
+                SLD_BODY: sldCatchmentStyle
             },
             // the rest of the attributes are for the definition of the layer
             name: "Catchments Layer",
