@@ -50,7 +50,7 @@ const HydroFabricLinePlot = (props) => {
 
 
  return (  
-    <div id="chartdiv" style={{ width: "100%", height: "90%" }}></div>
+    <div id="chartdiv" style={{ width: "100%", height: "90%", order: 1, flex: "1 1 80%" }}></div>
  )
 
 }
