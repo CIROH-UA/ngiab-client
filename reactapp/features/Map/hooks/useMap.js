@@ -1,6 +1,7 @@
 import React, { useReducer } from 'react';
 import { mapReducer, mapInitialStore } from '../store/reducers/mapReducer';
 import { MapActionsTypes } from '../store/actions/actionsTypes';
+import { add } from 'ol/coordinate';
 
 
 const useMap = () => {
@@ -15,6 +16,7 @@ const useMap = () => {
         add_click_event: (event) => dispatch({ type: MapActionsTypes.add_click_event, payload: event }),
         add_load_start_event: (event) => dispatch({ type: MapActionsTypes.add_load_start_event, payload: event }),
         add_load_end_event: (event) => dispatch({ type: MapActionsTypes.add_load_end_event, payload: event }),
+        add_pointer_move_event: (event) => dispatch({ type: MapActionsTypes.add_pointer_move_event, payload: event }),
     };
     return { state, actions };
 }

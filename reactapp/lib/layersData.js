@@ -35,7 +35,7 @@ const sldCatchmentStyle = `<?xml version="1.0" encoding="ISO-8859-1"?>
           <PolygonSymbolizer>
           <Fill>
             <CssParameter name="fill">#ccd5e8</CssParameter>
-            <CssParameter name="fill-opacity">0</CssParameter>
+            <CssParameter name="fill-opacity">0.1</CssParameter>
           </Fill>
         <Stroke>
           <CssParameter name="stroke">#000080</CssParameter>

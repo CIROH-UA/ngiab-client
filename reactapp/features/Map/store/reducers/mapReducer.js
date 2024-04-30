@@ -24,7 +24,8 @@ const mapInitialStore = {
         events:{
             click: null,
             loadstart: null,
-            loadend: null
+            loadend: null,
+            pointermove:null
         }
     },
     actions:{}
@@ -122,6 +123,17 @@ const mapReducer = (state, action) => {
                     events: {
                         ...state.state.events,
                         loadend: action.payload
+                    }
+                }
+            };
+        case MapActionsTypes.add_pointer_move_event:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    events: {
+                        ...state.state.events,
+                        pointermove: action.payload
                     }
                 }
             };

@@ -60,6 +60,14 @@ export const MapProvider = ({ children, layers= [] }) => {
   }, [state.state.events.loadend]);
 
   useEffect(() => {
+    if (!state.state.events.pointermove) return;
+    const onPointerMoveEventHandler = state.state.events.pointermove
+    state.state.mapObject.on('pointermove',(evt)=>{
+      onPointerMoveEventHandler(evt)
+    })
+  }, [state.state.events.pointermove]);
+
+  useEffect(() => {
     if (state.state.layers.length === 0 ) return;
     //console.log("layers changed", state.state.layers);
     const layersToRemove = getLayerToRemove(state.state.mapObject, state.state.layers);

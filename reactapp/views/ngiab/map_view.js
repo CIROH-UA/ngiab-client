@@ -6,7 +6,8 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
 import {
   onClickLayersEvent,
   onStartLoadingLayersEvent, 
-  onEndLoadingLayerEvent 
+  onEndLoadingLayerEvent,
+  onPointerMoveLayersEvent 
 } from 'lib/mapEvents'
 import { initialLayersArray } from 'lib/layersData';
 import { 
@@ -30,6 +31,9 @@ const MapView = (props) => {
     return makeCatchmentLayer(catchmentLayersURL);
   })
 
+  const onPointerMoveLayersEventCallback = useCallback((event) => {
+    return onPointerMoveLayersEvent(event)
+  });
   const onClickEventHandlerCallBack = useCallback((event) => {
     return onClickLayersEvent(event,hydroFabricActions,props.setIsLoading);
   })
@@ -47,6 +51,7 @@ const MapView = (props) => {
     mapActions.add_click_event(onClickEventHandlerCallBack);
     mapActions.add_load_start_event(onLoadStartHandlerCallBack);
     mapActions.add_load_end_event(onLoadEndHandlerCallBack);
+    mapActions.add_pointer_move_event(onPointerMoveLayersEventCallback);
 
     //Add Layers
     appAPI.getNexusGeoJson().then(response => {
