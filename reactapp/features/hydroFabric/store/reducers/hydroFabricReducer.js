@@ -53,7 +53,7 @@ const hydroFabricReducer = (state, action) => {
                     ...state.state,
                     nexus: {
                         ...state.state.nexus,
-                        series: []
+                        series: null
                     }
                 }
             };

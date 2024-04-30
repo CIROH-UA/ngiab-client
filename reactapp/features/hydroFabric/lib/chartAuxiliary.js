@@ -3,9 +3,6 @@ import * as am5xy from "@amcharts/amcharts5/xy";
 import am5themes_Animated from "@amcharts/amcharts5/themes/Animated";
 import * as am5plugins_exporting from "@amcharts/amcharts5/plugins/exporting";
 
-import {createIndividualLegend} from './legendAuxiliary'
-
-
 
 // Define handleUpdate outside of the useEffect
 const handleUpdate = (key, chartRef, currentProducts, updateSeries, legendContainer, toggleProduct) => {
@@ -16,9 +13,7 @@ const handleUpdate = (key, chartRef, currentProducts, updateSeries, legendContai
 
 
 const initializeChart = (containerId, title, subtitle) => {
-    // //console.log(containerId,data, onClickLegend);
-    const root = am5.Root.new(containerId);
-    
+    const root = am5.Root.new(containerId);    
     root.setThemes([am5themes_Animated.new(root)]);
     
     // Create chart
@@ -109,31 +104,33 @@ const initializeChart = (containerId, title, subtitle) => {
     });
       
     // add title and subtitle
-    chart.children.unshift(am5.Label.new(root, {
-      text: subtitle,
-      fontSize: 14,
-      textAlign: "center",
-      x: am5.percent(50),
-      centerX: am5.percent(50)
-    }));
-
-    chart.children.unshift(am5.Label.new(root, {
-      text: title,
-      fontSize: 25,
-      fontWeight: "500",
-      textAlign: "center",
-      x: am5.percent(50),
-      centerX: am5.percent(50),
-      paddingTop: 0,
-      paddingBottom: 0
-    }));
+      chart.children.unshift(am5.Label.new(root, {
+        text: subtitle,
+        fontSize: 14,
+        textAlign: "center",
+        x: am5.percent(50),
+        centerX: am5.percent(50)
+      }));
+  
+    
+      chart.children.unshift(am5.Label.new(root, {
+        text: title,
+        fontSize: 18,
+        fontWeight: "500",
+        textAlign: "center",
+        x: am5.percent(50),
+        centerX: am5.percent(50),
+        paddingTop: 0,
+        paddingBottom: 0
+      }));
+    
 
     return chart; // Return the chart,root, and legend for further manipulation if needed
   };
   
 
 
-const updateSeries = (chart,item,title,subtitle,variable, legendContainer) => {
+const updateSeries = (chart,item,title,subtitle,variable) => {
     //delete the first series, so only one time series at a time
     if (chart.series.values.length > 0) {
         chart.series.removeIndex(0).dispose();;
@@ -173,37 +170,12 @@ const updateSeries = (chart,item,title,subtitle,variable, legendContainer) => {
             strokeWidth: 2
         });
 
-        // defineSeries(item,series)
-        // chart.children.values[chart.children.values.length-1].data.push(series)
-        //   createOrAddLegend(legendContainer,chart.root,chart,item, toggleProduct,series)
         
     }
     makeExportData(chart)
 
 }
 
-const createOrAddLegend = (legendContainer,root,chart,item,toggleProduct,series ) =>{
-  // //console.log(legendContainer.children.values)
-
-  // Determine the legend name based on the product name.
-  let nameLegend;
-  if (['analysis_assimilation', 'short_range', 'medium_range_blend'].includes(item.name_product)) {
-    nameLegend = 'National Water Model';
-  } else {
-    nameLegend = `${item.name_product.split('_')[0][0].toUpperCase() + item.name_product.split('_')[0].slice(1)} Range Ensembles`;
-  }
-
-  const legend = legendContainer.children.values.find(s => s.get('name','').includes(nameLegend) || s.get('name','') === nameLegend);
-
-  if(legend){
-    legend.data.push(series)
-  }
-  else{
-    let new_legend = createIndividualLegend(legendContainer, root, chart,nameLegend,toggleProduct)
-    new_legend.data.push(series)
-  }
-
-}
 
 const makeExportData = (chart) =>{
   var seriesData = [];

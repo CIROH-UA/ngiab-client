@@ -6,17 +6,21 @@ import HydroFabricLinePlot from '../../features/hydroFabric/components/hydroFabr
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import appAPI from 'services/api/app';
 import SelectComponent from 'features/hydroFabric/components/selectComponent';
-import { SelectContainer } from './containers';
+import { SelectContainer,HydroFabricPlotContainer } from './containers';
 
 const HydroFabricView = (props) => {
   const {state,actions} = useHydroFabricContext();
 
-  const title = `${state.catchment.id ? 'Catchment: '+ state.catchment.id.split('cat-')['1'] : 'Nexus: ' + state.nexus.id } Time Series`;
-  var subtitle = `${state.catchment.id ? state.catchment.variable + ' vs Time' : 'Flow (CFS) vs Time'}`
+  var title = `${state.nexus.id ? 'Nexus: '+ state.nexus.id.split("-")[1] : state.catchment.id ? 'Catchment: ' + state.catchment.id.split("-")[1] : ''}`
+  var subtitle = `${state.nexus.id ? 'streamflow vs time' : state.catchment.variable_list ? state.catchment.variable_list[0]['label'] + ' vs time' : ''}`
+  
   var defaultNexusID = {'value': state.nexus.id ? state.nexus.id : 'Select a Nexus ID'  ,'label': state.nexus.id ? state.nexus.id : 'Select a Nexus ID'};
   var defaultCatchmentID = {'value': state.catchment.id ? state.catchment.id : 'Select a Catchment ID'  ,'label': state.catchment.id ? state.catchment.id : 'Select a Catchment ID'};
-  var defaultCatchmentVariable = {'value': state.catchment.variable ? state.catchment.variable : 'Select a Variable'  ,'label': state.catchment.variable ? state.catchment.variable : 'Select a Variable'};
-
+  var defaultCatchmentVariable = {
+    'value': state.catchment.id && state.catchment.variable ? state.catchment.variable : state.catchment.variable_list ? state.catchment.variable_list[0]['value'] : 'Select a Variable',
+    'label': state.catchment.id && state.catchment.variable ? state.catchment.variable : state.catchment.variable_list ? state.catchment.variable_list[0]['label'] : 'Select a Variable'
+  };
+  console.log(defaultCatchmentVariable)
   useEffect(() => {
     if (!state.nexus.id) return;
     actions.reset_catchment();
@@ -46,9 +50,10 @@ const HydroFabricView = (props) => {
       catchment_id: state.catchment.id
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
+      console.log(response)
       actions.set_catchment_series(response.data);
       actions.set_catchment_variable_list(response.variables);
-      subtitle = response.variable
+      console.log(state.catchment)
       // actions.set_catchment_variable(response.variable);
       actions.set_catchment_list(response.catchment_ids);
       props.toggleSingleRow(false);
@@ -92,8 +97,10 @@ const HydroFabricView = (props) => {
         <SelectContainer>
           {state.catchment.id &&
             <Fragment>
+              <h5>Catchment Metadata</h5>
+              <p><b>ID</b>: {state.catchment.id}</p>
               <div>
-                <label>Select/Look a Catchment ID </label>
+                <label>Current Catchment ID </label>
                 <SelectComponent 
                   optionsList={state.catchment.list} 
                   onChangeHandler={actions.set_catchment_id} 
@@ -101,7 +108,7 @@ const HydroFabricView = (props) => {
                 />
               </div>
               <div>
-                <label>Select a Variable</label>
+                <label>Current Variable</label>
                 <SelectComponent 
                   optionsList={state.catchment.variable_list} 
                   onChangeHandler={actions.set_catchment_variable}
@@ -113,7 +120,9 @@ const HydroFabricView = (props) => {
           }
         {state.nexus.id &&
         <Fragment>
-            <label>Select/Look a Nexus ID</label>
+            <h5>Nexus Metadata</h5>
+            <p><b>ID</b>: {state.nexus.id}</p>
+            <label>Current Nexus ID</label>
             <SelectComponent 
               optionsList={state.nexus.list} 
               onChangeHandler={actions.set_nexus_id}
@@ -123,8 +132,9 @@ const HydroFabricView = (props) => {
 
         }
       </SelectContainer>
-
-      <HydroFabricLinePlot singleRowOn={props.singleRowOn} title={title} subtitle={subtitle} />
+       <HydroFabricPlotContainer>
+          <HydroFabricLinePlot singleRowOn={props.singleRowOn} title={title} subtitle={subtitle} /> 
+        </HydroFabricPlotContainer> 
 
     </Fragment>
 

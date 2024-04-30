@@ -45,8 +45,7 @@ const SelectComponent = ({ optionsList, onChangeHandler,defaultValue }) => {
  // Handler for when an option is selected, wrapped in useCallback
  const handleChange = useCallback((option) => {
   onChangeHandler(`${option.value}`)
-
-  }, [onChangeHandler]);
+  }, [onChangeHandler,defaultValue]);
 
   return (
     <Select

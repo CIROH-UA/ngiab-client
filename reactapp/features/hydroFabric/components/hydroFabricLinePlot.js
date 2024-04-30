@@ -1,19 +1,16 @@
 import { useEffect ,useRef } from "react";
 import { useHydroFabricContext } from "../hooks/useHydroFabricContext";
-
-import { initializeChart,updateSeries } from "../lib/chartAuxiliary";
-import { initializeLegend, createLegendContainer } from "../lib/legendAuxiliary";
+import { initializeChart, updateSeries } from "../lib/chartAuxiliary";
 
 
 const HydroFabricLinePlot = (props) => {
   const chartRef = useRef(null);
-  const legendContainerRef = useRef(null);
   const {state, actions} = useHydroFabricContext();
   const variable = `${state.catchment.id ? state.catchment.variable : 'streamflow'}`;
-
+  console.log(variable)
 
   useEffect(() => {
-    chartRef.current = initializeChart('chartdiv',props.title, props.subtitle) // initialize the chart
+    chartRef.current = initializeChart('chartdiv', props.title , props.subtitle) // initialize the chart
     // legendContainerRef.current = createLegendContainer(chartRef.current.root,chartRef.current)
     // initializeLegend(chartRef.current.root,chartRef.current) // add a legend
     return () => {
@@ -50,7 +47,9 @@ const HydroFabricLinePlot = (props) => {
 
 
  return (  
-    <div id="chartdiv" style={{ width: "100%", height: "90%", order: 1, flex: "1 1 80%" }}></div>
+    <div id="chartdiv" style={{ width: "100%", height: "100%" }}></div>
+    // <div id="chartdiv" style={{ width: "100%", height: "90%", order: 1, flex: "1 1 80%" }}></div>
+    
  )
 
 }

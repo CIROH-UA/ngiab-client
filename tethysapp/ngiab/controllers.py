@@ -36,8 +36,6 @@ def getCatchmentTimeSeries(request, app_workspace):
     else:
         second_col = df[variable_column]
 
-    # second_col_cfs_col = second_col * 35.314
-
     data = [
         {"x": time, "y": val}
         for time, val in zip(time_col.tolist(), second_col.tolist())
@@ -46,7 +44,8 @@ def getCatchmentTimeSeries(request, app_workspace):
         {
             "data": data,
             "variables": [
-                {"value": variable, "label": variable} for variable in list_variables
+                {"value": variable, "label": variable.lower().replace("_", " ")}
+                for variable in list_variables
             ],
             "variable": list_variables[0],
             "catchment_ids": getCatchmentsIds(app_workspace),
@@ -117,15 +116,13 @@ def getNexusTimeSeries(request, app_workspace):
         "ngen-data",
         "outputs",
         "{}_output.csv".format(nexus_id),
-        # app_workspace.path, "ngen-data", "outputs", "nex-{}_output.csv".format(nexus_id)
     )
     df = pd.read_csv(nexus_output_file_path, header=None)
     time_col = df.iloc[:, 1]
     streamflow_cms_col = df.iloc[:, 2]
-    sreamflow_cfs_col = streamflow_cms_col * 35.314  # Convert to cfs
     data = [
         {"x": time, "y": streamflow}
-        for time, streamflow in zip(time_col.tolist(), sreamflow_cfs_col.tolist())
+        for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
     ]
 
     return JsonResponse({"data": data, "nexus_ids": getNexusIDs(app_workspace)})

@@ -10,6 +10,14 @@ export const HydroFabricContainer = styled.div`
   display:flex;
   flex-direction:row;
 `;
+
+export const HydroFabricPlotContainer = styled.div`
+  width: 100%; 
+  height: 100%; 
+  order: 1;
+  flex: 1 1 80%;
+`;
+
 export const SelectContainer = styled.div`
   display: flex;
   flex-direction: column;
