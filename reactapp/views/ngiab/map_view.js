@@ -1,34 +1,52 @@
-import React, { Fragment, useEffect,useCallback } from 'react';
+import React, { Fragment, useEffect,useCallback,useState } from 'react';
 import appAPI from 'services/api/app';
 import { useMapContext } from 'features/Map/hooks/useMapContext';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
-import {createVectorLayer, createClusterVectorLayer} from 'features/Map/lib/mapUtils';
-import {getInfoFromLayers} from 'lib/mapEvents'
+// import {createVectorLayer, createClusterVectorLayer} from 'features/Map/lib/mapUtils';
+import {
+  onClickLayersEvent,
+  onStartLoadingLayersEvent, 
+  onEndLoadingLayerEvent 
+} from 'lib/mapEvents'
 import { initialLayersArray } from 'lib/layersData';
-import { makeNexusLayerParams, makeCatchmentLayer } from 'lib/mapUtils';
+import { 
+  makeNexusLayerParams, 
+  makeCatchmentLayer,
+  createClusterVectorLayer
+} from 'lib/mapUtils';
+import LoadingAnimation from 'components/loader/LoadingAnimation';
 
-
-const MapView = ({props}) => {
+const MapView = (props) => {
   const {actions: mapActions } = useMapContext();
+
   const {state: hydroFabricState, actions: hydroFabricActions } = useHydroFabricContext(); 
   
   const nexusLayerParamsCallBack = useCallback(() => {
-    return makeNexusLayerParams(hydroFabricActions);
+    return makeNexusLayerParams();
   })
 
   const catchmentLayerCallBack = useCallback(() => {
     const catchmentLayersURL = 'http://localhost:8181/geoserver/wms'; 
-    return makeCatchmentLayer(catchmentLayersURL,hydroFabricActions);
+    return makeCatchmentLayer(catchmentLayersURL);
   })
 
-  const onClickEventHandlerCallBack = useCallback((event, clickable_layers) => {
-    return getInfoFromLayers(event, clickable_layers,hydroFabricActions);
+  const onClickEventHandlerCallBack = useCallback((event) => {
+    return onClickLayersEvent(event,hydroFabricActions,props.setIsLoading);
+  })
+
+  const onLoadStartHandlerCallBack = useCallback((event) => {
+    return onStartLoadingLayersEvent(event,props.setIsLoading);
+  })
+  const onLoadEndHandlerCallBack = useCallback((event) => {
+    return onEndLoadingLayerEvent(event,props.setIsLoading);
   })
 
   useEffect(() => {
 
-    //Add onClick Function
+    //Add events
     mapActions.add_click_event(onClickEventHandlerCallBack);
+    mapActions.add_load_start_event(onLoadStartHandlerCallBack);
+    mapActions.add_load_end_event(onLoadEndHandlerCallBack);
 
     //Add Layers
     appAPI.getNexusGeoJson().then(response => {
@@ -43,8 +61,6 @@ const MapView = ({props}) => {
 
         mapActions.addLayer(nexusClusterLayer);
         mapActions.addLayer(catchmentLayer);
-        
-        
         hydroFabricActions.set_nexus_list(response.list_ids);
 
 
@@ -72,6 +88,11 @@ const MapView = ({props}) => {
   
   return (
     <Fragment>
+      {props.isLoading ?
+        <LoadingAnimation /> : 
+        <></>
+      }
+      
     </Fragment>
   );
 };

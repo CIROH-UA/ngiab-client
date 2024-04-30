@@ -36,8 +36,7 @@ const getCurrentReachOnClick = (esriPaths) => {
         }
 
     return geojsonObject
-    // setCurrentReachGeometry(null);
-    // setCurrentReachGeometryOnClick(geojsonObject);
+
 }
 
 
@@ -96,8 +95,7 @@ const processStreamServiceQueryResult = (zoom, point, response, mapObject) => {
    
     let stationName = isBlank(validFeatures[0].attributes[nameAttrName]) ? 'N/A' : validFeatures[0].attributes[nameAttrName]
     let stationID = validFeatures[0].attributes[fidAttrName]
-    // setCurrentStationID(stationID);
-    // setCurrentStation(stationName);
+
     let currentGeosjonReach = getCurrentReachOnClick(validFeatures[0].geometry.paths, mapObject)
 
     let currentStreamFeature = {

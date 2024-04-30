@@ -13,8 +13,9 @@ const useMap = () => {
         delete_all_layers: () => dispatch({ type: MapActionsTypes.delete_all_layers }),
         reset_map: () => dispatch({ type: MapActionsTypes.reset_map }),
         add_click_event: (event) => dispatch({ type: MapActionsTypes.add_click_event, payload: event }),
+        add_load_start_event: (event) => dispatch({ type: MapActionsTypes.add_load_start_event, payload: event }),
+        add_load_end_event: (event) => dispatch({ type: MapActionsTypes.add_load_end_event, payload: event }),
     };
-    // //console.log(state, actions)
     return { state, actions };
 }
 

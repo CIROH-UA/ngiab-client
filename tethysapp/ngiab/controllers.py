@@ -82,7 +82,7 @@ def getNexuslayer(request, app_workspace):
 
     # Convert the DataFrame back to a GeoJSON object
     # breakpoint()
-    nexus_ids_list = gdf["toid"].tolist()
+    nexus_ids_list = gdf["id"].tolist()
     nexus_select_list = [{"value": id, "label": id} for id in nexus_ids_list]
     data = json.loads(gdf.to_json())
 

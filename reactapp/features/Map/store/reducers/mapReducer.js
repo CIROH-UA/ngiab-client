@@ -22,7 +22,9 @@ const mapInitialStore = {
         layers:[],
         toggle_loading_layers: false,
         events:{
-            click: null
+            click: null,
+            loadstart: null,
+            loadend: null
         }
     },
     actions:{}
@@ -98,6 +100,28 @@ const mapReducer = (state, action) => {
                     events: {
                         ...state.state.events,
                         click: action.payload
+                    }
+                }
+            };
+        case MapActionsTypes.add_load_start_event:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    events: {
+                        ...state.state.events,
+                        loadstart: action.payload
+                    }
+                }
+            };
+        case MapActionsTypes.add_load_end_event:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    events: {
+                        ...state.state.events,
+                        loadend: action.payload
                     }
                 }
             };

@@ -13,8 +13,6 @@ const HydroFabricLinePlot = (props) => {
 
 
   useEffect(() => {
-    // const title = "my nex gen title"
-    // const subtitle = "my next gen"
     chartRef.current = initializeChart('chartdiv',props.title, props.subtitle) // initialize the chart
     // legendContainerRef.current = createLegendContainer(chartRef.current.root,chartRef.current)
     // initializeLegend(chartRef.current.root,chartRef.current) // add a legend

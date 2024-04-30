@@ -5,9 +5,10 @@ import HydroFabricView from './hydroFabricView';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
 import { MapProvider } from 'features/Map/providers/MapProvider';
 import { HydroFabricContainer, MapContainer } from './containers';
-import {getInfoFromLayers} from 'lib/mapEvents';
+
 const NGIABView = () => {
   const [singleRowOn, toggleSingleRow] = useState(true);
+  const [ isLoading, setIsLoading ] = useState(false);
 
   return (
     <Fragment>
@@ -15,11 +16,18 @@ const NGIABView = () => {
 
             <MapContainer fullScreen={singleRowOn}>
               <MapProvider>
-                  <MapView/>
+                  <MapView 
+                    isLoading={isLoading} 
+                    setIsLoading={setIsLoading} 
+                  />
               </MapProvider>
             </MapContainer>
             <HydroFabricContainer fullScreen={singleRowOn} >
-              <HydroFabricView toggleSingleRow = {toggleSingleRow} singleRowOn={singleRowOn} />
+              <HydroFabricView 
+                toggleSingleRow = {toggleSingleRow} 
+                singleRowOn={singleRowOn} 
+                setIsLoading={setIsLoading} 
+              />
             </HydroFabricContainer>
 
         </HydroFabricProvider>

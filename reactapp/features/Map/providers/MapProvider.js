@@ -2,12 +2,18 @@ import React, { useEffect , useRef } from 'react';
 import MapContext from 'features/Map/contexts/MapContext';
 // import { MapContainer } from './styles/Map.styled';
 import './map.css';
-import { onClickHandler,filterLayersNotInMap,addLayer,removeLayer,getLayerToRemove} from '../lib/mapUtils';
+import { 
+  // onClickHandler,
+  filterLayersNotInMap,
+  addLayer,
+  removeLayer,
+  getLayerToRemove
+} from '../lib/utils';
 import { useMap } from '../hooks/useMap';
 
 import {LoadingText} from 'components/loader/LoadingComponents';
 
-export const MapProvider = ({ children,layers= [], onClickEventHandler }) => {
+export const MapProvider = ({ children, layers= [] }) => {
   const {state,actions} = useMap();
 
   const mapRef = useRef();
@@ -15,19 +21,6 @@ export const MapProvider = ({ children,layers= [], onClickEventHandler }) => {
   useEffect(() => {
     // added the map to the reference
     state.state.mapObject.setTarget(mapRef.current);
-    // Define the click handler of the layer
-    if (onClickEventHandler) {
-      actions.add_click_event(onClickEventHandler);
-    }
-
-    // Define the loading handler of the map object
-    state.state.mapObject.on('loadstart', function () {
-      actions.toggle_loading_layers();
-    });
-    state.state.mapObject.on('loadend', function () {
-      actions.toggle_loading_layers();
-    });
-    // add the event for cursor in map
     // adding layers 
     layers.forEach(layer => {
       ////console.log("adding layer to store", layer);
@@ -43,12 +36,28 @@ export const MapProvider = ({ children,layers= [], onClickEventHandler }) => {
 
   useEffect(() => {
     if (!state.state.events.click) return;
-    console.log("click event added");
     const onClickEventHandler = state.state.events.click
     state.state.mapObject.on('click',(evt)=>{
-      onClickHandler(evt,onClickEventHandler)
+      onClickEventHandler(evt)
+      // onClickHandler(evt,onClickEventHandler)
     })
   }, [state.state.events.click]);
+
+  useEffect(() => {
+    if (!state.state.events.loadstart) return;
+    const onLoadStartEventHandler = state.state.events.loadstart
+    state.state.mapObject.on('loadstart',(evt)=>{
+      onLoadStartEventHandler(evt)
+    })
+  }, [state.state.events.loadstart]);
+
+  useEffect(() => {
+    if (!state.state.events.loadend) return;
+    const onLoadEndEventHandler = state.state.events.loadend
+    state.state.mapObject.on('loadend',(evt)=>{
+      onLoadEndEventHandler(evt)
+    })
+  }, [state.state.events.loadend]);
 
   useEffect(() => {
     if (state.state.layers.length === 0 ) return;
@@ -57,14 +66,12 @@ export const MapProvider = ({ children,layers= [], onClickEventHandler }) => {
     const layersToAdd = filterLayersNotInMap(state.state.mapObject, state.state.layers);
     if (layersToRemove.length > 0){
       layersToRemove.forEach(layer => {
-        console.log("removing layer", layer);
         removeLayer(state.state.mapObject,layer);
       });
     }
     else{
       layersToAdd.forEach(layerInfo => {
         // console.log(layerInfo)
-        console.log("adding layer", layerInfo);
         addLayer(state.state.mapObject,layerInfo,actions);
 
       });

@@ -35,14 +35,6 @@ const TileImageArcGISRest = (url, params) => {
 };
 
 const WMSTile = (url, params,source) => {
-  console.log(
-    {
-      url: url,
-      params: {...params},
-      serverType: 'geoserver',
-      // crossOrigin: 'anonymous',
-    }
-  )
   return new TileWMS({
     url: url,
     params: {...params},

@@ -8,7 +8,9 @@ const MapActionsTypes = {
     toggle_full_map: 'TOGGLE_FULL_MAP',
     delete_all_layers: 'REMOVE_ALL_LAYERS',
     reset_map: 'RESET_MAP',
-    add_click_event: 'ADD_CLICK_EVENT'
+    add_click_event: 'ADD_CLICK_EVENT',
+    add_load_start_event: 'ADD_LOAD_START_EVENT',
+    add_load_end_event: 'ADD_LOAD_END_EVENT',
     
 }
   

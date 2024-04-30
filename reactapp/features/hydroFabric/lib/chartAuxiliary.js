@@ -134,7 +134,6 @@ const initializeChart = (containerId, title, subtitle) => {
 
 
 const updateSeries = (chart,item,title,subtitle,variable, legendContainer) => {
-    console.log("updating series",item)
     //delete the first series, so only one time series at a time
     if (chart.series.values.length > 0) {
         chart.series.removeIndex(0).dispose();;
@@ -142,9 +141,6 @@ const updateSeries = (chart,item,title,subtitle,variable, legendContainer) => {
     //update the title and subtitle
     chart.allChildren()[0].set("text",`${title}`);
     chart.allChildren()[1].set("text",`${subtitle}`);
-    // chart.allChildren()[0].set("text",`Nexus ID: ${item.id}`);
-    // chart.allChildren()[1].set("text",'Flow (CFS) vs Time');
-    
     
     let parsedSeries = item.series.map(obj => ({
         'y': obj.y,
@@ -209,18 +205,6 @@ const createOrAddLegend = (legendContainer,root,chart,item,toggleProduct,series 
 
 }
 
-const defineSeries = (item,series) =>{
-    if (series) {
-        // setTimeout(() => {
-        series.data.setAll(item.series);
-        // }, 100);
-        // series.show();
-        series.strokes.template.setAll({
-            strokeWidth: 2
-        });
-    }
-}
-
 const makeExportData = (chart) =>{
   var seriesData = [];
   chart.series.each(function (s) {
@@ -228,10 +212,9 @@ const makeExportData = (chart) =>{
       var dataItem = s.dataItems[i];
       var seriesName = s.get('name');
       const date = new Date(dataItem.get('valueX'));
-      // Get the date string in the desired format (YYYY-MM-DD HH:MM:SS)
       const dateString = date.toISOString().slice(0, 19).replace('T', ' ');
       var dataItemObject = {};
-      dataItemObject['forecastTime'] = dateString,
+      dataItemObject['x'] = dateString,
       dataItemObject[seriesName] = dataItem.get('valueY'),
       seriesData.push(dataItemObject);
     }
@@ -241,12 +224,12 @@ const makeExportData = (chart) =>{
 
   // Iterate through the data array
   seriesData.forEach((item) => {
-    const { forecastTime, ...values } = item;
+    const { x, ...values } = item;
 
-    if (!mergedData[forecastTime]) {
-      mergedData[forecastTime] = { forecastTime, ...values };
+    if (!mergedData[x]) {
+      mergedData[x] = { x, ...values };
     } else {
-      mergedData[forecastTime] = { forecastTime, ...mergedData[forecastTime], ...values };
+      mergedData[x] = { x, ...mergedData[y], ...values };
     }
   });
 
