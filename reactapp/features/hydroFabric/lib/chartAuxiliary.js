@@ -48,7 +48,7 @@ const initializeChart = (containerId, title, subtitle) => {
     );
   
     yAxis.children.unshift(am5.Label.new(root, {
-      text: 'Flow (CFS)',
+      text: '',
       textAlign: 'center',
       y: am5.p50,
       rotation: -90,

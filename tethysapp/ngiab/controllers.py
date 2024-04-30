@@ -20,6 +20,8 @@ def home(request):
 def getCatchmentTimeSeries(request, app_workspace):
     # breakpoint()
     catchment_id = request.GET.get("catchment_id")
+    variable_column = request.GET.get("variable_column")
+
     catchment_output_file_path = os.path.join(
         app_workspace.path,
         "ngen-data",
@@ -29,7 +31,11 @@ def getCatchmentTimeSeries(request, app_workspace):
     df = pd.read_csv(catchment_output_file_path)
     list_variables = df.columns.tolist()[2:]  # remove time and timestep
     time_col = df.iloc[:, 1]
-    second_col = df.iloc[:, 2]
+    if variable_column is None:
+        second_col = df.iloc[:, 2]
+    else:
+        second_col = df[variable_column]
+
     # second_col_cfs_col = second_col * 35.314
 
     data = [

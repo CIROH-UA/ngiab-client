@@ -8,6 +8,7 @@ import {
     Style,
     Text,
   } from 'ol/style';
+  
 const image = new CircleStyle({
     radius: 5,
     fill: null,
@@ -190,80 +191,6 @@ const getClickEventLayers = (event, mapObject) => {
     return layers
 }
 
-// const findKeyWithMaxValue = (obj) => {
-//     let maxValue = -Infinity; // Initialize with a very low value
-//     let maxKey = null;
-  
-//     for (const key in obj) {
-//       if (obj.hasOwnProperty(key)) {
-//         if (obj[key] > maxValue) {
-//           maxValue = obj[key];
-//           maxKey = key;
-//         }
-//       }
-//     }
-  
-//     return maxKey;
-// }
-
-const findKeysWithMaxValue = (obj) => {
-    let maxValue = -Infinity; // Initialize with a very low value
-    let maxKeys = []; // Use an array to store keys with the maximum value
-  
-    for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-            if (obj[key] > maxValue) {
-                // New maximum found, update maxValue and reset maxKeys
-                maxValue = obj[key];
-                maxKeys = [key];
-            } else if (obj[key] === maxValue) {
-                // Same as current maxValue, add key to maxKeys
-                maxKeys.push(key);
-            }
-        }
-    }
-  
-    return maxKeys;
-}
-
-
-
-// according to the weight of the layer, we will find the priority layer
-// the priority layer is the one with the highest weight, and it is given by the priority attribute
-// the priority attribute is set in the layer object
-
-// const findPriorityLayerForOnClickEvent = (layers) => {
-const findPriorityLayersForOnClickEvent = (layers) => {
-
-    let layerWeight={}
-    let priorityLayer = layers[0]
-
-    layers.forEach(function(layer,index){
-        layerWeight[index] = layer.get('priority');
-    });
-
-    // let priorityLayerIndex = findKeyWithMaxValue(layerWeight);
-    // priorityLayer = layers[priorityLayerIndex]
-    // return priorityLayer
-
-    let priorityLayers = []
-    let priorityLayersIndex = findKeysWithMaxValue(layerWeight);
-    priorityLayersIndex.forEach(function(index){
-        priorityLayers.push(layers[index])
-    });
-    return priorityLayers
-}
-
-
-// onClickHandler will call the click event handler for the layer with the highest priority
-// the click event handler is set in the layer object
-// const onClickHandler = async (event,customOnClick=()=>{}) => {
-//     event.preventDefault();
-//     const clickedCoordinate = event.map.getCoordinateFromPixel(event.pixel);
-//     let layers = getClickEventLayers(event,event.map);
-//     customOnClick(event,layers);
-// }
-
 const onClickHandler = async (event, customOnClick = undefined) => {
     event.preventDefault();
     const clickedCoordinate = event.map.getCoordinateFromPixel(event.pixel);
@@ -273,19 +200,6 @@ const onClickHandler = async (event, customOnClick = undefined) => {
       customOnClick(event, layers);
     }
   }
-
-
-   // if (layers.length > 0) {
-    //     // let layer = layers[0]
-    //     // let layer = findPriorityLayerForOnClickEvent(layers)
-    //     let priority_layers = findPriorityLayersForOnClickEvent(layers)
-    //     console.log(priority_layers)
-
-    //     priority_layers.forEach(layer => {
-    //         let clickHandler = layer.get('events').find(event => event.type === 'click').handler
-    //         clickHandler(layer, event)
-    //     })
-    // }
 
 const useLayerFactory = (layerType, options,mapAction) => {
     
@@ -392,7 +306,6 @@ const addLayer = (map, layerInfo,mapAction) => {
     layer.set('events', events);
     layer.set('priority', priority);
     map.addLayer(layer);
-    
 
   };
 

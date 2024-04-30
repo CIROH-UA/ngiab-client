@@ -49,13 +49,36 @@ const HydroFabricView = (props) => {
       props.toggleSingleRow(false);
 
     }).catch((error) => {
-      console.log("Error fetching nexus time series", error);
+      console.log("Error fetching catchement time series", error);
     })
     return  () => {
 
     }
 
   }, [state.catchment.id]);
+
+
+  useEffect(() => {
+    if (!state.catchment.id) return;
+    var params = {
+      catchment_id: state.catchment.id,
+      variable_column: state.catchment.variable
+    }
+    console.log(params)    
+    appAPI.getCatchmentTimeSeries(params).then((response) => {
+      console.log(response)
+      actions.set_catchment_series(response.data);
+      props.toggleSingleRow(false);
+
+    }).catch((error) => {
+      console.log("Error fetching nexus time series", error);
+    })
+    return  () => {
+
+    }
+
+  }, [state.catchment.variable]);
+
 
 
 
