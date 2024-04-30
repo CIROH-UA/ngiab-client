@@ -34,7 +34,7 @@ let makeCatchmentLayer = (catchmentLayersURL,hydroFabricActions) =>{
                 Tiled: true,
             },
             // the rest of the attributes are for the definition of the layer
-            name: "catchments",
+            name: "Catchments Layer",
             zIndex: 2,
             source:{
               serverType: 'geoserver',

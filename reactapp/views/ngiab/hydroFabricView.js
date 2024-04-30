@@ -10,7 +10,9 @@ import SelectComponent from 'features/hydroFabric/components/selectComponent';
 
 const HydroFabricView = (props) => {
   const {state,actions} = useHydroFabricContext();
-  
+  const title = `${state.catchment.id ? 'Catchment: '+ state.catchment.id.split('cat-')['1'] : 'Nexus: ' + state.nexus.id } Time Series`;
+  const subtitle = `${state.catchment.id ? state.catchment.variable + ' vs Time' : 'Flow (CFS) vs Time'}`
+
   useEffect(() => {
     if (!state.nexus.id) return;
     var params = {
@@ -38,9 +40,11 @@ const HydroFabricView = (props) => {
     }
     console.log(params)    
     appAPI.getCatchmentTimeSeries(params).then((response) => {
+      console.log(response)
       actions.set_catchment_series(response.data);
-      actions.set_catchment_variable_list(response.list_variables);
+      actions.set_catchment_variable_list(response.variables);
       actions.set_catchment_variable(response.variable);
+      actions.set_catchment_list(response.catchment_ids);
       actions.reset_nexus();
       props.toggleSingleRow(false);
 
@@ -59,18 +63,20 @@ const HydroFabricView = (props) => {
     <Fragment>
       {state.catchment.id &&
         <Fragment>
-          <h5>Catchment ID Selection</h5>
-          <SelectComponent state={state.catchment} set_id={actions.set_catchment_id} />
-          <HydroFabricLinePlot singleRowOn={props.singleRowOn} />
+          <label>Select/Look a Catchment ID </label>
+          <SelectComponent optionsList={state.catchment.list} onChangeHandler={actions.set_catchment_id} />
+          <label>Select a Variable</label>
+          <SelectComponent optionsList={state.catchment.variable_list} onChangeHandler={actions.set_catchment_variable} />
         </Fragment>
       }
       {state.nexus.id &&
         <Fragment>
-          <h5>Nexus ID Selection</h5>
-          <SelectComponent state={state.catchment} set_id={actions.set_catchment_id} />
-          <HydroFabricLinePlot singleRowOn={props.singleRowOn} />
+          <label>Select/Look a Nexus ID</label>
+          <SelectComponent optionsList={state.nexus.list} onChangeHandler={actions.set_nexus_id} />
         </Fragment>
       }
+      <HydroFabricLinePlot singleRowOn={props.singleRowOn} title={title} subtitle={subtitle} />
+
     </Fragment>
 
 

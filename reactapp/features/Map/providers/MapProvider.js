@@ -7,7 +7,7 @@ import { useMap } from '../hooks/useMap';
 
 import {LoadingText} from 'components/loader/LoadingComponents';
 
-export const MapProvider = ({ children,layers= [] }) => {
+export const MapProvider = ({ children,layers= [], onClickEventHandler }) => {
   const {state,actions} = useMap();
 
   const mapRef = useRef();
@@ -16,7 +16,9 @@ export const MapProvider = ({ children,layers= [] }) => {
     // added the map to the reference
     state.state.mapObject.setTarget(mapRef.current);
     // Define the click handler of the layer
-    state.state.mapObject.on('click',onClickHandler)
+    if (onClickEventHandler) {
+      actions.add_click_event(onClickEventHandler);
+    }
 
     // Define the loading handler of the map object
     state.state.mapObject.on('loadstart', function () {
@@ -38,6 +40,15 @@ export const MapProvider = ({ children,layers= [] }) => {
     }
 
   }, []);
+
+  useEffect(() => {
+    if (!state.state.events.click) return;
+    console.log("click event added");
+    const onClickEventHandler = state.state.events.click
+    state.state.mapObject.on('click',(evt)=>{
+      onClickHandler(evt,onClickEventHandler)
+    })
+  }, [state.state.events.click]);
 
   useEffect(() => {
     if (state.state.layers.length === 0 ) return;

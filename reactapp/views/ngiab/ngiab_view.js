@@ -5,6 +5,7 @@ import HydroFabricView from './hydroFabricView';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
 import { MapProvider } from 'features/Map/providers/MapProvider';
 import { HydroFabricContainer, MapContainer } from './containers';
+import {getInfoFromLayers} from 'lib/mapEvents';
 const NGIABView = () => {
   const [singleRowOn, toggleSingleRow] = useState(true);
 
@@ -14,7 +15,7 @@ const NGIABView = () => {
 
             <MapContainer fullScreen={singleRowOn}>
               <MapProvider>
-                  <MapView  />
+                  <MapView/>
               </MapProvider>
             </MapContainer>
             <HydroFabricContainer fullScreen={singleRowOn} >

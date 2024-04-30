@@ -2,7 +2,6 @@ import React,{ Component,useCallback } from 'react';
 import Select, { createFilter } from 'react-select';
 import { FixedSizeList as List } from 'react-window';
 
-
 const height = 35;
 
 class MenuList extends Component {
@@ -42,18 +41,19 @@ const customStyles = {
   };
   
 // Usage of the Select component with the custom Option component
-const SelectComponent = ({ state, set_id }) => {
+const SelectComponent = ({ optionsList, onChangeHandler }) => {
  // Handler for when an option is selected, wrapped in useCallback
  const handleChange = useCallback((option) => {
-    set_id(`${option.value.split('wb-')[1]}`)
-  }, []);
+  onChangeHandler(`${option.value}`)
+
+  }, [onChangeHandler]);
 
   return (
     <Select
       components={{ MenuList }}
       styles={customStyles}
       filterOption={createFilter({ ignoreAccents: false })} // this makes all the difference!
-      options={state.list}
+      options={optionsList}
       onChange={handleChange}
     />
   );

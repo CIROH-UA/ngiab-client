@@ -133,15 +133,17 @@ const initializeChart = (containerId, title, subtitle) => {
   
 
 
-const updateSeries = (chart,item,legendContainer) => {
+const updateSeries = (chart,item,title,subtitle,variable, legendContainer) => {
     console.log("updating series",item)
     //delete the first series, so only one time series at a time
     if (chart.series.values.length > 0) {
         chart.series.removeIndex(0).dispose();;
     }
     //update the title and subtitle
-    chart.allChildren()[0].set("text",`Nexus ID: ${item.id}`);
-    chart.allChildren()[1].set("text",'Flow (CFS) vs Time');
+    chart.allChildren()[0].set("text",`${title}`);
+    chart.allChildren()[1].set("text",`${subtitle}`);
+    // chart.allChildren()[0].set("text",`Nexus ID: ${item.id}`);
+    // chart.allChildren()[1].set("text",'Flow (CFS) vs Time');
     
     
     let parsedSeries = item.series.map(obj => ({
@@ -151,7 +153,7 @@ const updateSeries = (chart,item,legendContainer) => {
     // Create a tooltip
     
     var tooltip = am5.Tooltip.new(chart.root, {
-        labelText: `streamflow: {valueY}`
+        labelText: `${variable}: {valueY}`
     })
     
     // add the data

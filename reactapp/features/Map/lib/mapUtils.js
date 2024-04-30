@@ -177,6 +177,7 @@ const getClickEventLayers = (event, mapObject) => {
         {
             layerFilter: layer => {
                 return (
+                    // console.log(layer)
                     // for the following events: [{'type': 'click', 'handler': onClickHandler}] please filter to only get elements that have type click please
                    
                     layer.get('events') && layer.get('events').length > 0 && layer.get('events').findIndex(event => event.type === 'click') > -1
@@ -256,24 +257,35 @@ const findPriorityLayersForOnClickEvent = (layers) => {
 
 // onClickHandler will call the click event handler for the layer with the highest priority
 // the click event handler is set in the layer object
-const onClickHandler = async (event) => {
+// const onClickHandler = async (event,customOnClick=()=>{}) => {
+//     event.preventDefault();
+//     const clickedCoordinate = event.map.getCoordinateFromPixel(event.pixel);
+//     let layers = getClickEventLayers(event,event.map);
+//     customOnClick(event,layers);
+// }
+
+const onClickHandler = async (event, customOnClick = undefined) => {
     event.preventDefault();
     const clickedCoordinate = event.map.getCoordinateFromPixel(event.pixel);
-    let layers = getClickEventLayers(event,event.map);
-    if (layers.length > 0) {
-        // let layer = layers[0]
-        // let layer = findPriorityLayerForOnClickEvent(layers)
-        let priority_layers = findPriorityLayersForOnClickEvent(layers)
-        console.log(priority_layers)
-
-        priority_layers.forEach(layer => {
-            let clickHandler = layer.get('events').find(event => event.type === 'click').handler
-            clickHandler(layer, event)
-        })
-        // let clickHandler = layer.get('events').find(event => event.type === 'click').handler
-        // clickHandler(layer, event)
+    let layers = getClickEventLayers(event, event.map);
+    
+    if (customOnClick !== undefined) {
+      customOnClick(event, layers);
     }
-}
+  }
+
+
+   // if (layers.length > 0) {
+    //     // let layer = layers[0]
+    //     // let layer = findPriorityLayerForOnClickEvent(layers)
+    //     let priority_layers = findPriorityLayersForOnClickEvent(layers)
+    //     console.log(priority_layers)
+
+    //     priority_layers.forEach(layer => {
+    //         let clickHandler = layer.get('events').find(event => event.type === 'click').handler
+    //         clickHandler(layer, event)
+    //     })
+    // }
 
 const useLayerFactory = (layerType, options,mapAction) => {
     

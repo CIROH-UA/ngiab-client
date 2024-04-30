@@ -20,7 +20,10 @@ const mapInitialStore = {
         mapObject: new Map(options),
         isFullMap: true,  
         layers:[],
-        toggle_loading_layers: false
+        toggle_loading_layers: false,
+        events:{
+            click: null
+        }
     },
     actions:{}
 };
@@ -85,6 +88,17 @@ const mapReducer = (state, action) => {
                 state: {
                     ...state.state,
                     mapObject: null
+                }
+            };
+        case MapActionsTypes.add_click_event:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    events: {
+                        ...state.state.events,
+                        click: action.payload
+                    }
                 }
             };
       default:

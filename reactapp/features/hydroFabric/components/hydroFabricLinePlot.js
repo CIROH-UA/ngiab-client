@@ -9,11 +9,13 @@ const HydroFabricLinePlot = (props) => {
   const chartRef = useRef(null);
   const legendContainerRef = useRef(null);
   const {state, actions} = useHydroFabricContext();
+  const variable = `${state.catchment.id ? state.catchment.variable : 'streamflow'}`;
+
 
   useEffect(() => {
-    const title = "my nex gen title"
-    const subtitle = "my next gen"
-    chartRef.current = initializeChart('chartdiv',title, subtitle) // initialize the chart
+    // const title = "my nex gen title"
+    // const subtitle = "my next gen"
+    chartRef.current = initializeChart('chartdiv',props.title, props.subtitle) // initialize the chart
     // legendContainerRef.current = createLegendContainer(chartRef.current.root,chartRef.current)
     // initializeLegend(chartRef.current.root,chartRef.current) // add a legend
     return () => {
@@ -27,7 +29,7 @@ const HydroFabricLinePlot = (props) => {
 
   useEffect(() => {
     if (!state.nexus.series) return
-    updateSeries(chartRef.current,state.nexus)
+    updateSeries(chartRef.current,state.nexus,props.title, props.subtitle,variable)
     return () => {
       if (chartRef.current && props.singleRowOn) {
         chartRef.current.dispose();
@@ -39,7 +41,7 @@ const HydroFabricLinePlot = (props) => {
 
   useEffect(() => {
     if (!state.catchment.series) return
-    updateSeries(chartRef.current,state.catchment)
+    updateSeries(chartRef.current,state.catchment,props.title, props.subtitle, variable)
     return () => {
       if (chartRef.current && props.singleRowOn) {
         chartRef.current.dispose();

@@ -12,6 +12,7 @@ const useMap = () => {
         delete_layer_by_name: (name) => dispatch({ type: MapActionsTypes.delete_layer_by_name,payload: name }),
         delete_all_layers: () => dispatch({ type: MapActionsTypes.delete_all_layers }),
         reset_map: () => dispatch({ type: MapActionsTypes.reset_map }),
+        add_click_event: (event) => dispatch({ type: MapActionsTypes.add_click_event, payload: event }),
     };
     // //console.log(state, actions)
     return { state, actions };

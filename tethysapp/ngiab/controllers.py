@@ -36,11 +36,12 @@ def getCatchmentTimeSeries(request, app_workspace):
         {"x": time, "y": val}
         for time, val in zip(time_col.tolist(), second_col.tolist())
     ]
-
     return JsonResponse(
         {
             "data": data,
-            "variables": list_variables,
+            "variables": [
+                {"value": variable, "label": variable} for variable in list_variables
+            ],
             "variable": list_variables[0],
             "catchment_ids": getCatchmentsIds(app_workspace),
         }
@@ -49,7 +50,7 @@ def getCatchmentTimeSeries(request, app_workspace):
 
 def getCatchmentsIds(app_workspace):
     catchment_file_path = os.path.join(
-        app_workspace.path, "ngen-data", "config", "catchment.geojson"
+        app_workspace.path, "ngen-data", "config", "catchments.geojson"
     )
 
     # Load the GeoJSON file into a GeoPandas DataFrame
@@ -89,7 +90,11 @@ def getNexusTimeSeries(request, app_workspace):
     # breakpoint()
     nexus_id = request.GET.get("nexus_id")
     nexus_output_file_path = os.path.join(
-        app_workspace.path, "ngen-data", "outputs", "nex-{}_output.csv".format(nexus_id)
+        app_workspace.path,
+        "ngen-data",
+        "outputs",
+        "{}_output.csv".format(nexus_id),
+        # app_workspace.path, "ngen-data", "outputs", "nex-{}_output.csv".format(nexus_id)
     )
     df = pd.read_csv(nexus_output_file_path, header=None)
     time_col = df.iloc[:, 1]

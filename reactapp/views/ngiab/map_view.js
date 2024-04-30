@@ -3,7 +3,7 @@ import appAPI from 'services/api/app';
 import { useMapContext } from 'features/Map/hooks/useMapContext';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import {createVectorLayer, createClusterVectorLayer} from 'features/Map/lib/mapUtils';
-// import {displayFeatureInfo} from 'lib/mapEvents'
+import {getInfoFromLayers} from 'lib/mapEvents'
 import { initialLayersArray } from 'lib/layersData';
 import { makeNexusLayerParams, makeCatchmentLayer } from 'lib/mapUtils';
 
@@ -21,8 +21,16 @@ const MapView = ({props}) => {
     return makeCatchmentLayer(catchmentLayersURL,hydroFabricActions);
   })
 
+  const onClickEventHandlerCallBack = useCallback((event, clickable_layers) => {
+    return getInfoFromLayers(event, clickable_layers,hydroFabricActions);
+  })
 
   useEffect(() => {
+
+    //Add onClick Function
+    mapActions.add_click_event(onClickEventHandlerCallBack);
+
+    //Add Layers
     appAPI.getNexusGeoJson().then(response => {
         console.log(response)
         // Define the parameters for the layer
@@ -38,6 +46,7 @@ const MapView = ({props}) => {
         
         
         hydroFabricActions.set_nexus_list(response.list_ids);
+
 
     }).catch(error => {
         console.log(error)
