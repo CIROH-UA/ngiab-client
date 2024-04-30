@@ -13,6 +13,9 @@ const HydroFabricView = (props) => {
 
   const title = `${state.catchment.id ? 'Catchment: '+ state.catchment.id.split('cat-')['1'] : 'Nexus: ' + state.nexus.id } Time Series`;
   var subtitle = `${state.catchment.id ? state.catchment.variable + ' vs Time' : 'Flow (CFS) vs Time'}`
+  var defaultNexusID = {'value': state.nexus.id ? state.nexus.id : 'Select a Nexus ID'  ,'label': state.nexus.id ? state.nexus.id : 'Select a Nexus ID'};
+  var defaultCatchmentID = {'value': state.catchment.id ? state.catchment.id : 'Select a Catchment ID'  ,'label': state.catchment.id ? state.catchment.id : 'Select a Catchment ID'};
+  var defaultCatchmentVariable = {'value': state.catchment.variable ? state.catchment.variable : 'Select a Variable'  ,'label': state.catchment.variable ? state.catchment.variable : 'Select a Variable'};
 
   useEffect(() => {
     if (!state.nexus.id) return;
@@ -91,11 +94,19 @@ const HydroFabricView = (props) => {
             <Fragment>
               <div>
                 <label>Select/Look a Catchment ID </label>
-                <SelectComponent optionsList={state.catchment.list} onChangeHandler={actions.set_catchment_id} />
+                <SelectComponent 
+                  optionsList={state.catchment.list} 
+                  onChangeHandler={actions.set_catchment_id} 
+                  defaultValue={defaultCatchmentID}
+                />
               </div>
               <div>
                 <label>Select a Variable</label>
-                <SelectComponent optionsList={state.catchment.variable_list} onChangeHandler={actions.set_catchment_variable} />
+                <SelectComponent 
+                  optionsList={state.catchment.variable_list} 
+                  onChangeHandler={actions.set_catchment_variable}
+                  defaultValue={defaultCatchmentVariable}
+                />
               </div>
             </Fragment>
 
@@ -103,7 +114,11 @@ const HydroFabricView = (props) => {
         {state.nexus.id &&
         <Fragment>
             <label>Select/Look a Nexus ID</label>
-            <SelectComponent optionsList={state.nexus.list} onChangeHandler={actions.set_nexus_id} />
+            <SelectComponent 
+              optionsList={state.nexus.list} 
+              onChangeHandler={actions.set_nexus_id}
+              defaultValue={defaultNexusID}
+            />
         </Fragment>
 
         }

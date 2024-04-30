@@ -41,7 +41,7 @@ const customStyles = {
   };
   
 // Usage of the Select component with the custom Option component
-const SelectComponent = ({ optionsList, onChangeHandler }) => {
+const SelectComponent = ({ optionsList, onChangeHandler,defaultValue }) => {
  // Handler for when an option is selected, wrapped in useCallback
  const handleChange = useCallback((option) => {
   onChangeHandler(`${option.value}`)
@@ -55,6 +55,7 @@ const SelectComponent = ({ optionsList, onChangeHandler }) => {
       filterOption={createFilter({ ignoreAccents: false })} // this makes all the difference!
       options={optionsList}
       onChange={handleChange}
+      defaultValue={defaultValue}
     />
   );
 };
