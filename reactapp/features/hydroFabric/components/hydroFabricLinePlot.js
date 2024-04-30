@@ -11,8 +11,6 @@ const HydroFabricLinePlot = (props) => {
 
   useEffect(() => {
     chartRef.current = initializeChart('chartdiv', props.title , props.subtitle) // initialize the chart
-    // legendContainerRef.current = createLegendContainer(chartRef.current.root,chartRef.current)
-    // initializeLegend(chartRef.current.root,chartRef.current) // add a legend
     return () => {
       // if full screen has changed, reset the chart
       if (chartRef.current && props.singleRowOn ){
@@ -48,7 +46,6 @@ const HydroFabricLinePlot = (props) => {
 
  return (  
     <div id="chartdiv" style={{ width: "100%", height: "100%" }}></div>
-    // <div id="chartdiv" style={{ width: "100%", height: "90%", order: 1, flex: "1 1 80%" }}></div>
     
  )
 

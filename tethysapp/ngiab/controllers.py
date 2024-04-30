@@ -126,25 +126,3 @@ def getNexusTimeSeries(request, app_workspace):
     ]
 
     return JsonResponse({"data": data, "nexus_ids": getNexusIDs(app_workspace)})
-
-
-@controller
-def data(request):
-    """API controller for the plot page."""
-    # Download example data from GitHub
-    df = pd.read_csv(
-        "https://raw.githubusercontent.com/plotly/datasets/master/finance-charts-apple.csv"
-    )
-
-    # Do data processing in Python
-    l_date = df["Date"].tolist()
-
-    # Then return JSON containing data
-    return JsonResponse(
-        {
-            "series": [
-                {"title": "AAPL High", "x": l_date, "y": df["AAPL.High"].tolist()},
-                {"title": "AAPL Low", "x": l_date, "y": df["AAPL.Low"].tolist()},
-            ],
-        }
-    )
