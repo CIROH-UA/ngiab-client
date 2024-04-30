@@ -66,7 +66,7 @@ const MapView = (props) => {
 
         mapActions.addLayer(nexusClusterLayer);
         mapActions.addLayer(catchmentLayer);
-        hydroFabricActions.set_nexus_list(response.list_ids);
+
 
 
     }).catch(error => {

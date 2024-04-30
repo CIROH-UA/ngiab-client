@@ -82,13 +82,30 @@ def getNexuslayer(request, app_workspace):
 
     # Convert the DataFrame back to a GeoJSON object
     # breakpoint()
-    nexus_ids_list = gdf["id"].tolist()
-    nexus_select_list = [{"value": id, "label": id} for id in nexus_ids_list]
+    # nexus_ids_list = gdf["id"].tolist()
+    # nexus_select_list = [{"value": id, "label": id} for id in nexus_ids_list]
     data = json.loads(gdf.to_json())
 
     response_object["geojson"] = data
-    response_object["list_ids"] = nexus_select_list
+    # response_object["list_ids"] = nexus_select_list
     return JsonResponse(response_object)
+
+
+def getNexusIDs(app_workspace):
+    nexus_file_path = os.path.join(
+        app_workspace.path, "ngen-data", "config", "nexus.geojson"
+    )
+
+    # Load the GeoJSON file into a GeoPandas DataFrame
+    gdf = gpd.read_file(nexus_file_path)
+
+    # Convert the DataFrame to the "EPSG:3857" coordinate system
+    gdf = gdf.to_crs("EPSG:3857")
+
+    # Convert the DataFrame back to a GeoJSON object
+    # breakpoint()
+    nexus_ids_list = gdf["id"].tolist()
+    return [{"value": id, "label": id} for id in nexus_ids_list]
 
 
 @controller(app_workspace=True)
@@ -106,13 +123,12 @@ def getNexusTimeSeries(request, app_workspace):
     time_col = df.iloc[:, 1]
     streamflow_cms_col = df.iloc[:, 2]
     sreamflow_cfs_col = streamflow_cms_col * 35.314  # Convert to cfs
-
     data = [
         {"x": time, "y": streamflow}
         for time, streamflow in zip(time_col.tolist(), sreamflow_cfs_col.tolist())
     ]
 
-    return JsonResponse({"data": data})
+    return JsonResponse({"data": data, "nexus_ids": getNexusIDs(app_workspace)})
 
 
 @controller

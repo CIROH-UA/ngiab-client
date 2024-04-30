@@ -22,6 +22,7 @@ const HydroFabricView = (props) => {
     }    
     appAPI.getNexusTimeSeries(params).then((response) => {
       actions.set_nexus_series(response.data);
+      actions.set_nexus_list(response.nexus_ids);
       props.toggleSingleRow(false);
 
     }).catch((error) => {
