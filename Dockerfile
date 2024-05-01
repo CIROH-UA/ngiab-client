@@ -10,6 +10,12 @@ ARG MICRO_TETHYS=true \
 
 
 
+#########################
+# ADD APPLICATION FILES #
+#########################
+COPY . ${TETHYS_HOME}
+
+
 ###############
 # ENVIRONMENT #
 ###############
@@ -23,10 +29,10 @@ ENV ENABLE_OPEN_PORTAL=True
 ENV PORTAL_SUPERUSER_NAME=admin
 ENV PORTAL_SUPERUSER_PASSWORD=pass
 
-#######################################
-# INSTALL EXTENSIONS and APPLICATIONS #
-#######################################
-RUN micromamba install --yes -c conda-forge --file requirements.txt  && \
+#######################
+# INSTALL APPLICATION #
+#######################
+RUN micromamba install --yes -c conda-forge --file ${TETHYS_HOME}/requirements.txt  && \
     micromamba clean --all --yes && \
     npm install && npm run build && \
     tethys install -d -N && \
