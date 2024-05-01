@@ -9,13 +9,6 @@ ARG MICRO_TETHYS=true \
     MAMBA_DOCKERFILE_ACTIVATE=1
 
 
-###################
-# ADD APPLICATION #
-###################
-
-COPY . ${TETHYS_HOME}/apps
-
-
 
 ###############
 # ENVIRONMENT #
@@ -35,7 +28,6 @@ ENV PORTAL_SUPERUSER_PASSWORD=pass
 #############
 RUN micromamba install --yes -c conda-forge --file requirements.txt \
     && micromamba clean --all --yes \
-    && cd ${TETHYS_HOME}/apps/tethysapp-ngiab \
     && npm install && npm run build \
     && tethys install -d -N \
     && mv salt /srv/salt/
