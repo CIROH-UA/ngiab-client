@@ -299,7 +299,7 @@ const displayFeatureInfo = (event,layer,hydroFabricActions) => {
           .then((data) => {
             // console.log(data)
             const data_catchment_id = data.features[0].properties.divide_id;
-            console.log(data_catchment_id)
+            // console.log(data_catchment_id)
             hydroFabricActions.set_catchment_id(data_catchment_id);
             // setIsLoading(false)
   
