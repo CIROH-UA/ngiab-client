@@ -1,0 +1,67 @@
+name: build_push_dev_image
+
+on:
+  push:
+    branches:
+      - '*'
+
+env:
+  DOCKER_HUB_ORG: gioelkin
+  DOCKER_REPO: tethys-ngiab
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # build image
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+
+      # Checks-out the hydrocompute extra submodule
+      - name: checkout Hydrocompute submodule
+        run: |
+          cd apps/tethysapp-hydrocompute/tethysapp/hydrocompute/public/HydroCompute && git submodule update --force --init --recursive --remote
+
+      - name: Set Tag
+        run: |
+          echo "TAG=dev_${GITHUB_SHA}" >> $GITHUB_ENV
+          echo "TAG_LATEST=dev_latest" >> $GITHUB_ENV
+
+      - name: Test Tag
+        run: |
+          echo $TAG
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_BUILDER_USERNAME }}
+          password: ${{ secrets.DOCKER_BUILDER_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:${{ env.TAG }}
+            ${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:${{ env.TAG_LATEST }}
+          cache-from: type=registry,ref=${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}-dev-cache:latest
+          cache-to: type=registry,ref=${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}-dev-cache:latest,mode=max
+
+  cleanup:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: only keeps the first 5 image
+        run: |
+          echo "TAG=dev_${GITHUB_SHA}" >> $GITHUB_ENV
+          echo $TAG
+          . .github/scripts/clean_up_docker_hub.sh '${{ secrets.DOCKER_BUILDER_USERNAME }}' '${{ secrets.DOCKER_BUILDER_TOKEN }}' '${{ env.DOCKER_HUB_ORG }}' '${{ env.DOCKER_REPO }}' '${{ env.MAX_NUMBER_IMAGE }}'
