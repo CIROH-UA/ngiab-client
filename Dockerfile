@@ -13,7 +13,7 @@ ARG MICRO_TETHYS=true \
 #########################
 # ADD APPLICATION FILES #
 #########################
-COPY . ${TETHYS_HOME}
+COPY . ${TETHYS_HOME}/apps/ngiab
 
 
 ###############
@@ -32,7 +32,8 @@ ENV PORTAL_SUPERUSER_PASSWORD=pass
 #######################
 # INSTALL APPLICATION #
 #######################
-RUN micromamba install --yes -c conda-forge --file ${TETHYS_HOME}/requirements.txt  && \
+RUN cd ${TETHYS_HOME}/apps/ngiab && \ 
+    micromamba install --yes -c conda-forge --file requirements.txt  && \
     micromamba clean --all --yes && \
     npm install && npm run build && \
     tethys install -d -N
