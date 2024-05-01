@@ -1,7 +1,6 @@
 import geopandas as gpd
 import argparse
 from geo.Geoserver import Geoserver
-import shutil
 import os
 import zipfile
 
@@ -25,8 +24,10 @@ def publish_gpkg_layer_to_geoserver(
     geoserver_password,
 ):
     gdf = gpd.read_file(gpkg_path, layer=layer_name)
+    if gdf.crs.to_string() != "EPSG:4326":
+        gdf = gdf.to_crs(epsg=4326)
 
-    gdf.to_crs(f"EPSG:4326").to_file(f"{shp_path}.shp", driver="ESRI Shapefile")
+    gdf.to_file(f"{shp_path}.shp", driver="ESRI Shapefile")
 
     shp_files = [f"{shp_path}.{ext}" for ext in ["shp", "shx", "dbf", "prj"]]
 
@@ -34,6 +35,7 @@ def publish_gpkg_layer_to_geoserver(
         for file in shp_files:
             zipf.write(file, arcname=os.path.basename(file))
 
+    # remove shapefiles
     for file in shp_files:
         os.remove(file)
 
@@ -49,6 +51,8 @@ def publish_gpkg_layer_to_geoserver(
         store_name="hydrofabrics",
         workspace="nextgen",
     )
+    # remove zip file
+    os.remove(f"{shp_path}.zip")
 
 
 def main():
