@@ -16,6 +16,7 @@ requirements:
       - geopandas
       - pandas
       - geoserver-rest
+      - zip
 
   pip:
 
