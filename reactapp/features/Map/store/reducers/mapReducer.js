@@ -18,6 +18,7 @@ let options = {
 const mapInitialStore = {
     state:{
         mapObject: new Map(options),
+        extent: null,
         isFullMap: true,  
         layers:[],
         toggle_loading_layers: false,
@@ -135,6 +136,14 @@ const mapReducer = (state, action) => {
                         ...state.state.events,
                         pointermove: action.payload
                     }
+                }
+            };
+        case MapActionsTypes.set_extent:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    extent: action.payload
                 }
             };
       default:

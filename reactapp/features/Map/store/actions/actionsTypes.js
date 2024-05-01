@@ -12,6 +12,7 @@ const MapActionsTypes = {
     add_load_start_event: 'ADD_LOAD_START_EVENT',
     add_load_end_event: 'ADD_LOAD_END_EVENT',
     add_pointer_move_event: 'ADD_POINTER_MOVE_EVENT',
+    set_extent: 'SET_EXTENT',
     
 }
   

@@ -23,12 +23,10 @@ export const MapProvider = ({ children, layers= [] }) => {
     state.state.mapObject.setTarget(mapRef.current);
     // adding layers 
     layers.forEach(layer => {
-      ////console.log("adding layer to store", layer);
       actions.addLayer(layer);
     });
     return  () => {
       if (state.state.mapObject) return;
-      // console.log("unmounting map");
       actions.reset_map();
     }
 
@@ -39,7 +37,6 @@ export const MapProvider = ({ children, layers= [] }) => {
     const onClickEventHandler = state.state.events.click
     state.state.mapObject.on('click',(evt)=>{
       onClickEventHandler(evt)
-      // onClickHandler(evt,onClickEventHandler)
     })
   }, [state.state.events.click]);
 
@@ -66,6 +63,7 @@ export const MapProvider = ({ children, layers= [] }) => {
       onPointerMoveEventHandler(evt)
     })
   }, [state.state.events.pointermove]);
+
 
   useEffect(() => {
     if (state.state.layers.length === 0 ) return;
@@ -97,6 +95,12 @@ export const MapProvider = ({ children, layers= [] }) => {
     };
   // Ensures the hook re-runs only if the map or layer reference changes
   }, [state.state.layers]);
+
+  // useEffect(() => {
+  //   if (!state.state.extent) return;
+  //   // console.log(state.state.extent)
+  //   state.state.mapObject.getView().fit(state.state.extent, {duration: 1300, padding: [50, 50, 50, 50]});
+  // }, [state.state.extent]);
 
 
   return (

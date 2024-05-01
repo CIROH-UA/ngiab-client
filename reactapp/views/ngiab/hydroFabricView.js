@@ -20,7 +20,6 @@ const HydroFabricView = (props) => {
     'value': state.catchment.id && state.catchment.variable ? state.catchment.variable : state.catchment.variable_list ? state.catchment.variable_list[0]['value'] : 'Select a Variable',
     'label': state.catchment.id && state.catchment.variable ? state.catchment.variable : state.catchment.variable_list ? state.catchment.variable_list[0]['label'] : 'Select a Variable'
   };
-  console.log(defaultCatchmentVariable)
   useEffect(() => {
     if (!state.nexus.id) return;
     actions.reset_catchment();
@@ -50,10 +49,8 @@ const HydroFabricView = (props) => {
       catchment_id: state.catchment.id
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
-      console.log(response)
       actions.set_catchment_series(response.data);
       actions.set_catchment_variable_list(response.variables);
-      console.log(state.catchment)
       // actions.set_catchment_variable(response.variable);
       actions.set_catchment_list(response.catchment_ids);
       props.toggleSingleRow(false);
@@ -78,7 +75,6 @@ const HydroFabricView = (props) => {
       variable_column: state.catchment.variable
     }    
     appAPI.getCatchmentTimeSeries(params).then((response) => {
-      console.log(response)
       actions.set_catchment_series(response.data);
       props.toggleSingleRow(false);
       props.setIsLoading(false);

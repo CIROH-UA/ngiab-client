@@ -13,14 +13,15 @@ import { initialLayersArray } from 'lib/layersData';
 import { 
   makeNexusLayerParams, 
   makeCatchmentLayer,
-  createClusterVectorLayer
+  createClusterVectorLayer,
+  getMapExtentForNexusLayer
 } from 'lib/mapUtils';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 
 const MapView = (props) => {
-  const {actions: mapActions } = useMapContext();
+  const {state: mapState, actions: mapActions } = useMapContext();
 
-  const {state: hydroFabricState, actions: hydroFabricActions } = useHydroFabricContext(); 
+  const {actions: hydroFabricActions } = useHydroFabricContext(); 
   
   const nexusLayerParamsCallBack = useCallback(() => {
     return makeNexusLayerParams();
@@ -29,21 +30,29 @@ const MapView = (props) => {
   const catchmentLayerCallBack = useCallback(() => {
     const catchmentLayersURL = 'http://localhost:8181/geoserver/wms'; 
     return makeCatchmentLayer(catchmentLayersURL);
-  })
-
+  },[])
   const onPointerMoveLayersEventCallback = useCallback((event) => {
     return onPointerMoveLayersEvent(event)
-  });
+  },[]);
   const onClickEventHandlerCallBack = useCallback((event) => {
     return onClickLayersEvent(event,hydroFabricActions,props.setIsLoading);
-  })
+  },[])
 
   const onLoadStartHandlerCallBack = useCallback((event) => {
     return onStartLoadingLayersEvent(event,props.setIsLoading);
-  })
+  },[])
+
   const onLoadEndHandlerCallBack = useCallback((event) => {
     return onEndLoadingLayerEvent(event,props.setIsLoading);
-  })
+  },[])
+
+  // const getMapExtentForNexusLayerCallBack = useCallback(() => {
+  //   console.log(mapState.mapObject.getLayers().getArray())
+  //   const vector_layer = mapState.mapObject.getLayers().getArray().find(layer => layer.get('name') === 'Nexus Layer');
+  //   if (!vector_layer) return
+  //   console.log(vector_layer)
+  //   return getMapExtentForNexusLayer(vector_layer);
+  // },[mapState.mapObject])
 
   useEffect(() => {
 
@@ -53,9 +62,10 @@ const MapView = (props) => {
     mapActions.add_load_end_event(onLoadEndHandlerCallBack);
     mapActions.add_pointer_move_event(onPointerMoveLayersEventCallback);
 
+
     //Add Layers
     appAPI.getNexusGeoJson().then(response => {
-        console.log(response)
+
         // Define the parameters for the layer
         var nexusLayerParams = nexusLayerParamsCallBack();
         var catchmentLayer = catchmentLayerCallBack();
@@ -67,8 +77,6 @@ const MapView = (props) => {
         mapActions.addLayer(nexusClusterLayer);
         mapActions.addLayer(catchmentLayer);
 
-
-
     }).catch(error => {
         console.log(error)
     })
@@ -77,19 +85,33 @@ const MapView = (props) => {
     initialLayersArray.forEach(layer => {
       mapActions.addLayer(layer);
     })
+    ;
+    
     // remove the layers wheen the component unmounts
     return () => {
-
+      if(!mapState.mapObject) return
       //delete added layers when unmounting
       initialLayersArray.forEach(layer => {
         mapActions.delete_layer_by_name(layer.options.name)
       })
       mapActions.delete_layer_by_name('Nexus Layer')
+      mapActions.delete_layer_by_name('Catchments Layer')
+      
     }
 
   }, []);
 
+  // useEffect(() => {
+  //   // const clusterLayerExtent = getMapExtentForNexusLayerCallBack();
+  //   // console.log(clusterLayerExtent)
+  //   if (mapState.mapObject.getLayers().getArray().length < 1) return
+  //   const vector_layer = mapState.mapObject.getLayers().getArray().find(layer => layer.get('name') === 'Nexus Layer');
+  //   console.log(vector_layer)
+  //   if (!vector_layer) return
+  //   const clusterLayerExtent = getMapExtentForNexusLayer(vector_layer);
+  //   mapActions.set_extent(clusterLayerExtent);
 
+  // }, [mapState.mapObject])
   
   return (
     <Fragment>

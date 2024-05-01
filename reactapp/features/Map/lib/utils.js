@@ -1,5 +1,6 @@
 import { OlImageTileLayer, OlTileLayer, VectorLayer } from './layers/layers';
 import { ArcGISRestTile, OSMWMSTile, TileImageArcGISRest, WMSTile, VectorSourceLayer,ClusterSource } from './source/sources';
+import * as olExtent from 'ol/extent';
 
 const useLayerFactory = (layerType, options,mapAction) => {
     
@@ -102,9 +103,6 @@ const filterLayersNotInMap = (map, layersArray) => {
 
 const addLayer = (map, layerInfo,mapAction) => {
     const layer = useLayerFactory(layerInfo.layerType, layerInfo.options,mapAction);
-    // let {events, priority} = layerInfo.extraProperties;
-    // layer.set('events', events);
-    // layer.set('priority', priority);
     map.addLayer(layer);
 
   };

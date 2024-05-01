@@ -39,7 +39,7 @@ const sldCatchmentStyle = `<?xml version="1.0" encoding="ISO-8859-1"?>
           </Fill>
         <Stroke>
           <CssParameter name="stroke">#000080</CssParameter>
-          <CssParameter name="stroke-width">2</CssParameter>
+          <CssParameter name="stroke-width">1</CssParameter>
         </Stroke>
           </PolygonSymbolizer>
         </Rule>

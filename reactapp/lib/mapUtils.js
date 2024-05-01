@@ -138,7 +138,7 @@ const createClusterVectorLayer = (params) => {
                   radius: 10,
                   stroke: new Stroke({
                     color: '#DA4167',
-                    width: 3
+                    width: 2
                   }),
                   fill: new Fill({
                     // color: '#ffffff00',
@@ -230,13 +230,11 @@ const getClickEventLayers = (event, mapObject) => {
 
 
 const getInfoFromLayers = async (event, clickable_layers, hydroFabricActions,setIsLoading) => {
-  console.log(clickable_layers)
   var checkForWMS = false;
   for (const layer of clickable_layers) {
     const layer_name = layer.get('name');
     if (layer_name === 'Nexus Layer') {
       checkForWMS = await displayFeatureInfo(event, layer, hydroFabricActions);
-      console.log(checkForWMS)
     }
     if (checkForWMS && layer_name === 'Catchments Layer') {
         displayFeatureInfoWMS(event, layer, hydroFabricActions,setIsLoading);
@@ -272,6 +270,17 @@ const displayFeatureInfo = (event,layer,hydroFabricActions) => {
       });
   };
   
+ const getMapExtentForNexusLayer = (layer) => {
+  // layers.forEach(layer => {
+    if (layer.get('name') === 'Nexus Layer'){
+      const extent = layer.getSource().getExtent();
+      return extent
+    }
+  
+  // })
+
+ }
+
   const displayFeatureInfoWMS = (event,layer,hydroFabricActions,setIsLoading) => {
       setIsLoading(true)
       const wmsSource = layer.getSource();
@@ -315,5 +324,6 @@ export {
   getClickEventLayers,
   getInfoFromLayers,
   createClusterVectorLayer,
-  createVectorLayer
+  createVectorLayer,
+  getMapExtentForNexusLayer
 }

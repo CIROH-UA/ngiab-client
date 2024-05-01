@@ -7,7 +7,6 @@ const HydroFabricLinePlot = (props) => {
   const chartRef = useRef(null);
   const {state, actions} = useHydroFabricContext();
   const variable = `${state.catchment.id ? state.catchment.variable : 'streamflow'}`;
-  console.log(variable)
 
   useEffect(() => {
     chartRef.current = initializeChart('chartdiv', props.title , props.subtitle) // initialize the chart
