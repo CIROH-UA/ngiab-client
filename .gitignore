@@ -12,4 +12,4 @@ services.yml
 node_modules*
 tethysapp/ngiab/public/frontend/
 tethysapp/ngiab/workspaces/
-reactapp/config/production.env
+# reactapp/config/production.env
