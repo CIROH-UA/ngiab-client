@@ -16,6 +16,7 @@ ARG MICRO_TETHYS=true \
 COPY . ${TETHYS_HOME}/apps
 
 
+
 ###############
 # ENVIRONMENT #
 ###############
