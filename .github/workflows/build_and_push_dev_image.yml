@@ -1,6 +1,7 @@
 name: build_push_dev_image
 
 on:
+  pull_request:
   push:
     branches:
       - '*'
@@ -31,10 +32,10 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY_IMAGE }}
-          flavor: |
-            latest=false
-            prefix={{ .Branch }}-
-            suffix=-cache
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=ref,event=tag
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -51,9 +52,10 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=registry,ref=${{ steps.meta.outputs.tags }}
-          cache-to: type=registry,ref=${{ steps.meta.outputs.tags }},mode=max
+          cache-from: type=registry,ref=${{ steps.meta.outputs.tags }}-cache
+          cache-to: type=registry,ref=${{ steps.meta.outputs.tags }}-cache,mode=max
       - name: Export digest
         run: |
           mkdir -p /tmp/digests
