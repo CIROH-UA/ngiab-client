@@ -11,12 +11,26 @@ env:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Set matrix for build
+        id: set-matrix
+        run: echo "::set-output name=matrix::{\"include\":[{\"platform\":\"linux/amd64\",\"tag\":\"user/repo:latest-amd64\"},{\"platform\":\"linux/arm64\",\"tag\":\"user/repo:latest-arm64\"}]}"
   # build image
   build:
+    needs: setup
     runs-on: ubuntu-latest
+    strategy:
+      matrix: ${{fromJson(needs.setup.outputs.matrix)}}
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set Tag
         run: |
@@ -36,16 +50,18 @@ jobs:
           username: ${{ secrets.DOCKER_BUILDER_USERNAME }}
           password: ${{ secrets.DOCKER_BUILDER_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push specific architecture
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: ./Dockerfile
           push: true
           tags: |
-            ${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:${{ env.TAG }}
-            ${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:${{ env.TAG_LATEST }}
-          cache-from: type=registry,ref=${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}-dev-cache:latest
-          cache-to: type=registry,ref=${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}-dev-cache:latest,mode=max
+            ${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:${{ env.TAG }}_${{ matrix.tag }}
+            ${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:${{ env.TAG_LATEST }}_${{ matrix.tag }}
+          platforms: ${{ matrix.platform }}
+          cache-from: type=registry,ref=${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}-dev-${{ matrix.platform }}-cache:latest
+          cache-to: type=registry,ref=${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}-dev-${{ matrix.platform }}-cache:latest,mode=max
 
   cleanup:
     needs: [build]
@@ -56,4 +72,6 @@ jobs:
         run: |
           echo "TAG=dev_${GITHUB_SHA}" >> $GITHUB_ENV
           echo $TAG
+          echo "MAX_NUMBER_IMAGE=10" >> $GITHUB_ENV
+          echo $MAX_NUMBER_IMAGE
           . .github/scripts/clean_up_docker_hub.sh '${{ secrets.DOCKER_BUILDER_USERNAME }}' '${{ secrets.DOCKER_BUILDER_TOKEN }}' '${{ env.DOCKER_HUB_ORG }}' '${{ env.DOCKER_REPO }}' '${{ env.MAX_NUMBER_IMAGE }}'
