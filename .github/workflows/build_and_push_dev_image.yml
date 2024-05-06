@@ -8,72 +8,158 @@ on:
 env:
   DOCKER_HUB_ORG: gioelkin
   DOCKER_REPO: tethys-ngiab
+  REGISTRY_IMAGE: gioelkin/tethys-ngiab
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  setup:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - name: Set Tag
-        run: |
-          echo "TAG=dev_${GITHUB_SHA}" >> $GITHUB_ENV
-          echo "TAG_LATEST=dev_latest" >> $GITHUB_ENV
-      - name: Set matrix for build
-        id: set-matrix
-        run: echo "::set-output name=matrix::{\"include\":[{\"platform\":\"linux/amd64\",\"tag\":\"${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:dev_latest-amd64\"},{\"platform\":\"linux/arm64\",\"tag\":\"${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:dev_latest-arm64\"}]}"
-  # build image
   build:
-    needs: setup
     runs-on: ubuntu-latest
     strategy:
-      matrix: ${{fromJson(needs.setup.outputs.matrix)}}
+      fail-fast: false
+      matrix:
+        platform:
+          - linux/amd64
+          - linux/arm64
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
-
+      - name: Prepare
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-
-      - name: Set Tag
-        run: |
-          echo "TAG=dev_${GITHUB_SHA}" >> $GITHUB_ENV
-          echo "TAG_LATEST=dev_latest" >> $GITHUB_ENV
-
-      - name: Test Tag
-        run: |
-          echo $TAG
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_BUILDER_USERNAME }}
           password: ${{ secrets.DOCKER_BUILDER_TOKEN }}
-
-      - name: Build and push specific architecture
+      - name: Build and push by digest
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ matrix.tag }}
           platforms: ${{ matrix.platform }}
-          cache-from: type=registry,ref=${{ matrix.tag }}-cache:latest
-          cache-to: type=registry,ref=${{ matrix.tag }}-cache:latest,mode=max
-
-  cleanup:
-    needs: [build]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: only keeps the first 5 image
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=registry,ref=${{ env.REGISTRY_IMAGE }}:dev-cache
+          cache-to: type=registry,ref=${{ env.REGISTRY_IMAGE }}:dev-cache,mode=max
+      - name: Export digest
         run: |
-          echo "TAG=dev_${GITHUB_SHA}" >> $GITHUB_ENV
-          echo $TAG
-          echo "MAX_NUMBER_IMAGE=10" >> $GITHUB_ENV
-          echo $MAX_NUMBER_IMAGE
-          . .github/scripts/clean_up_docker_hub.sh '${{ secrets.DOCKER_BUILDER_USERNAME }}' '${{ secrets.DOCKER_BUILDER_TOKEN }}' '${{ env.DOCKER_HUB_ORG }}' '${{ env.DOCKER_REPO }}' '${{ env.MAX_NUMBER_IMAGE }}'
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_BUILDER_USERNAME }}
+          password: ${{ secrets.DOCKER_BUILDER_TOKEN }}
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
+
+# # A workflow run is made up of one or more jobs that can run sequentially or in parallel
+# jobs:
+#   setup:
+#     runs-on: ubuntu-latest
+#     outputs:
+#       matrix: ${{ steps.set-matrix.outputs.matrix }}
+#     steps:
+#       - name: Set Tag
+#         run: |
+#           echo "TAG=dev_${GITHUB_SHA}" >> $GITHUB_ENV
+#           echo "TAG_LATEST=dev_latest" >> $GITHUB_ENV
+#       - name: Set matrix for build
+#         id: set-matrix
+#         run: echo "::set-output name=matrix::{\"include\":[{\"platform\":\"linux/amd64\",\"tag\":\"${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:dev_latest-amd64\"},{\"platform\":\"linux/arm64\",\"tag\":\"${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:dev_latest-arm64\"}]}"
+#   # build image
+#   build:
+#     needs: setup
+#     runs-on: ubuntu-latest
+#     strategy:
+#       matrix: ${{fromJson(needs.setup.outputs.matrix)}}
+#     steps:
+#       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+#       - uses: actions/checkout@v4
+
+#       - name: Set up QEMU
+#         uses: docker/setup-qemu-action@v3
+
+#       - name: Set Tag
+#         run: |
+#           echo "TAG=dev_${GITHUB_SHA}" >> $GITHUB_ENV
+#           echo "TAG_LATEST=dev_latest" >> $GITHUB_ENV
+
+#       - name: Test Tag
+#         run: |
+#           echo $TAG
+
+#       - name: Set up Docker Buildx
+#         uses: docker/setup-buildx-action@v3
+
+#       - name: Login to Docker Hub
+#         uses: docker/login-action@v2
+#         with:
+#           username: ${{ secrets.DOCKER_BUILDER_USERNAME }}
+#           password: ${{ secrets.DOCKER_BUILDER_TOKEN }}
+
+#       - name: Build and push specific architecture
+#         uses: docker/build-push-action@v5
+#         with:
+#           context: .
+#           file: ./Dockerfile
+#           push: true
+#           tags: ${{ matrix.tag }}
+#           platforms: ${{ matrix.platform }}
+#           cache-from: type=registry,ref=${{ matrix.tag }}-cache:latest
+#           cache-to: type=registry,ref=${{ matrix.tag }}-cache:latest,mode=max
+
+#   cleanup:
+#     needs: [build]
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v2
+#       - name: only keeps the first 5 image
+#         run: |
+#           echo "TAG=dev_${GITHUB_SHA}" >> $GITHUB_ENV
+#           echo $TAG
+#           echo "MAX_NUMBER_IMAGE=10" >> $GITHUB_ENV
+#           echo $MAX_NUMBER_IMAGE
+#           . .github/scripts/clean_up_docker_hub.sh '${{ secrets.DOCKER_BUILDER_USERNAME }}' '${{ secrets.DOCKER_BUILDER_TOKEN }}' '${{ env.DOCKER_HUB_ORG }}' '${{ env.DOCKER_REPO }}' '${{ env.MAX_NUMBER_IMAGE }}'
