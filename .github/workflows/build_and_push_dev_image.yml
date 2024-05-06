@@ -22,7 +22,7 @@ jobs:
           echo "TAG_LATEST=dev_latest" >> $GITHUB_ENV
       - name: Set matrix for build
         id: set-matrix
-        run: echo "::set-output name=matrix::{\"include\":[{\"platform\":\"linux/amd64\",\"tag\":\"${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:${{ env.TAG_LATEST }}_amd64\"},{\"platform\":\"linux/arm64\",\"tag\":\"${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:${{ env.TAG_LATEST }}_arm64\"}]}"
+        run: echo "::set-output name=matrix::{\"include\":[{\"platform\":\"linux/amd64\",\"tag\":\"${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:dev_latest-amd64\"},{\"platform\":\"linux/arm64\",\"tag\":\"${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}:dev_latest-arm64\"}]}"
   # build image
   build:
     needs: setup
@@ -62,8 +62,8 @@ jobs:
           push: true
           tags: ${{ matrix.tag }}
           platforms: ${{ matrix.platform }}
-          cache-from: type=registry,ref=${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}-dev-${{ matrix.platform }}-cache:latest
-          cache-to: type=registry,ref=${{ env.DOCKER_HUB_ORG }}/${{ env.DOCKER_REPO }}-dev-${{ matrix.platform }}-cache:latest,mode=max
+          cache-from: type=registry,ref=${{ matrix.tag }}-cache:latest
+          cache-to: type=registry,ref=${{ matrix.tag }}-cache:latest,mode=max
 
   cleanup:
     needs: [build]
