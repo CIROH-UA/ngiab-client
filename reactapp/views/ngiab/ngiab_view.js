@@ -1,10 +1,10 @@
-import React, { Fragment, useState } from 'react';
-// import Map from 'features/Map/components/Map';
-import MapView from './map_view';
-import HydroFabricView from './hydroFabricView';
+import { Fragment, useState, lazy } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
 import { MapProvider } from 'features/Map/providers/MapProvider';
 import { HydroFabricContainer, MapContainer } from './containers';
+
+const HydroFabricView = lazy(() => import('./hydroFabricView.js'));
+const MapView = lazy(() => import('./map_view.js'));
 
 const NGIABView = () => {
   const [singleRowOn, toggleSingleRow] = useState(true);
@@ -13,7 +13,6 @@ const NGIABView = () => {
   return (
     <Fragment>
         <HydroFabricProvider>
-
             <MapContainer fullScreen={singleRowOn}>
               <MapProvider>
                   <MapView 
@@ -29,7 +28,6 @@ const NGIABView = () => {
                 setIsLoading={setIsLoading} 
               />
             </HydroFabricContainer>
-
         </HydroFabricProvider>
 
     </Fragment>

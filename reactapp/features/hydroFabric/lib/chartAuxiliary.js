@@ -1,8 +1,21 @@
-import * as am5 from "@amcharts/amcharts5";
-import * as am5xy from "@amcharts/amcharts5/xy";
 import am5themes_Animated from "@amcharts/amcharts5/themes/Animated";
-import * as am5plugins_exporting from "@amcharts/amcharts5/plugins/exporting";
-
+import { 
+  Root, 
+  XYChart, 
+  DateAxis, 
+  ValueAxis, 
+  LineSeries, 
+  Scrollbar, 
+  XYCursor, 
+  Label, 
+  Tooltip, 
+  Exporting, 
+  Annotator,
+  AxisRendererX,
+  AxisRendererY,
+  percent,
+  color
+} from "./charts"; 
 
 // Define handleUpdate outside of the useEffect
 const handleUpdate = (key, chartRef, currentProducts, updateSeries, legendContainer, toggleProduct) => {
@@ -13,11 +26,11 @@ const handleUpdate = (key, chartRef, currentProducts, updateSeries, legendContai
 
 
 const initializeChart = (containerId, title, subtitle) => {
-    const root = am5.Root.new(containerId);    
+    const root = Root.new(containerId);    
     root.setThemes([am5themes_Animated.new(root)]);
     
     // Create chart
-    const chart = root.container.children.push(am5xy.XYChart.new(root, {
+    const chart = root.container.children.push(XYChart.new(root, {
       panX: true,
       panY: true,
       wheelX: 'panX',
@@ -28,32 +41,32 @@ const initializeChart = (containerId, title, subtitle) => {
   
     // Create axes
     let xAxis = chart.xAxes.push(
-      am5xy.DateAxis.new(root, {
+      DateAxis.new(root, {
         baseInterval: { timeUnit: "hour", count: 1 },
-        renderer: am5xy.AxisRendererX.new(root, {}),
-        tooltip: am5.Tooltip.new(root, {}),
+        renderer: AxisRendererX.new(root, {}),
+        tooltip: Tooltip.new(root, {}),
         tooltipDateFormat: "MM/dd HH:mm"
       })
     );
     let yAxis = chart.yAxes.push(
-      am5xy.ValueAxis.new(root, {
-        renderer: am5xy.AxisRendererY.new(root, {pan:"zoom"}),
-        tooltip: am5.Tooltip.new(root, {})
+      ValueAxis.new(root, {
+        renderer: AxisRendererY.new(root, {pan:"zoom"}),
+        tooltip: Tooltip.new(root, {})
       })
     );
   
-    yAxis.children.unshift(am5.Label.new(root, {
+    yAxis.children.unshift(Label.new(root, {
       text: '',
       textAlign: 'center',
-      y: am5.p50,
+      y: percent(50),
       rotation: -90,
       fontWeight: 'bold'
     }));
   
-    xAxis.children.push(am5.Label.new(root, {
+    xAxis.children.push(Label.new(root, {
       text: 'Date',
       textAlign: 'center',
-      x: am5.p50,
+      x: percent(50),
       fontWeight: 'bold'
     }));
 
@@ -77,13 +90,13 @@ const initializeChart = (containerId, title, subtitle) => {
   
     // Add scrollbar
     // https://www.amcharts.com/docs/v5/charts/xy-chart/scrollbars/
-    chart.set("scrollbarX", am5.Scrollbar.new(root, {
+    chart.set("scrollbarX", Scrollbar.new(root, {
       orientation: "horizontal",
       
     }));
   
     // Add cursor
-    var cursor = chart.set("cursor", am5xy.XYCursor.new(root, {}));
+    var cursor = chart.set("cursor", XYCursor.new(root, {}));
     cursor.lineX.set("forceHidden", true);
     cursor.lineY.set("forceHidden", true);
   
@@ -104,22 +117,22 @@ const initializeChart = (containerId, title, subtitle) => {
     });
       
     // add title and subtitle
-      chart.children.unshift(am5.Label.new(root, {
+      chart.children.unshift(Label.new(root, {
         text: subtitle,
         fontSize: 14,
         textAlign: "center",
-        x: am5.percent(50),
-        centerX: am5.percent(50)
+        x: percent(50),
+        centerX: percent(50)
       }));
   
     
-      chart.children.unshift(am5.Label.new(root, {
+      chart.children.unshift(Label.new(root, {
         text: title,
         fontSize: 18,
         fontWeight: "500",
         textAlign: "center",
-        x: am5.percent(50),
-        centerX: am5.percent(50),
+        x: percent(50),
+        centerX: percent(50),
         paddingTop: 0,
         paddingBottom: 0
       }));
@@ -145,20 +158,20 @@ const updateSeries = (chart,item,title,subtitle,variable) => {
     }));
     // Create a tooltip
     
-    var tooltip = am5.Tooltip.new(chart.root, {
+    var tooltip = Tooltip.new(chart.root, {
         labelText: `${variable}: {valueY}`
     })
     
     // add the data
     if(item.series){
-        const series = chart.series.push(am5xy.LineSeries.new(chart.root, {
+        const series = chart.series.push(LineSeries.new(chart.root, {
             name: item.id,
             xAxis: chart.xAxes.values[0],
             yAxis: chart.yAxes.values[0],
             valueYField: "y",
             valueXField: "x",
-            stroke: am5.color('#2c3e50'),
-            fill: am5.color('#2c3e50'),
+            stroke: color('#2c3e50'),
+            fill: color('#2c3e50'),
             maxDeviation:1,
             tooltip: tooltip,
             legendLabelText: `[{stroke}]${item['id']}[/]`,
@@ -208,11 +221,20 @@ const makeExportData = (chart) =>{
   // Convert the mergedData object back to an array
   const mergedDataArray = Object.values(mergedData);
 
-  var exporting = am5plugins_exporting.Exporting.new(chart.root, {
-    menu: am5plugins_exporting.ExportingMenu.new(chart.root, {}),
+  var exporting = Exporting.new(chart.root, {
+    menu: ExportingMenu.new(chart.root, {}),
+    htmlOptions: {
+      disabled: true
+    },
+    xlsxOptions:{
+      disabled: true
+    },
+    pdfOptions:{
+      disabled: true
+    },
     dataSource: mergedDataArray
   });
-  var annotator = am5plugins_exporting.Annotator.new(chart.root, {});
+  var annotator = Annotator.new(chart.root, {});
 
   var menuitems = exporting.get("menu").get("items");
 

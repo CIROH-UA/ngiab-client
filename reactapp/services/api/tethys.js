@@ -1,6 +1,7 @@
 import apiClient from "services/api/client";
 
 function getSession() {
+  getCSRF()
   return apiClient.get('/api/session/');
 }
 

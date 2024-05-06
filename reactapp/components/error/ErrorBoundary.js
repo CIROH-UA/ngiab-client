@@ -1,10 +1,11 @@
 import PropTypes from 'prop-types';
-import React from "react";
+import {Component, lazy} from "react";
 
-import DebugError from 'components/error/DebugError';
+// import DebugError from 'components/error/DebugError';
 import GenericError from "components/error/GenericError";
 
-class ErrorBoundary extends React.Component {
+const DebugError = lazy(() => import('components/error/DebugError'));
+class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
     this.state = {

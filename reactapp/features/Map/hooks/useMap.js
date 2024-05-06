@@ -1,8 +1,7 @@
-import React, { useReducer } from 'react';
+import { useReducer } from 'react';
 import { mapReducer, mapInitialStore } from '../store/reducers/mapReducer';
 import { MapActionsTypes } from '../store/actions/actionsTypes';
-import { add } from 'ol/coordinate';
-import { set } from 'ol/transform';
+
 
 
 const useMap = () => {

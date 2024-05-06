@@ -1,6 +1,5 @@
 import { OlImageTileLayer, OlTileLayer, VectorLayer } from './layers/layers';
 import { ArcGISRestTile, OSMWMSTile, TileImageArcGISRest, WMSTile, VectorSourceLayer,ClusterSource } from './source/sources';
-import * as olExtent from 'ol/extent';
 
 const useLayerFactory = (layerType, options,mapAction) => {
     

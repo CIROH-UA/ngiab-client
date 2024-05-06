@@ -1,9 +1,7 @@
 import React, { useEffect , useRef } from 'react';
 import MapContext from 'features/Map/contexts/MapContext';
-// import { MapContainer } from './styles/Map.styled';
 import './map.css';
 import { 
-  // onClickHandler,
   filterLayersNotInMap,
   addLayer,
   removeLayer,
@@ -104,7 +102,6 @@ export const MapProvider = ({ children, layers= [] }) => {
 
 
   return (
-  // <MapContainer>
     <MapContext.Provider value={{ ...state, actions }}>
         <div ref={mapRef} className="ol-map" >
           {children}
@@ -119,7 +116,6 @@ export const MapProvider = ({ children, layers= [] }) => {
         }
 
     </MapContext.Provider>
-  // </MapContainer>
 
   );
 };

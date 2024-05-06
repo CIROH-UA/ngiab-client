@@ -1,12 +1,16 @@
 
 
-import React,{useEffect, Fragment, useState} from 'react';
+import {useEffect, Fragment,lazy} from 'react';
 
-import HydroFabricLinePlot from '../../features/hydroFabric/components/hydroFabricLinePlot';
+// import HydroFabricLinePlot from '../../features/hydroFabric/components/hydroFabricLinePlot';
+// import SelectComponent from 'features/hydroFabric/components/selectComponent';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import appAPI from 'services/api/app';
-import SelectComponent from 'features/hydroFabric/components/selectComponent';
 import { SelectContainer,HydroFabricPlotContainer } from './containers';
+
+
+const HydroFabricLinePlot = lazy(() => import('../../features/hydroFabric/components/hydroFabricLinePlot'));
+const SelectComponent = lazy(() => import('../../features/hydroFabric/components/selectComponent'));
 
 const HydroFabricView = (props) => {
   const {state,actions} = useHydroFabricContext();

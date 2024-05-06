@@ -1,4 +1,9 @@
-@import "custom-bootstrap";
+// @import "custom-bootstrap";
+/* Set bootstrap primary color to be app theme color */
+$primary: #2c3e50;
+
+/* import bootstrap to set changes */
+@import "../node_modules/bootstrap/scss/bootstrap";
 
 :root {
     --ts-header-height: 56px;
