@@ -185,71 +185,7 @@ const updateSeries = (chart,item,title,subtitle,variable) => {
 
         
     }
-    makeExportData(chart)
 
-}
-
-
-const makeExportData = (chart) =>{
-  var seriesData = [];
-  chart.series.each(function (s) {
-    for (var i = 0; i < s.dataItems.length; i++) {
-      var dataItem = s.dataItems[i];
-      var seriesName = s.get('name');
-      const date = new Date(dataItem.get('valueX'));
-      const dateString = date.toISOString().slice(0, 19).replace('T', ' ');
-      var dataItemObject = {};
-      dataItemObject['x'] = dateString,
-      dataItemObject[seriesName] = dataItem.get('valueY'),
-      seriesData.push(dataItemObject);
-    }
-  });
-  // Create an object to store the merged values
-  const mergedData = {};
-
-  // Iterate through the data array
-  seriesData.forEach((item) => {
-    const { x, ...values } = item;
-
-    if (!mergedData[x]) {
-      mergedData[x] = { x, ...values };
-    } else {
-      mergedData[x] = { x, ...mergedData[y], ...values };
-    }
-  });
-
-  // Convert the mergedData object back to an array
-  const mergedDataArray = Object.values(mergedData);
-
-  var exporting = Exporting.new(chart.root, {
-    menu: ExportingMenu.new(chart.root, {}),
-    htmlOptions: {
-      disabled: true
-    },
-    xlsxOptions:{
-      disabled: true
-    },
-    pdfOptions:{
-      disabled: true
-    },
-    dataSource: mergedDataArray
-  });
-  var annotator = Annotator.new(chart.root, {});
-
-  var menuitems = exporting.get("menu").get("items");
-
-  menuitems.push({
-      type: "separator"
-  });
-
-  menuitems.push({
-      type: "custom",
-      label: "Annotate",
-      callback: function () {
-          this.close();
-          annotator.toggle();            
-      }
-  });
 }
 
 

@@ -1,12 +1,13 @@
 
 
-import {useEffect, Fragment,lazy} from 'react';
+import {useEffect, Suspense, Fragment,lazy} from 'react';
 
 // import HydroFabricLinePlot from '../../features/hydroFabric/components/hydroFabricLinePlot';
 // import SelectComponent from 'features/hydroFabric/components/selectComponent';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import appAPI from 'services/api/app';
 import { SelectContainer,HydroFabricPlotContainer } from './containers';
+import LoadingAnimation from 'components/loader/LoadingAnimation';
 
 
 const HydroFabricLinePlot = lazy(() => import('../../features/hydroFabric/components/hydroFabricLinePlot'));
@@ -61,6 +62,7 @@ const HydroFabricView = (props) => {
       props.setIsLoading(false);
 
     }).catch((error) => {
+      props.setIsLoading(false);
       console.log("Error fetching catchment time series", error);
     })
     return  () => {
@@ -132,9 +134,11 @@ const HydroFabricView = (props) => {
 
         }
       </SelectContainer>
+      <Suspense fallback={<LoadingAnimation />}>
        <HydroFabricPlotContainer>
           <HydroFabricLinePlot singleRowOn={props.singleRowOn} title={title} subtitle={subtitle} /> 
         </HydroFabricPlotContainer> 
+      </Suspense>
 
     </Fragment>
 
