@@ -5,30 +5,22 @@ import os
 import zipfile
 
 
-def convert_gpkg_to_geojson(gpkg_path, layer_name, output_path):
+def read_and_transform(gpkg_path, layer_name):
     gdf = gpd.read_file(gpkg_path, layer=layer_name)
-
-    if gdf.crs.to_string() != "EPSG:4326":
-        gdf = gdf.to_crs(epsg=4326)
-
-    gdf.to_file(output_path, driver="GeoJSON")
+    if gdf.crs.to_string() != "EPSG:5070":
+        gdf = gdf.to_crs(epsg=5070)
+    return gdf
 
 
-def publish_gpkg_layer_to_geoserver(
-    gpkg_path,
-    layer_name,
+def create_and_publish_shp(
+    gdf,
     shp_path,
     geoserver_host,
     geoserver_port,
     geoserver_username,
     geoserver_password,
 ):
-    gdf = gpd.read_file(gpkg_path, layer=layer_name)
-    if gdf.crs.to_string() != "EPSG:4326":
-        gdf = gdf.to_crs(epsg=4326)
-
     gdf.to_file(f"{shp_path}.shp", driver="ESRI Shapefile")
-
     shp_files = [f"{shp_path}.{ext}" for ext in ["shp", "shx", "dbf", "prj"]]
 
     with zipfile.ZipFile(f"{shp_path}.zip", "w") as zipf:
@@ -55,6 +47,65 @@ def publish_gpkg_layer_to_geoserver(
     os.remove(f"{shp_path}.zip")
 
 
+def convert_gpkg_to_geojson(gpkg_path, layer_name, output_path):
+    try:
+        gdf = read_and_transform(gpkg_path, layer_name)
+        gdf.to_file(output_path, driver="GeoJSON")
+        return 0
+    except Exception as e:
+        print(f"Error in convert_gpkg_to_geojson: {e}")
+        return 1
+
+
+def publish_gpkg_layer_to_geoserver(
+    gpkg_path,
+    layer_name,
+    shp_path,
+    geoserver_host,
+    geoserver_port,
+    geoserver_username,
+    geoserver_password,
+):
+    try:
+        gdf = read_and_transform(gpkg_path, layer_name)
+        create_and_publish_shp(
+            gdf,
+            shp_path,
+            geoserver_host,
+            geoserver_port,
+            geoserver_username,
+            geoserver_password,
+        )
+        return 0
+    except Exception as e:
+        print(f"Error in publish_gpkg_layer_to_geoserver: {e}")
+        return 1
+
+
+def publish_geojson_layer_to_geoserver(
+    geojson_path,
+    shp_path,
+    geoserver_host,
+    geoserver_port,
+    geoserver_username,
+    geoserver_password,
+):
+    try:
+        gdf = read_and_transform(geojson_path, None)
+        create_and_publish_shp(
+            gdf,
+            shp_path,
+            geoserver_host,
+            geoserver_port,
+            geoserver_username,
+            geoserver_password,
+        )
+        return 0
+    except Exception as e:
+        print(f"Error in publish_geojson_layer_to_geoserver: {e}")
+        return 1
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Convert a GeoPackage layer to GeoJSON format with projection to EPSG:4326."
@@ -70,13 +121,22 @@ def main():
     parser.add_argument("--geoserver_port", help="GeoServer port.")
     parser.add_argument("--geoserver_username", help="GeoServer username.")
     parser.add_argument("--geoserver_password", help="GeoServer password.")
+    parser.add_argument(
+        "--publish_geojson",
+        action="store_true",
+        help="Publish the GeoJSON layer to GeoServer.",
+    )
+    parser.add_argument("geojson_path", help="Path to the GeoJSON file.")
 
     args = parser.parse_args()
 
-    convert_gpkg_to_geojson(args.gpkg_path, args.layer_name, args.output_path)
+    result = convert_gpkg_to_geojson(args.gpkg_path, args.layer_name, args.output_path)
+
+    if result != 0:
+        exit(result)
 
     if args.publish:
-        publish_gpkg_layer_to_geoserver(
+        result = publish_gpkg_layer_to_geoserver(
             args.gpkg_path,
             args.layer_name,
             args.shp_path,
@@ -85,6 +145,18 @@ def main():
             args.geoserver_username,
             args.geoserver_password,
         )
+        exit(result)
+
+    if args.publish_geojson:
+        result = publish_geojson_layer_to_geoserver(
+            args.geojson_path,
+            args.shp_path,
+            args.geoserver_host,
+            args.geoserver_port,
+            args.geoserver_username,
+            args.geoserver_password,
+        )
+        exit(result)
 
 
 if __name__ == "__main__":
