@@ -6,7 +6,6 @@
   "scripts": {
     "start": "webpack-dev-server --mode development --config ./reactapp/config/webpack.config.js",
     "build": "webpack --mode production --config ./reactapp/config/webpack.config.js",
-    "build-css": "node-sass --include-path scss ./reactapp/App.scss -o ./reactapp/App.css",
     "lint": "npx eslint reactapp",
     "test": "jest",
     "test:watch": "npm run test -- --watch"
