@@ -108,34 +108,66 @@ def publish_geojson_layer_to_geoserver(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Convert a GeoPackage layer to GeoJSON format with projection to EPSG:4326."
+        description="Tool for converting and publishing geospatial data"
     )
-    parser.add_argument("gpkg_path", help="Path to the GeoPackage file.")
-    parser.add_argument("layer_name", help="Name of the layer to convert.")
-    parser.add_argument("output_path", help="Output path for the GeoJSON file.")
     parser.add_argument(
-        "--publish", action="store_true", help="Publish the layer to GeoServer."
+        "--convert_to_geojson",
+        action="store_true",
+        help="Convert GeoPackage to GeoJSON",
     )
-    parser.add_argument("--shp_path", help="Path to save the shapefile for GeoServer.")
-    parser.add_argument("--geoserver_host", help="GeoServer host.")
-    parser.add_argument("--geoserver_port", help="GeoServer port.")
-    parser.add_argument("--geoserver_username", help="GeoServer username.")
-    parser.add_argument("--geoserver_password", help="GeoServer password.")
+    parser.add_argument(
+        "--publish", action="store_true", help="Publish the layer to GeoServer"
+    )
     parser.add_argument(
         "--publish_geojson",
         action="store_true",
-        help="Publish the GeoJSON layer to GeoServer.",
+        help="Publish the GeoJSON layer to GeoServer",
     )
-    parser.add_argument("geojson_path", help="Path to the GeoJSON file.")
+
+    # Optional Arguments
+    parser.add_argument(
+        "--gpkg_path", help="Path to the GeoPackage file", required=False
+    )
+    parser.add_argument(
+        "--layer_name",
+        help="Name of the layer in the GeoPackage to convert",
+        required=False,
+    )
+    parser.add_argument(
+        "--output_path", help="Output path for the GeoJSON file", required=False
+    )
+    parser.add_argument(
+        "--geojson_path", help="Path to the GeoJSON file", required=False
+    )
+    parser.add_argument(
+        "--shp_path", help="Path to save the shapefile for GeoServer", required=False
+    )
+    parser.add_argument("--geoserver_host", help="GeoServer host", required=False)
+    parser.add_argument("--geoserver_port", help="GeoServer port", required=False)
+    parser.add_argument(
+        "--geoserver_username", help="GeoServer username", required=False
+    )
+    parser.add_argument(
+        "--geoserver_password", help="GeoServer password", required=False
+    )
 
     args = parser.parse_args()
 
-    result = convert_gpkg_to_geojson(args.gpkg_path, args.layer_name, args.output_path)
-
-    if result != 0:
+    if args.convert_to_geojson:
+        if not args.gpkg_path or not args.layer_name or not args.output_path:
+            parser.error(
+                "--convert_to_geojson requires --gpkg_path, --layer_name, and --output_path."
+            )
+        result = convert_gpkg_to_geojson(
+            args.gpkg_path, args.layer_name, args.output_path
+        )
         exit(result)
 
     if args.publish:
+        if not args.gpkg_path or not args.layer_name or not args.shp_path:
+            parser.error(
+                "--publish requires --gpkg_path, --layer_name, and --shp_path."
+            )
         result = publish_gpkg_layer_to_geoserver(
             args.gpkg_path,
             args.layer_name,
@@ -148,6 +180,8 @@ def main():
         exit(result)
 
     if args.publish_geojson:
+        if not args.geojson_path or not args.shp_path:
+            parser.error("--publish_geojson requires --geojson_path and --shp_path.")
         result = publish_geojson_layer_to_geoserver(
             args.geojson_path,
             args.shp_path,
