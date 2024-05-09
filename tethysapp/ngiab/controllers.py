@@ -76,7 +76,6 @@ def getNexuslayer(request, app_workspace):
 def getNexusTimeSeries(request, app_workspace):
     nexus_id = request.GET.get("nexus_id")
     base_output_path = get_base_output(app_workspace)
-    breakpoint()
 
     nexus_output_file_path = os.path.join(
         base_output_path,

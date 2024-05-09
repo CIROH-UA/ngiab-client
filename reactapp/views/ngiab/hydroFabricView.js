@@ -50,12 +50,10 @@ const HydroFabricView = (props) => {
     if (!state.catchment.id) return;
     actions.reset_nexus();
     props.setIsLoading(true);
-    console.log(state.catchment.id)
     var params = {
       catchment_id: state.catchment.id
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
-      console.log(response)
       actions.set_catchment_series(response.data);
       actions.set_catchment_variable_list(response.variables);
       // actions.set_catchment_variable(response.variable);
