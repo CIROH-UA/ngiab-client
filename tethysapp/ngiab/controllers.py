@@ -4,6 +4,7 @@ import os
 import json
 import geopandas as gpd
 from tethys_sdk.routing import controller
+from .utils import get_base_output, getCatchmentsIds, getNexusIDs
 from .app import App
 
 
@@ -18,16 +19,15 @@ def home(request):
 
 @controller(app_workspace=True)
 def getCatchmentTimeSeries(request, app_workspace):
-    # breakpoint()
     catchment_id = request.GET.get("catchment_id")
     variable_column = request.GET.get("variable_column")
+    base_output_path = get_base_output(app_workspace)
 
     catchment_output_file_path = os.path.join(
-        app_workspace.path,
-        "ngen-data",
-        "outputs",
+        base_output_path,
         "{}.csv".format(catchment_id),
     )
+
     df = pd.read_csv(catchment_output_file_path)
     list_variables = df.columns.tolist()[2:]  # remove time and timestep
     time_col = df.iloc[:, 1]
@@ -53,19 +53,6 @@ def getCatchmentTimeSeries(request, app_workspace):
     )
 
 
-def getCatchmentsIds(app_workspace):
-    catchment_file_path = os.path.join(
-        app_workspace.path, "ngen-data", "config", "catchments.geojson"
-    )
-
-    # Load the GeoJSON file into a GeoPandas DataFrame
-    gdf = gpd.read_file(catchment_file_path)
-
-    # Convert the DataFrame to the "EPSG:3857" coordinate system
-    catchment_ids_list = gdf["divide_id"].tolist()
-    return [{"value": id, "label": id} for id in catchment_ids_list]
-
-
 @controller(app_workspace=True)
 def getNexuslayer(request, app_workspace):
     response_object = {}
@@ -78,11 +65,6 @@ def getNexuslayer(request, app_workspace):
 
     # Convert the DataFrame to the "EPSG:3857" coordinate system
     gdf = gdf.to_crs("EPSG:3857")
-
-    # Convert the DataFrame back to a GeoJSON object
-    # breakpoint()
-    # nexus_ids_list = gdf["id"].tolist()
-    # nexus_select_list = [{"value": id, "label": id} for id in nexus_ids_list]
     data = json.loads(gdf.to_json())
 
     response_object["geojson"] = data
@@ -90,34 +72,17 @@ def getNexuslayer(request, app_workspace):
     return JsonResponse(response_object)
 
 
-def getNexusIDs(app_workspace):
-    nexus_file_path = os.path.join(
-        app_workspace.path, "ngen-data", "config", "nexus.geojson"
-    )
-
-    # Load the GeoJSON file into a GeoPandas DataFrame
-    gdf = gpd.read_file(nexus_file_path)
-
-    # Convert the DataFrame to the "EPSG:3857" coordinate system
-    gdf = gdf.to_crs("EPSG:3857")
-
-    # Convert the DataFrame back to a GeoJSON object
-    # breakpoint()
-    nexus_ids_list = gdf["id"].tolist()
-    return [{"value": id, "label": id} for id in nexus_ids_list]
-
-
 @controller(app_workspace=True)
 def getNexusTimeSeries(request, app_workspace):
-    # breakpoint()
     nexus_id = request.GET.get("nexus_id")
+    base_output_path = get_base_output(app_workspace)
     nexus_output_file_path = os.path.join(
-        app_workspace.path,
-        "ngen-data",
-        "outputs",
+        base_output_path,
         "{}_output.csv".format(nexus_id),
     )
+
     df = pd.read_csv(nexus_output_file_path, header=None)
+
     time_col = df.iloc[:, 1]
     streamflow_cms_col = df.iloc[:, 2]
     data = [
