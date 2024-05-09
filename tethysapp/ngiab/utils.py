@@ -3,13 +3,9 @@ import json
 
 
 def get_base_output(app_workspace):
-    output_relative_path = get_output_path(app_workspace).split("/outputs/")[-1]
-    if output_relative_path == "":
-        output_relative_path = "outputs"
-    else:
-        output_relative_path = f"outputs/{output_relative_path}"
+    output_relative_path = get_output_path(app_workspace).split("outputs")[-1]
     base_output_path = os.path.join(
-        app_workspace.path, "ngen-data", output_relative_path
+        app_workspace.path, "ngen-data", "outputs", output_relative_path
     )
     return base_output_path
 
