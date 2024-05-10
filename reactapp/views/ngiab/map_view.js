@@ -13,8 +13,7 @@ import { initialLayersArray } from 'lib/layersData';
 import { 
   makeNexusLayerParams, 
   makeCatchmentLayer,
-  createClusterVectorLayer,
-  getMapExtentForNexusLayer
+  createClusterVectorLayer
 } from 'lib/mapUtils';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 
@@ -46,13 +45,6 @@ const MapView = (props) => {
     return onEndLoadingLayerEvent(event,props.setIsLoading);
   },[])
 
-  // const getMapExtentForNexusLayerCallBack = useCallback(() => {
-  //   console.log(mapState.mapObject.getLayers().getArray())
-  //   const vector_layer = mapState.mapObject.getLayers().getArray().find(layer => layer.get('name') === 'Nexus Layer');
-  //   if (!vector_layer) return
-  //   console.log(vector_layer)
-  //   return getMapExtentForNexusLayer(vector_layer);
-  // },[mapState.mapObject])
 
   useEffect(() => {
 
@@ -73,8 +65,11 @@ const MapView = (props) => {
         nexusLayerParams['geojsonLayer']=response.geojson;
         
         const nexusClusterLayer = createClusterVectorLayer(nexusLayerParams);
+        
+        const NexusExtent = nexusClusterLayer.options.params.source.getExtent();
 
         mapActions.addLayer(nexusClusterLayer);
+        mapActions.set_extent(NexusExtent);
         mapActions.addLayer(catchmentLayer);
 
     }).catch(error => {
@@ -100,18 +95,6 @@ const MapView = (props) => {
     }
 
   }, []);
-
-  // useEffect(() => {
-  //   // const clusterLayerExtent = getMapExtentForNexusLayerCallBack();
-  //   // console.log(clusterLayerExtent)
-  //   if (mapState.mapObject.getLayers().getArray().length < 1) return
-  //   const vector_layer = mapState.mapObject.getLayers().getArray().find(layer => layer.get('name') === 'Nexus Layer');
-  //   console.log(vector_layer)
-  //   if (!vector_layer) return
-  //   const clusterLayerExtent = getMapExtentForNexusLayer(vector_layer);
-  //   mapActions.set_extent(clusterLayerExtent);
-
-  // }, [mapState.mapObject])
   
   return (
     <Fragment>

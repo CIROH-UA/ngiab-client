@@ -36,14 +36,6 @@ const onStartLoadingLayersEvent = async (evt, setIsLoading) =>{
   setIsLoading(true);
 }
 const onEndLoadingLayerEvent = async (evt, setIsLoading) =>{
-  // var map = evt.map;
-  // map.getLayers().getArray().forEach(layer => {
-  // if (layer.get('name') === 'Nexus Layer'){
-  //   const extent = layer.getSource().getExtent();
-  //   map.getView().fit(extent, {duration: 1300, padding: [50, 50, 50, 50]});
-  // }
-
-  // })
   setIsLoading(false);
 }
 

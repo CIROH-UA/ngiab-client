@@ -270,16 +270,6 @@ const displayFeatureInfo = (event,layer,hydroFabricActions) => {
       });
   };
   
- const getMapExtentForNexusLayer = (layer) => {
-  // layers.forEach(layer => {
-    if (layer.get('name') === 'Nexus Layer'){
-      const extent = layer.getSource().getExtent();
-      return extent
-    }
-  
-  // })
-
- }
 
   const displayFeatureInfoWMS = (event,layer,hydroFabricActions,setIsLoading) => {
       setIsLoading(true)
@@ -333,5 +323,4 @@ export {
   getInfoFromLayers,
   createClusterVectorLayer,
   createVectorLayer,
-  getMapExtentForNexusLayer
 }

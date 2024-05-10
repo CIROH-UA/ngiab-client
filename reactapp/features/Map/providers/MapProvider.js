@@ -94,11 +94,11 @@ export const MapProvider = ({ children, layers= [] }) => {
   // Ensures the hook re-runs only if the map or layer reference changes
   }, [state.state.layers]);
 
-  // useEffect(() => {
-  //   if (!state.state.extent) return;
-  //   // console.log(state.state.extent)
-  //   state.state.mapObject.getView().fit(state.state.extent, {duration: 1300, padding: [50, 50, 50, 50]});
-  // }, [state.state.extent]);
+  useEffect(() => {
+    if (!state.state.extent) return;
+    console.log(state.state.extent)
+    state.state.mapObject.getView().fit(state.state.extent, {duration: 1300, padding: [50, 50, 50, 50]});
+  }, [state.state.extent]);
 
 
   return (
