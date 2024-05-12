@@ -47,7 +47,12 @@ def getCatchmentTimeSeries(request, app_workspace):
                 {"value": variable, "label": variable.lower().replace("_", " ")}
                 for variable in list_variables
             ],
-            "variable": list_variables[0],
+            "variable": (
+                # {"value": variable_column, "label": variable_column.lower()}
+                variable_column
+                if variable_column
+                else list_variables[0]
+            ),
             "catchment_ids": getCatchmentsIds(app_workspace),
         }
     )

@@ -1,192 +1,84 @@
-import am5themes_Animated from "@amcharts/amcharts5/themes/Animated";
-import { 
-  Root, 
-  XYChart, 
-  DateAxis, 
-  ValueAxis, 
-  LineSeries, 
-  Scrollbar, 
-  XYCursor, 
-  Label, 
-  Tooltip, 
-  Exporting, 
-  Annotator,
-  AxisRendererX,
-  AxisRendererY,
-  percent,
-  color
-} from "./charts"; 
-
-// Define handleUpdate outside of the useEffect
-const handleUpdate = (key, chartRef, currentProducts, updateSeries, legendContainer, toggleProduct) => {
-    if (chartRef.current && currentProducts.products[key]) {
-        updateSeries(chartRef.current, currentProducts.products[key],legendContainer,toggleProduct);
-    }
-};
-
-
-const initializeChart = (containerId, title, subtitle) => {
-    const root = Root.new(containerId);    
-    root.setThemes([am5themes_Animated.new(root)]);
-    
-    // Create chart
-    const chart = root.container.children.push(XYChart.new(root, {
-      panX: true,
-      panY: true,
-      wheelX: 'panX',
-      wheelY: 'zoomX',
-      pinchZoomX:true,
-      layout: root.verticalLayout
-    }));
-  
-    // Create axes
-    let xAxis = chart.xAxes.push(
-      DateAxis.new(root, {
-        baseInterval: { timeUnit: "hour", count: 1 },
-        renderer: AxisRendererX.new(root, {}),
-        tooltip: Tooltip.new(root, {}),
-        tooltipDateFormat: "MM/dd HH:mm"
-      })
-    );
-    let yAxis = chart.yAxes.push(
-      ValueAxis.new(root, {
-        renderer: AxisRendererY.new(root, {pan:"zoom"}),
-        tooltip: Tooltip.new(root, {})
-      })
-    );
-  
-    yAxis.children.unshift(Label.new(root, {
-      text: '',
-      textAlign: 'center',
-      y: percent(50),
-      rotation: -90,
-      fontWeight: 'bold'
-    }));
-  
-    xAxis.children.push(Label.new(root, {
-      text: 'Date',
-      textAlign: 'center',
-      x: percent(50),
-      fontWeight: 'bold'
-    }));
-
-    //Today date line
-    var rangeDataItem = xAxis.makeDataItem({
-      value: new Date().setHours(20),
-      above: false
-    });
-
-    var range = xAxis.createAxisRange(rangeDataItem);
-    
-    rangeDataItem.get("grid").set("visible", true);
-    
-    range.get("grid").setAll({
-      stroke: '#88d318',
-      strokeOpacity: 1,
-      strokeWidth:2,
-      width: 40,
-      location: 1
-    });
-  
-    // Add scrollbar
-    // https://www.amcharts.com/docs/v5/charts/xy-chart/scrollbars/
-    chart.set("scrollbarX", Scrollbar.new(root, {
-      orientation: "horizontal",
-      
-    }));
-  
-    // Add cursor
-    var cursor = chart.set("cursor", XYCursor.new(root, {}));
-    cursor.lineX.set("forceHidden", true);
-    cursor.lineY.set("forceHidden", true);
-  
-  
-    chart.events.on("datavalidated", function(ev) {
-      // Get objects of interest
-      var chart = ev.target;
-      var categoryAxis = chart.yAxes.getIndex(0);
-    
-      // Calculate how we need to adjust chart height
-      var adjustHeight = chart.data.length * cellSize - categoryAxis.pixelHeight;
-    
-      // get current chart height
-      var targetHeight = chart.pixelHeight + adjustHeight;
-    
-      // Set it on chart's container
-      chart.svgContainer.htmlElement.style.height = targetHeight + "px";
-    });
-      
-    // add title and subtitle
-      chart.children.unshift(Label.new(root, {
-        text: subtitle,
-        fontSize: 14,
-        textAlign: "center",
-        x: percent(50),
-        centerX: percent(50)
-      }));
-  
-    
-      chart.children.unshift(Label.new(root, {
-        text: title,
-        fontSize: 18,
-        fontWeight: "500",
-        textAlign: "center",
-        x: percent(50),
-        centerX: percent(50),
-        paddingTop: 0,
-        paddingBottom: 0
-      }));
-    
-
-    return chart; // Return the chart,root, and legend for further manipulation if needed
-  };
-  
-
-
-const updateSeries = (chart,item,title,subtitle,variable) => {
-    //delete the first series, so only one time series at a time
-    if (chart.series.values.length > 0) {
-        chart.series.removeIndex(0).dispose();;
-    }
-    //update the title and subtitle
-    chart.allChildren()[0].set("text",`${title}`);
-    chart.allChildren()[1].set("text",`${subtitle}`);
-    
-    let parsedSeries = item.series.map(obj => ({
-        'y': obj.y,
-        'x': new Date(obj['x']).getTime()
-    }));
-    // Create a tooltip
-    
-    var tooltip = Tooltip.new(chart.root, {
-        labelText: `${variable}: {valueY}`
-    })
-    
-    // add the data
-    if(item.series){
-        const series = chart.series.push(LineSeries.new(chart.root, {
-            name: item.id,
-            xAxis: chart.xAxes.values[0],
-            yAxis: chart.yAxes.values[0],
-            valueYField: "y",
-            valueXField: "x",
-            stroke: color('#2c3e50'),
-            fill: color('#2c3e50'),
-            maxDeviation:1,
-            tooltip: tooltip,
-            legendLabelText: `[{stroke}]${item['id']}[/]`,
-            legendRangeLabelText: `[{stroke}]${item['id']}[/]`,
-        }));
-    
-        series.data.setAll(parsedSeries);
-        series.strokes.template.setAll({
-            strokeWidth: 2
-        });
-
-        
-    }
+function createAxisTitle(id, className, text, styles) {
+  // Check if an element with the specified ID already exists
+  if (document.getElementById(id)) {
+    document.getElementById(id).textContent = text;
+    return null; // Return null or handle as needed
+  }
+  else{
+    const title = document.createElement('div');
+    title.id = id;
+    title.className = className;
+    title.textContent = text;
+    Object.assign(title.style, styles);
+    return title;
+  }
 
 }
 
 
-export { handleUpdate, initializeChart, updateSeries}
+const makeAxis = (chartDiv, xAxisContent, yAxisContent) => {
+  const xAxisTitle = createAxisTitle('x-axis-title', 'ct-axis-title ct-axis-title-x', xAxisContent, {
+    position: 'absolute',
+    bottom: '-10px',
+    left: '50%',
+    transform: 'translateX(-50%)'
+  });
+
+  const yAxisTitle = createAxisTitle('y-axis-title', 'ct-axis-title ct-axis-title-y', yAxisContent, {
+    position: 'absolute',
+    top: '50%',
+    left: '-20px',
+    transform: 'translateY(-50%) rotate(-90deg)'
+  });
+
+  if (xAxisTitle) {
+    chartDiv.appendChild(xAxisTitle);
+  }
+  if (yAxisTitle) {
+    chartDiv.appendChild(yAxisTitle);
+  }
+};
+
+const makeTitle = (chartDiv,text)=>{
+  if (!document.getElementById('chart-title')) {
+    const title = document.createElement('div');
+    title.id = 'chart-title';
+    title.textContent = text;
+    title.className = 'chart-title'; // Use this class to style your title
+    title.style.position = 'absolute';
+    title.style.top = '0px';
+    title.style.left = '50%';
+    title.style.transform = 'translateX(-50%)';
+    title.style.fontSize = '20px'; // Example style
+    title.style.fontWeight = 'bold';
+    title.style.color = '#333';
+    chartDiv.appendChild(title);
+  }
+  else{
+    document.getElementById('chart-title').textContent = text;
+  }
+}
+
+
+
+const addAnimationToLineChart = (chart, easings) =>{
+  chart.on('draw', data => {
+    if (data.type === 'line' || data.type === 'area') {
+      data.element.animate({
+        d: {
+          begin: 2000 * data.index,
+          dur: 2000,
+          from: data.path
+            .clone()
+            .scale(1, 0)
+            .translate(0, data.chartRect.height())
+            .stringify(),
+          to: data.path.clone().stringify(),
+          easing: easings.easeOutQuint
+        }
+      });
+    }
+  });
+}
+
+export { makeAxis, addAnimationToLineChart,makeTitle}

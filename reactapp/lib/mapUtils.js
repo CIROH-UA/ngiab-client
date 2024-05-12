@@ -294,12 +294,10 @@ const displayFeatureInfo = (event,layer,hydroFabricActions) => {
                 data_catchment_id = data.features[0].properties['id']
               }
             } catch (error) {
-              console.log('Error fetching data:', error)
+              setIsLoading(false)
+              return
             }
-            
-            // console.log(data_catchment_id)
             hydroFabricActions.set_catchment_id(data_catchment_id);
-            // setIsLoading(false)
   
           })     // Log the actual JSON data
           .catch(error => {
@@ -309,7 +307,6 @@ const displayFeatureInfo = (event,layer,hydroFabricActions) => {
       }
       else{
         setIsLoading(false)
-  
       }
   
   }

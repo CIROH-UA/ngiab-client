@@ -13,9 +13,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@amcharts/amcharts5": "^5.9.4",
     "axios": "^0.27.2",
     "bootstrap": "^5.1.3",
+    "chartist": "^1.3.0",
     "color": "^4.2.3",
     "css-loader": "^6.5.1",
     "dotenv": "^16.0.1",

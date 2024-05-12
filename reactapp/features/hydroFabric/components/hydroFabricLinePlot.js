@@ -1,54 +1,108 @@
-import { useEffect ,useRef } from "react";
+import { useEffect, useRef } from 'react';
 import { useHydroFabricContext } from "../hooks/useHydroFabricContext";
-import { initializeChart, updateSeries } from "../lib/chartAuxiliary";
+// import Chartist from 'chartist';
+import { LineChart, FixedScaleAxis, easings } from 'chartist';
+import { makeAxis,addAnimationToLineChart,makeTitle } from '../lib/chartAuxiliary';
+import 'chartist/dist/index.css';
+import '../css/chart.css';
+
+
+
+const chartOptions = {
+  axisX: {
+    type: FixedScaleAxis,
+    divisor: 5,
+    labelInterpolationFnc: function(value) {
+      return new Date(value).toLocaleDateString();
+    }
+  },
+  axisY: {
+    offset: 20
+  },
+  showArea: true,
+  fullWidth: true,
+  showPoint: false,
+  chartPadding: {
+    left: 70,
+    top: 50
+  }
+};
 
 
 const HydroFabricLinePlot = (props) => {
+  // Reference to the chart container
   const chartRef = useRef(null);
-  const {state, actions} = useHydroFabricContext();
-  const variable = `${state.catchment.id ? state.catchment.variable : 'streamflow'}`;
+  const chartInstance = useRef(null);
+
+  const { state, actions } = useHydroFabricContext();
 
   useEffect(() => {
-    chartRef.current = initializeChart('chartdiv', props.title , props.subtitle) // initialize the chart
-    return () => {
-      // if full screen has changed, reset the chart
-      if (chartRef.current && props.singleRowOn ){
-        chartRef.current && chartRef.current.dispose();
-        actions.reset();
-      }      
-    }  
-  }, []);
+    if (!state.nexus.series) return;    
+      const nexusSeries = state.nexus.series.map(point => ({x: new Date(point.x), y: point.y}));
+      const chartData = {
+        series: [
+          { name: 'Nexus', data: nexusSeries },
+        ]
+      };
 
-  useEffect(() => {
-    if (!state.nexus.series) return
-    updateSeries(chartRef.current,state.nexus,props.title, props.subtitle,variable)
+      chartInstance.current = new LineChart (chartRef.current, chartData, chartOptions);
+      
+      addAnimationToLineChart(chartInstance.current, easings)
+      makeAxis(chartRef.current,'Date', 'StreamFlow' )
+      makeTitle(chartRef.current, `StreamFlow: ${state.nexus.id}`)
+
+
     return () => {
-      if (chartRef.current && props.singleRowOn) {
-        chartRef.current.dispose();
+      if(chartInstance && props.singleRowOn){
         actions.reset_nexus();
+        chartInstance.current.detach();
+        document.getElementById('x-axis-title')?.remove();
+        document.getElementById('y-axis-title')?.remove();
       }
     };
   }, [state.nexus.series]);
 
 
   useEffect(() => {
-    if (!state.catchment.series) return
-    updateSeries(chartRef.current,state.catchment,props.title, props.subtitle, variable)
+    if (!state.catchment.series) return;
+    if (chartRef.current) {
+      const catchmentSeries = state.catchment.series.map(point => ({x: new Date(point.x), y: point.y}));
+
+      const chartData = {
+        series: [
+          { name: 'Catchment', data: catchmentSeries }
+        ]
+      };
+
+      chartInstance.current = new LineChart(chartRef.current, chartData, chartOptions);
+      
+      addAnimationToLineChart(chartInstance.current, easings)
+      makeAxis(
+        chartRef.current,
+        'Time (Date)', 
+        `${state.catchment.variable ? state.catchment.variable.toLowerCase().replace(/_/g, " ") : state.catchment.variable_list ? state.catchment.variable_list[0].label : null}`
+      )
+
+      
+      makeTitle(
+        chartRef.current, 
+        `${state.catchment.variable ? state.catchment.variable.toLowerCase().replace(/_/g, " ") : state.catchment.variable_list ? state.catchment.variable_list[0].label : null}: ${state.catchment.id} `)
+    }
+
     return () => {
-      if (chartRef.current && props.singleRowOn) {
-        chartRef.current.dispose();
+      if(props.singleRowOn){
         actions.reset_catchment();
+        chartRef.current.detach();
+        document.getElementById('x-axis-title')?.remove();
+        document.getElementById('y-axis-title')?.remove();      
       }
+
     };
-  }, [state.catchment.series]);
+  }, [state.catchment.series]); // Re-run effect if series data changes
 
+  return (
+    <div ref={chartRef} style={{ width: "100%", height: "90%", position: "relative"}}></div>
+  );
+};
 
- return (  
-    <div id="chartdiv" style={{ width: "100%", height: "100%" }}></div>
-    
- )
-
-}
 export default HydroFabricLinePlot;
-
-
