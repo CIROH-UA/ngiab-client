@@ -28,6 +28,7 @@ ENV TETHYS_DB_PORT=
 ENV ENABLE_OPEN_PORTAL=True
 ENV PORTAL_SUPERUSER_NAME=admin
 ENV PORTAL_SUPERUSER_PASSWORD=pass
+ENV PROJ_LIB=/opt/conda/envs/tethys/share/proj
 
 #######################
 # INSTALL APPLICATION #
