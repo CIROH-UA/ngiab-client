@@ -8,11 +8,11 @@ on:
       - 'v*'
   pull_request:
     branches:
-      - 'master'
+      - 'main'
 env:
-  DOCKER_HUB_ORG: gioelkin
+  DOCKER_HUB_ORG: awiciroh
   DOCKER_REPO: tethys-ngiab
-  REGISTRY_IMAGE: gioelkin/tethys-ngiab
+  REGISTRY_IMAGE: awiciroh/tethys-ngiab
 
 jobs:
   build:
