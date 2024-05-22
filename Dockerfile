@@ -49,3 +49,6 @@ EXPOSE 80
 #######
 
 CMD bash run.sh
+
+HEALTHCHECK --start-period=60s --interval=60s --retries=4 \
+    CMD ./liveness-probe.sh
