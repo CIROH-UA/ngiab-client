@@ -1,5 +1,5 @@
 
-FROM tethysplatform/tethys-core:dev
+FROM gioelkin/tethys-ngiab:dev-r1
 
 ###################
 # BUILD ARGUMENTS #
