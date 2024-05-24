@@ -1,5 +1,5 @@
 
-FROM tethysplatform/tethys-core:dev
+FROM --platform=linux/amd64 tethysplatform/tethys-core:dev
 
 ###################
 # BUILD ARGUMENTS #
@@ -49,6 +49,3 @@ EXPOSE 80
 #######
 
 CMD bash run.sh
-
-HEALTHCHECK --start-period=240s --interval=60s --retries=10 \
-    CMD ./liveness-probe.sh
