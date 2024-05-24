@@ -1,5 +1,5 @@
 
-FROM --platform=linux/arm64 tethysplatform/tethys-core:dev
+FROM tethysplatform/tethys-core:dev
 
 ###################
 # BUILD ARGUMENTS #
