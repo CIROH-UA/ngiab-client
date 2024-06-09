@@ -1,5 +1,36 @@
 import os
 import json
+import pandas as pd
+import glob
+
+
+def _get_base_troute_output(app_workspace):
+    base_output_path = os.path.join(
+        app_workspace.path, "ngen-data", "outputs", "troute"
+    )
+    return base_output_path
+
+
+def get_troute_df(app_workspace):
+    base_output_path = _get_base_troute_output(app_workspace)
+    troute_output_files = glob.glob(base_output_path + "/*.csv")
+    df = pd.read_csv(troute_output_files[0])
+    return df
+
+
+def check_troute_id(df, id):
+    if int(id) in df["feature_id"].values:
+        return True
+    return False
+
+
+def get_troute_vars(df):
+    list_variables = df.columns.tolist()[3:]  # remove feature, time and t0
+
+    variables = [
+        {"value": variable, "label": variable.lower()} for variable in list_variables
+    ]
+    return variables
 
 
 def get_base_output(app_workspace):

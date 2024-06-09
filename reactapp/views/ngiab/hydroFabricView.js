@@ -22,6 +22,7 @@ const HydroFabricView = (props) => {
     appAPI.getNexusTimeSeries(params).then((response) => {
       actions.set_nexus_series(response.data);
       actions.set_nexus_list(response.nexus_ids);
+      actions.set_troute_id(state.nexus.id);
       props.toggleSingleRow(false);
     }).catch((error) => {
       console.log("Error fetching nexus time series", error);
@@ -32,6 +33,51 @@ const HydroFabricView = (props) => {
     }
 
   }, [state.nexus.id]);
+
+  useEffect(() => {
+    if (!state.troute.id) return;
+    props.setIsLoading(true);
+
+    var params = {
+      troute_id: state.troute.id
+    }
+    appAPI.getTrouteVariables(params).then((response) => {
+      actions.set_troute_variable_list(response.troute_variables);
+      props.toggleSingleRow(false);
+      props.setIsLoading(false);
+    }).catch((error) => {
+      props.setIsLoading(false);
+      console.log("Error fetching troute variables", error);
+    })
+    return  () => {
+      if (state.troute.id) return;
+      actions.reset_troute();
+    }
+  },[state.troute.id]);
+
+
+  useEffect(() => {
+    if (!state.troute.variable || !state.troute.id) return;
+    // actions.reset_nexus();
+    props.setIsLoading(true);
+    var params = {
+      troute_id: state.troute.id,
+      troute_variable: state.troute.variable
+    }
+    appAPI.getTrouteTimeSeries(params).then((response) => {
+      actions.set_troute_series(response.data);
+      props.toggleSingleRow(false);
+      props.setIsLoading(false);
+    }).catch((error) => {
+      props.setIsLoading(false);
+      console.log("Error fetching troute time series", error);
+    })
+    return  () => {
+      if (state.troute.id) return;
+      actions.reset_troute();
+    }
+  },[state.troute.variable]);
+
 
 
   useEffect(() => {
@@ -132,8 +178,22 @@ const HydroFabricView = (props) => {
               }
             />
         </Fragment>
-
+        
         }
+
+        {
+          state.troute.id &&
+          <Fragment>
+            <h5>Troute</h5>
+            <label>Current Variable</label>
+            <SelectComponent 
+              optionsList={state.troute.variable_list} 
+              onChangeHandler={actions.set_troute_variable}
+            />
+          </Fragment>
+        }
+
+
       </SelectContainer>
       <Suspense fallback={<LoadingAnimation />}>
        <HydroFabricPlotContainer>
