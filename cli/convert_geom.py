@@ -15,6 +15,7 @@ def _read_and_transform(gpkg_path, layer_name):
 def _create_and_publish_shp(
     gdf,
     shp_path,
+    store_name,
     geoserver_host,
     geoserver_port,
     geoserver_username,
@@ -39,7 +40,7 @@ def _create_and_publish_shp(
 
     geo.create_shp_datastore(
         path=f"{shp_path}.zip",
-        store_name="hydrofabrics",
+        store_name=f"{store_name}",
         workspace="nextgen",
     )
     # remove zip file
@@ -77,6 +78,7 @@ def publish_gpkg_layer_to_geoserver(
     gpkg_path,
     layer_name,
     shp_path,
+    store_name,
     geoserver_host,
     geoserver_port,
     geoserver_username,
@@ -87,6 +89,7 @@ def publish_gpkg_layer_to_geoserver(
         _create_and_publish_shp(
             gdf,
             shp_path,
+            store_name,
             geoserver_host,
             geoserver_port,
             geoserver_username,
@@ -101,6 +104,7 @@ def publish_gpkg_layer_to_geoserver(
 def publish_geojson_layer_to_geoserver(
     geojson_path,
     shp_path,
+    store_name,
     geoserver_host,
     geoserver_port,
     geoserver_username,
@@ -111,6 +115,7 @@ def publish_geojson_layer_to_geoserver(
         _create_and_publish_shp(
             gdf,
             shp_path,
+            store_name,
             geoserver_host,
             geoserver_port,
             geoserver_username,
@@ -163,6 +168,7 @@ def main():
     parser.add_argument(
         "--shp_path", help="Path to save the shapefile for GeoServer", required=False
     )
+    parser.add_argument("--store_name", help="Shapefile store name", required=False)
     parser.add_argument("--geoserver_host", help="GeoServer host", required=False)
     parser.add_argument("--geoserver_port", help="GeoServer port", required=False)
     parser.add_argument(
@@ -193,6 +199,7 @@ def main():
             args.gpkg_path,
             args.layer_name,
             args.shp_path,
+            args.store_name,
             args.geoserver_host,
             args.geoserver_port,
             args.geoserver_username,
@@ -206,6 +213,7 @@ def main():
         result = publish_geojson_layer_to_geoserver(
             args.geojson_path,
             args.shp_path,
+            args.store_name,
             args.geoserver_host,
             args.geoserver_port,
             args.geoserver_username,
