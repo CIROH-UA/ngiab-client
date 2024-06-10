@@ -1,55 +1,28 @@
-import geopandas as gpd
 import argparse
 from geo.Geoserver import Geoserver
-import os
-import zipfile
+from .utils import _read_and_transform, _create_and_publish_shp
 
 
-def read_and_transform(gpkg_path, layer_name):
-    gdf = gpd.read_file(gpkg_path, layer=layer_name)
-    if gdf.crs.to_string() != "EPSG:5070":
-        gdf = gdf.to_crs(epsg=5070)
-    return gdf
-
-
-def create_and_publish_shp(
-    gdf,
-    shp_path,
-    geoserver_host,
-    geoserver_port,
-    geoserver_username,
-    geoserver_password,
+def create_workspace(
+    geoserver_host, geoserver_port, geoserver_username, geoserver_password
 ):
-    gdf.to_file(f"{shp_path}.shp", driver="ESRI Shapefile")
-    shp_files = [f"{shp_path}.{ext}" for ext in ["shp", "shx", "dbf", "prj"]]
+    try:
+        geo = Geoserver(
+            f"http://{geoserver_host}:{geoserver_port}/geoserver",
+            username=geoserver_username,
+            password=geoserver_password,
+        )
+        geo.create_workspace(workspace="nextgen")
 
-    with zipfile.ZipFile(f"{shp_path}.zip", "w") as zipf:
-        for file in shp_files:
-            zipf.write(file, arcname=os.path.basename(file))
-
-    # remove shapefiles
-    for file in shp_files:
-        os.remove(file)
-
-    geo = Geoserver(
-        f"http://{geoserver_host}:{geoserver_port}/geoserver",
-        username=geoserver_username,
-        password=geoserver_password,
-    )
-    geo.create_workspace(workspace="nextgen")
-
-    geo.create_shp_datastore(
-        path=f"{shp_path}.zip",
-        store_name="hydrofabrics",
-        workspace="nextgen",
-    )
-    # remove zip file
-    os.remove(f"{shp_path}.zip")
+    except Exception as e:
+        print(f"Error in create_workspace: {e}")
+        return 1
+    return 0
 
 
 def convert_gpkg_to_geojson(gpkg_path, layer_name, output_path):
     try:
-        gdf = read_and_transform(gpkg_path, layer_name)
+        gdf = _read_and_transform(gpkg_path, layer_name)
         gdf.to_file(output_path, driver="GeoJSON")
         return 0
     except Exception as e:
@@ -67,8 +40,8 @@ def publish_gpkg_layer_to_geoserver(
     geoserver_password,
 ):
     try:
-        gdf = read_and_transform(gpkg_path, layer_name)
-        create_and_publish_shp(
+        gdf = _read_and_transform(gpkg_path, layer_name)
+        _create_and_publish_shp(
             gdf,
             shp_path,
             geoserver_host,
@@ -91,8 +64,8 @@ def publish_geojson_layer_to_geoserver(
     geoserver_password,
 ):
     try:
-        gdf = read_and_transform(geojson_path, None)
-        create_and_publish_shp(
+        gdf = _read_and_transform(geojson_path, None)
+        _create_and_publish_shp(
             gdf,
             shp_path,
             geoserver_host,
@@ -122,6 +95,11 @@ def main():
         "--publish_geojson",
         action="store_true",
         help="Publish the GeoJSON layer to GeoServer",
+    )
+    parser.add_argument(
+        "--create_workspace",
+        action="store_true",
+        help="Create a workspace in GeoServer",
     )
 
     # Optional Arguments
@@ -185,6 +163,24 @@ def main():
         result = publish_geojson_layer_to_geoserver(
             args.geojson_path,
             args.shp_path,
+            args.geoserver_host,
+            args.geoserver_port,
+            args.geoserver_username,
+            args.geoserver_password,
+        )
+        exit(result)
+
+    if args.create_workspace:
+        if (
+            not args.geoserver_host
+            or not args.geoserver_port
+            or not args.geoserver_username
+            or not args.geoserver_password
+        ):
+            parser.error(
+                "--create_workspace requires --geoserver_host, --geoserver_port, --geoserver_username, and --geoserver_password."
+            )
+        result = create_workspace(
             args.geoserver_host,
             args.geoserver_port,
             args.geoserver_username,
