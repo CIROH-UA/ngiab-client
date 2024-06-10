@@ -13,7 +13,6 @@ const chartOptions = {
     type: FixedScaleAxis,
     divisor: 10,
     labelInterpolationFnc: function(value) {
-      console.log(value)
       return new Date(value).toLocaleDateString();
     }
   },
@@ -57,7 +56,6 @@ const HydroFabricLinePlot = (props) => {
 
 
     return () => {
-      console.log("retuirnin")
       if(chartInstance && props.singleRowOn){
         actions.reset_nexus();
         chartInstance.current.detach();
@@ -133,7 +131,6 @@ const HydroFabricLinePlot = (props) => {
 
     return () => {
       if(props.singleRowOn){
-        console.log(props.singleRowOn)
         actions.reset_troute();
         chartRef.current.detach();
         document.getElementById('x-axis-title')?.remove();

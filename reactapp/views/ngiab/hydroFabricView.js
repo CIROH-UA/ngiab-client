@@ -37,7 +37,6 @@ const HydroFabricView = (props) => {
   useEffect(() => {
     if (!state.troute.id) return;
     props.setIsLoading(true);
-
     var params = {
       troute_id: state.troute.id
     }
@@ -58,7 +57,6 @@ const HydroFabricView = (props) => {
 
   useEffect(() => {
     if (!state.troute.variable || !state.troute.id) return;
-    // actions.reset_nexus();
     props.setIsLoading(true);
     var params = {
       troute_id: state.troute.id,
@@ -92,6 +90,7 @@ const HydroFabricView = (props) => {
       actions.set_catchment_variable_list(response.variables);
       actions.set_catchment_variable(null);
       actions.set_catchment_list(response.catchment_ids);
+      actions.set_troute_id(state.catchment.id);
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     }).catch((error) => {
