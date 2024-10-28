@@ -20,6 +20,7 @@ COPY . ${TETHYS_HOME}/apps/ngiab
 # ENVIRONMENT #
 ###############
 ENV TETHYS_DB_ENGINE=django.db.backends.sqlite3
+ENV SKIP_DB_SETUP=True
 ENV TETHYS_DB_NAME=
 ENV TETHYS_DB_USERNAME=
 ENV TETHYS_DB_PASSWORD=
@@ -48,4 +49,4 @@ EXPOSE 80
 # RUN #
 #######
 
-CMD bash run.sh
+CMD ["bash", "run.sh", "--skip-perm"]
