@@ -32,7 +32,7 @@ ENV PROJ_LIB=/opt/conda/envs/tethys/share/proj
 
 
 RUN apt-get update \
-    && apt-get -y install libquadmath0 \
+    && apt-get -y install gfortran \
     && rm -rf /var/lib/apt/lists/*
 
 #######################
