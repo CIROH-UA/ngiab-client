@@ -13,6 +13,8 @@ ARG MICRO_TETHYS=true \
 # ADD APPLICATION FILES #
 #########################
 COPY . ${TETHYS_HOME}/apps/ngiab
+COPY run.sh ${TETHYS_HOME}/run.sh
+
 
 
 ###############
@@ -55,4 +57,4 @@ EXPOSE 80
 # RUN #
 #######
 
-CMD ["bash", "simplified_run.sh"]
+CMD ["bash", "run.sh"]
