@@ -9,7 +9,6 @@ ARG MICRO_TETHYS=true \
     MAMBA_DOCKERFILE_ACTIVATE=1
 
 
-
 #########################
 # ADD APPLICATION FILES #
 #########################
@@ -30,6 +29,11 @@ ENV ENABLE_OPEN_PORTAL=True
 ENV PORTAL_SUPERUSER_NAME=admin
 ENV PORTAL_SUPERUSER_PASSWORD=pass
 ENV PROJ_LIB=/opt/conda/envs/tethys/share/proj
+
+
+RUN apt-get update \
+    && apt-get -y install libquadmath0 \
+    && rm -rf /var/lib/apt/lists/*
 
 #######################
 # INSTALL APPLICATION #
