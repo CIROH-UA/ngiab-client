@@ -55,4 +55,4 @@ EXPOSE 80
 # RUN #
 #######
 
-CMD ["bash", "run.sh", "--skip-perm"]
+CMD ["bash", "simplified_run.sh"]
