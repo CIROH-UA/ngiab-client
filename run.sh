@@ -30,8 +30,8 @@ salt-call --local state.apply
 
 echo_status "Changing permissions"
 chown -R www: /usr/lib/tethys
-chmod -R www: /var/lib/tethys_persist
-chmod -R www: /var/logs/tethys
+chown -R www: /var/lib/tethys_persist
+chown -R www: /var/logs/tethys
 
 echo_status "Starting supervisor"
 
