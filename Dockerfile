@@ -57,4 +57,7 @@ EXPOSE 80
 # RUN #
 #######
 
-CMD ["bash", "run.sh"]
+CMD bash run.sh
+
+HEALTHCHECK --start-period=1s \
+    CMD ./liveness-probe.sh
