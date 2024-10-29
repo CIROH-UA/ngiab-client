@@ -30,7 +30,7 @@ ENV PORTAL_SUPERUSER_NAME=admin
 ENV PORTAL_SUPERUSER_PASSWORD=pass
 ENV PROJ_LIB=/opt/conda/envs/tethys/share/proj
 
-# fix error for numpy not beign imported
+# fix error for numpy not being imported. libquadmath not found
 RUN apt-get update \
     && apt-get -y install gfortran \
     && rm -rf /var/lib/apt/lists/*
@@ -50,7 +50,7 @@ RUN cd ${TETHYS_HOME}/apps/ngiab && \
     chown -R ${NGINX_USER}: ${STATIC_ROOT} && \
     chown -R ${NGINX_USER}: ${WORKSPACE_ROOT} && \
     chown -R ${NGINX_USER}: ${MEDIA_ROOT} && \
-    chown -R ${NGINX_USER}: ${TETHYSAPP_DIR} && \
+    chown -R ${NGINX_USER}: ${TETHYS_HOME}/apps/ngiab && \
     chown -R ${NGINX_USER}: ${TETHYS_HOME}
 
 #########
