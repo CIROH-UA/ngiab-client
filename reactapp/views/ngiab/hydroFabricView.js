@@ -35,6 +35,7 @@ const HydroFabricView = (props) => {
   }, [state.nexus.id]);
 
   useEffect(() => {
+    console.log("here")
     if (!state.troute.id) return;
     props.setIsLoading(true);
     var params = {
@@ -75,7 +76,6 @@ const HydroFabricView = (props) => {
       actions.reset_troute();
     }
   },[state.troute.variable]);
-
 
 
   useEffect(() => {
