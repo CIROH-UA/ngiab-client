@@ -30,7 +30,7 @@ ENV PORTAL_SUPERUSER_NAME=admin
 ENV PORTAL_SUPERUSER_PASSWORD=pass
 ENV PROJ_LIB=/opt/conda/envs/tethys/share/proj
 
-
+# fix error for numpy not beign imported
 RUN apt-get update \
     && apt-get -y install gfortran \
     && rm -rf /var/lib/apt/lists/*
@@ -38,12 +38,20 @@ RUN apt-get update \
 #######################
 # INSTALL APPLICATION #
 #######################
+
 RUN cd ${TETHYS_HOME}/apps/ngiab && \ 
     micromamba install --yes -c conda-forge --file requirements.txt  && \
     micromamba remove pyarrow && micromamba install --yes -c conda-forge pyarrow && \
     micromamba clean --all --yes && \
     npm install && npm run build && \
-    tethys install -d -N
+    tethys install -d -N && \
+    export NGINX_USER=$(grep 'user .*;' /etc/nginx/nginx.conf | awk '{print $2}' | awk -F';' '{print $1}') && \
+    chown -R ${NGINX_USER}: ${TETHYS_PERSIST} && \
+    chown -R ${NGINX_USER}: ${STATIC_ROOT} && \
+    chown -R ${NGINX_USER}: ${WORKSPACE_ROOT} && \
+    chown -R ${NGINX_USER}: ${MEDIA_ROOT} && \
+    chown -R ${NGINX_USER}: ${TETHYSAPP_DIR} && \
+    chown -R ${NGINX_USER}: ${TETHYS_HOME}
 
 #########
 # PORTS #
