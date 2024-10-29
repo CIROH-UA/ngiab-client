@@ -44,14 +44,7 @@ RUN cd ${TETHYS_HOME}/apps/ngiab && \
     micromamba remove pyarrow && micromamba install --yes -c conda-forge pyarrow && \
     micromamba clean --all --yes && \
     npm install && npm run build && \
-    tethys install -d -N && \
-    export NGINX_USER=$(grep 'user .*;' /etc/nginx/nginx.conf | awk '{print $2}' | awk -F';' '{print $1}') && \
-    chown -R ${NGINX_USER}: ${TETHYS_PERSIST} && \
-    chown -R ${NGINX_USER}: ${STATIC_ROOT} && \
-    chown -R ${NGINX_USER}: ${WORKSPACE_ROOT} && \
-    chown -R ${NGINX_USER}: ${MEDIA_ROOT} && \
-    chown -R ${NGINX_USER}: ${TETHYS_HOME}/apps/ngiab && \
-    chown -R ${NGINX_USER}: ${TETHYS_HOME}
+    tethys install -d -N
 
 #########
 # PORTS #
