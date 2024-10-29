@@ -121,7 +121,7 @@ def getTrouteVariables(request, app_workspace):
             vars = get_troute_vars(df)
         else:
             vars = []
-    except Exception as e:
+    except Exception:
         vars = []
 
     return JsonResponse({"troute_variables": vars})
@@ -133,22 +133,15 @@ def getTrouteTimeSeries(request, app_workspace):
     clean_troute_id = troute_id.split("-")[1]
     variable_column = request.GET.get("troute_variable")
     df = get_troute_df(app_workspace)
-    df_sliced_by_id = df[df["feature_id"] == int(clean_troute_id)]
-
-    df_sliced_by_id["t0"] = pd.to_datetime(df_sliced_by_id["t0"].iloc[0])
-
-    # Convert the time_offset column to timedelta
-    df_sliced_by_id["time"] = pd.to_timedelta(df_sliced_by_id["time"])
-
-    df_sliced_by_id["t1"] = df_sliced_by_id["t0"] + df_sliced_by_id["time"]
+    df_sliced_by_id = df[df["featureID"] == int(clean_troute_id)]
     try:
-        time_col = df_sliced_by_id["t1"]
+        time_col = df_sliced_by_id["current_time"]
         var_col = df_sliced_by_id[variable_column]
         data = [
             {"x": time, "y": val}
             for time, val in zip(time_col.tolist(), var_col.tolist())
         ]
-    except Exception as e:
+    except Exception:
         data = []
 
     return JsonResponse({"data": data})

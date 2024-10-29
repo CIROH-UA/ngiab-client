@@ -19,7 +19,7 @@ def get_troute_df(app_workspace):
 
 
 def check_troute_id(df, id):
-    if int(id) in df["feature_id"].values:
+    if int(id) in df["featureID"].values:
         return True
     return False
 
