@@ -1,20 +1,21 @@
-import geopandas as gpd
 import argparse
 from geo.Geoserver import Geoserver
-import os
+import geopandas as gpd
 import zipfile
+import os
 
 
-def read_and_transform(gpkg_path, layer_name):
+def _read_and_transform(gpkg_path, layer_name):
     gdf = gpd.read_file(gpkg_path, layer=layer_name)
     if gdf.crs.to_string() != "EPSG:5070":
         gdf = gdf.to_crs(epsg=5070)
     return gdf
 
 
-def create_and_publish_shp(
+def _create_and_publish_shp(
     gdf,
     shp_path,
+    store_name,
     geoserver_host,
     geoserver_port,
     geoserver_username,
@@ -36,20 +37,36 @@ def create_and_publish_shp(
         username=geoserver_username,
         password=geoserver_password,
     )
-    geo.create_workspace(workspace="nextgen")
 
     geo.create_shp_datastore(
         path=f"{shp_path}.zip",
-        store_name="hydrofabrics",
+        store_name=f"{store_name}",
         workspace="nextgen",
     )
     # remove zip file
     os.remove(f"{shp_path}.zip")
 
 
+def create_workspace(
+    geoserver_host, geoserver_port, geoserver_username, geoserver_password
+):
+    try:
+        geo = Geoserver(
+            f"http://{geoserver_host}:{geoserver_port}/geoserver",
+            username=geoserver_username,
+            password=geoserver_password,
+        )
+        geo.create_workspace(workspace="nextgen")
+
+    except Exception as e:
+        print(f"Error in create_workspace: {e}")
+        return 1
+    return 0
+
+
 def convert_gpkg_to_geojson(gpkg_path, layer_name, output_path):
     try:
-        gdf = read_and_transform(gpkg_path, layer_name)
+        gdf = _read_and_transform(gpkg_path, layer_name)
         gdf.to_file(output_path, driver="GeoJSON")
         return 0
     except Exception as e:
@@ -61,16 +78,18 @@ def publish_gpkg_layer_to_geoserver(
     gpkg_path,
     layer_name,
     shp_path,
+    store_name,
     geoserver_host,
     geoserver_port,
     geoserver_username,
     geoserver_password,
 ):
     try:
-        gdf = read_and_transform(gpkg_path, layer_name)
-        create_and_publish_shp(
+        gdf = _read_and_transform(gpkg_path, layer_name)
+        _create_and_publish_shp(
             gdf,
             shp_path,
+            store_name,
             geoserver_host,
             geoserver_port,
             geoserver_username,
@@ -85,16 +104,18 @@ def publish_gpkg_layer_to_geoserver(
 def publish_geojson_layer_to_geoserver(
     geojson_path,
     shp_path,
+    store_name,
     geoserver_host,
     geoserver_port,
     geoserver_username,
     geoserver_password,
 ):
     try:
-        gdf = read_and_transform(geojson_path, None)
-        create_and_publish_shp(
+        gdf = _read_and_transform(geojson_path, None)
+        _create_and_publish_shp(
             gdf,
             shp_path,
+            store_name,
             geoserver_host,
             geoserver_port,
             geoserver_username,
@@ -123,6 +144,11 @@ def main():
         action="store_true",
         help="Publish the GeoJSON layer to GeoServer",
     )
+    parser.add_argument(
+        "--create_workspace",
+        action="store_true",
+        help="Create a workspace in GeoServer",
+    )
 
     # Optional Arguments
     parser.add_argument(
@@ -142,6 +168,7 @@ def main():
     parser.add_argument(
         "--shp_path", help="Path to save the shapefile for GeoServer", required=False
     )
+    parser.add_argument("--store_name", help="Shapefile store name", required=False)
     parser.add_argument("--geoserver_host", help="GeoServer host", required=False)
     parser.add_argument("--geoserver_port", help="GeoServer port", required=False)
     parser.add_argument(
@@ -172,6 +199,7 @@ def main():
             args.gpkg_path,
             args.layer_name,
             args.shp_path,
+            args.store_name,
             args.geoserver_host,
             args.geoserver_port,
             args.geoserver_username,
@@ -185,6 +213,25 @@ def main():
         result = publish_geojson_layer_to_geoserver(
             args.geojson_path,
             args.shp_path,
+            args.store_name,
+            args.geoserver_host,
+            args.geoserver_port,
+            args.geoserver_username,
+            args.geoserver_password,
+        )
+        exit(result)
+
+    if args.create_workspace:
+        if (
+            not args.geoserver_host
+            or not args.geoserver_port
+            or not args.geoserver_username
+            or not args.geoserver_password
+        ):
+            parser.error(
+                "--create_workspace requires --geoserver_host, --geoserver_port, --geoserver_username, and --geoserver_password."
+            )
+        result = create_workspace(
             args.geoserver_host,
             args.geoserver_port,
             args.geoserver_username,

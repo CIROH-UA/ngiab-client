@@ -4,7 +4,15 @@ import os
 import json
 import geopandas as gpd
 from tethys_sdk.routing import controller
-from .utils import get_base_output, getCatchmentsIds, getNexusIDs
+from .utils import (
+    get_base_output,
+    getCatchmentsIds,
+    getNexusIDs,
+    check_troute_id,
+    get_troute_vars,
+    get_troute_df,
+)
+
 from .app import App
 
 
@@ -95,4 +103,45 @@ def getNexusTimeSeries(request, app_workspace):
         for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
     ]
 
-    return JsonResponse({"data": data, "nexus_ids": getNexusIDs(app_workspace)})
+    return JsonResponse(
+        {
+            "data": data,
+            "nexus_ids": getNexusIDs(app_workspace),
+        }
+    )
+
+
+@controller(app_workspace=True)
+def getTrouteVariables(request, app_workspace):
+    troute_id = request.GET.get("troute_id")
+    clean_troute_id = troute_id.split("-")[1]
+    df = get_troute_df(app_workspace)
+    try:
+        if check_troute_id(df, clean_troute_id):
+            vars = get_troute_vars(df)
+        else:
+            vars = []
+    except Exception:
+        vars = []
+
+    return JsonResponse({"troute_variables": vars})
+
+
+@controller(app_workspace=True)
+def getTrouteTimeSeries(request, app_workspace):
+    troute_id = request.GET.get("troute_id")
+    clean_troute_id = troute_id.split("-")[1]
+    variable_column = request.GET.get("troute_variable")
+    df = get_troute_df(app_workspace)
+    df_sliced_by_id = df[df["featureID"] == int(clean_troute_id)]
+    try:
+        time_col = df_sliced_by_id["current_time"]
+        var_col = df_sliced_by_id[variable_column]
+        data = [
+            {"x": time, "y": val}
+            for time, val in zip(time_col.tolist(), var_col.tolist())
+        ]
+    except Exception:
+        data = []
+
+    return JsonResponse({"data": data})

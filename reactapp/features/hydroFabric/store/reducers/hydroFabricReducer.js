@@ -15,6 +15,13 @@ const hydroFabricInitialStore = {
             list:null,
             variable_list:null
         },
+        troute:{
+            series:null,
+            variable:null,
+            id:null,
+            list:null,
+            variable_list:null
+        }
 
     },
     actions:{}
@@ -121,6 +128,64 @@ const hydroFabricReducer = (state, action) => {
                     catchment: {
                         ...state.state.catchment,
                         variable_list: action.payload
+                    }
+                }
+            };
+        case hydroFabricActionsTypes.set_troute_series:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    troute: {
+                        ...state.state.troute,
+                        series: action.payload
+                    }
+                }
+            };
+        case hydroFabricActionsTypes.set_troute_id:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    troute: {
+                        ...state.state.troute,
+                        id: action.payload
+                    }
+                }
+            };
+        case hydroFabricActionsTypes.set_troute_variable:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    troute: {
+                        ...state.state.troute,
+                        variable: action.payload
+                    }
+                }
+            };
+        case hydroFabricActionsTypes.set_troute_variable_list:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    troute: {
+                        ...state.state.troute,
+                        variable_list: action.payload
+                    }
+                }
+            };
+        case hydroFabricActionsTypes.reset_troute:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    troute: {
+                        series:null,
+                        variable:null,
+                        id:null,
+                        list:null,
+                        variable_list:null
                     }
                 }
             };
