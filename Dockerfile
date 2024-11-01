@@ -46,7 +46,8 @@ RUN cd ${TETHYS_HOME}/apps/ngiab && \
     micromamba remove pyarrow && micromamba install --yes -c conda-forge pyarrow && \
     micromamba clean --all --yes && \
     npm install && npm run build && \
-    tethys install -d -N -w
+    tethys install -d -N -w && \
+    rm -rf node_modules
 
 #########
 # PORTS #
