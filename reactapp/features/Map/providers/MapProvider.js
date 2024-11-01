@@ -96,7 +96,6 @@ export const MapProvider = ({ children, layers= [] }) => {
 
   useEffect(() => {
     if (!state.state.extent) return;
-    console.log(state.state.extent)
     state.state.mapObject.getView().fit(state.state.extent, {duration: 1300, padding: [50, 50, 50, 50]});
   }, [state.state.extent]);
 

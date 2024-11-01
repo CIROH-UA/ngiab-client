@@ -8,7 +8,7 @@ import {
     Text,
   } from 'ol/style';
 import { VectorSourceLayer } from 'features/Map/lib/source/sources';
-import { sldCatchmentStyle } from './layersData';
+import { sldCatchmentStyle,sldFlowPathsStyle } from './layersData';
 
 const image = new CircleStyle({
     radius: 5,
@@ -202,6 +202,34 @@ let makeCatchmentLayer = (catchmentLayersURL) =>{
     }
 }
 
+let makeFlowPathsLayer = (flowPathsLayersURL) =>{
+  return   {
+      layerType: 'OlTileLayer',
+      options: 
+      {
+          sourceType: 'WMSTile',
+          url: flowPathsLayersURL,
+          // all the params for the source goes here
+          params: {
+              LAYERS: 'nextgen:flowpaths',
+              Tiled: true,
+              SLD_BODY: sldFlowPathsStyle
+          },
+          // the rest of the attributes are for the definition of the layer
+          name: "Flowpaths Layer",
+          zIndex: 2,
+          source:{
+            serverType: 'geoserver',
+            crossOrigin: 'anonymous'
+          }
+
+      },
+
+  }
+}
+
+
+
 const customForEachLayerAtPixelLayerFilter = (layer) =>{
   return layer.get('name') !== 'baseMapLayer'
   // return  layer.get('events') && layer.get('events').length > 0 && layer.get('events').findIndex(event => event.type === 'click') > -1
@@ -313,6 +341,7 @@ const displayFeatureInfo = (event,layer,hydroFabricActions) => {
 export { 
   makeNexusLayerParams, 
   makeCatchmentLayer,
+  makeFlowPathsLayer,
   displayFeatureInfo, 
   displayFeatureInfoWMS, 
   customForEachLayerAtPixelLayerFilter,

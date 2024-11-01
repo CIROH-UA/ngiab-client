@@ -13,6 +13,7 @@ import { initialLayersArray } from 'lib/layersData';
 import { 
   makeNexusLayerParams, 
   makeCatchmentLayer,
+  makeFlowPathsLayer,
   createClusterVectorLayer
 } from 'lib/mapUtils';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
@@ -30,6 +31,12 @@ const MapView = (props) => {
     const catchmentLayersURL = 'http://localhost:8181/geoserver/wms'; 
     return makeCatchmentLayer(catchmentLayersURL);
   },[])
+
+  const flowPathsLayerCallBack = useCallback(() => {
+    const flowPathsLayersURL = 'http://localhost:8181/geoserver/wms'; 
+    return makeFlowPathsLayer(flowPathsLayersURL);
+  },[])
+
   const onPointerMoveLayersEventCallback = useCallback((event) => {
     return onPointerMoveLayersEvent(event)
   },[]);
@@ -61,16 +68,19 @@ const MapView = (props) => {
         // Define the parameters for the layer
         var nexusLayerParams = nexusLayerParamsCallBack();
         var catchmentLayer = catchmentLayerCallBack();
+        var flowPathsLayer = flowPathsLayerCallBack();
 
         nexusLayerParams['geojsonLayer']=response.geojson;
         
         const nexusClusterLayer = createClusterVectorLayer(nexusLayerParams);
+        
         
         const NexusExtent = nexusClusterLayer.options.params.source.getExtent();
 
         mapActions.addLayer(nexusClusterLayer);
         mapActions.set_extent(NexusExtent);
         mapActions.addLayer(catchmentLayer);
+        mapActions.addLayer(flowPathsLayer);
 
     }).catch(error => {
         console.log(error)
