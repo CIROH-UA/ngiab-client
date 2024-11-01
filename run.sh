@@ -29,9 +29,11 @@ salt-call --local state.apply
 
 
 echo_status "Fixing permissions"
+
 chown -R www: /usr/lib/tethys
 chown -R www: /var/lib/tethys_persist
 chown -R www: /var/log/tethys
+chmod -R 777 /var/lib/nginx
 
 echo_status "Starting supervisor"
 
