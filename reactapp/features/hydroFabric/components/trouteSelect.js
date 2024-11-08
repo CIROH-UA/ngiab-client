@@ -5,8 +5,6 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 
-// const SelectComponent = lazy(() => import('../../features/hydroFabric/components/selectComponent'));
-
 const TRouteSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
 

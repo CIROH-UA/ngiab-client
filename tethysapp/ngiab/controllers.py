@@ -11,6 +11,11 @@ from .utils import (
     check_troute_id,
     get_troute_vars,
     get_troute_df,
+    append_ngen_usgs_column,
+    append_nwm_usgs_column,
+    get_configuration_variable_pairs,
+    get_teehr_joined_ts_path,
+    get_teehr_ts,
 )
 
 from .app import App
@@ -78,7 +83,13 @@ def getNexuslayer(request, app_workspace):
 
     # Convert the DataFrame to the "EPSG:3857" coordinate system
     gdf = gdf.to_crs("EPSG:3857")
-    data = json.loads(gdf.to_json())
+
+    # Append ngen_usgs and nwm_usgs columns
+    gdf = append_ngen_usgs_column(gdf, app_workspace)
+    gdf = append_nwm_usgs_column(gdf, app_workspace)
+    filtered_gdf = gdf[gdf["ngen_usgs"] != "none"]
+    data = json.loads(filtered_gdf.to_json())
+    # data = json.loads(gdf.to_json())
 
     response_object["geojson"] = data
     # response_object["list_ids"] = nexus_select_list
@@ -145,3 +156,25 @@ def getTrouteTimeSeries(request, app_workspace):
         data = []
 
     return JsonResponse({"data": data})
+
+
+@controller(app_workspace=True)
+def getTeehrTimeSeries(request, app_workspace):
+    teehr_id = request.GET.get("teehr_id")
+    teehr_config_variable = request.GET.get("teehr_variable")
+    teehr_configuration = teehr_config_variable.split("-")[0]
+    teehr_variable = teehr_config_variable.split("-")[1]
+    teehr_ts_path = get_teehr_joined_ts_path(
+        app_workspace, teehr_configuration, teehr_variable
+    )
+    teehr_ts = get_teehr_ts(teehr_ts_path, teehr_id)
+    return JsonResponse({"data": teehr_ts})
+
+
+@controller(app_workspace=True)
+def getTeehrVariables(request, app_workspace):
+    try:
+        vars = get_configuration_variable_pairs(app_workspace)
+    except Exception:
+        vars = []
+    return JsonResponse({"teehr_variables": vars})

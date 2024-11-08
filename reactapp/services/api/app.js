@@ -17,7 +17,14 @@ const appAPI = {
     },
     getTrouteTimeSeries: (params) => {
         return apiClient.get(`${APP_ROOT_URL}getTrouteTimeSeries/`, { params });
+    },
+    getTeehrTimeSeries: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}getTeehrTimeSeries/`, { params });
+    },
+    getTeehrVariables: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}getTeehrVariables/`, { params });
     }
+
 }
  
 export default appAPI;

@@ -39,7 +39,8 @@ const HydroFabricLinePlot = (props) => {
   const { state, actions } = useHydroFabricContext();
 
   useEffect(() => {
-    if (!state.nexus.series) return;    
+    if (!state.nexus.series) return;
+      console.log(state.nexus.series)    
       const nexusSeries = state.nexus.series.map(point => ({x: new Date(point.x), y: point.y}));
 
       const chartData = {
@@ -139,6 +140,47 @@ const HydroFabricLinePlot = (props) => {
 
     };
   }, [state.troute.series]); // Re-run effect if series data changes
+
+  useEffect(() => {
+    if (!state.teehr.series) return;
+    console.log(state.teehr.series)
+    if (chartRef.current) {
+      
+      const teehrSeries = state.teehr.series.map(series =>
+        series.map(point => ({ x: new Date(point.x), y: point.y }))
+      );
+      const chartData = {
+        series: [
+          { name: 'TEERH', data: teehrSeries[0] },
+          { name: 'TEERH 2', data: teehrSeries[1] },
+        ]
+      };
+
+      chartInstance.current = new LineChart(chartRef.current, chartData, chartOptions);
+      
+      addAnimationToLineChart(chartInstance.current, easings)
+      makeAxis(
+        chartRef.current,
+        'Time (Date)', 
+        `${state.teehr.variable ? state.teehr.variable.toLowerCase() : state.teehr.variable_list ? state.teehr.variable_list[0].label : null}`
+      )
+
+      makeTitle(
+        chartRef.current, 
+        `${state.teehr.variable ? state.teehr.variable.toLowerCase() : state.teehr.variable_list ? state.teehr.variable_list[0].label : null}: ${state.teehr.id} `)
+    }
+
+    return () => {
+      if(props.singleRowOn){
+        actions.reset_troute();
+        chartRef.current.detach();
+        document.getElementById('x-axis-title')?.remove();
+        document.getElementById('y-axis-title')?.remove();      
+      }
+
+    };
+  }, [state.teehr.series]); // Re-run effect if series data changes
+
 
 
   return (
