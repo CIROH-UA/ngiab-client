@@ -38,7 +38,8 @@ const TRouteSelect = (props) => {
       troute_variable: state.troute.variable
     }
     appAPI.getTrouteTimeSeries(params).then((response) => {
-      actions.set_troute_series(response.data);
+      actions.set_series(response.data)
+      // actions.set_troute_series(response.data);
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     }).catch((error) => {

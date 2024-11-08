@@ -37,8 +37,9 @@ const TeehrSelect = (props) => {
     }
     console.log(params)
     appAPI.getTeehrTimeSeries(params).then((response) => {
-      console.log(response)
-      actions.set_teehr_series(response.data);
+      console.log(response.data)
+      actions.set_series(response.data)
+      // actions.set_teehr_series(response.data);
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     }).catch((error) => {

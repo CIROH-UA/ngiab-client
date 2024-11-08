@@ -20,6 +20,7 @@ const hydroFabricActionsTypes = {
     reset_catchment: 'RESET_CATCHMENT',
     reset_troute: 'RESET_TROUTE',
     reset: 'RESET',
+    set_series: 'SET_SERIES',
 };
 
 export { hydroFabricActionsTypes }

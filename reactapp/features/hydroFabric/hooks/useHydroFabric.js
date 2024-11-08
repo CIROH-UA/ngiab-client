@@ -29,6 +29,7 @@ const useHydroFabric = () => {
         reset_nexus: () => dispatch({ type: hydroFabricActionsTypes.reset_nexus }),
         reset_catchment: () => dispatch({ type: hydroFabricActionsTypes.reset_catchment }),
         reset: () => dispatch({ type: hydroFabricActionsTypes.reset }),
+        set_series: (series) => dispatch({ type: hydroFabricActionsTypes.set_series, payload: series }),
     };
     return { state, actions };
 }
