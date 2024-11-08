@@ -16,6 +16,7 @@ from .utils import (
     get_configuration_variable_pairs,
     get_teehr_joined_ts_path,
     get_teehr_ts,
+    get_teehr_metrics,
 )
 
 from .app import App
@@ -93,9 +94,9 @@ def getNexuslayer(request, app_workspace):
     # Append ngen_usgs and nwm_usgs columns
     gdf = append_ngen_usgs_column(gdf, app_workspace)
     gdf = append_nwm_usgs_column(gdf, app_workspace)
-    filtered_gdf = gdf[gdf["ngen_usgs"] != "none"]
-    data = json.loads(filtered_gdf.to_json())
-    # data = json.loads(gdf.to_json())
+    # filtered_gdf = gdf[gdf["ngen_usgs"] != "none"]
+    # data = json.loads(filtered_gdf.to_json())
+    data = json.loads(gdf.to_json())
 
     response_object["geojson"] = data
     # response_object["list_ids"] = nexus_select_list
@@ -176,7 +177,12 @@ def getTeehrTimeSeries(request, app_workspace):
         app_workspace, teehr_configuration, teehr_variable
     )
     teehr_ts = get_teehr_ts(teehr_ts_path, teehr_id)
-    return JsonResponse({"data": teehr_ts})
+    teehr_metrics = get_teehr_metrics(app_workspace, teehr_id)
+    # breakpoint()
+    print(teehr_metrics)
+    return JsonResponse({"metrics": teehr_metrics, "data": teehr_ts})
+    # teehr_ts = get_teehr_ts(teehr_ts_path, teehr_id)
+    # return JsonResponse({"data": teehr_ts})
 
 
 @controller(app_workspace=True)

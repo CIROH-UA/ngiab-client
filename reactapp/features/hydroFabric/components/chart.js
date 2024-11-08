@@ -126,7 +126,7 @@ function LineChart({ width, height, data }) {
           y={0}
           width={width}
           height={height}
-          fill={"#718096"}
+          fill={"#fff"}
           rx={14}
         />
         <Group left={margin.left} top={margin.top}>
@@ -134,14 +134,14 @@ function LineChart({ width, height, data }) {
             scale={yScale}
             width={innerWidth}
             height={innerHeight}
-            stroke="#EDF2F7"
+            stroke="#0a100d"
             strokeOpacity={0.2}
           />
           <GridColumns
             scale={xScale}
             width={innerWidth}
             height={innerHeight}
-            stroke="#EDF2F7"
+            stroke="#0a100d"
             strokeOpacity={0.2}
           />
           <AxisLeft
@@ -149,7 +149,7 @@ function LineChart({ width, height, data }) {
             stroke={"#EDF2F7"}
             tickStroke={"#EDF2F7"}
             tickLabelProps={() => ({
-              fill: "#EDF2F7",
+              fill: "#0a100d",
               fontSize: 11,
               textAnchor: "end",
             })}
@@ -159,7 +159,7 @@ function LineChart({ width, height, data }) {
             y="20"
             transform="rotate(-90)"
             fontSize={12}
-            fill="#EDF2F7"
+            fill="#0a100d"
           >
             Y-axis Label
           </text>
@@ -170,7 +170,7 @@ function LineChart({ width, height, data }) {
             tickStroke={"#EDF2F7"}
             top={innerHeight}
             tickLabelProps={() => ({
-              fill: "#EDF2F7",
+              fill: "#0a100d",
               fontSize: 11,
               textAnchor: "middle",
             })}
@@ -180,7 +180,7 @@ function LineChart({ width, height, data }) {
             <LinePath
               key={`line-${index}`}
               stroke={colors[index % colors.length]}
-              strokeWidth={3}
+              strokeWidth={2}
               data={series.data}
               x={(d) => xScale(getDate(d)) ?? 0}
               y={(d) => yScale(getYValue(d)) ?? 0}
@@ -192,7 +192,7 @@ function LineChart({ width, height, data }) {
               <Line
                 from={{ x: tooltipLeft - margin.left, y: 0 }}
                 to={{ x: tooltipLeft - margin.left, y: innerHeight }}
-                stroke={"#EDF2F7"}
+                stroke={"#0a100d"}
                 strokeWidth={2}
                 pointerEvents="none"
                 strokeDasharray="4,2"
@@ -273,7 +273,7 @@ function LineChart({ width, height, data }) {
                 marginRight: 5,
               }}
             />
-            <div style={{ color: "#EDF2F7", fontSize: 12 }}>
+            <div style={{ color: "#0a100d", fontSize: 14 }}>
               {series.label}
             </div>
           </div>

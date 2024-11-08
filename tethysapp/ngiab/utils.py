@@ -315,3 +315,51 @@ def get_teehr_ts(parquet_file_path, primary_location_id_value):
     ]
 
     return series
+
+
+def get_teehr_metrics(app_workspace, primary_location_id):
+    base_output_teehr_path = get_base_teehr_path(app_workspace)
+    metrics_path = os.path.join(base_output_teehr_path, "metrics.csv")
+
+    # Load the CSV file
+    df = pd.read_csv(metrics_path)
+
+    # Filter the DataFrame by primary_location_id
+    df_filtered = df[df["primary_location_id"] == primary_location_id]
+
+    # Pivot the data to have metrics as rows and configurations as columns
+    pivot_df = df_filtered.pivot(
+        columns="configuration_name",
+        values=["kling_gupta_efficiency", "nash_sutcliffe_efficiency", "relative_bias"],
+    )
+    breakpoint()
+
+    # Flatten the multi-index columns
+    pivot_df.columns = [f"{metric}_{config}" for metric, config in pivot_df.columns]
+
+    # Transform the data into the required structure
+    metrics_data = [
+        {
+            "metric": "kling_gupta_efficiency",
+            **{
+                config: pivot_df[f"kling_gupta_efficiency_{config}"].values[0]
+                for config in df_filtered["configuration_name"].unique()
+            },
+        },
+        {
+            "metric": "nash_sutcliffe_efficiency",
+            **{
+                config: pivot_df[f"nash_sutcliffe_efficiency_{config}"].values[0]
+                for config in df_filtered["configuration_name"].unique()
+            },
+        },
+        {
+            "metric": "relative_bias",
+            **{
+                config: pivot_df[f"relative_bias_{config}"].values[0]
+                for config in df_filtered["configuration_name"].unique()
+            },
+        },
+    ]
+
+    return metrics_data

@@ -1,30 +1,32 @@
 
 
-import {useEffect, Suspense, Fragment,lazy, useState} from 'react';
+import {Suspense, Fragment,lazy} from 'react';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
-import { SelectContainer,HydroFabricPlotContainer } from './containers';
+import { SelectContainer,HydroFabricPlotContainer,TeehrMetricsWrapper } from './containers';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 import ParentSize from '@visx/responsive/lib/components/ParentSize';
 
 
+
 // const HydroFabricLinePlot = lazy(() => import('../../features/hydroFabric/components/hydroFabricLinePlot'));
-const HydroFabricLinePlot = lazy(() => import('../../features/hydroFabric/components/timeSeriesComponent'));
 const CatchmentSelectComponent = lazy(() => import('../../features/hydroFabric/components/catchmentsSelect'));
 const NexusSelectComponent = lazy(() => import('../../features/hydroFabric/components/nexusSelect'));
 const TrouteSelectComponent = lazy(() => import('../../features/hydroFabric/components/trouteSelect'));
 const TeehrSelectComponent = lazy(() => import('../../features/hydroFabric/components/teehrSelect'));
 const LineChart = lazy(() => import('../../features/hydroFabric/components/chart'));
+const  TeehrMetricsTable = lazy(() => import('../../features/hydroFabric/components/teehrMetrics'));
 
 const HydroFabricView = (props) => {
   const {state,actions} = useHydroFabricContext();
-  const [activeSeries, setActiveSeries] = useState([]);
-
-  useEffect(() => {
-  }
-  , [activeSeries]);
-
   return (
     <Fragment>
+        {
+            state.teehr.metrics &&
+            <TeehrMetricsWrapper>
+                <TeehrMetricsTable data={state.teehr.metrics} />
+            </TeehrMetricsWrapper>
+        }
+
         <SelectContainer>
             <Suspense fallback={<LoadingAnimation />}>
                 <CatchmentSelectComponent 

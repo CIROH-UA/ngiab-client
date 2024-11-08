@@ -16,8 +16,6 @@ const NexusSelect = (props) => {
       nexus_id: state.nexus.id
     }    
     appAPI.getNexusTimeSeries(params).then((response) => {
-      // actions.set_nexus_series(response.data);
-      console.log(response.data)
       actions.set_series(response.data);
       actions.set_nexus_list(response.nexus_ids);
       actions.set_troute_id(state.nexus.id);
