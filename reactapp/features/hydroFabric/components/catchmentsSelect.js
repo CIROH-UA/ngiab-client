@@ -19,7 +19,6 @@ const CatchmentSelect = (props) => {
       catchment_id: state.catchment.id
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
-      // actions.set_catchment_series(response.data);
       actions.set_series(response.data);
       actions.set_catchment_variable_list(response.variables);
       actions.set_catchment_variable(null);
@@ -48,7 +47,6 @@ const CatchmentSelect = (props) => {
       variable_column: state.catchment.variable
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
-      // actions.set_catchment_series(response.data);
       actions.set_series(response.data);
       props.toggleSingleRow(false);
       props.setIsLoading(false);
@@ -67,9 +65,9 @@ const CatchmentSelect = (props) => {
     <Fragment>
           {state.catchment.id &&
             <Fragment>
-              <h5>Catchment Metadata</h5>
+              <h5>Catchment</h5>
               <p><b>ID</b>: {state.catchment.id}</p>
-                <label>Current Catchment ID </label>
+                <label>Catchment ID </label>
                 <SelectComponent 
                   optionsList={state.catchment.list} 
                   onChangeHandler={actions.set_catchment_id} 
@@ -80,7 +78,7 @@ const CatchmentSelect = (props) => {
                     }
                   }
                 />
-              <label>Current Variable</label>
+              <label>Variable</label>
               <SelectComponent 
                 optionsList={state.catchment.variable_list} 
                 onChangeHandler={actions.set_catchment_variable}

@@ -151,8 +151,8 @@ const HydroFabricLinePlot = (props) => {
       );
       const chartData = {
         series: [
-          { name: 'TEERH', data: teehrSeries[0] },
-          { name: 'TEERH 2', data: teehrSeries[1] },
+          { name: 'TEEHR', data: teehrSeries[0] },
+          { name: 'TEEHR 2', data: teehrSeries[1] },
         ]
       };
 

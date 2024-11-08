@@ -7,30 +7,27 @@ const hydroFabricInitialStore = {
         },
         nexus:
         {
-            series:[],
             id:null,
             list:null
         },
         catchment:{
-            series:[],
             variable:null,
             id:null,
             list:null,
             variable_list:null
         },
         troute:{
-            series:[],
             variable:null,
             id:null,
             list:null,
             variable_list:null
         },
         teehr:{
-            series:[],
             id:null,
             list:null,
             variable:null,
-            variable_list:null
+            variable_list:null,
+            metrics: null
         }
 
     },
@@ -51,29 +48,7 @@ const hydroFabricReducer = (state, action) => {
                         id: action.payload
                     }
                 }
-            };
-        case hydroFabricActionsTypes.set_nexus_series:
-            return {
-                ...state,
-                state: {
-                    ...state.state,
-                    nexus: {
-                        ...state.state.nexus,
-                        series: action.payload
-                    }
-                }
-            };
-        case hydroFabricActionsTypes.reset_nexus_series:
-            return {
-                ...state,
-                state: {
-                    ...state.state,
-                    nexus: {
-                        ...state.state.nexus,
-                        series: []
-                    }
-                }
-            };
+            }; 
         case hydroFabricActionsTypes.set_nexus_list:
             return {
                 ...state,
@@ -84,19 +59,7 @@ const hydroFabricReducer = (state, action) => {
                         list: action.payload
                     }
                 }
-            };
-        case hydroFabricActionsTypes.set_catchment_series:
-            return {
-                ...state,
-                state: {
-                    ...state.state,
-                    catchment: {
-                        ...state.state.catchment,
-                        series: action.payload
-                    }
-                }
-            };
-        
+            };        
         case hydroFabricActionsTypes.set_catchment_id:
             return {
                 ...state,
@@ -141,17 +104,7 @@ const hydroFabricReducer = (state, action) => {
                     }
                 }
             };
-        case hydroFabricActionsTypes.set_troute_series:
-            return {
-                ...state,
-                state: {
-                    ...state.state,
-                    troute: {
-                        ...state.state.troute,
-                        series: action.payload
-                    }
-                }
-            };
+
         case hydroFabricActionsTypes.set_troute_id:
             return {
                 ...state,
@@ -186,17 +139,6 @@ const hydroFabricReducer = (state, action) => {
                 }
             };
 
-        case hydroFabricActionsTypes.set_teehr_series:
-            return {
-                ...state,
-                state: {
-                    ...state.state,
-                    teehr: {
-                        ...state.state.teehr,
-                        series: action.payload
-                    }
-                }
-            };
         case hydroFabricActionsTypes.set_teehr_id:
             return {
                 ...state,
@@ -230,6 +172,18 @@ const hydroFabricReducer = (state, action) => {
                     }
                 }
             };
+        case hydroFabricActionsTypes.set_teehr_metrics:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    teehr: {
+                        ...state.state.teehr,
+                        metrics: action.payload
+                    }
+                }
+            };
+                
         case hydroFabricActionsTypes.reset_teehr:
             return {
                 ...state,

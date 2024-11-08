@@ -35,3 +35,10 @@ export const MapContainer = styled.div`
   overflow-y: hidden;
   height: ${props => props.fullScreen ? '100%' : '60%'};
 `;
+
+export const TeehrMetricsWrapper = styled.div`
+  width: 100%;
+  padding: 10px;
+  background-color: #f8f8f8;
+  border-bottom: 1px solid #ddd;
+`;

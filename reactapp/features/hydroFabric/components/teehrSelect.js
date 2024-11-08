@@ -11,16 +11,17 @@ const TeehrSelect = (props) => {
 
   useEffect(() => {
     if (!state.teehr.id) return;
-    actions.reset_teehr();
     var params = {}   
     appAPI.getTeehrVariables(params).then((response) => {
       actions.set_teehr_variable_list(response.teehr_variables);
+      console.log(response.teehr_variables)
+
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     
     }).catch((error) => {
       props.setIsLoading(false);
-      console.log("Error fetching troute variables", error);
+      console.log("Error fetching teehr variables", error);
     })
     return  () => {
       if (state.teehr.id) return;
@@ -35,11 +36,11 @@ const TeehrSelect = (props) => {
       teehr_id: state.teehr.id,
       teehr_variable: state.teehr.variable
     }
-    console.log(params)
-    appAPI.getTeehrTimeSeries(params).then((response) => {
-      console.log(response.data)
+    appAPI.getTeehrTimeSeries(params).then((rep) => {
+      response = JSON.parse(rep)
+      console.log(response)
       actions.set_series(response.data)
-      // actions.set_teehr_series(response.data);
+      actions.set_teehr_metrics(response.metrics)
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     }).catch((error) => {
@@ -57,8 +58,7 @@ const TeehrSelect = (props) => {
         {
           state.teehr.id &&
           <Fragment>
-            <h5>TEEHR</h5>
-            <label>Current Variable</label>
+            <label>TEEHR</label>
             <SelectComponent 
               optionsList={state.teehr.variable_list} 
               onChangeHandler={actions.set_teehr_variable}
