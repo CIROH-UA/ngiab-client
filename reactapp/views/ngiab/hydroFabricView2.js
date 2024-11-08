@@ -11,6 +11,8 @@ const HydroFabricLinePlot = lazy(() => import('../../features/hydroFabric/compon
 const CatchmentSelectComponent = lazy(() => import('../../features/hydroFabric/components/catchmentsSelect'));
 const NexusSelectComponent = lazy(() => import('../../features/hydroFabric/components/nexusSelect'));
 const TrouteSelectComponent = lazy(() => import('../../features/hydroFabric/components/trouteSelect'));
+const TeehrSelectComponent = lazy(() => import('../../features/hydroFabric/components/teehrSelect'));
+
 
 const HydroFabricView = (props) => {
   const {state,actions} = useHydroFabricContext();
@@ -41,7 +43,13 @@ const HydroFabricView = (props) => {
                     setIsLoading={props.setIsLoading} 
                 />
             </Suspense>
-            
+            <Suspense fallback={<LoadingAnimation />}>
+                <TeehrSelectComponent 
+                    toggleSingleRow = {props.toggleSingleRow} 
+                    singleRowOn={props.singleRowOn} 
+                    setIsLoading={props.setIsLoading} 
+                />
+            </Suspense>
       </SelectContainer>
 
       <Suspense fallback={<LoadingAnimation />}>

@@ -21,6 +21,13 @@ const hydroFabricInitialStore = {
             id:null,
             list:null,
             variable_list:null
+        },
+        teehr:{
+            series:null,
+            id:null,
+            list:null,
+            variable:null,
+            variable_list:null
         }
 
     },
@@ -172,6 +179,65 @@ const hydroFabricReducer = (state, action) => {
                     troute: {
                         ...state.state.troute,
                         variable_list: action.payload
+                    }
+                }
+            };
+
+        case hydroFabricActionsTypes.set_teehr_series:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    teehr: {
+                        ...state.state.teehr,
+                        series: action.payload
+                    }
+                }
+            };
+        case hydroFabricActionsTypes.set_teehr_id:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    teehr: {
+                        ...state.state.teehr,
+                        id: action.payload
+                    }
+                }
+            };
+        case hydroFabricActionsTypes.set_teehr_variable:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    teehr: {
+                        ...state.state.teehr,
+                        variable: action.payload
+                    }
+                }
+            };
+        case hydroFabricActionsTypes.set_teehr_variable_list:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    teehr: {
+                        ...state.state.teehr,
+                        variable_list: action.payload
+                    }
+                }
+            };
+        case hydroFabricActionsTypes.reset_teehr:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    teehr: {
+                        series:null,
+                        variable:null,
+                        id:null,
+                        list:null,
+                        variable_list:null
                     }
                 }
             };

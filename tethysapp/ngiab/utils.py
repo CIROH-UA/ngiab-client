@@ -2,6 +2,7 @@ import os
 import json
 import pandas as pd
 import glob
+import duckdb
 
 
 def _get_base_troute_output(app_workspace):
@@ -134,3 +135,173 @@ def getNexusIDs(app_workspace):
         {"value": id.split("_output.csv")[0], "label": id.split("_output.csv")[0]}
         for id in nexus_ids_list
     ]
+
+
+def get_base_teehr_path(app_workspace):
+    base_output_teehr_path = os.path.join(app_workspace.path, "ngen-data", "teehr")
+    return base_output_teehr_path
+
+
+def get_usgs_from_ngen(app_workspace, ngen_id):
+    base_output_teehr_path = get_base_teehr_path(app_workspace)
+    # Define the path to the ngen_usgs_crosswalk.parquet file
+    crosswalk_file_path = os.path.join(
+        base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
+    )
+
+    # Query the parquet file with DuckDB
+    query = f"""
+        SELECT primary_location_id
+        FROM '{crosswalk_file_path}'
+        WHERE secondary_location_id = '{ngen_id}'
+        LIMIT 1;
+    """
+    try:
+        # Execute query and fetch result
+        result = duckdb.query(query).fetchone()
+        # If a result was found, return the primary_location_id, otherwise None
+        return result[0] if result else None
+    except Exception as e:
+        print(f"Error querying ngen_usgs_crosswalk.parquet: {e}")
+        return None
+
+
+def append_ngen_usgs_column(gdf, app_workspace):
+    # Load ngen_usgs_crosswalk.parquet into DuckDB
+    base_output_teehr_path = get_base_teehr_path(app_workspace)
+    # Define the path to the ngen_usgs_crosswalk.parquet file
+    ngen_usgs_crosswalk_path = os.path.join(
+        base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
+    )
+
+    # Query the data from DuckDB
+    query = f"""
+        SELECT secondary_location_id, primary_location_id
+        FROM '{ngen_usgs_crosswalk_path}'
+    """
+    ngen_usgs_df = duckdb.query(query).to_df()
+
+    # Create a dictionary for fast lookup, replacing 'ngen' with 'nex' in the keys
+    ngen_usgs_map = {
+        sec_id.replace("ngen", "nex"): prim_id
+        for sec_id, prim_id in zip(
+            ngen_usgs_df["secondary_location_id"], ngen_usgs_df["primary_location_id"]
+        )
+    }
+
+    # Append ngen_usgs column to the GeoDataFrame
+    gdf["ngen_usgs"] = gdf["id"].apply(lambda x: ngen_usgs_map.get(x, "none"))
+
+    return gdf
+
+
+def append_nwm_usgs_column(gdf, app_workspace):
+    # Load nwm_usgs_crosswalk.parquet into DuckDB
+    base_output_teehr_path = get_base_teehr_path(app_workspace)
+    # Define the path to the ngen_usgs_crosswalk.parquet file
+    nwm_usgs_crosswalk_path = os.path.join(
+        base_output_teehr_path, "nwm_usgs_crosswalk.parquet"
+    )
+
+    query = f"""
+        SELECT primary_location_id, secondary_location_id
+        FROM '{nwm_usgs_crosswalk_path}'
+    """
+    nwm_usgs_df = duckdb.query(query).to_df()
+
+    # Create a dictionary for fast lookup
+    nwm_usgs_map = dict(
+        zip(
+            nwm_usgs_df["primary_location_id"],
+            nwm_usgs_df["secondary_location_id"],
+        )
+    )
+
+    # Append nwm_usgs column to the GeoDataFrame
+    gdf["nwm_usgs"] = gdf["ngen_usgs"].apply(lambda x: nwm_usgs_map.get(x, "none"))
+    return gdf
+
+
+def get_configuration_variable_pairs(app_workspace):
+    base_output_teehr_path = get_base_teehr_path(app_workspace)
+    joined_timeseries_base_path = os.path.join(
+        base_output_teehr_path, "dataset", "joined_timeseries"
+    )
+    configurations_variables = []
+
+    # Traverse the directory tree from the base path
+    for root, dirs, files in os.walk(joined_timeseries_base_path):
+        # Check if the directory matches the `configuration_name=` pattern
+        if "configuration_name=" in root:
+            # Extract the configuration name from the directory path
+            config_name = [
+                d.split("=")[1]
+                for d in root.split("/")
+                if d.startswith("configuration_name=")
+            ][0]
+
+            # Look one level deeper for `variable_name=` directories
+            for dir_name in dirs:
+                if dir_name.startswith("variable_name="):
+                    variable_name = dir_name.split("=")[1]
+
+                    # Create the dictionary with value and label
+                    config_var_pair = {
+                        "value": f"{config_name}-{variable_name}",
+                        "label": f"{config_name} {variable_name.replace('_', ' ')}",
+                    }
+                    configurations_variables.append(config_var_pair)
+
+    return configurations_variables
+
+
+def get_teehr_joined_ts_path(app_workspace, configuration, variable):
+    base_output_teehr_path = get_base_teehr_path(app_workspace)
+    joined_timeseries_path = os.path.join(
+        base_output_teehr_path, "dataset", "joined_timeseries"
+    )
+    # Build the target path
+    target_path = os.path.join(
+        joined_timeseries_path,
+        f"configuration_name={configuration}",
+        f"variable_name={variable}",
+    )
+
+    # Find the parquet file in the target directory
+    parquet_files = glob.glob(os.path.join(target_path, "*.parquet"))
+
+    # Return the parquet file path if found, otherwise return None
+    if parquet_files:
+        return parquet_files[0]  # Assuming there is only one parquet file
+    else:
+        return None
+
+
+def get_teehr_ts(parquet_file_path, primary_location_id_value):
+    # Open DuckDB connection
+    conn = duckdb.connect(database=":memory:")
+
+    # Load and filter the parquet file based on the primary_location_id value
+    query = f"""
+        SELECT value_time, primary_value, secondary_value
+        FROM parquet_scan('{parquet_file_path}')
+        WHERE primary_location_id = '{primary_location_id_value}'
+        ORDER BY value_time
+    """
+    filtered_df = conn.execute(query).fetchdf()
+
+    # Close DuckDB connection
+    conn.close()
+    # Prepare data for ChartistJS, converting `value_time` to datetime objects in milliseconds
+    series = [
+        [
+            {"x": row["value_time"], "y": row["primary_value"]}
+            for _, row in filtered_df.iterrows()
+        ],
+        [
+            {"x": row["value_time"], "y": row["secondary_value"]}
+            for _, row in filtered_df.iterrows()
+        ],
+    ]
+
+    return series
