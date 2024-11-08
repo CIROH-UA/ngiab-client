@@ -2,28 +2,31 @@ import { hydroFabricActionsTypes } from '../actions/actionsTypes';
 
 const hydroFabricInitialStore = {
     state:{
+        chart:{
+            series:[]
+        },
         nexus:
         {
-            series:null,
+            series:[],
             id:null,
             list:null
         },
         catchment:{
-            series:null,
+            series:[],
             variable:null,
             id:null,
             list:null,
             variable_list:null
         },
         troute:{
-            series:null,
+            series:[],
             variable:null,
             id:null,
             list:null,
             variable_list:null
         },
         teehr:{
-            series:null,
+            series:[],
             id:null,
             list:null,
             variable:null,
@@ -67,7 +70,7 @@ const hydroFabricReducer = (state, action) => {
                     ...state.state,
                     nexus: {
                         ...state.state.nexus,
-                        series: null
+                        series: []
                     }
                 }
             };
@@ -233,7 +236,7 @@ const hydroFabricReducer = (state, action) => {
                 state: {
                     ...state.state,
                     teehr: {
-                        series:null,
+                        series:[],
                         variable:null,
                         id:null,
                         list:null,
@@ -247,7 +250,7 @@ const hydroFabricReducer = (state, action) => {
                 state: {
                     ...state.state,
                     troute: {
-                        series:null,
+                        series:[],
                         variable:null,
                         id:null,
                         list:null,
@@ -261,7 +264,7 @@ const hydroFabricReducer = (state, action) => {
                 state: {
                     ...state.state,
                     nexus: {
-                        series:null,
+                        series:[],
                         id:null,
                         list:null
                     }
@@ -273,7 +276,7 @@ const hydroFabricReducer = (state, action) => {
                 state: {
                     ...state.state,
                     catchment: {
-                        series:null,
+                        series:[],
                         variable:null,
                         id:null,
                         list:null,
@@ -283,6 +286,17 @@ const hydroFabricReducer = (state, action) => {
             };
         case hydroFabricActionsTypes.reset:
             return hydroFabricInitialStore;
+        case hydroFabricActionsTypes.set_series:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    chart: {
+                        ...state.state.chart,
+                        series: action.payload
+                    }
+                }
+            };
         default:
             return state;
     }

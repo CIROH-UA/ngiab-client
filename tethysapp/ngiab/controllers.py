@@ -53,9 +53,15 @@ def getCatchmentTimeSeries(request, app_workspace):
         {"x": time, "y": val}
         for time, val in zip(time_col.tolist(), second_col.tolist())
     ]
+
     return JsonResponse(
         {
-            "data": data,
+            "data": [
+                {
+                    "label": f"{catchment_id}-{variable_column if variable_column else list_variables[0]}",
+                    "data": data,
+                }
+            ],
             "variables": [
                 {"value": variable, "label": variable.lower().replace("_", " ")}
                 for variable in list_variables
@@ -116,7 +122,7 @@ def getNexusTimeSeries(request, app_workspace):
 
     return JsonResponse(
         {
-            "data": data,
+            "data": [{"label": f"{nexus_id}-Streamflow", "data": data}],
             "nexus_ids": getNexusIDs(app_workspace),
         }
     )
@@ -155,7 +161,9 @@ def getTrouteTimeSeries(request, app_workspace):
     except Exception:
         data = []
 
-    return JsonResponse({"data": data})
+    return JsonResponse(
+        {"data": [{"label": f"{troute_id}-{variable_column}", "data": data}]}
+    )
 
 
 @controller(app_workspace=True)

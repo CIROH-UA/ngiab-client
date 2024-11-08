@@ -19,7 +19,8 @@ const CatchmentSelect = (props) => {
       catchment_id: state.catchment.id
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
-      actions.set_catchment_series(response.data);
+      // actions.set_catchment_series(response.data);
+      actions.set_series(response.data);
       actions.set_catchment_variable_list(response.variables);
       actions.set_catchment_variable(null);
       actions.set_catchment_list(response.catchment_ids);
@@ -47,7 +48,8 @@ const CatchmentSelect = (props) => {
       variable_column: state.catchment.variable
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
-      actions.set_catchment_series(response.data);
+      // actions.set_catchment_series(response.data);
+      actions.set_series(response.data);
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     }).catch((error) => {

@@ -3,6 +3,7 @@ import json
 import pandas as pd
 import glob
 import duckdb
+from datetime import datetime
 
 
 def _get_base_troute_output(app_workspace):
@@ -292,16 +293,25 @@ def get_teehr_ts(parquet_file_path, primary_location_id_value):
 
     # Close DuckDB connection
     conn.close()
-    # Prepare data for ChartistJS, converting `value_time` to datetime objects in milliseconds
+
+    # Convert datetime format
+    filtered_df["value_time"] = filtered_df["value_time"].apply(
+        lambda x: x.strftime("%Y-%m-%d %H:%M:%S")
+    )
+
+    primary_data = [
+        {"x": row["value_time"], "y": row["primary_value"]}
+        for _, row in filtered_df.iterrows()
+    ]
+
+    secondary_data = [
+        {"x": row["value_time"], "y": row["secondary_value"]}
+        for _, row in filtered_df.iterrows()
+    ]
+
     series = [
-        [
-            {"x": row["value_time"], "y": row["primary_value"]}
-            for _, row in filtered_df.iterrows()
-        ],
-        [
-            {"x": row["value_time"], "y": row["secondary_value"]}
-            for _, row in filtered_df.iterrows()
-        ],
+        {"label": "primary_value", "data": primary_data},
+        {"label": "secondary_value", "data": secondary_data},
     ]
 
     return series
