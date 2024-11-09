@@ -25,7 +25,6 @@ export const SelectContainer = styled.div`
   width: 100%;
   padding: 5px;
   flex: 1 1 20%;
-  width: 100%;
 `;
 
 export const MapContainer = styled.div`
@@ -41,4 +40,8 @@ export const TeehrMetricsWrapper = styled.div`
   padding: 10px;
   background-color: #f8f8f8;
   border-bottom: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+  order: 1;
+  flex: 1 1 20%;
 `;

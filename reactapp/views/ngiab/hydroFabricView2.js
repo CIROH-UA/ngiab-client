@@ -15,11 +15,21 @@ const TrouteSelectComponent = lazy(() => import('../../features/hydroFabric/comp
 const TeehrSelectComponent = lazy(() => import('../../features/hydroFabric/components/teehrSelect'));
 const LineChart = lazy(() => import('../../features/hydroFabric/components/chart'));
 const  TeehrMetricsTable = lazy(() => import('../../features/hydroFabric/components/teehrMetrics'));
+const SelectionView = lazy(() => import('../../components/selections'));
+
 
 const HydroFabricView = (props) => {
   const {state,actions} = useHydroFabricContext();
   return (
+
     <Fragment>
+        <Suspense fallback={<LoadingAnimation />}>
+            <SelectionView
+                toggleSingleRow = {props.toggleSingleRow}
+                singleRowOn={props.singleRowOn}
+                setIsLoading={props.setIsLoading}
+            />
+        </Suspense>
         {
             state.teehr.metrics &&
             <TeehrMetricsWrapper>
@@ -27,7 +37,7 @@ const HydroFabricView = (props) => {
             </TeehrMetricsWrapper>
         }
 
-        <SelectContainer>
+        {/* <SelectContainer>
             <Suspense fallback={<LoadingAnimation />}>
                 <CatchmentSelectComponent 
                     toggleSingleRow = {props.toggleSingleRow} 
@@ -58,7 +68,7 @@ const HydroFabricView = (props) => {
                     setIsLoading={props.setIsLoading} 
                 />
             </Suspense>
-      </SelectContainer>
+      </SelectContainer> */}
 
       <Suspense fallback={<LoadingAnimation />}>
        <HydroFabricPlotContainer>
