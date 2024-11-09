@@ -3,7 +3,7 @@ import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricP
 import { MapProvider } from 'features/Map/providers/MapProvider';
 import { HydroFabricContainer, MapContainer } from './containers';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
-const HydroFabricView = lazy(() => import('./hydroFabricView2.js'));
+const HydroFabricView = lazy(() => import('./hydroFabricView.js'));
 const MapView = lazy(() => import('./map_view.js'));
 
 const NGIABView = () => {
