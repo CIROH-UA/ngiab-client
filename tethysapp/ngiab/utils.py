@@ -327,38 +327,36 @@ def get_teehr_metrics(app_workspace, primary_location_id):
     # Filter the DataFrame by primary_location_id
     df_filtered = df[df["primary_location_id"] == primary_location_id]
 
-    # Pivot the data to have metrics as rows and configurations as columns
+    # Pivot the DataFrame to make configuration names the columns
     pivot_df = df_filtered.pivot(
-        columns="configuration_name",
-        values=["kling_gupta_efficiency", "nash_sutcliffe_efficiency", "relative_bias"],
+        index="primary_location_id", columns="configuration_name"
     )
-    breakpoint()
 
-    # Flatten the multi-index columns
+    # Flatten the MultiIndex columns
     pivot_df.columns = [f"{metric}_{config}" for metric, config in pivot_df.columns]
 
-    # Transform the data into the required structure
+    # Extract metrics into the required structure
     metrics_data = [
         {
             "metric": "kling_gupta_efficiency",
-            **{
-                config: pivot_df[f"kling_gupta_efficiency_{config}"].values[0]
-                for config in df_filtered["configuration_name"].unique()
-            },
+            "ngen": pivot_df["kling_gupta_efficiency_ngen"].values[0],
+            "nwm30_retrospective": pivot_df[
+                "kling_gupta_efficiency_nwm30_retrospective"
+            ].values[0],
         },
         {
             "metric": "nash_sutcliffe_efficiency",
-            **{
-                config: pivot_df[f"nash_sutcliffe_efficiency_{config}"].values[0]
-                for config in df_filtered["configuration_name"].unique()
-            },
+            "ngen": pivot_df["nash_sutcliffe_efficiency_ngen"].values[0],
+            "nwm30_retrospective": pivot_df[
+                "nash_sutcliffe_efficiency_nwm30_retrospective"
+            ].values[0],
         },
         {
             "metric": "relative_bias",
-            **{
-                config: pivot_df[f"relative_bias_{config}"].values[0]
-                for config in df_filtered["configuration_name"].unique()
-            },
+            "ngen": pivot_df["relative_bias_ngen"].values[0],
+            "nwm30_retrospective": pivot_df["relative_bias_nwm30_retrospective"].values[
+                0
+            ],
         },
     ]
 
