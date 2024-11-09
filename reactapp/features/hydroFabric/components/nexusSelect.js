@@ -35,8 +35,8 @@ const NexusSelect = (props) => {
     <Fragment>
         {state.nexus.id &&
             <Fragment>
-                <h5>Nexus</h5>
-                <label>Current Nexus ID</label>
+                <h5>Time Series</h5>
+                <label>Nexus ID</label>
                 <SelectComponent 
                 optionsList={state.nexus.list} 
                 onChangeHandler={actions.set_nexus_id}
