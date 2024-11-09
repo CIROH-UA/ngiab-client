@@ -280,14 +280,11 @@ const displayFeatureInfo = (event,layer,hydroFabricActions) => {
           var multipleFeatures = feature.get('features');
           // only one feature
           if (multipleFeatures.length < 2){
+            hydroFabricActions.reset_teehr();
             var nexus_id = multipleFeatures[0].get('id');
             hydroFabricActions.set_nexus_id(nexus_id);
-            console.log(multipleFeatures[0].get('ngen_usgs'))
             if (multipleFeatures[0].get('ngen_usgs') != "none"){
               hydroFabricActions.set_teehr_id(multipleFeatures[0].get('ngen_usgs'));
-            }
-            else{
-              hydroFabricActions.set_teehr_id(null);
             }
           }
           //zoom it through all the features
