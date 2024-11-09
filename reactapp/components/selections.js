@@ -14,7 +14,8 @@ const TeehrSelectComponent = lazy(() => import('../features/hydroFabric/componen
 
 export const Container = styled.div`
     position: absolute;
-    top: 56px;
+    display: ${props => props.singleRowOn ? 'none' : 'block'};
+    top: 60px;
     left: 0.5rem;
     padding: 10px;
     background-color: #f8f8f8;
@@ -25,7 +26,7 @@ export const Container = styled.div`
 
 const SelectionView = (props) => {
   return (
-        <Container>
+        <Container singleRowOn={props.singleRowOn}>
             <Suspense fallback={<LoadingAnimation />}>
                 <CatchmentSelectComponent 
                     toggleSingleRow = {props.toggleSingleRow} 
