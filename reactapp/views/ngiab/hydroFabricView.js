@@ -2,7 +2,7 @@
 
 import {Suspense, Fragment,lazy} from 'react';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
-import { SelectContainer,HydroFabricPlotContainer,TeehrMetricsWrapper } from './containers';
+import { HydroFabricPlotContainer,TeehrMetricsWrapper } from './containers';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 import ParentSize from '@visx/responsive/lib/components/ParentSize';
 
