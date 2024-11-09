@@ -12,8 +12,8 @@ export const HydroFabricContainer = styled.div`
 `;
 
 export const HydroFabricPlotContainer = styled.div`
-  width: 100%; 
-  height: 100%; 
+  width: 80%; 
+  height: 90%; 
   order: 1;
   flex: 1 1 80%;
 `;
