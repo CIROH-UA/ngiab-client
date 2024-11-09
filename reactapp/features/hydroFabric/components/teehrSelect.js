@@ -36,9 +36,7 @@ const TeehrSelect = (props) => {
       teehr_id: state.teehr.id,
       teehr_variable: state.teehr.variable
     }
-    appAPI.getTeehrTimeSeries(params).then((rep) => {
-      response = JSON.parse(rep)
-      console.log(response)
+    appAPI.getTeehrTimeSeries(params).then((response) => {
       actions.set_series(response.data)
       actions.set_teehr_metrics(response.metrics)
       props.toggleSingleRow(false);
