@@ -18,10 +18,11 @@ export const Container = styled.div`
     top: 60px;
     left: 0.5rem;
     padding: 10px;
-    background-color: #f8f8f8;
+    background-color: #2c3e50;
     border-bottom: 1px solid #ddd;
     width: 300px;
     border-radius: 0.5rem;  
+    color: white;
 `;
 
 const SelectionView = (props) => {
