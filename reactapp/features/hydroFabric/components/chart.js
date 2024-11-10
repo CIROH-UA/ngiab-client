@@ -1,3 +1,5 @@
+// https://github.com/airbnb/visx/issues/1276
+// for the constrains
 import React, { useCallback, useRef } from "react";
 import { Zoom, applyMatrixToPoint } from "@visx/zoom";
 import { Group } from "@visx/group";
@@ -57,15 +59,17 @@ function LineChart({ width, height, data }) {
   });
 
   // Colors for each series
-  const colors = ["#43b284", "#fab255", "#ff6361", "#58508d", "#ffa600"];
+  const colors = ["#43b284", "#ff8c42", "#a566ff", "#20a4f3", "#ffc107"];
+
 
   // Tooltip styles
   const tooltipStyles = {
     ...defaultStyles,
     minWidth: 60,
-    backgroundColor: "rgba(0,0,0,0.9)",
+    backgroundColor: "rgba(44, 62, 80, 0.9)", // Matches #2c3e50 with transparency
     color: "white",
-    position: "absolute",
+    fontSize: 14,
+    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
   };
 
   // Date formatter
@@ -207,6 +211,60 @@ function LineChart({ width, height, data }) {
 
           return (
             <>
+              {/* Legend and Controls */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  marginTop: 10,
+                  position: "relative",
+                }}
+              >
+                <div style={{ display: "flex" }}>
+                  {data.map((series, index) => (
+                    <div
+                      key={`legend-${index}`}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        marginRight: 10,
+                        padding: "2px 6px",            // Adds padding around each legend item
+                        border: "1px solid #ddd",       // Adds a light border around each item
+                        borderRadius: 4,                // Rounds the corners of each legend item
+                        backgroundColor: "#2c3e50",     // Light background color to make the legend stand out
+                      }}
+                    >
+                      <div
+                        style={{
+                          backgroundColor:
+                            colors[index % colors.length],
+                          width: 10,
+                          height: 10,
+                          marginRight: 5,
+                        }}
+                      />
+                      <div style={{ color: "#f0f0f0", fontSize: 14 }}>
+                        {series.label}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={zoom.reset}
+                  style={{
+                    backgroundColor: "#2c3e50",
+                    color: "#ffffff",
+                    fontWeight: "bold",
+                    border: "none",
+                    borderRadius: 4,
+                    padding: "4px 8px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Reset Zoom
+                </button>
+              </div>
+
               <svg
                 ref={svgRef}
                 width={width}
@@ -229,54 +287,36 @@ function LineChart({ width, height, data }) {
                   y={0}
                   width={width}
                   height={height}
-                  fill={"#fff"}
+                  fill={'#34495e'}
                   rx={14}
                 />
                 <Group left={margin.left} top={margin.top}>
-                  <GridRows
-                    scale={newYScale}
-                    width={innerWidth}
-                    height={innerHeight}
-                    stroke="#0a100d"
-                    strokeOpacity={0.2}
-                  />
-                  <GridColumns
-                    scale={newXScale}
-                    width={innerWidth}
-                    height={innerHeight}
-                    stroke="#0a100d"
-                    strokeOpacity={0.2}
-                  />
-                  <AxisLeft
-                    scale={newYScale}
-                    stroke={"#EDF2F7"}
-                    tickStroke={"#EDF2F7"}
-                    tickLabelProps={() => ({
-                      fill: "#0a100d",
-                      fontSize: 11,
-                      textAnchor: "end",
-                    })}
-                  />
+                <GridRows scale={newYScale} width={innerWidth} height={innerHeight} stroke="#7f8c8d" strokeOpacity={0.1} strokeWidth={1} />
+
+                <GridColumns scale={newXScale} width={innerWidth} height={innerHeight} stroke="#7f8c8d" strokeOpacity={0.1} strokeWidth={1} />
+
+                <AxisLeft
+                  scale={newYScale}
+                  stroke="#d1d5db"
+                  tickStroke="#d1d5db"
+                  tickLabelProps={() => ({ fill: "#e0e0e0", fontSize: 12, fontWeight: "bold", textAnchor: "end" })}
+                />
                   <text
                     x="-125"
                     y="20"
                     transform="rotate(-90)"
-                    fontSize={12}
-                    fill="#0a100d"
+                    fontSize={14}
+                    fill="#e0e0e0"
                   >
                     Y-axis Label
                   </text>
                   <AxisBottom
                     scale={newXScale}
                     top={innerHeight}
-                    stroke={"#EDF2F7"}
+                    stroke="#d1d5db"
                     tickFormat={formatDate}
-                    tickStroke={"#EDF2F7"}
-                    tickLabelProps={() => ({
-                      fill: "#0a100d",
-                      fontSize: 11,
-                      textAnchor: "middle",
-                    })}
+                    tickStroke="#d1d5db"
+                    tickLabelProps={() => ({ fill: "#e0e0e0", fontSize: 12, fontWeight: "bold", textAnchor: "middle" })}
                   />
                   {/* Apply the clip path to the chart elements */}
                   <Group clipPath="url(#chart-clip)">
@@ -296,14 +336,11 @@ function LineChart({ width, height, data }) {
                       <g>
                         <Line
                           from={{ x: tooltipLeft - margin.left, y: 0 }}
-                          to={{
-                            x: tooltipLeft - margin.left,
-                            y: innerHeight,
-                          }}
-                          stroke={"#0a100d"}
-                          strokeWidth={2}
+                          to={{ x: tooltipLeft - margin.left, y: innerHeight }}
+                          stroke="#d1d5db"
+                          strokeWidth={1.5}
                           pointerEvents="none"
-                          strokeDasharray="4,2"
+                          strokeDasharray="6,3"
                         />
                         {tooltipData.map((d, i) => (
                           <GlyphCircle
@@ -383,53 +420,7 @@ function LineChart({ width, height, data }) {
                   ))}
                 </TooltipWithBounds>
               )}
-              {/* Legend and Controls */}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginTop: 10,
-                  position: "relative",
-                }}
-              >
-                <div style={{ display: "flex" }}>
-                  {data.map((series, index) => (
-                    <div
-                      key={`legend-${index}`}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        marginRight: 10,
-                      }}
-                    >
-                      <div
-                        style={{
-                          backgroundColor:
-                            colors[index % colors.length],
-                          width: 10,
-                          height: 10,
-                          marginRight: 5,
-                        }}
-                      />
-                      <div style={{ color: "#0a100d", fontSize: 14 }}>
-                        {series.label}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button
-                  onClick={zoom.reset}
-                  style={{
-                    backgroundColor: "#fff",
-                    border: "1px solid #ccc",
-                    borderRadius: 4,
-                    padding: "4px 8px",
-                    cursor: "pointer",
-                  }}
-                >
-                  Reset Zoom
-                </button>
-              </div>
+
             </>
           );
         }}
