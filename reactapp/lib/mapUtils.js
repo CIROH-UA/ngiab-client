@@ -329,6 +329,7 @@ const displayFeatureInfo = (event,layer,hydroFabricActions) => {
               setIsLoading(false)
               return
             }
+            hydroFabricActions.reset_teehr();
             hydroFabricActions.set_catchment_id(data_catchment_id);
   
           })     // Log the actual JSON data
