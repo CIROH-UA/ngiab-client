@@ -14,8 +14,6 @@ const TeehrSelect = (props) => {
     var params = {}   
     appAPI.getTeehrVariables(params).then((response) => {
       actions.set_teehr_variable_list(response.teehr_variables);
-      console.log(response.teehr_variables)
-
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     
