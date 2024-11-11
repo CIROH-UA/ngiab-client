@@ -48,6 +48,7 @@ const CatchmentSelect = (props) => {
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
       actions.set_series(response.data);
+      actions.set_chart_layout(response.layout);
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     }).catch((error) => {
