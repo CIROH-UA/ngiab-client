@@ -3,7 +3,12 @@ import { hydroFabricActionsTypes } from '../actions/actionsTypes';
 const hydroFabricInitialStore = {
     state:{
         chart:{
-            series:[]
+            series:[],
+            layout:{
+                yaxis: null,
+                xaxis:null,
+                title:null
+            }
         },
         nexus:
         {
