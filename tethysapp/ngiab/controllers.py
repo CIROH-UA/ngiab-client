@@ -89,7 +89,8 @@ def getNexuslayer(request, app_workspace):
     gdf = gpd.read_file(nexus_file_path)
 
     # Convert the DataFrame to the "EPSG:3857" coordinate system
-    gdf = gdf.to_crs("EPSG:3857")
+    # gdf = gdf.to_crs("EPSG:3857")
+    gdf = gdf.to_crs("EPSG:4326")
 
     # Append ngen_usgs and nwm_usgs columns
     gdf = append_ngen_usgs_column(gdf, app_workspace)
