@@ -17,6 +17,7 @@ from .utils import (
     get_teehr_joined_ts_path,
     get_teehr_ts,
     get_teehr_metrics,
+    get_usgs_from_ngen_id,
 )
 
 from .app import App
@@ -126,6 +127,7 @@ def getNexusTimeSeries(request, app_workspace):
         for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
     ]
 
+    usgs_id = get_usgs_from_ngen_id(app_workspace, nexus_id)
     return JsonResponse(
         {
             "data": [
@@ -140,6 +142,7 @@ def getNexusTimeSeries(request, app_workspace):
                 "title": "",
             },
             "nexus_ids": getNexusIDs(app_workspace),
+            "usgs_id": usgs_id,
         }
     )
 

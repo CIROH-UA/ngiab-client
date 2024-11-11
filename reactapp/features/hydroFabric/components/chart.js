@@ -20,7 +20,6 @@ import { RectClipPath } from "@visx/clip-path"; // Import ClipPath
 
 function LineChart({ width, height, data, layout }) {
   // Tooltip parameters
-  console.log(layout)
   const {
     tooltipData,
     tooltipLeft = 0,

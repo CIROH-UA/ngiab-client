@@ -18,6 +18,7 @@ const NexusSelect = (props) => {
     appAPI.getNexusTimeSeries(params).then((response) => {
       actions.set_series(response.data);
       actions.set_chart_layout(response.layout);
+      actions.set_teehr_id(response.usgs_id);
       actions.set_nexus_list(response.nexus_ids);
       actions.set_troute_id(state.nexus.id);
       props.toggleSingleRow(false);
