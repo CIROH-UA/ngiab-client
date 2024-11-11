@@ -4,7 +4,6 @@ import {useEffect, Fragment,lazy} from 'react';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
-// const SelectComponent = lazy(() => import('selectComponent'));
 
 const NexusSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
@@ -18,7 +17,13 @@ const NexusSelect = (props) => {
     appAPI.getNexusTimeSeries(params).then((response) => {
       actions.set_series(response.data);
       actions.set_chart_layout(response.layout);
-      actions.set_teehr_id(response.usgs_id);
+      if(response.usgs_id){
+        actions.set_teehr_id(response.usgs_id);
+      }
+      else{
+        actions.reset_teehr();
+      }
+      
       actions.set_nexus_list(response.nexus_ids);
       actions.set_troute_id(state.nexus.id);
       props.toggleSingleRow(false);
