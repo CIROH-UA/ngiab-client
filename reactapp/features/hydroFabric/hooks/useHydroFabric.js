@@ -25,11 +25,13 @@ const useHydroFabric = () => {
         set_teehr_variable_list: (list) => dispatch({ type: hydroFabricActionsTypes.set_teehr_variable_list, payload: list }),
         set_teehr_metrics: (metrics) => dispatch({ type: hydroFabricActionsTypes.set_teehr_metrics, payload: metrics }),
 
+        set_series: (series) => dispatch({ type: hydroFabricActionsTypes.set_series, payload: series }),
+        set_chart_layout: (layout) => dispatch({ type: hydroFabricActionsTypes.set_chart_layout, payload: layout }),
+
         reset_teehr: () => dispatch({ type: hydroFabricActionsTypes.reset_teehr }),
         reset_troute: () => dispatch({ type: hydroFabricActionsTypes.reset_troute }),
         reset_nexus: () => dispatch({ type: hydroFabricActionsTypes.reset_nexus }),
         reset_catchment: () => dispatch({ type: hydroFabricActionsTypes.reset_catchment }),
-        set_series: (series) => dispatch({ type: hydroFabricActionsTypes.set_series, payload: series }),
         reset: () => dispatch({ type: hydroFabricActionsTypes.reset }),
     };
     return { state, actions };

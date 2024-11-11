@@ -13,7 +13,7 @@ const SelectionView = lazy(() => import('../../components/selections'));
 
 
 const HydroFabricView = (props) => {
-  const {state,actions} = useHydroFabricContext();
+  const {state} = useHydroFabricContext();
   return (
 
     <Fragment>
@@ -35,7 +35,7 @@ const HydroFabricView = (props) => {
        <HydroFabricPlotContainer>
           <ParentSize>
             {({ width, height }) => 
-              <LineChart width={width} height={height} data={state.chart.series} layout={{yaxis: state.teehr.variable}}/>}
+              <LineChart width={width} height={height} data={state.chart.series} layout={state.chart.layout}/>}
           </ParentSize>
 
         </HydroFabricPlotContainer> 

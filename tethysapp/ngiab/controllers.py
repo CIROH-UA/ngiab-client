@@ -73,6 +73,11 @@ def getCatchmentTimeSeries(request, app_workspace):
                 if variable_column
                 else list_variables[0]
             ),
+            "layout": {
+                "yaxis": variable_column,
+                "xaxis": "",
+                "title": "",
+            },
             "catchment_ids": getCatchmentsIds(app_workspace),
         }
     )
@@ -123,7 +128,17 @@ def getNexusTimeSeries(request, app_workspace):
 
     return JsonResponse(
         {
-            "data": [{"label": f"{nexus_id}-Streamflow", "data": data}],
+            "data": [
+                {
+                    "label": f"{nexus_id}-Streamflow",
+                    "data": data,
+                }
+            ],
+            "layout": {
+                "yaxis": "Streamflow",
+                "xaxis": "",
+                "title": "",
+            },
             "nexus_ids": getNexusIDs(app_workspace),
         }
     )
@@ -163,7 +178,19 @@ def getTrouteTimeSeries(request, app_workspace):
         data = []
 
     return JsonResponse(
-        {"data": [{"label": f"{troute_id}-{variable_column}", "data": data}]}
+        {
+            "data": [
+                {
+                    "label": f"{troute_id}-{variable_column}",
+                    "data": data,
+                }
+            ],
+            "layout": {
+                "yaxis": variable_column.title(),
+                "xaxis": "",
+                "title": "",
+            },
+        }
     )
 
 
@@ -178,7 +205,13 @@ def getTeehrTimeSeries(request, app_workspace):
     )
     teehr_ts = get_teehr_ts(teehr_ts_path, teehr_id, teehr_configuration)
     teehr_metrics = get_teehr_metrics(app_workspace, teehr_id)
-    return JsonResponse({"metrics": teehr_metrics, "data": teehr_ts})
+    return JsonResponse(
+        {
+            "metrics": teehr_metrics,
+            "data": teehr_ts,
+            "layout": {"yaxis": teehr_variable.title(), "xaxis": "", "title": ""},
+        }
+    )
 
 
 @controller(app_workspace=True)
