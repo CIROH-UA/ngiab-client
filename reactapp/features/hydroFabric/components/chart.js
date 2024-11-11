@@ -18,7 +18,7 @@ import { GlyphCircle } from "@visx/glyph";
 import { timeParse, timeFormat } from "d3-time-format";
 import { RectClipPath } from "@visx/clip-path"; // Import ClipPath
 
-function LineChart({ width, height, data }) {
+function LineChart({ width, height, data, layout }) {
   // Tooltip parameters
   const {
     tooltipData,
@@ -300,16 +300,15 @@ function LineChart({ width, height, data }) {
                   stroke="#d1d5db"
                   tickStroke="#d1d5db"
                   tickLabelProps={() => ({ fill: "#e0e0e0", fontSize: 12, fontWeight: "bold", textAnchor: "end" })}
+                  label= {layout.yaxis}
+                  labelProps={{
+                    fill: '#e0e0e0',
+                    fontSize: 14,
+                    strokeWidth: 0,
+                    paintOrder: 'stroke',
+                    fontFamily: 'sans-serif',
+                  }}
                 />
-                  <text
-                    x="-125"
-                    y="20"
-                    transform="rotate(-90)"
-                    fontSize={14}
-                    fill="#e0e0e0"
-                  >
-                    Y-axis Label
-                  </text>
                   <AxisBottom
                     scale={newXScale}
                     top={innerHeight}

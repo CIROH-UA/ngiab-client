@@ -278,7 +278,7 @@ def get_teehr_joined_ts_path(app_workspace, configuration, variable):
         return None
 
 
-def get_teehr_ts(parquet_file_path, primary_location_id_value):
+def get_teehr_ts(parquet_file_path, primary_location_id_value, teehr_configuration):
     # Open DuckDB connection
     conn = duckdb.connect(database=":memory:")
 
@@ -310,8 +310,11 @@ def get_teehr_ts(parquet_file_path, primary_location_id_value):
     ]
 
     series = [
-        {"label": "primary_value", "data": primary_data},
-        {"label": "secondary_value", "data": secondary_data},
+        {"label": "USGS", "data": primary_data},
+        {
+            "label": f"{teehr_configuration.replace('_', ' ').title()}",
+            "data": secondary_data,
+        },
     ]
 
     return series
