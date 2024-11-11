@@ -5,7 +5,7 @@ export const HydroFabricContainer = styled.div`
   order: 2;
   width: 100%;
   height: ${props => props.fullScreen ? '0%' : '40%'};
-  padding:10px;
+  padding:5px;
   display:flex;
   flex-direction:row;
 `;

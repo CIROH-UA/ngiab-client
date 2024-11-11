@@ -32,10 +32,13 @@ const HydroFabricView = (props) => {
         }
 
       <Suspense fallback={<LoadingAnimation />}>
+
        <HydroFabricPlotContainer>
           <ParentSize>
             {({ width, height }) => 
-              <LineChart width={width} height={height} data={state.chart.series} layout={state.chart.layout}/>}
+                      state.chart.series.length > 0 &&
+                      <LineChart width={width} height={height} data={state.chart.series} layout={state.chart.layout}/>
+              }
           </ParentSize>
 
         </HydroFabricPlotContainer> 
