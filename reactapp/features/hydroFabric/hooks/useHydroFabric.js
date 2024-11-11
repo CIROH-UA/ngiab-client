@@ -1,7 +1,6 @@
 import React, { useReducer } from 'react';
 import { hydroFabricReducer, hydroFabricInitialStore } from '../store/reducers/hydroFabricReducer';
 import { hydroFabricActionsTypes } from '../store/actions/actionsTypes';
-import { set } from 'ol/transform';
 
 
 const useHydroFabric = () => {
