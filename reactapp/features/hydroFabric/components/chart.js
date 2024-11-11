@@ -212,6 +212,7 @@ function LineChart({ width, height, data, layout }) {
           return (
             <>
               {/* Legend and Controls */}
+              
               <div
                 style={{
                   display: "flex",
