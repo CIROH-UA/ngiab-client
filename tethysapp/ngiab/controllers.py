@@ -17,6 +17,7 @@ from .utils import (
     get_teehr_joined_ts_path,
     get_teehr_ts,
     get_teehr_metrics,
+    getCatchmentsList,
 )
 
 from .app import App
@@ -79,7 +80,7 @@ def getCatchmentTimeSeries(request, app_workspace):
 
 
 @controller(app_workspace=True)
-def getNexuslayer(request, app_workspace):
+def getGeoSpatialData(request, app_workspace):
     response_object = {}
     nexus_file_path = os.path.join(
         app_workspace.path, "ngen-data", "config", "nexus.geojson"
@@ -100,8 +101,7 @@ def getNexuslayer(request, app_workspace):
     data = json.loads(gdf.to_json())
 
     response_object["geojson"] = data
-    # response_object["list_ids"] = nexus_select_list
-    return JsonResponse(response_object)
+    return JsonResponse({"nexus": data, "catchments": getCatchmentsList(app_workspace)})
 
 
 @controller(app_workspace=True)
