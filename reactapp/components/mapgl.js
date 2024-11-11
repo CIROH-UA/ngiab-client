@@ -19,26 +19,26 @@ const nexusLayer = {
     },
   };
 
+  const onMapLoad = (event) => {
+    const map = event.target;
   
-// Define the layer configuration BaseMap
-  const catchmentLayerConfig = {
-    id: 'catchments-layer',
-    type: 'fill',
-    source: 'conus',
-    'source-layer': 'catchments', // Replace with actual source layer name
-    "paint": {
-      "fill-color": ["rgba", 0, 0, 0, 0],
-      "fill-outline-color": ["rgba", 1, 1, 1, 0.5],
-      "fill-opacity": { "stops": [[7, 0], [11, 1]] }
+    if (map.getLayer('catchments')) {
+      // Set a filter that matches no features
+      map.setFilter('catchments',  ['any', ['in', 'divide_id', ""]]);
+      // map.setFilter('flowpaths',  ["any",["in", "id", ""]]);
+      console.log("Base 'catchments' layer has been filtered out.");
+    } else {
+      console.log("Base 'catchments' layer not found.");
     }
   };
-
-  
 
 const MapComponent = () => {
   const {actions: hydroFabricActions } = useHydroFabricContext(); 
   const [nexusPoints, setNexusPoints] = useState(null);
-  const [selectedCatchmentsConfig, setSelectedCatchmentsConfig] = useState(null);
+  const [filteredCatchmentsConfig, setFilteredCatchmentsConfig] = useState(null);
+  const [catchmentConfig, setCatchmentConfig] = useState(null);
+  const [flowpaths, setFlowpaths] = useState(null);
+  const [filteredFlowpaths, setfilteredFlowpaths] = useState(null);
 
   // PMTiles protocol setup
   useEffect(() => {
@@ -48,19 +48,62 @@ const MapComponent = () => {
     appAPI.getGeoSpatialData().then(response => {
         console.log(response)
         setNexusPoints(response.nexus);
+        console.log(['in', 'divide_id', ...response.catchments])
+        // const catchmentLayerConfig = {
+        //   id: 'catchments-layer',
+        //   type: 'fill',
+        //   source: 'conus',
+        //   'source-layer': 'catchments', // Replace with actual source layer name
+        //   filter: ['any', ['in', 'divide_id', ...response.catchments]],
+        //   "paint": {
+        //     "fill-color": ["rgba", 0, 0, 0, 0],
+        //     // "fill-outline-color": ["rgba", 238, 51, 119, 0.7],
+        //     "fill-opacity": { "stops": [[7, 0], [11, 1]] }
+        //   }
+        // };
+        // setCatchmentConfig(catchmentLayerConfig);
         const selectedCatchmentLayerConfig = {
-          id: 'selected-catchments-layer',
-          type: 'fill',
+          id: 'filtered-catchments-layer',
+          type: 'line',
           source: 'conus',
           'source-layer': 'catchments', // Replace with actual source layer name
-          filter: ['in', 'divide_id', ['literal', response.catchments]],
-          "paint": {
-            "fill-color": ["rgba", 238, 51, 119, 0.316],
-            "fill-outline-color": ["rgba", 238, 51, 119, 0.7],
-            "fill-opacity": { "stops": [[7, 0], [11, 1]] }
-          }
+          filter: ['in', 'divide_id', ...response.catchments],
+          paint: {
+            'line-color': ['rgba', 238, 51, 119, 0.7],
+            'line-width': 2, // Adjust this value to make the outline thicker
+          },
         };
-        setSelectedCatchmentsConfig(selectedCatchmentLayerConfig);
+        setFilteredCatchmentsConfig(selectedCatchmentLayerConfig);
+
+        const flowpathsLayerConfig = {
+          id: 'flowpaths-layer',
+          type: 'fill',
+          source: 'conus',
+          'source-layer': 'flowpaths', // Replace with actual source layer name
+          filter: ['any', ['in', 'divide_id', ...response.catchments]],
+          "paint": {
+            "line-color": ["rgba", 0, 119, 187, 1],
+            "line-width": { "stops": [[7, 1], [10, 2]] },
+            "line-opacity": { "stops": [[7, 0], [11, 1]] }
+          },
+        };
+        setFlowpaths(flowpathsLayerConfig);
+
+        const filteredFlowpathsLayerConfig = {
+          id: 'selected-flowpaths-layer',
+          type: 'fill',
+          source: 'conus',
+          'source-layer': 'flowpaths', // Replace with actual source layer name
+          filter: ['any', ['in', 'divide_id', ...response.catchments]],
+          "paint": {
+            "line-color": ["rgba", 0, 119, 187, 1],
+            "line-width": { "stops": [[7, 1], [10, 2]] },
+            "line-opacity": { "stops": [[7, 0], [11, 1]] }
+          },
+        };
+        setfilteredFlowpaths(filteredFlowpathsLayerConfig);
+
+
 
     }).catch(error => {
         console.log(error)
@@ -82,22 +125,23 @@ const handleMapClick = (event) => {
     
     // Include both 'conus-layer' and 'nexus-layer' in the layers array
     const features = map.queryRenderedFeatures(event.point, {
-      layers: ['catchments-layer', 'nexus-layer', 'selected-catchments-layer'],
+      layers: ['filtered-catchments-layer', 'nexus-layer'],
     });
   
     if (features.length > 0) {
       // Loop through all features at the click point
+      console.log(features.length)
+      
       for (const feature of features) {
         const layerId = feature.layer.id;
         console.log('Clicked on layer:', layerId);
         console.log('Feature properties:', feature.properties);
-        if (layerId === 'catchments-layer') {
+        if (layerId === 'filtered-catchments-layer') {
           // Handle click on 'conus-layer'
-          console.log('Clicked on catchments-layer');
-          // map.setFilter('catchments', ['any', ['in', 'divide_id', ['literal', catchments]]])
-          // Implement interaction logic specific to 'conus-layer' here
+          console.log('Clicked on filtered-catchments-layer');
           hydroFabricActions.reset_teehr();
           hydroFabricActions.set_catchment_id(feature.properties.divide_id);
+          return
         } else if (layerId === 'nexus-layer') {
           // Handle click on 'nexus-layer'
           console.log('Clicked on nexus-layer');
@@ -107,11 +151,8 @@ const handleMapClick = (event) => {
           if (feature.ngen_usgs != "none"){
             hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);
           }
+          return
         }
-        else if (layerId === 'selected-catchments-layer'){
-          console.log('Clicked on selected-catchments-layer');
-        }
-
       }
     }
   };
@@ -126,12 +167,16 @@ const handleMapClick = (event) => {
       mapLib={maplibregl}
       mapStyle="https://communityhydrofabric.s3.us-east-1.amazonaws.com/style.json"
       onClick={handleMapClick}
+      onLoad={onMapLoad}
     >
       {/* Add the PMTiles source */}
       <Source id="conus" type="vector" url={pmtilesUrl}>
         {/* Add the layer that uses the source */}
-        <Layer {...catchmentLayerConfig} />
-        <Layer {...selectedCatchmentsConfig} />
+        {/* <Layer {...catchmentConfig} /> */}
+        <Layer {...filteredCatchmentsConfig} />
+        {/* <Layer {...flowpaths} /> */}
+        {/* <Layer {...filteredFlowpaths} /> */}
+
       </Source>
       {nexusPoints && (
         <Source id="nexus-points" type="geojson" data={nexusPoints}>

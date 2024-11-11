@@ -14,8 +14,6 @@ const TeehrSelect = (props) => {
     var params = {}   
     appAPI.getTeehrVariables(params).then((response) => {
       actions.set_teehr_variable_list(response.teehr_variables);
-      console.log(response.teehr_variables)
-
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     
@@ -37,7 +35,8 @@ const TeehrSelect = (props) => {
       teehr_variable: state.teehr.variable
     }
     appAPI.getTeehrTimeSeries(params).then((response) => {
-      actions.set_series(response.data)
+      actions.set_series(response.data);
+      actions.set_chart_layout(response.layout);
       actions.set_teehr_metrics(response.metrics)
       props.toggleSingleRow(false);
       props.setIsLoading(false);

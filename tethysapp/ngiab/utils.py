@@ -16,8 +16,11 @@ def _get_base_troute_output(app_workspace):
 def get_troute_df(app_workspace):
     base_output_path = _get_base_troute_output(app_workspace)
     troute_output_files = glob.glob(base_output_path + "/*.csv")
-    df = pd.read_csv(troute_output_files[0])
-    return df
+    if len(troute_output_files) > 0:
+        df = pd.read_csv(troute_output_files[0])
+        return df
+
+    return None
 
 
 def check_troute_id(df, id):
@@ -285,7 +288,36 @@ def get_teehr_joined_ts_path(app_workspace, configuration, variable):
         return None
 
 
-def get_teehr_ts(parquet_file_path, primary_location_id_value):
+def get_usgs_from_ngen_id(app_workspace, nexgen_id):
+    base_output_teehr_path = get_base_teehr_path(app_workspace)
+    negen_usgs_path = os.path.join(
+        base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
+    )
+    # Open DuckDB connection
+    corrected_next_id = nexgen_id.replace("nex", "ngen")
+    conn = duckdb.connect(database=":memory:")
+
+    try:
+
+        # Load and filter the parquet file based on the primary_location_id value
+        query = f"""
+            SELECT primary_location_id, secondary_location_id
+            FROM parquet_scan('{negen_usgs_path}')
+            WHERE secondary_location_id = '{corrected_next_id}'
+        """
+        df = conn.execute(query).fetchdf()
+        if df.empty:
+            return None
+        return df["primary_location_id"].values[0]
+
+    except Exception:
+        print("Error querying ngen_usgs_crosswalk.parquet")
+
+    conn.close()
+    return None
+
+
+def get_teehr_ts(parquet_file_path, primary_location_id_value, teehr_configuration):
     # Open DuckDB connection
     conn = duckdb.connect(database=":memory:")
 
@@ -317,8 +349,11 @@ def get_teehr_ts(parquet_file_path, primary_location_id_value):
     ]
 
     series = [
-        {"label": "primary_value", "data": primary_data},
-        {"label": "secondary_value", "data": secondary_data},
+        {"label": "USGS", "data": primary_data},
+        {
+            "label": f"{teehr_configuration.replace('_', ' ').title()}",
+            "data": secondary_data,
+        },
     ]
 
     return series

@@ -17,6 +17,7 @@ from .utils import (
     get_teehr_joined_ts_path,
     get_teehr_ts,
     get_teehr_metrics,
+    get_usgs_from_ngen_id,
     getCatchmentsList,
 )
 
@@ -74,6 +75,11 @@ def getCatchmentTimeSeries(request, app_workspace):
                 if variable_column
                 else list_variables[0]
             ),
+            "layout": {
+                "yaxis": variable_column,
+                "xaxis": "",
+                "title": "",
+            },
             "catchment_ids": getCatchmentsIds(app_workspace),
         }
     )
@@ -122,26 +128,42 @@ def getNexusTimeSeries(request, app_workspace):
         for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
     ]
 
+    usgs_id = get_usgs_from_ngen_id(app_workspace, nexus_id)
     return JsonResponse(
         {
-            "data": [{"label": f"{nexus_id}-Streamflow", "data": data}],
+            "data": [
+                {
+                    "label": f"{nexus_id}-Streamflow",
+                    "data": data,
+                }
+            ],
+            "layout": {
+                "yaxis": "Streamflow",
+                "xaxis": "",
+                "title": "",
+            },
             "nexus_ids": getNexusIDs(app_workspace),
+            "usgs_id": usgs_id,
         }
     )
 
 
 @controller(app_workspace=True)
 def getTrouteVariables(request, app_workspace):
+    vars = []
     troute_id = request.GET.get("troute_id")
     clean_troute_id = troute_id.split("-")[1]
     df = get_troute_df(app_workspace)
-    try:
-        if check_troute_id(df, clean_troute_id):
-            vars = get_troute_vars(df)
-        else:
-            vars = []
-    except Exception:
+    if df is None:
         vars = []
+    else:
+        try:
+            if check_troute_id(df, clean_troute_id):
+                vars = get_troute_vars(df)
+            else:
+                vars = []
+        except Exception:
+            vars = []
 
     return JsonResponse({"troute_variables": vars})
 
@@ -164,7 +186,19 @@ def getTrouteTimeSeries(request, app_workspace):
         data = []
 
     return JsonResponse(
-        {"data": [{"label": f"{troute_id}-{variable_column}", "data": data}]}
+        {
+            "data": [
+                {
+                    "label": f"{troute_id}-{variable_column}",
+                    "data": data,
+                }
+            ],
+            "layout": {
+                "yaxis": variable_column.title(),
+                "xaxis": "",
+                "title": "",
+            },
+        }
     )
 
 
@@ -177,13 +211,15 @@ def getTeehrTimeSeries(request, app_workspace):
     teehr_ts_path = get_teehr_joined_ts_path(
         app_workspace, teehr_configuration, teehr_variable
     )
-    teehr_ts = get_teehr_ts(teehr_ts_path, teehr_id)
+    teehr_ts = get_teehr_ts(teehr_ts_path, teehr_id, teehr_configuration)
     teehr_metrics = get_teehr_metrics(app_workspace, teehr_id)
-    # breakpoint()
-    print(teehr_metrics)
-    return JsonResponse({"metrics": teehr_metrics, "data": teehr_ts})
-    # teehr_ts = get_teehr_ts(teehr_ts_path, teehr_id)
-    # return JsonResponse({"data": teehr_ts})
+    return JsonResponse(
+        {
+            "metrics": teehr_metrics,
+            "data": teehr_ts,
+            "layout": {"yaxis": teehr_variable.title(), "xaxis": "", "title": ""},
+        }
+    )
 
 
 @controller(app_workspace=True)
