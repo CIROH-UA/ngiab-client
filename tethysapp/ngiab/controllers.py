@@ -94,8 +94,8 @@ def getGeoSpatialData(request, app_workspace):
     gdf = gdf.to_crs("EPSG:4326")
 
     # Append ngen_usgs and nwm_usgs columns
-    gdf = append_ngen_usgs_column(gdf, app_workspace)
-    gdf = append_nwm_usgs_column(gdf, app_workspace)
+    # gdf = append_ngen_usgs_column(gdf, app_workspace)
+    # gdf = append_nwm_usgs_column(gdf, app_workspace)
     # filtered_gdf = gdf[gdf["ngen_usgs"] != "none"]
     # data = json.loads(filtered_gdf.to_json())
     data = json.loads(gdf.to_json())
