@@ -109,9 +109,9 @@ const MapComponent = () => {
   const pmtilesUrl =
     'pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/conus.pmtiles';
 
-    const handleMapClick = (event) => {
+    const handleMapClick = async (event) => {
       const map = event.target;
-      
+    
       // Include both 'catchments-layer' and the nexus point layers in the array
       const features = map.queryRenderedFeatures(event.point, {
         layers: ['selected-catchments', 'catchments-layer', 'unclustered-point', 'clusters'],
@@ -129,14 +129,25 @@ const MapComponent = () => {
             hydroFabricActions.reset_teehr();
             hydroFabricActions.set_catchment_id(feature.properties.divide_id);
             return;
-          } else if (layerId === 'unclustered-point' || layerId === 'clusters') {
-            // Handle click on 'nexus' points (clustered or unclustered)
+          } else if (layerId === 'unclustered-point') {
+            // Handle click on individual nexus points
             hydroFabricActions.reset_teehr();
             const nexus_id = feature.properties.id;
             hydroFabricActions.set_nexus_id(nexus_id);
             if (feature.properties.ngen_usgs !== "none") {
               hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);
             }
+            return;
+          } else if (layerId === 'clusters') {
+            const clusterId = feature.properties.cluster_id;
+            const zoom = await map.getSource('nexus-points').getClusterExpansionZoom(clusterId);
+            map.flyTo({
+              center: feature.geometry.coordinates,
+              zoom: zoom,
+              speed: 1.2, // Adjust speed of zoom animation (higher is slower)
+              curve: 1 // Controls zoom "smoothness"
+            });
+
             return;
           }
         }
