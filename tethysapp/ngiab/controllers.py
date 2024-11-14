@@ -98,7 +98,7 @@ def getGeoSpatialData(request, app_workspace):
     # Convert the DataFrame to the "EPSG:3857" coordinate system
     # gdf = gdf.to_crs("EPSG:3857")
     gdf = gdf.to_crs("EPSG:4326")
-
+    bounds = gdf.total_bounds.tolist()
     # Append ngen_usgs and nwm_usgs columns
     # gdf = append_ngen_usgs_column(gdf, app_workspace)
     # gdf = append_nwm_usgs_column(gdf, app_workspace)
@@ -106,8 +106,11 @@ def getGeoSpatialData(request, app_workspace):
     # data = json.loads(filtered_gdf.to_json())
     data = json.loads(gdf.to_json())
 
-    response_object["geojson"] = data
-    return JsonResponse({"nexus": data, "catchments": getCatchmentsList(app_workspace)})
+    response_object["nexus"] = data
+    response_object["bounds"] = bounds
+    response_object["catchments"] = getCatchmentsList(app_workspace)
+
+    return JsonResponse(response_object)
 
 
 @controller(app_workspace=True)

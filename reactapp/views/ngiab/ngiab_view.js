@@ -5,7 +5,7 @@ import { HydroFabricContainer, MapContainer } from './containers';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 const HydroFabricView = lazy(() => import('./hydroFabricView.js'));
 const MapView = lazy(() => import('./map_view.js'));
-const MapComponent = lazy(() => import('components/mapgl.js'));
+const MapComponent = lazy(() => import('components/map/mapgl.js'));
 const NGIABView = () => {
   const [singleRowOn, toggleSingleRow] = useState(true);
   const [ isLoading, setIsLoading ] = useState(false);
