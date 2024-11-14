@@ -10,7 +10,19 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
   // Define the onMapLoad function
   const onMapLoad = (event) => {
     const map = event.target;
+    const hoverLayers = ['selected-catchments', 'catchments-layer', 'unclustered-point', 'clusters'];
 
+    hoverLayers.forEach(layer => {
+      // Change cursor to pointer on mouse enter
+      map.on('mouseenter', layer, () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+
+      // Revert cursor to default on mouse leave
+      map.on('mouseleave', layer, () => {
+        map.getCanvas().style.cursor = '';
+      });
+    });
     if (map.getLayer('catchments')) {
       // Set a filter that matches no features
       map.setFilter('catchments', ['any', ['in', 'divide_id', ""]]);
@@ -111,7 +123,6 @@ const MapComponent = () => {
 
     const handleMapClick = async (event) => {
       const map = event.target;
-    
       // Include both 'catchments-layer' and the nexus point layers in the array
       const features = map.queryRenderedFeatures(event.point, {
         layers: ['selected-catchments', 'catchments-layer', 'unclustered-point', 'clusters'],
