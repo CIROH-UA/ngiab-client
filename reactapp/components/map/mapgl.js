@@ -49,12 +49,12 @@ const unclusteredPointLayer = {
   id: 'unclustered-point',
   type: 'circle',
   source: 'nexus-points',
-  filter: ['!', ['has', 'point_count']],
+  filter: ['!', ['has', 'point_count']], // Non-clustered points do not have `point_count`
   paint: {
-    'circle-color': '#007cbf',
-    'circle-radius': 5,
-    'circle-stroke-width': 1,
-    'circle-stroke-color': '#fff',
+    'circle-color': '#007cbf', // Fill color for the point
+    'circle-radius': 7,
+    'circle-stroke-width': 2, // Width of the stroke
+    'circle-stroke-color': '#ff0000', // Red color for the stroke
   },
 };
 
@@ -109,42 +109,39 @@ const MapComponent = () => {
   const pmtilesUrl =
     'pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/conus.pmtiles';
 
-  const handleMapClick = (event) => {
-    const map = event.target;
-    
-    // Include both 'conus-layer' and 'nexus-layer' in the layers array
-    const features = map.queryRenderedFeatures(event.point, {
-      layers: ['selected-catchments','catchments-layer', 'nexus-layer'],
-    });
-  
-    if (features.length > 0) {
-      // Loop through all features at the click point
-      console.log(features.length)
+    const handleMapClick = (event) => {
+      const map = event.target;
       
-      for (const feature of features) {
-        const layerId = feature.layer.id;
-        console.log('Clicked on layer:', layerId);
-        console.log('Feature properties:', feature.properties);
-        if (layerId === 'catchments-layer') {
-          // Handle click on 'conus-layer'
-          console.log('Clicked on catchments-layer');
-          hydroFabricActions.reset_teehr();
-          hydroFabricActions.set_catchment_id(feature.properties.divide_id);
-          return
-        } else if (layerId === 'nexus-layer') {
-          // Handle click on 'nexus-layer'
-          console.log('Clicked on nexus-layer');
-          hydroFabricActions.reset_teehr();
-          var nexus_id = feature.properties.id;
-          hydroFabricActions.set_nexus_id(nexus_id);
-          if (feature.ngen_usgs != "none"){
-            hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);
+      // Include both 'catchments-layer' and the nexus point layers in the array
+      const features = map.queryRenderedFeatures(event.point, {
+        layers: ['selected-catchments', 'catchments-layer', 'unclustered-point', 'clusters'],
+      });
+    
+      if (features.length > 0) {
+        // Loop through all features at the click point
+        for (const feature of features) {
+          const layerId = feature.layer.id;
+          console.log('Clicked on layer:', layerId);
+          console.log('Feature properties:', feature.properties);
+          
+          if (layerId === 'catchments-layer') {
+            // Handle click on 'catchments-layer'
+            hydroFabricActions.reset_teehr();
+            hydroFabricActions.set_catchment_id(feature.properties.divide_id);
+            return;
+          } else if (layerId === 'unclustered-point' || layerId === 'clusters') {
+            // Handle click on 'nexus' points (clustered or unclustered)
+            hydroFabricActions.reset_teehr();
+            const nexus_id = feature.properties.id;
+            hydroFabricActions.set_nexus_id(nexus_id);
+            if (feature.properties.ngen_usgs !== "none") {
+              hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);
+            }
+            return;
           }
-          return
         }
       }
-    }
-  };
+    };
   return (
     <Map
       ref={mapRef}
