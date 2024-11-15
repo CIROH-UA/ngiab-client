@@ -4,7 +4,7 @@ import pandas as pd
 import glob
 import duckdb
 from datetime import datetime
-import geopandas as gpd
+import xarray as xr
 
 
 def _get_base_troute_output(app_workspace):
@@ -15,28 +15,40 @@ def _get_base_troute_output(app_workspace):
 
 
 def get_troute_df(app_workspace):
+    """
+    Load the first T-Route data file from the workspace as a DataFrame.
+    Supports both CSV and NetCDF (.nc) files, and replaces NaN values with -9999.
+    """
     base_output_path = _get_base_troute_output(app_workspace)
-    troute_output_files = glob.glob(base_output_path + "/*.csv")
-    if len(troute_output_files) > 0:
-        df = pd.read_csv(troute_output_files[0])
-        return df
 
+    # Search for supported file types in priority order
+    file_types = [("CSV", "*.csv"), ("NetCDF", "*.nc")]
+
+    for file_type, pattern in file_types:
+        files = glob.glob(os.path.join(base_output_path, pattern))
+
+        if files:
+            file_path = files[0]
+            print(f"Found {file_type} file: {file_path}")
+
+            try:
+                if file_type == "CSV":
+                    # Read the CSV file into a DataFrame
+                    df = pd.read_csv(file_path)
+                elif file_type == "NetCDF":
+                    # Read the NetCDF file and convert to a DataFrame
+                    ds = xr.open_dataset(file_path)
+                    df = ds.to_dataframe()
+
+                # Replace NaN values with -9999
+                df.fillna(-9999, inplace=True)
+                return df
+            except Exception as e:
+                print(f"Error reading {file_type} file '{file_path}': {e}")
+
+    # If no files found, return None
+    print(f"No supported T-Route output files found in {base_output_path}.")
     return None
-
-
-def check_troute_id(df, id):
-    if int(id) in df["featureID"].values:
-        return True
-    return False
-
-
-def get_troute_vars(df):
-    list_variables = df.columns.tolist()[3:]  # remove feature, time and t0
-
-    variables = [
-        {"value": variable, "label": variable.lower()} for variable in list_variables
-    ]
-    return variables
 
 
 def get_base_output(app_workspace):
@@ -360,3 +372,51 @@ def find_gpkg_file(app_workspace):
                 gpkg_files.append(os.path.join(root, file))
 
     return gpkg_files[0]
+
+
+def get_troute_vars(df):
+    # Check if the DataFrame has a MultiIndex
+    if isinstance(df.index, pd.MultiIndex):
+        # For multi-indexed DataFrame
+        list_variables = df.columns.tolist()  # All columns are variables
+    else:
+        # For flat-indexed DataFrame
+        list_variables = df.columns.tolist()[
+            3:
+        ]  # Skip the first three columns (featureID, Type, time)
+
+    # Format the variables for display
+    variables = [
+        {"value": variable, "label": variable.lower()} for variable in list_variables
+    ]
+    return variables
+
+
+def check_troute_id(df, id):
+    if isinstance(df.index, pd.MultiIndex):
+        # Multi-indexed DataFrame: Check in the `feature_id` level
+        return int(id) in df.index.get_level_values("feature_id")
+    else:
+        # Flat-indexed DataFrame: Check in the `featureID` column
+        return int(id) in df["featureID"].values
+
+
+# def get_troute_time_series_nc(troute_id, variable_column, app_workspace):
+#     clean_troute_id = troute_id.split("-")[1]
+#     df = get_troute_df(app_workspace)
+
+#     try:
+#         # Filter by `feature_id` in the multi-index
+#         df_sliced_by_id = df.xs(int(clean_troute_id), level="feature_id")
+#         time_col = df_sliced_by_id.index.get_level_values("time")  # Get the time index
+#         var_col = df_sliced_by_id[variable_column]  # Get the requested variable column
+
+#         data = [
+#             {"x": time.strftime("%Y-%m-%d %H:%M:%S"), "y": val}
+#             for time, val in zip(time_col.tolist(), var_col.tolist())
+#         ]
+#     except Exception as e:
+#         print(f"Error: {e}")
+#         data = []
+
+#     return data

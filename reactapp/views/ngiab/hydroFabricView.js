@@ -36,7 +36,7 @@ const HydroFabricView = (props) => {
        <HydroFabricPlotContainer>
           <ParentSize>
             {({ width, height }) => 
-                      state.chart.series.length > 0 &&
+                      state.chart.series &&
                       <LineChart width={width} height={height} data={state.chart.series} layout={state.chart.layout}/>
               }
           </ParentSize>

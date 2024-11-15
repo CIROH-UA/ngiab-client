@@ -153,6 +153,7 @@ def getTrouteVariables(request, app_workspace):
     troute_id = request.GET.get("troute_id")
     clean_troute_id = troute_id.split("-")[1]
     df = get_troute_df(app_workspace)
+
     if df is None:
         vars = []
     else:
@@ -173,15 +174,32 @@ def getTrouteTimeSeries(request, app_workspace):
     clean_troute_id = troute_id.split("-")[1]
     variable_column = request.GET.get("troute_variable")
     df = get_troute_df(app_workspace)
-    df_sliced_by_id = df[df["featureID"] == int(clean_troute_id)]
+
     try:
-        time_col = df_sliced_by_id["current_time"]
+        if isinstance(df.index, pd.MultiIndex):
+            # Multi-indexed DataFrame: Slice using `feature_id` in the multi-index
+            df_sliced_by_id = df.xs(int(clean_troute_id), level="feature_id")
+            time_col = df_sliced_by_id.index.get_level_values("time")
+        else:
+            # Flat-indexed DataFrame: Filter using `featureID` column
+            df_sliced_by_id = df[df["featureID"] == int(clean_troute_id)]
+            time_col = df_sliced_by_id["current_time"]
+
         var_col = df_sliced_by_id[variable_column]
+
         data = [
-            {"x": time, "y": val}
+            {
+                "x": (
+                    time.strftime("%Y-%m-%d %H:%M:%S")
+                    if isinstance(time, pd.Timestamp)
+                    else str(time)
+                ),
+                "y": val,
+            }
             for time, val in zip(time_col.tolist(), var_col.tolist())
         ]
-    except Exception:
+    except Exception as e:
+        print(f"Error: {e}")
         data = []
 
     return JsonResponse(
