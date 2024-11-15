@@ -97,6 +97,8 @@ def getGeoSpatialData(request, app_workspace):
     # Convert the DataFrame to the "EPSG:3857" coordinate system
     # gdf = gdf.to_crs("EPSG:3857")
     gdf = gdf.to_crs("EPSG:4326")
+
+    flow_paths_ids = gdf["toid"].tolist()
     bounds = gdf.total_bounds.tolist()
     # filtered_gdf = gdf[gdf["ngen_usgs"] != "none"]
     # data = json.loads(filtered_gdf.to_json())
@@ -105,7 +107,7 @@ def getGeoSpatialData(request, app_workspace):
     response_object["nexus"] = data
     response_object["bounds"] = bounds
     response_object["catchments"] = getCatchmentsList(app_workspace)
-
+    response_object["flow_paths_ids"] = flow_paths_ids
     return JsonResponse(response_object)
 
 
