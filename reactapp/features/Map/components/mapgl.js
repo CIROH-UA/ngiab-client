@@ -10,7 +10,7 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
   // Define the onMapLoad function
   const onMapLoad = (event) => {
     const map = event.target;
-    const hoverLayers = ['selected-catchments', 'catchments-layer', 'unclustered-point', 'clusters'];
+    const hoverLayers = ['catchments-layer', 'unclustered-point', 'clusters'];
 
     hoverLayers.forEach(layer => {
       // Change cursor to pointer on mouse enter
@@ -23,8 +23,15 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
         map.getCanvas().style.cursor = '';
       });
     });
+    // Ensure 'unclustered-point' and 'clusters' layers are rendered on top of others
+    if (map.getLayer('unclustered-point')) {
+      map.moveLayer('unclustered-point');
+    }
+    if (map.getLayer('clusters')) {
+      map.moveLayer('clusters');
+    }
+
     if (map.getLayer('catchments')) {
-      // Set a filter that matches no features
       map.setFilter('catchments', ['any', ['in', 'divide_id', ""]]);
       console.log("Base 'catchments' layer has been filtered out.");
     } else {
@@ -123,9 +130,10 @@ const MapComponent = () => {
 
     const handleMapClick = async (event) => {
       const map = event.target;
-      // Include both 'catchments-layer' and the nexus point layers in the array
+    
+      // Prioritize clicking on 'unclustered-point' and 'clusters' layers first
       const features = map.queryRenderedFeatures(event.point, {
-        layers: ['selected-catchments', 'catchments-layer', 'unclustered-point', 'clusters'],
+        layers: ['unclustered-point', 'clusters', 'catchments-layer'],
       });
     
       if (features.length > 0) {
@@ -135,32 +143,35 @@ const MapComponent = () => {
           console.log('Clicked on layer:', layerId);
           console.log('Feature properties:', feature.properties);
           
-          if (layerId === 'catchments-layer') {
-            // Handle click on 'catchments-layer'
-            hydroFabricActions.reset_teehr();
-            hydroFabricActions.set_catchment_id(feature.properties.divide_id);
-            return;
-          } else if (layerId === 'unclustered-point') {
-            // Handle click on individual nexus points
+          // Priority click handling for 'unclustered-point' and 'clusters'
+          if (layerId === 'unclustered-point') {
             hydroFabricActions.reset_teehr();
             const nexus_id = feature.properties.id;
             hydroFabricActions.set_nexus_id(nexus_id);
             if (feature.properties.ngen_usgs !== "none") {
               hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);
             }
-            return;
+            return; // Exit after handling unclustered point click
           } else if (layerId === 'clusters') {
             const clusterId = feature.properties.cluster_id;
             const zoom = await map.getSource('nexus-points').getClusterExpansionZoom(clusterId);
             map.flyTo({
               center: feature.geometry.coordinates,
               zoom: zoom,
-              speed: 1.2, // Adjust speed of zoom animation (higher is slower)
-              curve: 1 // Controls zoom "smoothness"
+              speed: 1.2,
+              curve: 1,
             });
-
+            return; // Exit after handling cluster click
+          }
+          
+          // Handle other layers, like 'catchments-layer', only if unclustered/clustered layers weren't clicked
+          if (layerId === 'catchments-layer') {
+            hydroFabricActions.reset_teehr();
+            hydroFabricActions.set_catchment_id(feature.properties.divide_id);
             return;
           }
+
+
         }
       }
     };
