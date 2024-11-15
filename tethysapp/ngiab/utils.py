@@ -7,6 +7,62 @@ from datetime import datetime
 import xarray as xr
 
 
+def append_ngen_usgs_column(gdf, app_workspace):
+    # Load ngen_usgs_crosswalk.parquet into DuckDB
+    base_output_teehr_path = get_base_teehr_path(app_workspace)
+    # Define the path to the ngen_usgs_crosswalk.parquet file
+    ngen_usgs_crosswalk_path = os.path.join(
+        base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
+    )
+
+    # Query the data from DuckDB
+    query = f"""
+        SELECT secondary_location_id, primary_location_id
+        FROM '{ngen_usgs_crosswalk_path}'
+    """
+    ngen_usgs_df = duckdb.query(query).to_df()
+
+    # Create a dictionary for fast lookup, replacing 'ngen' with 'nex' in the keys
+    ngen_usgs_map = {
+        sec_id.replace("ngen", "nex"): prim_id
+        for sec_id, prim_id in zip(
+            ngen_usgs_df["secondary_location_id"], ngen_usgs_df["primary_location_id"]
+        )
+    }
+
+    # Append ngen_usgs column to the GeoDataFrame
+    gdf["ngen_usgs"] = gdf["id"].apply(lambda x: ngen_usgs_map.get(x, "none"))
+
+    return gdf
+
+
+def append_nwm_usgs_column(gdf, app_workspace):
+    # Load nwm_usgs_crosswalk.parquet into DuckDB
+    base_output_teehr_path = get_base_teehr_path(app_workspace)
+    # Define the path to the ngen_usgs_crosswalk.parquet file
+    nwm_usgs_crosswalk_path = os.path.join(
+        base_output_teehr_path, "nwm_usgs_crosswalk.parquet"
+    )
+
+    query = f"""
+        SELECT primary_location_id, secondary_location_id
+        FROM '{nwm_usgs_crosswalk_path}'
+    """
+    nwm_usgs_df = duckdb.query(query).to_df()
+
+    # Create a dictionary for fast lookup
+    nwm_usgs_map = dict(
+        zip(
+            nwm_usgs_df["primary_location_id"],
+            nwm_usgs_df["secondary_location_id"],
+        )
+    )
+
+    # Append nwm_usgs column to the GeoDataFrame
+    gdf["nwm_usgs"] = gdf["ngen_usgs"].apply(lambda x: nwm_usgs_map.get(x, "none"))
+    return gdf
+
+
 def _get_base_troute_output(app_workspace):
     base_output_path = os.path.join(
         app_workspace.path, "ngen-data", "outputs", "troute"
