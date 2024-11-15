@@ -44,8 +44,8 @@ const clusterLayer = {
       'step',
       ['get', 'point_count'],
       '#51bbd6', 10,
-      '#f1f075', 50,
-      '#f28cb1'
+      '#6610f2', 50,
+      '#20c997'
     ],
     'circle-radius': [
       'step',
@@ -63,10 +63,10 @@ const unclusteredPointLayer = {
   source: 'nexus-points',
   filter: ['!', ['has', 'point_count']], // Non-clustered points do not have `point_count`
   paint: {
-    'circle-color': '#007cbf', // Fill color for the point
+    'circle-color': '#2c3e50', // Fill color for the point
     'circle-radius': 7,
     'circle-stroke-width': 2, // Width of the stroke
-    'circle-stroke-color': '#ff0000', // Red color for the stroke
+    'circle-stroke-color': '#e9ecef', // Red color for the stroke
   },
 };
 
@@ -99,8 +99,8 @@ const MapComponent = () => {
         'source-layer': 'catchments', // Replace with actual source layer name
         filter: ['any', ['in', 'divide_id', ...response.catchments]],
         "paint": {
-          "fill-color": ["rgba", 0, 0, 0, 0],
-          "fill-outline-color": ["rgba", 1, 1, 1, 0.5],
+          "fill-color": ["rgba", 238, 51, 119, 0.316],
+          "fill-outline-color": ["rgba", 238, 51, 119, 0.7],
           "fill-opacity": { "stops": [[7, 0], [11, 1]] }
         }
       };
