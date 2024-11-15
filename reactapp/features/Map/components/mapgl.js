@@ -34,8 +34,10 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
     if (map.getLayer('catchments')) {
       map.setFilter('catchments', ['any', ['in', 'divide_id', ""]]);
       console.log("Base 'catchments' layer has been filtered out.");
-    } else {
-      console.log("Base 'catchments' layer not found.");
+    }
+    if(map.getLayer('flowpaths')){
+      map.setFilter('flowpaths', ['any', ['in', 'id', ""]]);
+      console.log("Base 'flowpaths' layer has been filtered out.");
     }
   };
 
@@ -81,7 +83,7 @@ const MapComponent = () => {
   const { actions: hydroFabricActions } = useHydroFabricContext();
   const [nexusPoints, setNexusPoints] = useState(null);
   const [catchmentConfig, setCatchmentConfig] = useState(null);
-
+  const [flowPathsConfig, setFlowPathsConfig] = useState(null);
   const mapRef = useRef(null);
 
   useEffect(() => {
@@ -112,6 +114,22 @@ const MapComponent = () => {
         }
       };
       setCatchmentConfig(catchmentLayerConfig);
+
+      const flowPathsLayerConfig = {
+        "id": "flowpaths-layer",
+        "type": "line",
+        "source": "conus",
+        "source-layer": "flowpaths",
+        "layout": {},
+        "paint": {
+            "line-color": ["rgba", 0, 119, 187, 1],
+            "line-width": { "stops": [[7, 1], [10, 2]] },
+            "line-opacity": { "stops": [[7, 0], [11, 1]] }
+        },
+        "filter": ["any",["in", "id", ...response.flow_paths_ids]] // Replace with actual
+      }
+      
+      setFlowPathsConfig(flowPathsLayerConfig);
 
 
     }).catch(error => {
@@ -206,6 +224,7 @@ const MapComponent = () => {
       <Source id="conus" type="vector" url={pmtilesUrl}>
         {/* Add the layer that uses the source */}
         <Layer {...catchmentConfig} />
+        <Layer {...flowPathsConfig} />
 
       </Source>
     </Map>
