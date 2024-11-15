@@ -1,4 +1,3 @@
 geopandas
 nodejs
-geoserver-rest
 zip
