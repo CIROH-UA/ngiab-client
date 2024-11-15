@@ -280,8 +280,12 @@ const displayFeatureInfo = (event,layer,hydroFabricActions) => {
           var multipleFeatures = feature.get('features');
           // only one feature
           if (multipleFeatures.length < 2){
+            hydroFabricActions.reset_teehr();
             var nexus_id = multipleFeatures[0].get('id');
             hydroFabricActions.set_nexus_id(nexus_id);
+            if (multipleFeatures[0].get('ngen_usgs') != "none"){
+              hydroFabricActions.set_teehr_id(multipleFeatures[0].get('ngen_usgs'));
+            }
           }
           //zoom it through all the features
           else{
@@ -325,6 +329,7 @@ const displayFeatureInfo = (event,layer,hydroFabricActions) => {
               setIsLoading(false)
               return
             }
+            hydroFabricActions.reset_teehr();
             hydroFabricActions.set_catchment_id(data_catchment_id);
   
           })     // Log the actual JSON data

@@ -5,8 +5,6 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 
-// const SelectComponent = lazy(() => import('../../features/hydroFabric/components/selectComponent'));
-
 const TRouteSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
 
@@ -18,7 +16,12 @@ const TRouteSelect = (props) => {
       troute_id: state.troute.id
     }
     appAPI.getTrouteVariables(params).then((response) => {
-      actions.set_troute_variable_list(response.troute_variables);
+      if (response.troute_variables.length === 0){
+        actions.set_troute_id(null);
+      }
+      else{
+        actions.set_troute_variable_list(response.troute_variables);
+      }
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     }).catch((error) => {
@@ -40,7 +43,8 @@ const TRouteSelect = (props) => {
       troute_variable: state.troute.variable
     }
     appAPI.getTrouteTimeSeries(params).then((response) => {
-      actions.set_troute_series(response.data);
+      actions.set_series(response.data);
+      actions.set_chart_layout(response.layout);
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     }).catch((error) => {
@@ -59,8 +63,7 @@ const TRouteSelect = (props) => {
         {
           state.troute.id &&
           <Fragment>
-            <h5>Troute</h5>
-            <label>Current Variable</label>
+            <label>Troute Variable</label>
             <SelectComponent 
               optionsList={state.troute.variable_list} 
               onChangeHandler={actions.set_troute_variable}

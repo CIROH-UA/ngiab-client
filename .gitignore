@@ -12,4 +12,5 @@ services.yml
 node_modules*
 tethysapp/ngiab/public/frontend/
 tethysapp/ngiab/workspaces/
+.vscode
 # reactapp/config/production.env

@@ -1,11 +1,9 @@
 import { Fragment, useState, lazy,Suspense } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
-import { MapProvider } from 'features/Map/providers/MapProvider';
 import { HydroFabricContainer, MapContainer } from './containers';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
-const HydroFabricView = lazy(() => import('./hydroFabricView2.js'));
-const MapView = lazy(() => import('./map_view.js'));
-
+const HydroFabricView = lazy(() => import('./hydroFabricView.js'));
+const MapComponent = lazy(() => import('features/Map/components/mapgl.js'));
 const NGIABView = () => {
   const [singleRowOn, toggleSingleRow] = useState(true);
   const [ isLoading, setIsLoading ] = useState(false);
@@ -14,12 +12,7 @@ const NGIABView = () => {
     <Fragment>
         <HydroFabricProvider>
             <MapContainer fullScreen={singleRowOn}>
-              <MapProvider>
-                  <MapView 
-                    isLoading={isLoading} 
-                    setIsLoading={setIsLoading} 
-                  />
-              </MapProvider>
+              <MapComponent />
             </MapContainer>
             <HydroFabricContainer fullScreen={singleRowOn} >
               <Suspense fallback={<LoadingAnimation />}>

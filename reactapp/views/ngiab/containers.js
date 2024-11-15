@@ -4,7 +4,6 @@ export const HydroFabricContainer = styled.div`
   flex: ${props => props.fullScreen ? '1 1 0%' : '1 1 40%'};
   order: 2;
   width: 100%;
-  // overflow-y: hidden;
   height: ${props => props.fullScreen ? '0%' : '40%'};
   padding:10px;
   display:flex;
@@ -12,8 +11,8 @@ export const HydroFabricContainer = styled.div`
 `;
 
 export const HydroFabricPlotContainer = styled.div`
-  width: 100%; 
-  height: 100%; 
+  width: 80%; 
+  height: 90%; 
   order: 1;
   flex: 1 1 80%;
 `;
@@ -25,7 +24,6 @@ export const SelectContainer = styled.div`
   width: 100%;
   padding: 5px;
   flex: 1 1 20%;
-  width: 100%;
 `;
 
 export const MapContainer = styled.div`
@@ -34,4 +32,15 @@ export const MapContainer = styled.div`
   width: 100%;
   overflow-y: hidden;
   height: ${props => props.fullScreen ? '100%' : '60%'};
+`;
+
+export const TeehrMetricsWrapper = styled.div`
+  width: 100%;
+  padding: 10px;
+  background-color: #f8f8f8;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+  order: 1;
+  flex: 1 1 20%;
 `;
