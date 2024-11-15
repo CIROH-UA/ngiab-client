@@ -3,9 +3,6 @@ import apiClient from "services/api/client";
 const APP_ROOT_URL = process.env.TETHYS_APP_ROOT_URL;
 
 const appAPI = {
-    getNexusGeoJson: () => {
-        return apiClient.get(`${APP_ROOT_URL}getNexuslayer/`);
-    },
     getNexusTimeSeries: (params) => {
         return apiClient.get(`${APP_ROOT_URL}getNexusTimeSeries/`, { params });
     },
@@ -17,7 +14,18 @@ const appAPI = {
     },
     getTrouteTimeSeries: (params) => {
         return apiClient.get(`${APP_ROOT_URL}getTrouteTimeSeries/`, { params });
+    },
+    getTeehrTimeSeries: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}getTeehrTimeSeries/`, { params });
+    },
+    getTeehrVariables: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}getTeehrVariables/`, { params });
+    },
+    getGeoSpatialData: () => {
+        return apiClient.get(`${APP_ROOT_URL}getGeoSpatialData/`);
     }
+
+
 }
  
 export default appAPI;

@@ -44,6 +44,7 @@ RUN apt-get update \
 RUN cd ${TETHYS_HOME}/apps/ngiab && \ 
     micromamba install --yes -c conda-forge --file requirements.txt  && \
     micromamba remove pyarrow && micromamba install --yes -c conda-forge pyarrow && \
+    pip install duckdb --upgrade && \
     micromamba clean --all --yes && \
     npm install && npm run build && \
     tethys install -d -N -w && \
