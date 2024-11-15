@@ -33,11 +33,9 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
 
     if (map.getLayer('catchments')) {
       map.setFilter('catchments', ['any', ['in', 'divide_id', ""]]);
-      console.log("Base 'catchments' layer has been filtered out.");
     }
     if(map.getLayer('flowpaths')){
       map.setFilter('flowpaths', ['any', ['in', 'id', ""]]);
-      console.log("Base 'flowpaths' layer has been filtered out.");
     }
   };
 
@@ -107,8 +105,6 @@ const MapComponent = () => {
     appAPI.getGeoSpatialData().then(response => {
       const { nexus, bounds,teerh } = response;
       setNexusPoints(nexus);
-      console.log('Nexus points:', nexus);
-
       setTeerhAvailableNexusPoints(teerh);
       // Fit the map to the bounds from the backend response
       if (bounds && mapRef.current) {
@@ -174,9 +170,6 @@ const MapComponent = () => {
         // Loop through all features at the click point
         for (const feature of features) {
           const layerId = feature.layer.id;
-          console.log('Clicked on layer:', layerId);
-          console.log('Feature properties:', feature.properties);
-          
           // Priority click handling for 'unclustered-point' and 'clusters'
           if (layerId === 'unclustered-point') {
             hydroFabricActions.reset_teehr();
