@@ -11,14 +11,13 @@ from .utils import (
     check_troute_id,
     get_troute_vars,
     get_troute_df,
-    append_ngen_usgs_column,
-    append_nwm_usgs_column,
     get_configuration_variable_pairs,
     get_teehr_joined_ts_path,
     get_teehr_ts,
     get_teehr_metrics,
     get_usgs_from_ngen_id,
     getCatchmentsList,
+    find_gpkg_file,
 )
 
 from .app import App
@@ -27,9 +26,7 @@ from .app import App
 @controller
 def home(request):
     """Controller for the app home page."""
-
     # The index.html template loads the React frontend
-
     return App.render(request, "index.html")
 
 
@@ -88,20 +85,19 @@ def getCatchmentTimeSeries(request, app_workspace):
 @controller(app_workspace=True)
 def getGeoSpatialData(request, app_workspace):
     response_object = {}
-    nexus_file_path = os.path.join(
-        app_workspace.path, "ngen-data", "config", "nexus.geojson"
-    )
 
+    gepackage_file_name = find_gpkg_file(app_workspace)
+    gepackage_file_path = os.path.join(
+        app_workspace.path, "ngen-data", "config", gepackage_file_name
+    )
+    gdf = gpd.read_file(gepackage_file_path, layer="nexus")
     # Load the GeoJSON file into a GeoPandas DataFrame
-    gdf = gpd.read_file(nexus_file_path)
+    # gdf = gpd.read_file(nexus_file_path)
 
     # Convert the DataFrame to the "EPSG:3857" coordinate system
     # gdf = gdf.to_crs("EPSG:3857")
     gdf = gdf.to_crs("EPSG:4326")
     bounds = gdf.total_bounds.tolist()
-    # Append ngen_usgs and nwm_usgs columns
-    # gdf = append_ngen_usgs_column(gdf, app_workspace)
-    # gdf = append_nwm_usgs_column(gdf, app_workspace)
     # filtered_gdf = gdf[gdf["ngen_usgs"] != "none"]
     # data = json.loads(filtered_gdf.to_json())
     data = json.loads(gdf.to_json())
