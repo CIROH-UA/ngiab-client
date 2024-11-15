@@ -178,15 +178,7 @@ const MapComponent = () => {
       onClick={handleMapClick}
       onLoad={onMapLoad}
     >
-      {/* Add the PMTiles source */}
-      <Source id="conus" type="vector" url={pmtilesUrl}>
-        {/* Add the layer that uses the source */}
-        <Layer {...catchmentConfig} />
-
-      </Source>
-
-
-      {nexusPoints && (
+        {nexusPoints && (
         <Source
           id="nexus-points"
           type="geojson"
@@ -199,6 +191,12 @@ const MapComponent = () => {
           <Layer {...unclusteredPointLayer} />
         </Source>
       )}
+      {/* Add the PMTiles source */}
+      <Source id="conus" type="vector" url={pmtilesUrl}>
+        {/* Add the layer that uses the source */}
+        <Layer {...catchmentConfig} />
+
+      </Source>
     </Map>
   );
 };
