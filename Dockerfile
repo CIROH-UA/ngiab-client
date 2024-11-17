@@ -15,8 +15,6 @@ ARG MICRO_TETHYS=true \
 COPY . ${TETHYS_HOME}/apps/ngiab
 COPY run.sh ${TETHYS_HOME}/run.sh
 
-
-
 ###############
 # ENVIRONMENT #
 ###############
@@ -32,33 +30,42 @@ ENV PORTAL_SUPERUSER_NAME=admin
 ENV PORTAL_SUPERUSER_PASSWORD=pass
 ENV PROJ_LIB=/opt/conda/envs/tethys/share/proj
 
-# fix error for numpy not being imported. libquadmath not found
-RUN apt-get update \
-    && apt-get -y install gfortran \
-    && rm -rf /var/lib/apt/lists/*
+ENV NVM_DIR=/usr/local/nvm
+ENV NODE_VERSION=20.12.2
+ENV NODE_VERSION_DIR=${NVM_DIR}/versions/node/v${NODE_VERSION}
+ENV NODE_PATH=${NODE_VERSION_DIR}/lib/node_modules
+ENV PATH=${NODE_VERSION_DIR}/bin:$PATH
+ENV NPM=${NODE_VERSION_DIR}/bin/npm
 
-#######################
-# INSTALL APPLICATION #
-#######################
+ENV PDM="/root/.local/bin/pdm"
+ENV APP_SRC_ROOT=${TETHYS_HOME}/apps/ngiab
 
-RUN cd ${TETHYS_HOME}/apps/ngiab && \ 
-    micromamba install --yes -c conda-forge --file requirements.txt  && \
-    micromamba remove pyarrow && micromamba install --yes -c conda-forge pyarrow && \
-    pip install duckdb --upgrade && \
-    pip install xarray --upgrade && \
-    micromamba clean --all --yes && \
-    npm install && npm run build && \
-    tethys install -d -N -w && \
-    rm -rf node_modules
+# SETUP
+RUN mkdir -p ${NVM_DIR} \
+    && curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | /bin/bash \
+    && . ${NVM_DIR}/nvm.sh \
+    && nvm install ${NODE_VERSION} \
+    && nvm alias default ${NODE_VERSION} \
+    && nvm use default \
+    && ls -la ${NODE_VERSION_DIR} \
+    && ls -la ${NODE_VERSION_DIR}/lib \
+    && pip install --user pdm \
+    && ${PDM} self update \
+    && cd ${APP_SRC_ROOT} \ 
+    && git config --global --add safe.directory '*' \
+    && git update-index --assume-unchanged
 
-#########
-# PORTS #
-#########
-EXPOSE 80
 
-#######
-# RUN #
-#######
+RUN cd ${APP_SRC_ROOT} \
+    && ${NPM} install \
+    && ${NPM} run build \
+    && rm -rf node_modules \
+    && ${PDM} install --no-editable --production
+
+# # fix error for numpy not being imported. libquadmath not found
+# RUN apt-get update \
+#     && apt-get -y install gfortran \
+#     && rm -rf /var/lib/apt/lists/*
 
 CMD bash run.sh
 

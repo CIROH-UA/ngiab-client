@@ -12,11 +12,6 @@ requirements:
     channels:
       - conda-forge
     packages:
-      - nodejs
-      - geopandas
-      - pandas
-      - geoserver-rest
-      - zip
 
   pip:
 
