@@ -24,6 +24,12 @@ from .utils import (
 
 from .app import App
 
+# the following error is fixed with this lines
+# https://stackoverflow.com/a/79163867
+import pyproj
+
+pyproj.network.set_network_enabled(False)
+
 
 @controller
 def home(request):
