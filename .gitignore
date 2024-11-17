@@ -1,3 +1,4 @@
+# Python
 *.pydevproject
 *.project
 *.egg-info
@@ -5,12 +6,38 @@
 *.pyo
 *.pyc
 *.db
-*.sqlite
+.pytest_cache
+.venv
+
+# Vi
+*.swp
+
+# System
 *.DS_Store
-.idea/
+
+
+# Tethys
+tethysapp/*/workspaces/*
+home/*
+
+# Misc
+*.sqlite
+*.idea
+*.vscode
+*.coverage
+*.swp
+condorkey
+condorkey.pub
+tethysapp/ngiab/workspaces/*
 services.yml
+dist/*
+build/*
+
+# PDM
+.pdm-python
+
+# Node/React
 node_modules*
 tethysapp/ngiab/public/frontend/
-tethysapp/ngiab/workspaces/
-.vscode
-# reactapp/config/production.env
+reactapp/config/production.env
+coverage

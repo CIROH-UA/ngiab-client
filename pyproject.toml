@@ -1,0 +1,80 @@
+[project]
+name = "tethysapp-ngiab"
+dynamic = ["version"]
+description = "An application for visualizaing Next gen model data."
+authors = [{ name = "Giovanni Romero", email = "gromero@aquaveo.com" }]
+dependencies = ["duckdb", "geopandas", "xarray"]
+requires-python = ">=3.10"
+readme = "README.md"
+license = { text = "" }
+keywords = [""]
+
+
+[tool.pdm]
+[tool.pdm.dev-dependencies]
+test = [
+    "pytest>=7.3.1",
+    "pytest-sugar>=0.9.7",
+    "pytest-cov>=4.0.0",
+    "pytest-django>=4.5.2",
+    "pytest-mock>=3.12.0",
+    "pytest-unordered>=0.5.2",
+]
+lint = ["flake8>=5.0.4", "yapf>=0.32.0"]
+
+[tool.pdm.version]
+source = "scm"
+
+
+[tool.pdm.scripts]
+test.cmd = "pytest"
+test.env_file = "tests/.env"
+format = "yapf --in-place --recursive --verbose --exclude 'tethysapp/ngiab/workspaces/**/*.py' ."
+format-check = "yapf --recursive --verbose --diff --exclude 'tethysapp/ngiab/workspaces/**/*.py' ."
+lint = "flake8 --config .flake8 ."
+all = { composite = ["format", "lint", "test"] }
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tethys_portal.settings"
+addopts = "--cov"
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore::UserWarning",
+    "ignore::sqlalchemy.exc.SAWarning",
+]
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.coverage.paths]
+source = ["tethysapp"]
+
+[tool.coverage.run]
+source = ["tethysapp"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.yapf]
+based_on_style = "facebook"
+column_limit = 120
+
+[tool.yapfignore]
+ignore_patterns = [".git", ".venv", "build", "dist", "node_modules"]
+
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["tethysapp*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.js", "*.png", "*.gif", "*.jpg", "*.html", "*.css", "*.json", "*.svg"]
+
+[tool.setuptools_scm]
+# can be empty if no extra settings are needed, presence enables setuptools-scm
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
