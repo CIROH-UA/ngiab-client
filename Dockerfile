@@ -64,5 +64,5 @@ RUN cd ${APP_SRC_ROOT} \
 
 CMD bash run.sh
 
-HEALTHCHECK --start-period=60s \
+HEALTHCHECK --start-period=30s --retries=12 \
     CMD ./liveness-probe.sh
