@@ -62,12 +62,7 @@ RUN cd ${APP_SRC_ROOT} \
     && rm -rf node_modules \
     && ${PDM} install --no-editable --production
 
-# # fix error for numpy not being imported. libquadmath not found
-# RUN apt-get update \
-#     && apt-get -y install gfortran \
-#     && rm -rf /var/lib/apt/lists/*
-
 CMD bash run.sh
 
-HEALTHCHECK --start-period=1s \
+HEALTHCHECK --start-period=60s \
     CMD ./liveness-probe.sh
