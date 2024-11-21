@@ -97,6 +97,30 @@ const MapComponent = () => {
   const [catchmentConfig, setCatchmentConfig] = useState(null);
   const [flowPathsConfig, setFlowPathsConfig] = useState(null);
   const mapRef = useRef(null);
+  const [theme, setTheme] = useState('light');
+
+  const mapStyleUrl =
+    theme === 'dark'
+      ? 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/dark-style.json'
+      : 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/light-style.json';
+
+  useEffect(() => {
+    // Detect the user's preferred color scheme
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setTheme(mediaQuery.matches ? 'dark' : 'light');
+
+    const handleChange = (e) => {
+      setTheme(e.matches ? 'dark' : 'light');
+    };
+
+    // Listen for changes in the preferred color scheme
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
 
   useEffect(() => {
     const protocol = new Protocol({ metadata: true });
@@ -212,7 +236,7 @@ const MapComponent = () => {
       }}
       style={{ width: '100%', height: '100%' }}
       mapLib={maplibregl}
-      mapStyle="https://communityhydrofabric.s3.us-east-1.amazonaws.com/style.json"
+      mapStyle={mapStyleUrl}
       onClick={handleMapClick}
       onLoad={onMapLoad}
     >
