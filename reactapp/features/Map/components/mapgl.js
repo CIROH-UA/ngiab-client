@@ -24,6 +24,7 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
       });
     });
     // Ensure 'unclustered-point' and 'clusters' layers are rendered on top of others
+
     if (map.getLayer('unclustered-point')) {
       map.moveLayer('unclustered-point');
     }
@@ -37,9 +38,29 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
     if(map.getLayer('flowpaths')){
       map.setFilter('flowpaths', ['any', ['in', 'id', ""]]);
     }
+    if (map.getLayer('cluster-count')) {
+      map.moveLayer('cluster-count');
+  }
   };
 
-
+  // Define the Cluster Count Layer
+  const clusterCountLayer = {
+    id: 'cluster-count',
+    type: 'symbol',
+    source: 'nexus-points',
+    filter: ['has', 'point_count'],
+    layout: {
+      'text-field': '{point_count_abbreviated}',
+      'text-font': ['Noto Sans Regular'],
+      'text-size': 12,
+      'text-anchor': 'center',
+      'text-justify': 'center',
+      'symbol-placement': 'point',
+    },
+    paint: {
+      'text-color': '#ffffff',
+    },
+  };
 // Define the style for the Nexus Layer
 const clusterLayer = {
   id: 'clusters',
@@ -259,19 +280,19 @@ const MapComponent = () => {
           clusterMaxZoom={14}
         >
           <Layer {...clusterLayer} />
+          <Layer {...clusterCountLayer} />
           <Layer {...unclusteredPointLayer} />
         </Source>
       )}
 
 
 
-      {/* Add the PMTiles source */}
+      
       <Source id="conus" type="vector" url={pmtilesUrl}>
-        {/* Add the layer that uses the source */}
         <Layer {...catchmentConfig} />
         <Layer {...flowPathsConfig} />
-
       </Source>
+
     </Map>
   );
 };
