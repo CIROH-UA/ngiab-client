@@ -5,41 +5,49 @@ import { FixedSizeList as List } from 'react-window';
 const height = 35;
 
 class MenuList extends Component {
-    
-    render() {
-      const { options, children, maxHeight, getValue } = this.props;
-      const [value] = getValue();
-      const initialOffset = options.indexOf(value) * height;
-  
-      return (
-        <List
-          height={maxHeight}
-          itemCount={children.length}
-          itemSize={height}
-          initialScrollOffset={initialOffset}
-        >
-          {({ index, style }) => <div style={style}>{children[index]}</div>}
-        </List>
-      );
-    }
+  render() {
+    const { options, children, maxHeight, getValue } = this.props;
+    const [value] = getValue();
+    const initialOffset = options.indexOf(value) * height;
+
+    // Dynamically adjust maxHeight
+    const adjustedHeight = Math.min(children.length * height, maxHeight);
+
+    return (
+      <List
+        height={adjustedHeight} // Use the adjusted height
+        itemCount={children.length}
+        itemSize={height}
+        initialScrollOffset={initialOffset}
+      >
+        {({ index, style }) => <div style={style}>{children[index]}</div>}
+      </List>
+    );
   }
+}
+
 
 // Custom styles for react-select
 const customStyles = {
-    option: (provided) => ({
-      ...provided,
-      color: 'black',  // Set text color to black
-    }),
-    singleValue: (provided) => ({
-      ...provided,
-      color: 'black',  // Ensure selected value is also black
-    }),
-    input: (provided) => ({
-      ...provided,
-      color: 'black'  // Text color in the input field
-    })
-  };
-  
+  menu: (provided) => ({
+    ...provided,
+    maxHeight: '500px', // Adjust dropdown height here
+    overflowY: 'auto',
+  }),
+  option: (provided) => ({
+    ...provided,
+    color: 'black',
+    overflowY: 'auto',
+  }),
+  singleValue: (provided) => ({
+    ...provided,
+    color: 'black',
+  }),
+  input: (provided) => ({
+    ...provided,
+    color: 'black',
+  }),
+};
   
 // Usage of the Select component with the custom Option component
 const SelectComponent = ({ optionsList, onChangeHandler,defaultValue }) => {
@@ -55,10 +63,13 @@ const SelectComponent = ({ optionsList, onChangeHandler,defaultValue }) => {
     <Select
       components={{ MenuList }}
       styles={customStyles}
-      filterOption={createFilter({ ignoreAccents: false })} // this makes all the difference!
+      filterOption={createFilter({ ignoreAccents: false })}
       options={optionsList}
       onChange={handleChange}
       value={defaultValue}
+      menuPortalTarget={document.body} // Ensure menu renders outside container if needed
+      menuShouldScrollIntoView={false} // Prevents auto-scrolling issues
+      menuPosition="fixed" // Keeps the dropdown position fixed
     />
   );
 };
