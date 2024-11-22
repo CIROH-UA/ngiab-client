@@ -210,6 +210,13 @@ def getCatchmentsList(app_workspace):
     return [id.split(".csv")[0] for id in catchment_ids_list]
 
 
+def getNexusList(app_workspace):
+    output_base_file = get_base_output(app_workspace)
+    nexus_prefix = "nex-"
+    nexus_ids_list = _list_prefixed_csv_files(output_base_file, nexus_prefix)
+    return [id.split(".csv")[0].split("_output")[0] for id in nexus_ids_list]
+
+
 def getNexusIDs(app_workspace):
     """
     Get a list of Nexus IDs.

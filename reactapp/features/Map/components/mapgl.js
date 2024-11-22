@@ -36,11 +36,13 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
       map.setFilter('catchments', ['any', ['in', 'divide_id', ""]]);
     }
     if(map.getLayer('flowpaths')){
-      map.setFilter('flowpaths', ['any', ['in', 'id', ""]]);
+      map.setFilter('flowpaths', ["any",["in", "id", ""]]);
+
     }
     if (map.getLayer('cluster-count')) {
       map.moveLayer('cluster-count');
-  }
+    }
+
   };
 
   // Define the Cluster Count Layer
@@ -117,6 +119,7 @@ const MapComponent = () => {
   const [teerhAvailableNexusPoints, setTeerhAvailableNexusPoints] = useState(null);
   const [catchmentConfig, setCatchmentConfig] = useState(null);
   const [flowPathsConfig, setFlowPathsConfig] = useState(null);
+  const [conusGaugesConfig, setConusGaugesConfig] = useState(null);
   const mapRef = useRef(null);
   const [theme, setTheme] = useState('light');
 
@@ -161,10 +164,10 @@ const MapComponent = () => {
       const catchmentLayerConfig = {
         id: 'catchments-layer',
         type: 'fill',
-        source: 'conus',
-        'source-layer': 'catchments', // Replace with actual source layer name
+        source: 'hydrofabric',
+        'source-layer': 'conus_divides', // Replace with actual source layer name
         filter: ['any', ['in', 'divide_id', ...response.catchments]],
-        "paint": {
+        paint: {
           "fill-color": ["rgba", 238, 51, 119, 0.316],
           "fill-outline-color": ["rgba", 238, 51, 119, 0.7],
           "fill-opacity": { "stops": [[7, 0], [11, 1]] }
@@ -173,21 +176,34 @@ const MapComponent = () => {
       setCatchmentConfig(catchmentLayerConfig);
 
       const flowPathsLayerConfig = {
-        "id": "flowpaths-layer",
-        "type": "line",
-        "source": "conus",
-        "source-layer": "flowpaths",
-        "layout": {},
-        "paint": {
+        id: "flowpaths-layer",
+        type: "line",
+        source: "hydrofabric",
+        "source-layer": "conus_flowpaths",
+        paint: {
             "line-color": ["rgba", 0, 119, 187, 1],
             "line-width": { "stops": [[7, 1], [10, 2]] },
             "line-opacity": { "stops": [[7, 0], [11, 1]] }
         },
-        "filter": ["any",["in", "id", ...response.flow_paths_ids]] // Replace with actual
+        filter: ["any",["in", "id", ...response.flow_paths_ids]] // Replace with actual
       }
       
       setFlowPathsConfig(flowPathsLayerConfig);
 
+      const conusGaugesLayerConfig = {
+        id: 'gauges-layer',
+        type: "circle",
+        source: "hydrofabric",
+        "source-layer": "conus_gages",
+        filter: ["any",["in", "nex_id", ...response.nexus_ids]],
+        paint: {
+          "circle-radius": { "stops": [[3, 2], [11, 5]] },
+          "circle-color": ["rgba", 200, 200, 200, 1],
+          "circle-opacity": { "stops": [[3, 0], [9, 1]] }
+        }
+      }
+
+      setConusGaugesConfig(conusGaugesLayerConfig);
 
     }).catch(error => {
       console.log(error);
@@ -201,8 +217,8 @@ const MapComponent = () => {
 
   // Define the PMTiles source URL
   const pmtilesUrl =
-    'pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/conus.pmtiles';
-
+    // 'pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/conus.pmtiles';
+    'pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles';
     const handleMapClick = async (event) => {
       const map = event.target;
     
@@ -289,6 +305,7 @@ const MapComponent = () => {
 
       
       <Source id="conus" type="vector" url={pmtilesUrl}>
+        <Layer {...conusGaugesConfig} />
         <Layer {...catchmentConfig} />
         <Layer {...flowPathsConfig} />
       </Source>

@@ -23,20 +23,8 @@ const HeaderButton = ({children, tooltipPlacement, tooltipText, href, ...props})
   const styledButton = (
     <StyledButton href={href} variant="light" size="sm" {...props}>{children}</StyledButton>
   );
-  const styledButtonWithTooltip = (
-    <OverlayTrigger
-      key={tooltipPlacement}
-      placement={tooltipPlacement}
-      overlay={
-        <Tooltip id={`tooltip-${tooltipPlacement}`}>
-          {tooltipText}
-        </Tooltip>
-      }
-    >
-      {styledButton}
-    </OverlayTrigger>
-  );
-  return tooltipText ? styledButtonWithTooltip : styledButton;
+
+  return styledButton;
 }
 
 HeaderButton.propTypes = {
