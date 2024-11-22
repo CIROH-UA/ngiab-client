@@ -8,6 +8,7 @@ from .utils import (
     get_base_output,
     getCatchmentsIds,
     getNexusIDs,
+    getNexusList,
     check_troute_id,
     get_troute_vars,
     get_troute_df,
@@ -115,6 +116,7 @@ def getGeoSpatialData(request, app_workspace):
     teerh_data = json.loads(teerh_gdf.to_json())
 
     response_object["nexus"] = data
+    response_object["nexus_ids"] = getNexusList(app_workspace)
     response_object["bounds"] = bounds
     response_object["teerh"] = teerh_data
     response_object["catchments"] = getCatchmentsList(app_workspace)

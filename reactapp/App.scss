@@ -1,16 +1,18 @@
-// @import "custom-bootstrap";
-/* Set bootstrap primary color to be app theme color */
-$primary: #2c3e50;
-
 /* import bootstrap to set changes */
 @import "../node_modules/bootstrap/scss/bootstrap";
 
 :root {
     --ts-header-height: 56px;
+    /* Enabling light mode and dark mode*/
+    color-scheme: light dark;
+
+    /* Assigning light/dark color tokens into variable*/
+    --primary: light-dark(#2c3e50, #bbcddf); 
 }
 
 html, body, #root {
     height: 100%;
+    $primary: var (--primary)
 }
 
 body {
