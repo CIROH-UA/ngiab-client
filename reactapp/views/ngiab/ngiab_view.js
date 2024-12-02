@@ -1,6 +1,6 @@
 import { Fragment, useState, lazy,Suspense } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
-import { HydroFabricContainer, MapContainer } from './containers';
+import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 const HydroFabricView = lazy(() => import('./hydroFabricView.js'));
 const MapComponent = lazy(() => import('features/Map/components/mapgl.js'));

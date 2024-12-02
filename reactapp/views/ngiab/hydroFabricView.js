@@ -2,14 +2,14 @@
 
 import {Suspense, Fragment,lazy} from 'react';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
-import { HydroFabricPlotContainer,TeehrMetricsWrapper } from './containers';
+import { HydroFabricPlotContainer,TeehrMetricsWrapper } from '../../components/StyledContainers';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 import ParentSize from '@visx/responsive/lib/components/ParentSize';
 
 
 const LineChart = lazy(() => import('../../features/hydroFabric/components/chart'));
 const  TeehrMetricsTable = lazy(() => import('../../features/hydroFabric/components/teehrMetrics'));
-const SelectionView = lazy(() => import('../../components/selections'));
+const SelectionView = lazy(() => import('./selections'));
 
 
 const HydroFabricView = (props) => {

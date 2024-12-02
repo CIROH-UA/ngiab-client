@@ -1,21 +1,62 @@
-/* import bootstrap to set changes */
+/* Define color variables */
+$primary: #2c3e50;
+$secondary: #8f5325;
+$success: #3e8d63;
+$info: #7854e4;
+$warning: #b8c924;
+$danger: #d62518;
+$light: #f8f9fa;
+$dark: #343a40;
+
+/* Custom accent color */
+$accent: #da6d25;
+
+/* Map colors for Bootstrap */
+$theme-colors: (
+  primary: $primary,
+  secondary: $secondary,
+  success: $success,
+  info: $info,
+  warning: $warning,
+  danger: $danger,
+  light: $light,
+  dark: $dark,
+  accent: $accent,
+);
+
+/* Import Bootstrap SCSS */
 @import "../node_modules/bootstrap/scss/bootstrap";
 
+/* Define CSS variables for theming */
 :root {
-    --ts-header-height: 56px;
-    /* Enabling light mode and dark mode*/
-    color-scheme: light dark;
+  --ts-header-height: 56px;
+  color-scheme: light dark;
 
-    /* Assigning light/dark color tokens into variable*/
-    --primary: light-dark(#2c3e50, #bbcddf); 
+  /* Light theme variables */
+  --background-color: #{$light};
+  --text-color: #000000;
+  --primary-color: #{$primary};
+  /* Additional variables */
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Dark theme variables */
+    --background-color: #{$primary};
+    --text-color: #ffffff;
+    --primary-color: #{$light};
+    /* Additional variables */
+  }
+}
+
+/* Apply the variables */
 html, body, #root {
-    height: 100%;
-    $primary: var (--primary)
+  height: 100%;
+  background-color: var(--background-color);
+  color: var(--text-color);
 }
 
 body {
-    /* offset for fixed header */
-    padding-top: var(--ts-header-height);
+  /* Offset for fixed header */
+  padding-top: var(--ts-header-height);
 }
