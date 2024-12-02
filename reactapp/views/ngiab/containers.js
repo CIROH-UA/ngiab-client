@@ -4,15 +4,14 @@ export const HydroFabricContainer = styled.div`
   flex: ${props => props.fullScreen ? '1 1 0%' : '1 1 40%'};
   order: 2;
   width: 100%;
-  height: ${props => props.fullScreen ? '0%' : '40%'};
+  display: ${props => props.fullScreen ? 'none' : 'flex'};
   padding:10px;
-  display:flex;
   flex-direction:row;
 `;
 
 export const HydroFabricPlotContainer = styled.div`
-  width: 80%; 
-  height: 90%; 
+  width: 500px; 
+  height: 250px; 
   order: 1;
   flex: 1 1 80%;
 `;
@@ -36,6 +35,7 @@ export const MapContainer = styled.div`
 
 export const TeehrMetricsWrapper = styled.div`
   width: 100%;
+  height:100%;
   padding: 10px;
   background-color: #f8f8f8;
   border-bottom: 1px solid #ddd;

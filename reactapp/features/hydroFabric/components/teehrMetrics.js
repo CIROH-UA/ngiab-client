@@ -47,13 +47,16 @@ const customStyles = {
 };
 
 const TeehrMetricsTable = ({ data }) => {
+    // const [theme, setTheme] = useState('light');
+
+
     const columns = [
         { name: 'Metric', selector: row => row.metric, sortable: true },
-        ...Object.keys(data[0]).filter(key => key !== 'metric').map(configName => ({
+        ...(data.length > 0 ? Object.keys(data[0]).filter(key => key !== 'metric').map(configName => ({
             name: configName,
             selector: row => row[configName],
             sortable: true,
-        }))
+        })) : [])
     ];
 
     return (

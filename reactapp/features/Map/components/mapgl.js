@@ -100,23 +100,10 @@ const unclusteredPointLayer = {
   },
 };
 
-const teerhAvailableLayer = {
-  id: "teerh-available-points",
-  type: "circle",
-  source: "teerh-available-points",
-  paint: {
-    "circle-color": "rgba(0, 0, 0, 0)", // Fully transparent fill
-    "circle-radius": 9,
-    "circle-stroke-width": 2,
-    "circle-stroke-color": "red", // Stroke color
-  },
-};
-
 
 const MapComponent = () => {
   const { actions: hydroFabricActions } = useHydroFabricContext();
   const [nexusPoints, setNexusPoints] = useState(null);
-  const [teerhAvailableNexusPoints, setTeerhAvailableNexusPoints] = useState(null);
   const [catchmentConfig, setCatchmentConfig] = useState(null);
   const [flowPathsConfig, setFlowPathsConfig] = useState(null);
   const [conusGaugesConfig, setConusGaugesConfig] = useState(null);
@@ -151,9 +138,8 @@ const MapComponent = () => {
     maplibregl.addProtocol('pmtiles', protocol.tile);
 
     appAPI.getGeoSpatialData().then(response => {
-      const { nexus, bounds,teerh } = response;
+      const { nexus, bounds } = response;
       setNexusPoints(nexus);
-      setTeerhAvailableNexusPoints(teerh);
       // Fit the map to the bounds from the backend response
       if (bounds && mapRef.current) {
         mapRef.current.fitBounds(bounds, {
@@ -277,15 +263,6 @@ const MapComponent = () => {
       onClick={handleMapClick}
       onLoad={onMapLoad}
     >
-            {teerhAvailableNexusPoints && (
-        <Source
-          id="teerh-available-points"
-          type="geojson"
-          data={teerhAvailableNexusPoints}
-        >
-          <Layer {...teerhAvailableLayer} />
-        </Source>
-      )}
         {nexusPoints && (
         <Source
           id="nexus-points"

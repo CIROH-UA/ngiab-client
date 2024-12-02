@@ -400,12 +400,13 @@ def get_teehr_metrics(app_workspace, primary_location_id):
 
     # Filter the DataFrame by primary_location_id
     df_filtered = df[df["primary_location_id"] == primary_location_id]
-
+    if df_filtered.empty:
+        return []
     # Pivot the DataFrame to make configuration names the columns
     pivot_df = df_filtered.pivot(
         index="primary_location_id", columns="configuration_name"
     )
-
+    
     # Flatten the MultiIndex columns
     pivot_df.columns = [f"{metric}_{config}" for metric, config in pivot_df.columns]
 
