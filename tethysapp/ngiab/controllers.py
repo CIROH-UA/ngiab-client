@@ -112,13 +112,13 @@ def getGeoSpatialData(request, app_workspace):
 
     data = json.loads(gdf.to_json())
 
-    teerh_gdf = gdf[gdf["ngen_usgs"] != "none"]
-    teerh_data = json.loads(teerh_gdf.to_json())
+    # teerh_gdf = gdf[gdf["ngen_usgs"] != "none"]
+    # teerh_data = json.loads(teerh_gdf.to_json())
 
     response_object["nexus"] = data
     response_object["nexus_ids"] = getNexusList(app_workspace)
     response_object["bounds"] = bounds
-    response_object["teerh"] = teerh_data
+    # response_object["teerh"] = teerh_data
     response_object["catchments"] = getCatchmentsList(app_workspace)
     response_object["flow_paths_ids"] = flow_paths_ids
     return JsonResponse(response_object)
