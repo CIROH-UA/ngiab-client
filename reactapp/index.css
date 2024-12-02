@@ -1,17 +1,4 @@
-:root {
-  /* Enabling light mode and dark mode*/
-  color-scheme: light dark;
-
-  /* Assigning light/dark color tokens into variable*/
-  --text-heading: light-dark(#333333, #f0f0f0); 
-  --text-body: light-dark(#555555, #e0e0e0); 
-  --background-primary: light-dark(#ff7d7d, #6f0000); 
-  --background-secondary: light-dark(#fffef3, #1a1913);
-}
-body {
-  /* Consuming the color tokens */
-  background-color: var(--bg-primary) !important;
-  color: var(--text-body);
+html, body {
   height: 100%;
   margin: 0;
   padding: 0;

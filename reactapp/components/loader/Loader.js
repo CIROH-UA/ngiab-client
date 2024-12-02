@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 
 import tethysAPI from 'services/api/tethys';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
-import { AppContext } from 'components/context';
+import { AppContext } from 'context/context';
 
 const APP_ID = process.env.TETHYS_APP_ID;
 const LOADER_DELAY = process.env.TETHYS_LOADER_DELAY;

@@ -1,24 +1,28 @@
-// https://github.com/airbnb/visx/issues/1276
-// for the constrains
-import React, { useCallback, useRef } from "react";
-import { Zoom, applyMatrixToPoint } from "@visx/zoom";
-import { Group } from "@visx/group";
-import { scaleLinear, scaleTime } from "@visx/scale";
-import { AxisLeft, AxisBottom } from "@visx/axis";
-import { LinePath, Line } from "@visx/shape";
-import { extent, bisector } from "d3-array";
-import { GridRows, GridColumns } from "@visx/grid";
+// LineChart.js
+import React, { useCallback } from 'react';
+import { Zoom, applyMatrixToPoint } from '@visx/zoom';
+import { Group } from '@visx/group';
+import { scaleLinear, scaleTime } from '@visx/scale';
+import { AxisLeft, AxisBottom } from '@visx/axis';
+import { LinePath, Line } from '@visx/shape';
+import { extent, bisector } from 'd3-array';
+import { GridRows, GridColumns } from '@visx/grid';
 import {
   useTooltip,
   TooltipWithBounds,
   defaultStyles,
-} from "@visx/tooltip";
-import { localPoint } from "@visx/event";
-import { GlyphCircle } from "@visx/glyph";
-import { timeParse, timeFormat } from "d3-time-format";
-import { RectClipPath } from "@visx/clip-path"; // Import ClipPath
+} from '@visx/tooltip';
+import { localPoint } from '@visx/event';
+import { GlyphCircle } from '@visx/glyph';
+import { timeParse, timeFormat } from 'd3-time-format';
+import { RectClipPath } from '@visx/clip-path';
+import { lightTheme, darkTheme } from '@visx/xychart';
+import useTheme from 'hooks/useTheme'; // Adjust the import path as needed
 
 function LineChart({ width, height, data, layout }) {
+  const theme = useTheme();
+  const visxTheme = theme === 'dark' ? darkTheme : lightTheme;
+
   // Tooltip parameters
   const {
     tooltipData,
@@ -36,7 +40,7 @@ function LineChart({ width, height, data, layout }) {
   const innerHeight = height - margin.top - margin.bottom;
 
   // Parse date string to Date object
-  const parseDate = timeParse("%Y-%m-%d %H:%M:%S");
+  const parseDate = timeParse('%Y-%m-%d %H:%M:%S');
 
   // Flatten data to get all data points for scales
   const allData = data.flatMap((series) => series.data);
@@ -59,27 +63,29 @@ function LineChart({ width, height, data, layout }) {
   });
 
   // Colors for each series
-  const colors = ["#43b284", "#ff8c42", "#a566ff", "#20a4f3", "#ffc107"];
-
+  const colors =
+    theme === 'dark'
+      ? ['#43b284', '#ff8c42', '#a566ff', '#20a4f3', '#ffc107']
+      : ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd'];
 
   // Tooltip styles
   const tooltipStyles = {
     ...defaultStyles,
     minWidth: 60,
-    backgroundColor: "rgba(44, 62, 80, 0.9)", // Matches #2c3e50 with transparency
-    color: "white",
+    backgroundColor:
+      theme === 'dark'
+        ? 'rgba(44, 62, 80, 0.9)'
+        : 'rgba(255, 255, 255, 0.9)',
+    color: theme === 'dark' ? 'white' : 'black',
     fontSize: 14,
-    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.2)",
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
   };
 
   // Date formatter
-  const formatDate = timeFormat("%Y-%m-%d");
+  const formatDate = timeFormat('%Y-%m-%d');
 
   // Bisector for finding closest data point
   const bisectDate = bisector((d) => getDate(d)).left;
-
-  // Reference for the SVG element
-  const svgRef = useRef(null);
 
   // Function to rescale x-axis based on zoom
   const rescaleXAxis = (scale, transformMatrix) => {
@@ -158,7 +164,7 @@ function LineChart({ width, height, data, layout }) {
   );
 
   // Updated constrain function
-  const constrain = (transformMatrix, prevTransformMatrix) => {
+  const constrain = (transformMatrix) => {
     const { scaleX, scaleY, translateX, translateY } = transformMatrix;
 
     // Fix constrain scale
@@ -186,7 +192,7 @@ function LineChart({ width, height, data, layout }) {
   };
 
   return (
-    <div style={{ position: "relative" }}>
+    <div style={{ position: 'relative' }}>
       <Zoom
         width={innerWidth}
         height={innerHeight}
@@ -212,27 +218,27 @@ function LineChart({ width, height, data, layout }) {
           return (
             <>
               {/* Legend and Controls */}
-              
               <div
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
+                  display: 'flex',
+                  justifyContent: 'space-between',
                   marginTop: 10,
-                  position: "relative",
+                  position: 'relative',
                 }}
               >
-                <div style={{ display: "flex" }}>
+                <div style={{ display: 'flex' }}>
                   {data.map((series, index) => (
                     <div
                       key={`legend-${index}`}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
+                        display: 'flex',
+                        alignItems: 'center',
                         marginRight: 10,
-                        padding: "2px 6px",            // Adds padding around each legend item
-                        border: "1px solid #ddd",       // Adds a light border around each item
-                        borderRadius: 4,                // Rounds the corners of each legend item
-                        backgroundColor: "#2c3e50",     // Light background color to make the legend stand out
+                        padding: '2px 6px',
+                        border: '1px solid #ddd',
+                        borderRadius: 4,
+                        backgroundColor:
+                          theme === 'dark' ? '#2c3e50' : '#f0f0f0',
                       }}
                     >
                       <div
@@ -244,7 +250,13 @@ function LineChart({ width, height, data, layout }) {
                           marginRight: 5,
                         }}
                       />
-                      <div style={{ color: "#f0f0f0", fontSize: 14 }}>
+                      <div
+                        style={{
+                          color:
+                            theme === 'dark' ? '#f0f0f0' : '#000000',
+                          fontSize: 14,
+                        }}
+                      >
                         {series.label}
                       </div>
                     </div>
@@ -253,13 +265,14 @@ function LineChart({ width, height, data, layout }) {
                 <button
                   onClick={zoom.reset}
                   style={{
-                    backgroundColor: "#2c3e50",
-                    color: "#ffffff",
-                    fontWeight: "bold",
-                    border: "none",
+                    backgroundColor:
+                      theme === 'dark' ? '#2c3e50' : '#ffffff',
+                    color: theme === 'dark' ? '#ffffff' : '#000000',
+                    fontWeight: 'bold',
+                    border: 'none',
                     borderRadius: 4,
-                    padding: "4px 8px",
-                    cursor: "pointer",
+                    padding: '4px 8px',
+                    cursor: 'pointer',
                   }}
                 >
                   Reset Zoom
@@ -267,11 +280,10 @@ function LineChart({ width, height, data, layout }) {
               </div>
 
               <svg
-                ref={svgRef}
                 width={width}
                 height={height}
                 style={{
-                  cursor: zoom.isDragging ? "grabbing" : "grab",
+                  cursor: zoom.isDragging ? 'grabbing' : 'grab',
                 }}
               >
                 {/* Define a clip path */}
@@ -288,35 +300,74 @@ function LineChart({ width, height, data, layout }) {
                   y={0}
                   width={width}
                   height={height}
-                  fill={'#34495e'}
+                  fill={theme === 'dark' ? '#34495e' : '#ffffff'}
                   rx={14}
                 />
                 <Group left={margin.left} top={margin.top}>
-                <GridRows scale={newYScale} width={innerWidth} height={innerHeight} stroke="#7f8c8d" strokeOpacity={0.1} strokeWidth={1} />
+                  <GridRows
+                    scale={newYScale}
+                    width={innerWidth}
+                    height={innerHeight}
+                    stroke={
+                      theme === 'dark' ? '#7f8c8d' : '#e0e0e0'
+                    }
+                    strokeOpacity={0.1}
+                    strokeWidth={1}
+                  />
 
-                <GridColumns scale={newXScale} width={innerWidth} height={innerHeight} stroke="#7f8c8d" strokeOpacity={0.1} strokeWidth={1} />
+                  <GridColumns
+                    scale={newXScale}
+                    width={innerWidth}
+                    height={innerHeight}
+                    stroke={
+                      theme === 'dark' ? '#7f8c8d' : '#e0e0e0'
+                    }
+                    strokeOpacity={0.1}
+                    strokeWidth={1}
+                  />
 
-                <AxisLeft
-                  scale={newYScale}
-                  stroke="#d1d5db"
-                  tickStroke="#d1d5db"
-                  tickLabelProps={() => ({ fill: "#e0e0e0", fontSize: 12, fontWeight: "bold", textAnchor: "end" })}
-                  label= {layout.yaxis}
-                  labelProps={{
-                    fill: '#e0e0e0',
-                    fontSize: 14,
-                    strokeWidth: 0,
-                    paintOrder: 'stroke',
-                    fontFamily: 'sans-serif',
-                  }}
-                />
+                  <AxisLeft
+                    scale={newYScale}
+                    stroke={
+                      theme === 'dark' ? '#d1d5db' : '#000000'
+                    }
+                    tickStroke={
+                      theme === 'dark' ? '#d1d5db' : '#000000'
+                    }
+                    tickLabelProps={() => ({
+                      fill:
+                        theme === 'dark' ? '#e0e0e0' : '#000000',
+                      fontSize: 12,
+                      fontWeight: 'bold',
+                      textAnchor: 'end',
+                    })}
+                    label={layout.yaxis}
+                    labelProps={{
+                      fill:
+                        theme === 'dark' ? '#e0e0e0' : '#000000',
+                      fontSize: 14,
+                      strokeWidth: 0,
+                      paintOrder: 'stroke',
+                      fontFamily: 'sans-serif',
+                    }}
+                  />
                   <AxisBottom
                     scale={newXScale}
                     top={innerHeight}
-                    stroke="#d1d5db"
+                    stroke={
+                      theme === 'dark' ? '#d1d5db' : '#000000'
+                    }
                     tickFormat={formatDate}
-                    tickStroke="#d1d5db"
-                    tickLabelProps={() => ({ fill: "#e0e0e0", fontSize: 12, fontWeight: "bold", textAnchor: "middle" })}
+                    tickStroke={
+                      theme === 'dark' ? '#d1d5db' : '#000000'
+                    }
+                    tickLabelProps={() => ({
+                      fill:
+                        theme === 'dark' ? '#e0e0e0' : '#000000',
+                      fontSize: 12,
+                      fontWeight: 'bold',
+                      textAnchor: 'middle',
+                    })}
                   />
                   {/* Apply the clip path to the chart elements */}
                   <Group clipPath="url(#chart-clip)">
@@ -324,20 +375,34 @@ function LineChart({ width, height, data, layout }) {
                     {data.map((series, index) => (
                       <LinePath
                         key={`line-${index}`}
-                        stroke={colors[index % colors.length]}
+                        stroke={
+                          colors[index % colors.length]
+                        }
                         strokeWidth={2}
                         data={series.data}
                         x={(d) => newXScale(getDate(d)) ?? 0}
-                        y={(d) => newYScale(getYValue(d)) ?? 0}
+                        y={(d) =>
+                          newYScale(getYValue(d)) ?? 0
+                        }
                       />
                     ))}
                     {/* Tooltip components */}
                     {tooltipData && (
                       <g>
                         <Line
-                          from={{ x: tooltipLeft - margin.left, y: 0 }}
-                          to={{ x: tooltipLeft - margin.left, y: innerHeight }}
-                          stroke="#d1d5db"
+                          from={{
+                            x: tooltipLeft - margin.left,
+                            y: 0,
+                          }}
+                          to={{
+                            x: tooltipLeft - margin.left,
+                            y: innerHeight,
+                          }}
+                          stroke={
+                            theme === 'dark'
+                              ? '#d1d5db'
+                              : '#000000'
+                          }
                           strokeWidth={1.5}
                           pointerEvents="none"
                           strokeDasharray="6,3"
@@ -346,14 +411,25 @@ function LineChart({ width, height, data, layout }) {
                           <GlyphCircle
                             key={`glyph-${i}`}
                             left={
-                              newXScale(getDate(d.dataPoint)) ?? 0
+                              newXScale(getDate(d.dataPoint)) ??
+                              0
                             }
                             top={
-                              newYScale(getYValue(d.dataPoint)) ?? 0
+                              newYScale(
+                                getYValue(d.dataPoint)
+                              ) ?? 0
                             }
                             size={110}
-                            fill={colors[d.seriesIndex % colors.length]}
-                            stroke={"white"}
+                            fill={
+                              colors[
+                                d.seriesIndex % colors.length
+                              ]
+                            }
+                            stroke={
+                              theme === 'dark'
+                                ? 'white'
+                                : 'black'
+                            }
                             strokeWidth={2}
                           />
                         ))}
@@ -379,18 +455,30 @@ function LineChart({ width, height, data, layout }) {
                     onTouchMove={zoom.dragMove}
                     onTouchEnd={zoom.dragEnd}
                     onDoubleClick={(event) => {
-                      const point = localPoint(event) || { x: 0, y: 0 };
-                      zoom.scale({ scaleX: 1.5, scaleY: 1.5, point });
+                      const point =
+                        localPoint(event) || { x: 0, y: 0 };
+                      zoom.scale({
+                        scaleX: 1.5,
+                        scaleY: 1.5,
+                        point,
+                      });
                     }}
                     onWheel={(event) => {
                       event.preventDefault();
-                      const point = localPoint(event) || { x: 0, y: 0 };
+                      const point =
+                        localPoint(event) || { x: 0, y: 0 };
                       const delta = -event.deltaY / 500; // Adjust sensitivity
                       const scale = 1 + delta;
-                      zoom.scale({ scaleX: scale, scaleY: scale, point });
+                      zoom.scale({
+                        scaleX: scale,
+                        scaleY: scale,
+                        point,
+                      });
                     }}
                     style={{
-                      cursor: zoom.isDragging ? "grabbing" : "grab",
+                      cursor: zoom.isDragging
+                        ? 'grabbing'
+                        : 'grab',
                     }}
                   />
                 </Group>
@@ -404,23 +492,27 @@ function LineChart({ width, height, data, layout }) {
                 >
                   <div>
                     <strong>Date: </strong>
-                    {formatDate(getDate(tooltipData[0].dataPoint))}
+                    {formatDate(
+                      getDate(tooltipData[0].dataPoint)
+                    )}
                   </div>
                   {tooltipData.map((d, i) => (
                     <div key={`tooltip-${i}`}>
                       <strong
                         style={{
-                          color: colors[d.seriesIndex % colors.length],
+                          color:
+                            colors[
+                              d.seriesIndex % colors.length
+                            ],
                         }}
                       >
-                        {d.seriesLabel}:{" "}
+                        {d.seriesLabel}:{' '}
                       </strong>
                       {getYValue(d.dataPoint)}
                     </div>
                   ))}
                 </TooltipWithBounds>
               )}
-
             </>
           );
         }}

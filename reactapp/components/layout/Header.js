@@ -9,7 +9,7 @@ import { LinkContainer } from 'react-router-bootstrap';
 
 import HeaderButton from 'components/buttons/HeaderButton';
 import NavButton from 'components/buttons/NavButton';
-import { AppContext } from 'components/context';
+import { AppContext } from 'context/context';
 
 const CustomNavBar = styled(Navbar)`
   min-height: var(--ts-header-height);
