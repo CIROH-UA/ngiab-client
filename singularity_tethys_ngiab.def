@@ -1,0 +1,78 @@
+Bootstrap: docker
+From: gioelkin/tethys-ngiab:dev-r1
+
+%files
+    . /opt/conda/envs/tethys/apps/ngiab/
+    run.sh /opt/conda/envs/tethys/run.sh
+
+%environment
+    # Database configuration
+    export TETHYS_DB_ENGINE="django.db.backends.sqlite3"
+    export SKIP_DB_SETUP="True"
+    export TETHYS_DB_NAME=""
+    export TETHYS_DB_USERNAME=""
+    export TETHYS_DB_PASSWORD=""
+    export TETHYS_DB_HOST=""
+    export TETHYS_DB_PORT=""
+
+     # Portal configuration
+    export ENABLE_OPEN_PORTAL="True"
+    export PORTAL_SUPERUSER_NAME="admin"
+    export PORTAL_SUPERUSER_PASSWORD="pass"
+
+    # System paths
+    export PROJ_LIB="/opt/conda/envs/tethys/share/proj"
+    export NVM_DIR="/usr/local/nvm"
+    export NODE_VERSION="20.12.2"
+    export NODE_VERSION_DIR="$NVM_DIR/versions/node/v${NODE_VERSION}"
+    export NODE_PATH="$NODE_VERSION_DIR/lib/node_modules"
+    export PATH="$NODE_VERSION_DIR/bin:$PATH"
+    export NPM="$NODE_VERSION_DIR/bin/npm"
+    export PDM="/root/.local/bin/pdm"
+    export APP_SRC_ROOT="/opt/tethys/apps/ngiab"
+
+%post
+    export MICRO_TETHYS=true
+    export MAMBA_DOCKERFILE_ACTIVATE=1
+    export NVM_DIR=/usr/local/nvm
+    export NODE_VERSION=20.12.2
+    export NODE_VERSION_DIR=${NVM_DIR}/versions/node/v${NODE_VERSION}
+    export PATH=${NODE_VERSION_DIR}/bin:$PATH
+    # Commands that are run only during the image build process
+    
+    #Install nvm
+    mkdir -p $NVM_DIR
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | /bin/bash
+    . $NVM_DIR/nvm.sh
+    nvm install $NODE_VERSION
+    nvm alias default $NODE_VERSION
+    nvm use default
+
+    # debugging
+    ls -la $NODE_VERSION_DIR
+    ls -la $NODE_VERSION_DIR/lib
+
+    
+    pip install --user pdm
+    $PDM self update
+
+    
+    git config --global --add safe.directory '*'
+    git update-index --assume-unchanged
+
+    
+    cd $APP_SRC_ROOT
+    $NPM install
+    $NPM run build
+    rm -rf node_modules
+    $PDM install --no-editable --production
+
+    echo "***** Build tasks completed in %post *****"
+
+%runscript
+    echo "Container starting..."
+    exec /opt/tethys/run.sh
+
+# TODO: liveness-probe.sh
+# using a custom script or a separate run. Singularity doesn't have a direct
+# HEALTHCHECK equivalent, so it's often handled externally or in a separate script.
