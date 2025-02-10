@@ -4,6 +4,7 @@ From: gioelkin/tethys-ngiab:dev-r1
 %files
     . /opt/tethys/apps/ngiab
     run.sh /opt/tethys/run.sh
+    salt /srv/salt
 
 %environment
     # Database configuration
@@ -21,7 +22,10 @@ From: gioelkin/tethys-ngiab:dev-r1
     export PORTAL_SUPERUSER_PASSWORD="pass"
     export CSRF_TRUSTED_ORIGINS="\"[http://localhost, http://127.0.0.1]\""
     export MICRO_TETHYS=true
-
+    export TETHYS_PERSIST="/var/lib/tethys_persist"
+    export NGINX_PORT=8080
+    export TETHYS_PORT=8000
+    export CLIENT_MAX_BODY_SIZE='512M'
     # System paths
     export CONDA_ENV_PATH="/opt/conda/envs/tethys"
     export PROJ_LIB="${CONDA_ENV_PATH}/share/proj"
