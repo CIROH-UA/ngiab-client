@@ -4,9 +4,12 @@ From: gioelkin/tethys-ngiab:dev-r1
 %files
     . /opt/tethys/apps/ngiab
     run.sh /opt/tethys/run.sh
+    # salt/tethyscore.sls /srv/salt/tethyscore.sls
+    # salt/post_app.sls /srv/salt/post_app.sls
 
 %environment
     # Database configuration
+    export SHELL="/bin/bash"
     export TETHYS_DB_ENGINE="django.db.backends.sqlite3"
     export SKIP_DB_SETUP="True"
     export TETHYS_DB_NAME=""
@@ -14,14 +17,15 @@ From: gioelkin/tethys-ngiab:dev-r1
     export TETHYS_DB_PASSWORD=""
     export TETHYS_DB_HOST=""
     export TETHYS_DB_PORT=""
-
-     # Portal configuration
-    export ENABLE_OPEN_PORTAL="True"
+    
+    # Portal configuration
+    export ENABLE_OPEN_PORTAL=True
     export PORTAL_SUPERUSER_NAME="admin"
     export PORTAL_SUPERUSER_PASSWORD="pass"
-
+    export CSRF_TRUSTED_ORIGINS="\"[http://localhost, http://127.0.0.1]\""
     # System paths
-    export PROJ_LIB="/opt/conda/envs/tethys/share/proj"
+    export CONDA_ENV_PATH="/opt/conda/envs/tethys"
+    export PROJ_LIB="${CONDA_ENV_PATH}/share/proj"
     export NVM_DIR="/usr/local/nvm"
     export NODE_VERSION="20.12.2"
     export NODE_VERSION_DIR="$NVM_DIR/versions/node/v${NODE_VERSION}"
@@ -30,11 +34,13 @@ From: gioelkin/tethys-ngiab:dev-r1
     export NPM="$NODE_VERSION_DIR/bin/npm"
     export PDM="/root/.local/bin/pdm"
     export APP_SRC_ROOT="/opt/tethys/apps/ngiab"
+    export CONDA_TETHYS_PATH="/opt/conda/envs/tethys/bin/tethys"
+    export PATH="/opt/conda/envs/tethys/bin:$PATH"
 
 %post
     export MICRO_TETHYS=true
-    export MAMBA_DOCKERFILE_ACTIVATE=1
-    export PIP_PATH=/opt/conda/envs/tethys/bin/pip
+    export CONDA_ENV_PATH="/opt/conda/envs/tethys"
+    # export PIP_PATH=${CONDA_ENV_PATH}/bin/pip
     export NVM_DIR=/usr/local/nvm
     export NODE_VERSION=20.12.2
     export NODE_VERSION_DIR=${NVM_DIR}/versions/node/v${NODE_VERSION}
@@ -42,6 +48,7 @@ From: gioelkin/tethys-ngiab:dev-r1
     export PDM="/root/.local/bin/pdm"
     export APP_SRC_ROOT="/opt/tethys/apps/ngiab"
     export NPM="$NODE_VERSION_DIR/bin/npm"
+    export PATH="/opt/conda/envs/tethys/bin:$PATH"
 
     # Commands that are run only during the image build process
     
@@ -52,32 +59,25 @@ From: gioelkin/tethys-ngiab:dev-r1
     nvm install $NODE_VERSION
     nvm alias default $NODE_VERSION
     nvm use default
-
-    # debugging
-    ls -la $NODE_VERSION_DIR
-    ls -la $NODE_VERSION_DIR/lib
-
     
-    $PIP_PATH install --user pdm
+    # $PIP_PATH install --user pdm
+    pip install --user pdm
     $PDM self update
 
-    
-    # git config --global --add safe.directory '*'
-    # git update-index --assume-unchanged
-
-    
     cd $APP_SRC_ROOT
     $NPM install
     $NPM run build
     rm -rf node_modules
     $PDM install --no-editable --production
-
+    #create the log file
+    touch /var/log/tethys/tethys.log 
     echo "***** Build tasks completed in %post *****"
 
-%runscript
+%startscript
     echo "Container starting..."
-    exec /opt/tethys/run.sh
-
+    /opt/tethys/run.sh 2>&1 | tee /opt/tethys/logs/run.log
+    exit "${PIPESTATUS[0]}"
+    # exec /opt/tethys/run.sh
 # TODO: liveness-probe.sh
 # using a custom script or a separate run. Singularity doesn't have a direct
 # HEALTHCHECK equivalent, so it's often handled externally or in a separate script.
