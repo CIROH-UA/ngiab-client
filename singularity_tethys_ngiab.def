@@ -2,8 +2,8 @@ Bootstrap: docker
 From: gioelkin/tethys-ngiab:dev-r1
 
 %files
-    . /opt/conda/envs/tethys/apps/ngiab/
-    run.sh /opt/conda/envs/tethys/run.sh
+    . /opt/tethys/apps/ngiab
+    run.sh /opt/tethys/run.sh
 
 %environment
     # Database configuration
@@ -34,10 +34,15 @@ From: gioelkin/tethys-ngiab:dev-r1
 %post
     export MICRO_TETHYS=true
     export MAMBA_DOCKERFILE_ACTIVATE=1
+    export PIP_PATH=/opt/conda/envs/tethys/bin/pip
     export NVM_DIR=/usr/local/nvm
     export NODE_VERSION=20.12.2
     export NODE_VERSION_DIR=${NVM_DIR}/versions/node/v${NODE_VERSION}
     export PATH=${NODE_VERSION_DIR}/bin:$PATH
+    export PDM="/root/.local/bin/pdm"
+    export APP_SRC_ROOT="/opt/tethys/apps/ngiab"
+    export NPM="$NODE_VERSION_DIR/bin/npm"
+
     # Commands that are run only during the image build process
     
     #Install nvm
@@ -53,12 +58,12 @@ From: gioelkin/tethys-ngiab:dev-r1
     ls -la $NODE_VERSION_DIR/lib
 
     
-    pip install --user pdm
+    $PIP_PATH install --user pdm
     $PDM self update
 
     
-    git config --global --add safe.directory '*'
-    git update-index --assume-unchanged
+    # git config --global --add safe.directory '*'
+    # git update-index --assume-unchanged
 
     
     cd $APP_SRC_ROOT
