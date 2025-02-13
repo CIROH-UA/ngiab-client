@@ -2,10 +2,11 @@ Bootstrap: docker
 From: gioelkin/tethys-ngiab:dev-r1
 
 %files
-    . /opt/tethys/apps/ngiab
-    run.sh /opt/tethys/run.sh
-    salt /srv/salt
-
+    . /usr/lib/tethys/apps/ngiab
+    run.sh /var/lib/tethys/run.sh
+    salt/patches.sls /srv/salt/patches.sls
+    salt/top.sls /srv/salt/top.sls
+    
 %environment
     # Database configuration
     export SHELL="/bin/bash"
@@ -17,6 +18,7 @@ From: gioelkin/tethys-ngiab:dev-r1
     export TETHYS_DB_HOST=""
     export TETHYS_DB_PORT=""
     # Portal configuration
+    export TETHYS_HOME="/usr/lib/tethys"
     export ENABLE_OPEN_PORTAL=True
     export PORTAL_SUPERUSER_NAME="admin"
     export PORTAL_SUPERUSER_PASSWORD="pass"
@@ -36,24 +38,32 @@ From: gioelkin/tethys-ngiab:dev-r1
     export PATH="$NODE_VERSION_DIR/bin:$PATH"
     export NPM="$NODE_VERSION_DIR/bin/npm"
     export PDM="/root/.local/bin/pdm"
-    export APP_SRC_ROOT="/opt/tethys/apps/ngiab"
+    export APP_SRC_ROOT="$TETHYS_HOME/apps/ngiab"
     export CONDA_TETHYS_PATH="/opt/conda/envs/tethys/bin/tethys"
     export PATH="/opt/conda/envs/tethys/bin:$PATH"
     export PATH=$PDM:$PATH
 %post
+    export TETHYS_HOME="/usr/lib/tethys"
     export MICRO_TETHYS=true
     export NVM_DIR=/usr/local/nvm
     export NODE_VERSION=20.12.2
     export NODE_VERSION_DIR=${NVM_DIR}/versions/node/v${NODE_VERSION}
     export PATH=${NODE_VERSION_DIR}/bin:$PATH
     export PDM="/root/.local/bin/pdm"
-    export APP_SRC_ROOT="/opt/tethys/apps/ngiab"
+    export APP_SRC_ROOT="$TETHYS_HOME/apps/ngiab"
     export NPM="$NODE_VERSION_DIR/bin/npm"
     export CONDA_ENV_PATH="/opt/conda/envs/tethys"
     export PATH="/opt/conda/envs/tethys/bin:$PATH"
     export PATH=$PDM:$PATH
     # Commands that are run only during the image build process
-    
+
+    # clean the repo
+    rm -rf $TETHYS_HOME/apps/ngiab/salt
+    rm -rf $TETHYS_HOME/apps/ngiab/tests
+    rm $TETHYS_HOME/apps/ngiab/Dockerfile
+    rm $TETHYS_HOME/apps/ngiab/.dockerignore
+    rm -rf $TETHYS_HOME/apps/ngiab/.github
+
     #Install nvm
     mkdir -p $NVM_DIR
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | /bin/bash
@@ -74,11 +84,12 @@ From: gioelkin/tethys-ngiab:dev-r1
     
     #create the log file
     touch /var/log/tethys/tethys.log 
+    chmod +x $TETHYS_HOME/run.sh
     echo "***** Build tasks completed in %post *****"
 
 %startscript
     echo "Container starting..."
-    /opt/tethys/run.sh 2>&1 | tee /opt/tethys/logs/run.log
+    $TETHYS_HOME/run.sh 2>&1 | tee /opt/tethys/logs/run.log
     exit "${PIPESTATUS[0]}"
     
     # TODO: liveness-probe.sh
