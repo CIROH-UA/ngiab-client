@@ -184,7 +184,7 @@ _link_data_to_app_workspace() {
 
     # Execute the linking command
     _execute_command singularity exec "instance://$TETHYS_INSTANCE_NAME" sh -c \
-        "mkdir -p $APP_WORKSPACE_PATH/ngen-data && ln -s $TETHYS_PERSIST_PATH/ngen-data $APP_WORKSPACE_PATH/ngen-data"
+        "mkdir -p $APP_WORKSPACE_PATH && ln -s $TETHYS_PERSIST_PATH/ngen-data $APP_WORKSPACE_PATH/ngen-data"
 }
 
 
