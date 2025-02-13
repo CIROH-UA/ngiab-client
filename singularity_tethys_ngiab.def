@@ -35,18 +35,17 @@ From: gioelkin/tethys-ngiab:dev-r1
     export NODE_PATH="$NODE_VERSION_DIR/lib/node_modules"
     export PATH="$NODE_VERSION_DIR/bin:$PATH"
     export NPM="$NODE_VERSION_DIR/bin/npm"
-    export PDM="/root/.local/bin/pdm"
     export APP_SRC_ROOT="/opt/tethys/apps/ngiab"
     export CONDA_TETHYS_PATH="/opt/conda/envs/tethys/bin/tethys"
     export PATH="/opt/conda/envs/tethys/bin:$PATH"
 
 %post
+    export CONDA_ENV_PATH="/opt/conda/envs/tethys"
     export MICRO_TETHYS=true
     export NVM_DIR=/usr/local/nvm
     export NODE_VERSION=20.12.2
     export NODE_VERSION_DIR=${NVM_DIR}/versions/node/v${NODE_VERSION}
     export PATH=${NODE_VERSION_DIR}/bin:$PATH
-    export PDM="/root/.local/bin/pdm"
     export APP_SRC_ROOT="/opt/tethys/apps/ngiab"
     export NPM="$NODE_VERSION_DIR/bin/npm"
     export PATH="/opt/conda/envs/tethys/bin:$PATH"
@@ -61,15 +60,15 @@ From: gioelkin/tethys-ngiab:dev-r1
     nvm alias default $NODE_VERSION
     nvm use default
     
-    pip install --user pdm
-    $PDM self update
-
     cd $APP_SRC_ROOT
     $NPM install
     $NPM run build
     rm -rf node_modules
-    $PDM install --no-editable --production
-    #create the log file
+    
+    pip install --user pdm
+    pdm self update
+    pdm use -f  $CONDA_ENV_PATH /opt/conda/envs/tethys && pdm install --no-editable --production
+    
     touch /var/log/tethys/tethys.log 
     echo "***** Build tasks completed in %post *****"
 
