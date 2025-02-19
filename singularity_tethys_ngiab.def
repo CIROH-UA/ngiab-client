@@ -3,7 +3,7 @@ From: gioelkin/tethys-ngiab:dev-r1
 
 %files
     . /usr/lib/tethys/apps/ngiab
-    run.sh /var/lib/tethys/run.sh
+    singularity/run.sh /usr/lib/tethys/run.sh
     salt/patches.sls /srv/salt/patches.sls
     salt/top.sls /srv/salt/top.sls
     
@@ -11,7 +11,7 @@ From: gioelkin/tethys-ngiab:dev-r1
     # Database configuration
     export SHELL="/bin/bash"
     export TETHYS_DB_ENGINE="django.db.backends.sqlite3"
-    export SKIP_DB_SETUP="True"
+    export SKIP_DB_SETUP=true
     export TETHYS_DB_NAME=""
     export TETHYS_DB_USERNAME=""
     export TETHYS_DB_PASSWORD=""
@@ -44,6 +44,8 @@ From: gioelkin/tethys-ngiab:dev-r1
     export PATH=$PDM:$PATH
 %post
     export TETHYS_HOME="/usr/lib/tethys"
+    export TETHYS_PERSIST="/var/lib/tethys_persist"
+    export SKIP_DB_SETUP=true
     export MICRO_TETHYS=true
     export NVM_DIR=/usr/local/nvm
     export NODE_VERSION=20.12.2
@@ -63,6 +65,7 @@ From: gioelkin/tethys-ngiab:dev-r1
     rm $TETHYS_HOME/apps/ngiab/Dockerfile
     rm $TETHYS_HOME/apps/ngiab/.dockerignore
     rm -rf $TETHYS_HOME/apps/ngiab/.github
+    rm -rf $TETHYS_HOME/apps/ngiab/.*sif
 
     #Install nvm
     mkdir -p $NVM_DIR
@@ -82,15 +85,25 @@ From: gioelkin/tethys-ngiab:dev-r1
     $PDM self update
     $PDM use -f $CONDA_ENV_PATH && $PDM install --no-editable --production
     
-    #create the log file
-    touch /var/log/tethys/tethys.log 
+    
+    chmod -R 0777 /var/log/supervisor
+    touch /var/log/supervisor/supervisord.log
+    chmod 0777 /var/log/supervisor/supervisord.log
+    touch /var/log/tethys/salt.log
+    chmod 0777 /var/log/tethys/salt.log
+
     chmod +x $TETHYS_HOME/run.sh
+
+    # Remove the user=www line from the Supervisor config
+    sed -i '/^\s*user\s*=\s*www\s*$/d' /etc/supervisor/supervisord.conf
+    # Or, to comment it out instead of removing it entirely:
+    # sed -i 's/^\(\s*user\s*=\s*www\s*\)$/; \1/' /etc/supervisor/conf.d/nginx_supervisord.conf
     echo "***** Build tasks completed in %post *****"
 
 %startscript
     echo "Container starting..."
-    $TETHYS_HOME/run.sh 2>&1 | tee /opt/tethys/logs/run.log
-    exit "${PIPESTATUS[0]}"
+    exec /usr/lib/tethys/run.sh 2>&1 | tee /var/log/tethys/salt.log
+    
     
     # TODO: liveness-probe.sh
     # using a custom script or a separate run. Singularity doesn't have a direct
