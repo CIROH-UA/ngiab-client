@@ -100,6 +100,15 @@ From: gioelkin/tethys-ngiab:dev-r1
     sed -i '/^\s*user\s*=\s*www\s*$/d' /etc/supervisor/supervisord.conf
     # Or, to comment it out instead of removing it entirely:
     # sed -i 's/^\(\s*user\s*=\s*www\s*\)$/; \1/' /etc/supervisor/conf.d/nginx_supervisord.conf
+
+    # added more
+    export NGINX_USER=$(grep 'user .*;' /etc/nginx/nginx.conf | awk '{print $2}' | awk -F';' '{print $1}') ; find /var/lib/tethys_persist/workspaces ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {} ; find /var/lib/tethys_persist/media ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {} ; find /var/lib/tethys_persist/static ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {}
+    chown -R www: /var/lib/tethys_persist && chmod -R g+rw /var/lib/tethys_persist
+    chown www:www /usr/lib/tethys/portal_config.yml
+    
+    chmod -R 777 /etc/nginx
+    chmod -R 777 /etc/supervisor
+
     echo "***** Build tasks completed in %post *****"
 
 %startscript
