@@ -177,13 +177,13 @@ _get_filename() {
 # Link the data to the app workspace
 _link_data_to_app_workspace() {
     # Verify instance exists
-    if ! sudo singularity instance list | grep -q "$TETHYS_INSTANCE_NAME"; then
+    if ! singularity instance list | grep -q "$TETHYS_INSTANCE_NAME"; then
         echo -e "${BRed}Instance $TETHYS_INSTANCE_NAME does not exist${Color_Off}" >&2
         return 1
     fi
 
     # Execute the linking command
-    _execute_command sudo singularity exec "instance://$TETHYS_INSTANCE_NAME" sh -c \
+    _execute_command singularity exec "instance://$TETHYS_INSTANCE_NAME" sh -c \
         "mkdir -p $APP_WORKSPACE_PATH && ln -s $TETHYS_PERSIST_PATH/ngen-data $APP_WORKSPACE_PATH/ngen-data"
 }
 
@@ -215,21 +215,32 @@ _check_for_existing_tethys_image() {
 
 _tear_down_tethys(){
 
-    if sudo singularity instance list | grep -q "$TETHYS_INSTANCE_NAME"; then
-        sudo singularity instance stop $TETHYS_INSTANCE_NAME > /dev/null 2>&1
+    if singularity instance list | grep -q "$TETHYS_INSTANCE_NAME"; then
+        singularity instance stop $TETHYS_INSTANCE_NAME > /dev/null 2>&1
     fi
 
 }
 
 
 _run_tethys(){
-    _execute_command sudo singularity instance start \
+    echo "singularity instance start \
     --bind "$DATA_FOLDER_PATH:$TETHYS_PERSIST_PATH/ngen-data" \
     --bind /home/aquagio/tethysdev/ciroh/ngiab-client/logs:/opt/tethys/logs \
     --env MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
     --env MEDIA_URL="/media/" \
     --env SKIP_DB_SETUP=$SKIP_DB_SETUP \
     --writable-tmpfs \
+    --fakeroot \
+    $TETHYS_IMAGE_NAME $TETHYS_INSTANCE_NAME"
+    
+    _execute_command singularity instance start \
+    --bind "$DATA_FOLDER_PATH:$TETHYS_PERSIST_PATH/ngen-data" \
+    --bind /home/aquagio/tethysdev/ciroh/ngiab-client/logs:/opt/tethys/logs \
+    --env MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
+    --env MEDIA_URL="/media/" \
+    --env SKIP_DB_SETUP=$SKIP_DB_SETUP \
+    --writable-tmpfs \
+    --fakeroot \
     $TETHYS_IMAGE_NAME $TETHYS_INSTANCE_NAME \
     > /dev/null 2>&1
 }
