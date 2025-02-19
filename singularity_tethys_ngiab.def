@@ -91,6 +91,8 @@ From: gioelkin/tethys-ngiab:dev-r1
     chmod 0777 /var/log/supervisor/supervisord.log
     touch /var/log/tethys/salt.log
     chmod 0777 /var/log/tethys/salt.log
+    
+    chmod -R 777 /etc/salt /var/cache/salt /var/log/salt /var/run/salt /usr/lib/tethys /var/lib/tethys_persist /run
 
     chmod +x $TETHYS_HOME/run.sh
 
