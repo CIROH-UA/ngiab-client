@@ -86,13 +86,20 @@ From: gioelkin/tethys-ngiab:dev-r1
     $PDM use -f $CONDA_ENV_PATH && $PDM install --no-editable --production
     
     
-    chmod -R 0777 /var/log/supervisor
-    touch /var/log/supervisor/supervisord.log
-    chmod 0777 /var/log/supervisor/supervisord.log
-    touch /var/log/tethys/salt.log
-    chmod 0777 /var/log/tethys/salt.log
+
+
+    # Set permissions for the Salt directories
+    chmod -R 777 /etc/salt /var/cache/salt /var/log/salt /var/run/salt
+
+    # Set permissions for the Tethys directories
+    chmod -R 777 /usr/lib/tethys /var/lib/tethys_persist
+
+    # Set permissions for the ASGI and Nginx directories
+    mkdir -p /run/asgi
+    mkdir -p /var/lib/nginx/body
+    chown -R www:www /run /var/lib/nginx
+    chmod -R 777 /run /var/lib/nginx
     
-    chmod -R 777 /etc/salt /var/cache/salt /var/log/salt /var/run/salt /usr/lib/tethys /var/lib/tethys_persist /run
 
     chmod +x $TETHYS_HOME/run.sh
 
@@ -101,13 +108,32 @@ From: gioelkin/tethys-ngiab:dev-r1
     # Or, to comment it out instead of removing it entirely:
     # sed -i 's/^\(\s*user\s*=\s*www\s*\)$/; \1/' /etc/supervisor/conf.d/nginx_supervisord.conf
 
-    # added more
+    # Set permissions for the Tethys directories (this is a salt stack job, but it cannot be done due to permission)
     export NGINX_USER=$(grep 'user .*;' /etc/nginx/nginx.conf | awk '{print $2}' | awk -F';' '{print $1}') ; find /var/lib/tethys_persist/workspaces ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {} ; find /var/lib/tethys_persist/media ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {} ; find /var/lib/tethys_persist/static ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {}
-    chown -R www: /var/lib/tethys_persist && chmod -R g+rw /var/lib/tethys_persist
-    chown www:www /usr/lib/tethys/portal_config.yml
     
+    chown -R www: /var/lib/tethys_persist && chmod -R g+rw /var/lib/tethys_persist
+    
+
+    # nginx and supervisor permission
     chmod -R 777 /etc/nginx
     chmod -R 777 /etc/supervisor
+
+    #supervisor logs
+    chmod -R 0777 /var/log/supervisor
+    touch /var/log/supervisor/supervisord.log
+    chmod 0777 /var/log/supervisor/supervisord.log
+
+    # nginx logs
+    chown -R www:www /var/log/nginx
+    chmod -R 777 /var/log/nginx/
+
+    # tethys logs
+    touch /var/log/tethys/tethys.log
+    chown -R www:www /var/log/tethys/tethys.log
+    chmod 777 /var/log/tethys/tethys.log
+    
+    touch /var/log/tethys/salt.log
+    chmod 0777 /var/log/tethys/salt.log
 
     echo "***** Build tasks completed in %post *****"
 
