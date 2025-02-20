@@ -85,7 +85,8 @@ From: gioelkin/tethys-ngiab:dev-r1
     $PDM self update
     $PDM use -f $CONDA_ENV_PATH && $PDM install --no-editable --production
     
-    
+    # changes on the  workspaces dir
+    chmod -R 777 /opt/conda/envs/tethys/lib/python3.12/site-packages/tethysapp/ngiab/workspaces
 
 
     # Set permissions for the Salt directories
