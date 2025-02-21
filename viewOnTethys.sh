@@ -97,7 +97,7 @@ _wait_singularity_instance() {
     local instance_name=$1
     local health_check_command="${TETHYS_HOME_PATH}/liveness-probe.sh"
     local attempt=0
-    local max_attempts=30  # ~1 minute with 2s intervals
+    local max_attempts=60  # ~1 minute with 2s intervals
     local exit_code
 
     echo -e "${UPurple}Waiting for Singularity instance: $instance_name to become healthy...${Color_Off}"
@@ -108,22 +108,22 @@ _wait_singularity_instance() {
         return 1
     fi
 
-    # Basic health check validation
     if ! singularity exec "instance://${instance_name}" test -x "$health_check_command"; then
         echo -e "${BRed}Error: Health check script not found/executable in instance${Color_Off}" >&2
         return 1
     fi
 
+    # Run checks silently until success
     while (( attempt++ < max_attempts )); do
-        if singularity exec "instance://${instance_name}" "$health_check_command"; then
-            echo -e "${BCyan}Instance ready after ${attempt} attempts${Color_Off}"
+        # Capture output and only show if successful
+        if output=$(singularity exec "instance://${instance_name}" "$health_check_command" 2>&1); then
+            echo "$output"  # Show the "all tests passed" message
             return 0
         fi
-        
         sleep 2
     done
 
-    echo -e "${BRed}Error: Health check failed after ${max_attempts} attempts${Color_Off}" >&2
+    echo -e "${BRed}Error: Health check timed out${Color_Off}" >&2
     return 1
 }
 
