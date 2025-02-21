@@ -74,11 +74,19 @@ _execute_command() {
   return $status
 }
 
+_delete_tmp_logs(){
+    rm -rf /tmp/logs/tethys
+}
+_create_tmp_logs(){
+    mkdir -p /tmp/logs/tethys
+}
 _tear_down(){
     _tear_down_tethys
+    _delete_tmp_logs
 }
 
 _run_containers(){
+    _create_tmp_logs
     _run_tethys
 }
 
@@ -87,42 +95,36 @@ _run_containers(){
 # Wait for a Singularity instance to pass a health check command
 _wait_singularity_instance() {
     local instance_name=$1
-    local health_check_command="$TETHYS_HOME_PATH/liveness-probe.sh"
-    local attempt_counter=0
+    local health_check_command="${TETHYS_HOME_PATH}/liveness-probe.sh"
+    local attempt=0
+    local max_attempts=30  # ~1 minute with 2s intervals
+    local exit_code
 
-    echo -e "${UPurple}Waiting for Singularity instance: $instance_name to become healthy. This can take a couple of minutes...\n${Color_Off}"
+    echo -e "${UPurple}Waiting for Singularity instance: $instance_name to become healthy...${Color_Off}"
 
-    # Initial check if the instance exists
-    if ! singularity instance list | grep -q "$instance_name"; then
-        echo -e "${BRed}Instance $instance_name does not exist.\n${Color_Off}" >&2
+    # Verify instance exists
+    if ! singularity instance list | grep -qw "$instance_name"; then
+        echo -e "${BRed}Error: Instance '$instance_name' not found${Color_Off}" >&2
         return 1
     fi
 
-    # Check if the health check command is valid inside the instance
-    if ! singularity exec "instance://$instance_name" command -v "$health_check_command" &>/dev/null; then
-        echo -e "${BRed}Health check command '$health_check_command' not found in instance $instance_name. Ensure it's installed and in the PATH.\n${Color_Off}" >&2
+    # Basic health check validation
+    if ! singularity exec "instance://${instance_name}" test -x "$health_check_command"; then
+        echo -e "${BRed}Error: Health check script not found/executable in instance${Color_Off}" >&2
         return 1
     fi
 
-    while true; do
-        # Run the health check command inside the instance
-        singularity exec "instance://$instance_name" $health_check_command
-        local exit_code=$?
-
-        if [ $exit_code -eq 0 ]; then
-            echo -e "${BCyan}Instance $instance_name is now healthy.\n${Color_Off}"
+    while (( attempt++ < max_attempts )); do
+        if singularity exec "instance://${instance_name}" "$health_check_command"; then
+            echo -e "${BCyan}Instance ready after ${attempt} attempts${Color_Off}"
             return 0
-        else
-            # Verify the instance still exists after a failure
-            if ! singularity instance list | grep -q "$instance_name"; then
-                echo -e "${BRed}Instance $instance_name no longer exists.\n${Color_Off}" >&2
-                return 1
-            fi
-
-            ((attempt_counter++))
-            sleep 2  # Adjust sleep duration as needed
         fi
+        
+        sleep 2
     done
+
+    echo -e "${BRed}Error: Health check failed after ${max_attempts} attempts${Color_Off}" >&2
+    return 1
 }
 
 _pause_script_execution() {
@@ -185,6 +187,9 @@ _link_data_to_app_workspace() {
     # Execute the linking command
     _execute_command singularity exec "instance://$TETHYS_INSTANCE_NAME" sh -c \
         "mkdir -p $APP_WORKSPACE_PATH && ln -s $TETHYS_PERSIST_PATH/ngen-data $APP_WORKSPACE_PATH/ngen-data"
+        # "ln -s $TETHYS_PERSIST_PATH/ngen-data $APP_WORKSPACE_PATH/ngen-data"
+
+
 }
 
 
@@ -222,29 +227,17 @@ _tear_down_tethys(){
 }
 
 
-_run_tethys(){
-    echo "singularity instance start \
-    --bind "$DATA_FOLDER_PATH:$TETHYS_PERSIST_PATH/ngen-data" \
-    --bind /home/aquagio/tethysdev/ciroh/ngiab-client/logs:/opt/tethys/logs \
-    --env MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
-    --env MEDIA_URL="/media/" \
-    --env SKIP_DB_SETUP=$SKIP_DB_SETUP \
-    --writable-tmpfs \
-    --fakeroot \
-    $TETHYS_IMAGE_NAME $TETHYS_INSTANCE_NAME"
-    
+_run_tethys(){    
     _execute_command singularity instance start \
     --bind "$DATA_FOLDER_PATH:$TETHYS_PERSIST_PATH/ngen-data" \
-    --bind /home/aquagio/tethysdev/ciroh/ngiab-client/logs:/opt/tethys/logs \
+    --bind /tmp/logs/tethys:/opt/tethys/logs \
     --env MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
     --env MEDIA_URL="/media/" \
     --env SKIP_DB_SETUP=$SKIP_DB_SETUP \
     --writable-tmpfs \
-    --fakeroot \
-    $TETHYS_IMAGE_NAME $TETHYS_INSTANCE_NAME \
-    > /dev/null 2>&1
+    $TETHYS_IMAGE_NAME $TETHYS_INSTANCE_NAME
+    # > /dev/null 2>&1
 }
-
 
 create_tethys_portal(){
     while true; do
@@ -270,7 +263,7 @@ create_tethys_portal(){
         if _check_for_existing_tethys_image; then
             _execute_command _run_containers
             echo -e "${BCyan}Linking data to the Tethys app workspace.${Color_Off}"
-            # _wait_singularity_instance $TETHYS_INSTANCE_NAME
+            _wait_singularity_instance $TETHYS_INSTANCE_NAME
             _link_data_to_app_workspace
             echo -e "${BGreen}Your outputs are ready to be visualized at http://localhost:8080/apps/ngiab ${Color_Off}"
             echo -e "${UPurple}You can use the following to login: ${Color_Off}"
@@ -296,7 +289,7 @@ trap handle_sigint SIGINT
 
 # Constanst
 TETHYS_INSTANCE_NAME="tethys-ngen-portal"
-APP_WORKSPACE_PATH="/opt/conda/envs/tethys/lib/python3.12/site-packages/tethysapp/ngiab/workspaces/app_workspace/"
+APP_WORKSPACE_PATH="/opt/conda/envs/tethys/lib/python3.12/site-packages/tethysapp/ngiab/workspaces/app_workspace"
 TETHYS_IMAGE_NAME=ciroh-ngen-client-singularity_latest.sif
 DATA_FOLDER_PATH="$1"
 TETHYS_PERSIST_PATH="/var/lib/tethys_persist"

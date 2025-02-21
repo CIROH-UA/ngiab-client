@@ -42,6 +42,7 @@ From: gioelkin/tethys-ngiab:dev-r1
     export CONDA_TETHYS_PATH="/opt/conda/envs/tethys/bin/tethys"
     export PATH="/opt/conda/envs/tethys/bin:$PATH"
     export PATH=$PDM:$PATH
+    export NGINX_USER=www
 %post
     export TETHYS_HOME="/usr/lib/tethys"
     export TETHYS_PERSIST="/var/lib/tethys_persist"
@@ -57,6 +58,7 @@ From: gioelkin/tethys-ngiab:dev-r1
     export CONDA_ENV_PATH="/opt/conda/envs/tethys"
     export PATH="/opt/conda/envs/tethys/bin:$PATH"
     export PATH=$PDM:$PATH
+    export NGINX_USER=www
     # Commands that are run only during the image build process
 
     # clean the repo
@@ -86,19 +88,25 @@ From: gioelkin/tethys-ngiab:dev-r1
     $PDM use -f $CONDA_ENV_PATH && $PDM install --no-editable --production
     
     # changes on the  workspaces dir
-    chmod -R 777 /opt/conda/envs/tethys/lib/python3.12/site-packages/tethysapp/ngiab/workspaces
-
+    chmod -R 777 $CONDA_ENV_PATH/lib/python3.12/site-packages/tethysapp/ngiab/workspaces
 
     # Set permissions for the Salt directories
+    #https://docs.saltproject.io/en/latest/ref/configuration/nonroot.html
     chmod -R 777 /etc/salt /var/cache/salt /var/log/salt /var/run/salt
 
     # Set permissions for the Tethys directories
-    chmod -R 777 /usr/lib/tethys /var/lib/tethys_persist
+    chmod -R 777 $TETHYS_HOME $TETHYS_PERSIST
+
+
+    # Set permissions for the Tethys directories (this is a salt stack job, but it cannot be done due to permission)
+    export NGINX_USER=$(grep 'user .*;' /etc/nginx/nginx.conf | awk '{print $2}' | awk -F';' '{print $1}') ; find $TETHYS_PERSIST/workspaces ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {} ; find $TETHYS_PERSIST/media ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {} ; find $TETHYS_PERSIST/static ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {}
+    
+    chown -R $NGINX_USER: $TETHYS_PERSIST && chmod -R g+rw $TETHYS_PERSIST
 
     # Set permissions for the ASGI and Nginx directories
     mkdir -p /run/asgi
     mkdir -p /var/lib/nginx/body
-    chown -R www:www /run /var/lib/nginx
+    chown -R $NGINX_USER:$NGINX_USER /run /var/lib/nginx
     chmod -R 777 /run /var/lib/nginx
     
 
@@ -108,12 +116,6 @@ From: gioelkin/tethys-ngiab:dev-r1
     sed -i '/^\s*user\s*=\s*www\s*$/d' /etc/supervisor/supervisord.conf
     # Or, to comment it out instead of removing it entirely:
     # sed -i 's/^\(\s*user\s*=\s*www\s*\)$/; \1/' /etc/supervisor/conf.d/nginx_supervisord.conf
-
-    # Set permissions for the Tethys directories (this is a salt stack job, but it cannot be done due to permission)
-    export NGINX_USER=$(grep 'user .*;' /etc/nginx/nginx.conf | awk '{print $2}' | awk -F';' '{print $1}') ; find /var/lib/tethys_persist/workspaces ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {} ; find /var/lib/tethys_persist/media ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {} ; find /var/lib/tethys_persist/static ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {}
-    
-    chown -R www: /var/lib/tethys_persist && chmod -R g+rw /var/lib/tethys_persist
-    
 
     # nginx and supervisor permission
     chmod -R 777 /etc/nginx
@@ -125,24 +127,24 @@ From: gioelkin/tethys-ngiab:dev-r1
     chmod 0777 /var/log/supervisor/supervisord.log
 
     # nginx logs
-    chown -R www:www /var/log/nginx
+    chown -R $NGINX_USER:$NGINX_USER /var/log/nginx
     chmod -R 777 /var/log/nginx/
 
     # tethys logs
     touch /var/log/tethys/tethys.log
-    chown -R www:www /var/log/tethys/tethys.log
+    chown -R $NGINX_USER:$NGINX_USER /var/log/tethys/tethys.log
     chmod 777 /var/log/tethys/tethys.log
     
     touch /var/log/tethys/salt.log
     chmod 0777 /var/log/tethys/salt.log
+
+    # Generate the PortalConfig file
 
     echo "***** Build tasks completed in %post *****"
 
 %startscript
     echo "Container starting..."
     exec /usr/lib/tethys/run.sh 2>&1 | tee /var/log/tethys/salt.log
-    
-    
     # TODO: liveness-probe.sh
     # using a custom script or a separate run. Singularity doesn't have a direct
     # HEALTHCHECK equivalent, so it's often handled externally or in a separate script.

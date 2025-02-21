@@ -22,17 +22,6 @@ jobs:
         run: |
           sudo singularity build ciroh-ngen-client-singularity.sif singularity_tethys_ngiab.def
 
-      - name: Test
-        run: |
-          singularity run --bind /home/ubuntu/workspace/AWI_16_2863657_007:/ngen/ngen/data ciroh-ngen-singularity.sif /ngen/ngen/data auto 2
-          output_count=`ls /home/ubuntu/workspace/AWI_16_2863657_007/outputs/*/* | wc -l`
-          if [[ "$output_count" < 1 ]]; then
-            echo "No outputs found"
-            exit 1
-          else
-            echo "Test run successfully"
-          fi
-          
       - name: Sign Singularity Image
         run: |
            singularity sign --keyidx 0 ciroh-ngen-client-singularity.sif <<EOF
