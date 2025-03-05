@@ -3,7 +3,7 @@ name: Build and Push Singularity Image
 on:
   push:
     branches:
-      - main
+      - hpc-compatible
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -16,17 +16,27 @@ jobs:
         shell: bash
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+
+      - name: Singularity setup
+        uses: singularityhub/install-singularity@main
+
+      - name: Import Singularity private key
+        run: |
+          echo "${{ secrets.SIGNING_KEY }}" | base64 -d > private.key
+          singularity key import private.key
+          rm private.key
 
       - name: Build Singularity Image
         run: |
-          sudo singularity build ciroh-ngen-client-singularity.sif singularity_tethys_ngiab.def
+            singularity build ciroh-ngen-visualizer-singularity.sif singularity_tethys_ngiab.def
 
-      - name: Sign Singularity Image
+      - name: Sign the image
         run: |
-           singularity sign --keyidx 0 ciroh-ngen-client-singularity.sif <<EOF
-           ${{ secrets.KEY_PASSPHRASE }}
-           EOF
+          echo "${{ secrets.KEY_PASSPHRASE }}" > pass.txt
+          singularity sign --keyidx 1 --passphrase-file pass.txt ciroh-ngen-visualizer-singularity.sif
+          rm pass.txt
+
       - name: Login and Push Singularity Image
         env:
            SYLABS_AUTH_TOKEN: ${{ secrets.SYLABS_AUTH_TOKEN }}
@@ -45,8 +55,8 @@ jobs:
            if singularity remote login --tokenfile "$TOKEN_FILE"; then
               echo "Login successful"
               # Delete existing image and Push the image
-              singularity delete --force library://ciroh-it-support/ngiab/ciroh-ngen-singularity:latest_x86
-              singularity push ciroh-ngen-singularity.sif library://ciroh-it-support/ngiab/ciroh-ngen-singularity:latest_x86
+              singularity delete --force library://gioelkin/ngiab/ciroh-ngen-visualizer-singularity:latest_x86
+              singularity push ciroh-ngen-singularity.sif library://gioelkin/ngiab/ciroh-ngen-visualizer-singularity:latest_x86
            else
               echo "Login failed"
               exit 1
