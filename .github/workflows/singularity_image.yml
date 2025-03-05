@@ -43,7 +43,7 @@ jobs:
           # Test signing capability immediately
           echo "=== Test Key Functionality ==="
           touch testfile
-          SINGULARITY_SIGN_PASSPHRASE="$KEY_PASS" singularity sign --keyidx 0 testfile || true
+          echo "${{ secrets.KEY_PASSPHRASE }}" | singularity sign --keyidx 0 testfile || true
           rm -f private.asc testfile
 
       - name: Build Singularity Image
@@ -53,9 +53,7 @@ jobs:
 
       - name: Sign the image
         run: |
-          # For older Singularity versions (<3.11.0)
-          SINGULARITY_SIGN_PASSPHRASE="${{ secrets.KEY_PASSPHRASE }}" \
-            singularity sign --keyidx 0 ciroh-ngen-visualizer-singularity.sif
+           echo "${{ secrets.KEY_PASSPHRASE }}" | singularity sign --keyidx 0 ciroh-ngen-visualizer-singularity.sif
 
 
       - name: Login and Push Singularity Image
