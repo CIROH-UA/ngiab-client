@@ -2,10 +2,22 @@ Bootstrap: docker
 From: gioelkin/tethys-ngiab:dev-r1
 
 %files
-    . /usr/lib/tethys/apps/ngiab
-    singularity/run.sh /usr/lib/tethys/run.sh
-    salt/patches.sls /srv/salt/patches.sls
-    salt/top.sls /srv/salt/top.sls
+    .git                                        /usr/lib/tethys/apps/ngiab/.git
+    .gitignore                                  /usr/lib/tethys/apps/ngiab/.gitignore
+    reactapp                                    /usr/lib/tethys/apps/ngiab/reactapp
+    tethysapp                                   /usr/lib/tethys/apps/ngiab/tethysapp
+    install.yml                                 /usr/lib/tethys/apps/ngiab/install.yml
+    pyproject.toml                              /usr/lib/tethys/apps/ngiab/pyproject.toml
+    package-lock.json                           /usr/lib/tethys/apps/ngiab/package-lock.json
+    package.json                                /usr/lib/tethys/apps/ngiab/package.json
+    pdm.lock                                    /usr/lib/tethys/apps/ngiab/pdm.lock
+    jsconfig.json                               /usr/lib/tethys/apps/ngiab/jsconfig.json
+
+    singularity/salt/tethyscore.sls             /srv/salt/tethyscore.sls
+    singularity/salt/post_app.sls               /srv/salt/post_app.sls
+    singularity/run.sh                          /usr/lib/tethys/run.sh
+    salt/patches.sls                            /srv/salt/patches.sls
+    salt/top.sls                                /srv/salt/top.sls
     
 %environment
     # Database configuration
@@ -61,14 +73,6 @@ From: gioelkin/tethys-ngiab:dev-r1
     export NGINX_USER=www
     # Commands that are run only during the image build process
 
-    # clean the repo
-    rm -rf $TETHYS_HOME/apps/ngiab/salt
-    rm -rf $TETHYS_HOME/apps/ngiab/tests
-    rm $TETHYS_HOME/apps/ngiab/Dockerfile
-    rm $TETHYS_HOME/apps/ngiab/.dockerignore
-    rm -rf $TETHYS_HOME/apps/ngiab/.github
-    rm -rf $TETHYS_HOME/apps/ngiab/.*sif
-
     #Install nvm
     mkdir -p $NVM_DIR
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | /bin/bash
@@ -87,64 +91,45 @@ From: gioelkin/tethys-ngiab:dev-r1
     $PDM self update
     $PDM use -f $CONDA_ENV_PATH && $PDM install --no-editable --production
     
-    # changes on the  workspaces dir
-    chmod -R 777 $CONDA_ENV_PATH/lib/python3.12/site-packages/tethysapp/ngiab/workspaces
-
     # Set permissions for the Salt directories
     #https://docs.saltproject.io/en/latest/ref/configuration/nonroot.html
     chmod -R 777 /etc/salt /var/cache/salt /var/log/salt /var/run/salt
 
-    # Set permissions for the Tethys directories
-    chmod -R 777 $TETHYS_HOME $TETHYS_PERSIST
-
-
-    # Set permissions for the Tethys directories (this is a salt stack job, but it cannot be done due to permission)
-    export NGINX_USER=$(grep 'user .*;' /etc/nginx/nginx.conf | awk '{print $2}' | awk -F';' '{print $1}') ; find $TETHYS_PERSIST/workspaces ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {} ; find $TETHYS_PERSIST/media ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {} ; find $TETHYS_PERSIST/static ! -user ${NGINX_USER} -print0 | xargs -0 -I{} chown ${NGINX_USER}: {}
+    # Set permissions for the Tethys directories, this is done on the Tethys_Persist_Permissions salt job at post_app.sls
+    chown -R $NGINX_USER: $TETHYS_PERSIST $TETHYS_HOME && chmod -R 777 $TETHYS_HOME $TETHYS_PERSIST
     
-    chown -R $NGINX_USER: $TETHYS_PERSIST && chmod -R g+rw $TETHYS_PERSIST
-
     # Set permissions for the ASGI and Nginx directories
+    # The directory creation of /run/asgi and the change of permissions cover the tethyscore.sls job /run/asgi
     mkdir -p /run/asgi
     mkdir -p /var/lib/nginx/body
-    chown -R $NGINX_USER:$NGINX_USER /run /var/lib/nginx
     chmod -R 777 /run /var/lib/nginx
-    
 
-    chmod +x $TETHYS_HOME/run.sh
-
-    # Remove the user=www line from the Supervisor config
+    # Remove the user=www line from the Supervisor config, no needed since is not the user that runs the process
     sed -i '/^\s*user\s*=\s*www\s*$/d' /etc/supervisor/supervisord.conf
-    # Or, to comment it out instead of removing it entirely:
-    # sed -i 's/^\(\s*user\s*=\s*www\s*\)$/; \1/' /etc/supervisor/conf.d/nginx_supervisord.conf
 
-    # nginx and supervisor permission
-    chmod -R 777 /etc/nginx
-    chmod -R 777 /etc/supervisor
+    ## nginx and supervisor permission
+    chmod -R 777 /etc/nginx /etc/supervisor
 
-    #supervisor logs
-    chmod -R 0777 /var/log/supervisor
+    ## supervisor logs
+    ## /var/log needs to have write permissions or supervisor will not be able to write the logs, and it will fail to start the nginx and asgi process
     touch /var/log/supervisor/supervisord.log
-    chmod 0777 /var/log/supervisor/supervisord.log
+    chmod -R 777 /var/log/supervisor
 
-    # nginx logs
-    chown -R $NGINX_USER:$NGINX_USER /var/log/nginx
+    ## nginx logs
     chmod -R 777 /var/log/nginx/
 
     # tethys logs
     touch /var/log/tethys/tethys.log
+    # This is a salt stack job to create an change permissions at /var/log/tethys/tethys.log on tethyscore.sls
     chown -R $NGINX_USER:$NGINX_USER /var/log/tethys/tethys.log
     chmod 777 /var/log/tethys/tethys.log
     
     touch /var/log/tethys/salt.log
-    chmod 0777 /var/log/tethys/salt.log
+    chmod 777 /var/log/tethys/salt.log
 
-    # Generate the PortalConfig file
 
     echo "***** Build tasks completed in %post *****"
 
 %startscript
     echo "Container starting..."
     exec /usr/lib/tethys/run.sh 2>&1 | tee /var/log/tethys/salt.log
-    # TODO: liveness-probe.sh
-    # using a custom script or a separate run. Singularity doesn't have a direct
-    # HEALTHCHECK equivalent, so it's often handled externally or in a separate script.
