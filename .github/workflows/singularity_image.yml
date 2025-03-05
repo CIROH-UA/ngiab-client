@@ -21,11 +21,16 @@ jobs:
       - name: Singularity setup
         uses: singularityhub/install-singularity@main
 
+
       - name: Import Singularity private key
+        env:
+          KEY_B64: ${{ secrets.SIGNING_KEY }}
+          KEY_PASS: ${{ secrets.KEY_PASSPHRASE }}
         run: |
-          echo "${{ secrets.SIGNING_KEY }}" | base64 -d > private.key
-          singularity key import private.key
-          rm private.key
+          echo "$KEY_B64" | base64 -d > private.asc
+          echo "$KEY_PASS" > passphrase.txt
+          singularity key import --passphrase-file passphrase.txt private.asc
+          rm -f private.asc passphrase.txt
 
       - name: Build Singularity Image
         run: |
