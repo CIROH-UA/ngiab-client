@@ -32,15 +32,16 @@ jobs:
       #     singularity key import --passphrase-file passphrase.txt private.asc
       #     rm -f private.asc passphrase.txt
 
-      - name: Build Singularity Image
-        run: |
-            singularity build ciroh-ngen-visualizer-singularity.sif singularity_tethys_ngiab.def
-
       # - name: Sign the image
       #   run: |
       #     echo "${{ secrets.KEY_PASSPHRASE }}" > pass.txt
       #     singularity sign --keyidx 1 --passphrase-file pass.txt ciroh-ngen-visualizer-singularity.sif
       #     rm pass.txt
+
+      - name: Build Singularity Image
+        run: |
+            singularity build --fakeroot ciroh-ngen-visualizer-singularity.sif singularity_tethys_ngiab.def
+
 
       - name: Login and Push Singularity Image
         env:
