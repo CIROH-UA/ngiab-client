@@ -40,45 +40,47 @@ jobs:
 
 
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        id: go
+      # - name: Set up Go
+      #   uses: actions/setup-go@v5
+      #   id: go
 
-      - name: Install Dependencies
-        if: ${{ env.keepgoing == 'true' }}
-        run: |
-          sudo apt-get update && sudo apt-get install -y \
-            build-essential \
-            libssl-dev \
-            uuid-dev \
-            libgpgme11-dev \
-            squashfs-tools \
-            libseccomp-dev \
-            pkg-config \
-            debootstrap
+      # - name: Install Dependencies
+      #   if: ${{ env.keepgoing == 'true' }}
+      #   run: |
+      #     sudo apt-get update && sudo apt-get install -y \
+      #       build-essential \
+      #       libssl-dev \
+      #       uuid-dev \
+      #       libgpgme11-dev \
+      #       squashfs-tools \
+      #       libseccomp-dev \
+      #       pkg-config \
+      #       debootstrap
 
-      - name: Install Singularity
-        env:
-          SINGULARITY_VERSION: 4.2.0
-          GOPATH: /tmp/go
+      # - name: Install Singularity
+      #   env:
+      #     SINGULARITY_VERSION: 4.2.0
+      #     GOPATH: /tmp/go
       
-        run: |
-          mkdir -p $GOPATH
-          sudo mkdir -p /usr/local/var/singularity/mnt && \
-          mkdir -p $GOPATH/src/github.com/sylabs && \
-          cd $GOPATH/src/github.com/sylabs && \
-          wget -qO- https://github.com/sylabs/singularity/releases/download/v${SINGULARITY_VERSION}/singularity-ce-${SINGULARITY_VERSION}.tar.gz | \
-          tar xzv && \
-          cd singularity-ce-${SINGULARITY_VERSION} && \
-          ./mconfig -p /usr/local && \
-          make -C builddir && \
-          sudo make -C builddir install          
+      #   run: |
+      #     mkdir -p $GOPATH
+      #     sudo mkdir -p /usr/local/var/singularity/mnt && \
+      #     mkdir -p $GOPATH/src/github.com/sylabs && \
+      #     cd $GOPATH/src/github.com/sylabs && \
+      #     wget -qO- https://github.com/sylabs/singularity/releases/download/v${SINGULARITY_VERSION}/singularity-ce-${SINGULARITY_VERSION}.tar.gz | \
+      #     tar xzv && \
+      #     cd singularity-ce-${SINGULARITY_VERSION} && \
+      #     ./mconfig -p /usr/local && \
+      #     make -C builddir && \
+      #     sudo make -C builddir install
 
+      - name: Singularity setup
+        uses: singularityhub/install-singularity@main
 
       - name: Build Singularity Image
         run: |
             sudo -E singularity build ciroh-ngen-visualizer-singularity.sif singularity_tethys_ngiab.def
-            
+
       - name: Login and Push Singularity Image
         env:
            SYLABS_AUTH_TOKEN: ${{ secrets.SYLABS_AUTH_TOKEN }}
