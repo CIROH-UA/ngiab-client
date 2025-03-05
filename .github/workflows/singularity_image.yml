@@ -73,9 +73,18 @@ jobs:
            # Attempt to login
            if singularity remote login --tokenfile "$TOKEN_FILE"; then
               echo "Login successful"
-              # Delete existing image and Push the image
-              singularity delete --force library://gioelkin/ngiab/ciroh-ngen-visualizer-singularity:latest_x86
-              singularity push ciroh-ngen-singularity.sif library://gioelkin/ngiab/ciroh-ngen-visualizer-singularity:latest_x86
+              # 1) Check if the image exists by searching for the exact tag
+              #    We grep for 'latest_x86' to confirm a match
+              echo "Searching for existing image: library://gioelkin/ngiab/ciroh-ngen-visualizer-singularity:latest_x86"
+              if singularity search gioelkin/ngiab/ciroh-ngen-visualizer-singularity:latest_x86 | grep -q 'latest_x86'; then
+                echo "Image found in library, deleting it first..."
+                singularity delete --force library://gioelkin/ngiab/ciroh-ngen-visualizer-singularity:latest_x86
+              else
+                echo "Image does not exist, skipping delete step."
+              fi
+              
+              # 2) Now push the new image
+              singularity push ciroh-ngen-singularity.sif library://gioelkin/ngiab/ciroh-ngen-visualizer-singularity:latest_x86              
            else
               echo "Login failed"
               exit 1
