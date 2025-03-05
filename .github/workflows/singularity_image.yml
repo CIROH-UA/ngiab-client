@@ -22,25 +22,25 @@ jobs:
         uses: singularityhub/install-singularity@main
 
 
-      - name: Import Singularity private key
-        env:
-          KEY_B64: ${{ secrets.SIGNING_KEY }}
-          KEY_PASS: ${{ secrets.KEY_PASSPHRASE }}
-        run: |
-          echo "$KEY_B64" | base64 -d > private.asc
-          echo "$KEY_PASS" > passphrase.txt
-          singularity key import --passphrase-file passphrase.txt private.asc
-          rm -f private.asc passphrase.txt
+      # - name: Import Singularity private key
+      #   env:
+      #     KEY_B64: ${{ secrets.SIGNING_KEY }}
+      #     KEY_PASS: ${{ secrets.KEY_PASSPHRASE }}
+      #   run: |
+      #     echo "$KEY_B64" | base64 -d > private.asc
+      #     echo "$KEY_PASS" > passphrase.txt
+      #     singularity key import --passphrase-file passphrase.txt private.asc
+      #     rm -f private.asc passphrase.txt
 
       - name: Build Singularity Image
         run: |
             singularity build ciroh-ngen-visualizer-singularity.sif singularity_tethys_ngiab.def
 
-      - name: Sign the image
-        run: |
-          echo "${{ secrets.KEY_PASSPHRASE }}" > pass.txt
-          singularity sign --keyidx 1 --passphrase-file pass.txt ciroh-ngen-visualizer-singularity.sif
-          rm pass.txt
+      # - name: Sign the image
+      #   run: |
+      #     echo "${{ secrets.KEY_PASSPHRASE }}" > pass.txt
+      #     singularity sign --keyidx 1 --passphrase-file pass.txt ciroh-ngen-visualizer-singularity.sif
+      #     rm pass.txt
 
       - name: Login and Push Singularity Image
         env:
