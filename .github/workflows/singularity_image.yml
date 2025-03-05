@@ -40,12 +40,6 @@ jobs:
           echo "=== Imported Keys ==="
           singularity key list
           
-          # Test signing capability immediately
-          echo "=== Test Key Functionality ==="
-          touch testfile
-          echo "${{ secrets.KEY_PASSPHRASE }}" | singularity sign --keyidx 0 testfile || true
-          rm -f private.asc testfile
-
       - name: Build Singularity Image
         run: |
             sudo -E singularity build ciroh-ngen-visualizer-singularity.sif singularity_tethys_ngiab.def
@@ -84,7 +78,7 @@ jobs:
               fi
 
               # 2) Now push the new image
-              singularity push ciroh-ngen-singularity.sif library://gioelkin/ngiab/ciroh-ngen-visualizer-singularity:latest_x86              
+              singularity push ciroh-ngen-visualizer-singularity.sif library://gioelkin/ngiab/ciroh-ngen-visualizer-singularity:latest_x86              
            else
               echo "Login failed"
               exit 1
