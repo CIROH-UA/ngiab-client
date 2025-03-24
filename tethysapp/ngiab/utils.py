@@ -3,11 +3,46 @@ import json
 import pandas as pd
 import glob
 import duckdb
-from datetime import datetime
 import xarray as xr
-
-
 import os
+
+
+def _get_conf_file():
+    home_path = os.environ.get("HOME", "/tmp")
+    conf_base_path = os.environ.get("VISUALIZER_CONF", f"{home_path}/ngiab_visualizer.json")
+    return conf_base_path
+
+def _get_list_model_runs():
+    """
+        {
+            "model_runs": [
+                {
+                    "label": "run1",
+                    "path": "/path/to/run1",
+                    "date": "2021-01-01:00:00:00",
+                    "tags": ["tag1", "tag2"]
+                },
+                {
+                    "label": "run2",
+                    "path": "/path/to/run2",
+                    "date": "2021-01-01:00:00:00",
+                    "tags": ["tag1", "tag2"]
+                }
+            ]
+        }
+    """
+    conf_file = _get_conf_file()
+    with open(conf_file, "r") as f:
+        data = json.load(f)
+    return data
+
+def get_model_runs_selectable():
+    model_runs = _get_list_model_runs()
+    return [
+        {"value": model_run["path"], "label": model_run["label"]}
+        for model_run in model_runs["model_runs"]
+    ]
+
 
 
 def append_ngen_usgs_column(gdf, app_workspace):
@@ -126,8 +161,7 @@ def get_base_output(app_workspace):
     )
     return base_output_path
 
-
-def get_output_path(app_workspace):
+def get_output_path(base_path):
     """
     Retrieve the value of the 'output_root' key from a JSON file.
 
@@ -138,7 +172,7 @@ def get_output_path(app_workspace):
     str: The value of the 'output_root' key or None if the key doesn't exist.
     """
     realizations_output_path = os.path.join(
-        app_workspace.path, "ngen-data", "config", "realization.json"
+        base_path, "ngen-data", "config", "realization.json"
     )
 
     try:

@@ -23,6 +23,9 @@ const appAPI = {
     },
     getGeoSpatialData: () => {
         return apiClient.get(`${APP_ROOT_URL}getGeoSpatialData/`);
+    },
+    getModelRuns: () => {
+        return apiClient.get(`${APP_ROOT_URL}getModelRuns/`);
     }
 
 

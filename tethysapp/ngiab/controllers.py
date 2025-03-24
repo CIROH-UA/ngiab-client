@@ -21,6 +21,7 @@ from .utils import (
     find_gpkg_file,
     append_ngen_usgs_column,
     append_nwm_usgs_column,
+    get_model_runs_selectable
 )
 
 from .app import App
@@ -37,6 +38,15 @@ def home(request):
     """Controller for the app home page."""
     # The index.html template loads the React frontend
     return App.render(request, "index.html")
+
+
+
+@controller
+def getModelRuns(request):
+    model_run_select =  get_model_runs_selectable()
+    return JsonResponse({
+        "model_runs": model_run_select
+    })
 
 
 @controller(app_workspace=True)
