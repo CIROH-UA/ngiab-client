@@ -2,11 +2,13 @@ import { Fragment, useState, lazy,Suspense } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
 import { ModelRunsProvider } from 'features/ModelRuns/providers/modelRunsProvider';
 import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
+import SelectionView  from './selections';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 
 const HydroFabricView = lazy(() => import('./hydroFabricView.js'));
 const MapComponent = lazy(() => import('features/Map/components/mapgl.js'));
 const ModelRunsComponent = lazy(() => import('features/ModelRuns/views/modelsView.js'));
+// const SelectionView = lazy(() => import('./selections'));
 
 const NGIABView = () => {
   const [singleRowOn, toggleSingleRow] = useState(true);
@@ -16,7 +18,15 @@ const NGIABView = () => {
     <Fragment>
         <ModelRunsProvider>
           <HydroFabricProvider>
-              <ModelRunsComponent />
+              <ModelRunsComponent 
+                selectionView={
+                  <SelectionView
+                    singleRowOn={singleRowOn}
+                    toggleSingleRow={toggleSingleRow}
+                    setIsLoading={setIsLoading}
+                  />
+                }
+              />
               <MapContainer fullScreen={singleRowOn}>
                 <MapComponent />
               </MapContainer>

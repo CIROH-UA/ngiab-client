@@ -8,9 +8,12 @@ import SelectComponent from './selectComponent';
 
 const NexusSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
+  console.log("NexusSelect context nexus:", state.nexus);
+
   const {state: modelRunsState} = useModelRunsContext();
 
   useEffect(() => {
+    console.log("NexusSelect", state.nexus.id)
     if (!state.nexus.id) return;
     actions.reset_catchment();
     var params = {
