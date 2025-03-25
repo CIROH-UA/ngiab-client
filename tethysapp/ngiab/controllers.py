@@ -18,7 +18,7 @@ from .utils import (
     get_teehr_metrics,
     get_usgs_from_ngen_id,
     getCatchmentsList,
-    find_gpkg_file,
+    find_gpkg_file_path,
     append_ngen_usgs_column,
     append_nwm_usgs_column,
     get_model_runs_selectable
@@ -101,18 +101,18 @@ def getCatchmentTimeSeries(request, app_workspace):
     )
 
 
-@controller(app_workspace=True)
-def getGeoSpatialData(request, app_workspace):
+@controller
+def getGeoSpatialData(request):
     response_object = {}
+    model_run_id = request.GET.get("model_run_id")
 
-    gepackage_file_name = find_gpkg_file(app_workspace)
-    gepackage_file_path = os.path.join(
-        app_workspace.path, "ngen-data", "config", gepackage_file_name
-    )
+    # gepackage_file_name = find_gpkg_file(model_run_id)
+    gepackage_file_path = find_gpkg_file_path(model_run_id)
+    print(gepackage_file_path)
     gdf = gpd.read_file(gepackage_file_path, layer="nexus")
     # Append ngen_usgs and nwm_usgs columns
-    gdf = append_ngen_usgs_column(gdf, app_workspace)
-    gdf = append_nwm_usgs_column(gdf, app_workspace)
+    gdf = append_ngen_usgs_column(gdf, model_run_id)
+    gdf = append_nwm_usgs_column(gdf, model_run_id)
 
     # Load the GeoJSON file into a GeoPandas DataFrame
     gdf = gdf.to_crs("EPSG:4326")
@@ -126,10 +126,10 @@ def getGeoSpatialData(request, app_workspace):
     # teerh_data = json.loads(teerh_gdf.to_json())
 
     response_object["nexus"] = data
-    response_object["nexus_ids"] = getNexusList(app_workspace)
+    response_object["nexus_ids"] = getNexusList(model_run_id)
     response_object["bounds"] = bounds
     # response_object["teerh"] = teerh_data
-    response_object["catchments"] = getCatchmentsList(app_workspace)
+    response_object["catchments"] = getCatchmentsList(model_run_id)
     response_object["flow_paths_ids"] = flow_paths_ids
     return JsonResponse(response_object)
 

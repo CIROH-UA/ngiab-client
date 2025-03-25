@@ -6,13 +6,6 @@ import SelectComponent from './selectComponent';
 
 
 
-const options = [
-  { value: 'chocolate', label: 'Chocolate' },
-  { value: 'strawberry', label: 'Strawberry' },
-  { value: 'vanilla', label: 'Vanilla' }
-]
-
-
 const ModelRunsSelect = (props) => {
   const {state,actions} = useModelRunsContext();
   
@@ -34,7 +27,11 @@ const ModelRunsSelect = (props) => {
   }, []);
   
   useEffect(() => {
+    if (state.current_model_runs.length < 1){
+      return
+    }
     console.log("Model Runs", state.current_model_runs)
+    actions.set_base_model_id(state.current_model_runs[0].value)
   }
   , [state.current_model_runs]);
 

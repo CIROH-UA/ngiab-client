@@ -65,7 +65,6 @@ const ModelRunsView = () => {
         <p>This is your model runs container content.</p>
         <ModelRunsSelect />
 
-        {/* Additional content goes here */}
       </Content>
     </Container>
 

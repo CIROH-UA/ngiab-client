@@ -21,8 +21,8 @@ const appAPI = {
     getTeehrVariables: (params) => {
         return apiClient.get(`${APP_ROOT_URL}getTeehrVariables/`, { params });
     },
-    getGeoSpatialData: () => {
-        return apiClient.get(`${APP_ROOT_URL}getGeoSpatialData/`);
+    getGeoSpatialData: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}getGeoSpatialData/`, {params});
     },
     getModelRuns: () => {
         return apiClient.get(`${APP_ROOT_URL}getModelRuns/`);
