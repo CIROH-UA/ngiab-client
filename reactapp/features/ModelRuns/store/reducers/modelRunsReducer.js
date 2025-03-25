@@ -1,9 +1,11 @@
+import { subset } from 'd3-array';
 import { modelRunActionsTypes } from '../actions/actionsTypes';
 
 const modelRunsInitialStore = {
     state:{
         model_runs: [],
-        current_model_runs: []
+        current_model_runs: [],
+        base_model_id: null,
     },
     actions:{}
 };
@@ -25,6 +27,14 @@ const modelRunsReducer = (state, action) => {
                 state: {
                     ...state.state,
                     current_model_runs: action.payload
+                }
+            };
+        case modelRunActionsTypes.set_base_model_id:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    base_model_id: action.payload
                 }
             }; 
         case modelRunActionsTypes.reset:

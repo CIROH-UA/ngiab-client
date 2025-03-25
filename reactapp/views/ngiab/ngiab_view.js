@@ -17,9 +17,9 @@ const NGIABView = () => {
         <ModelRunsProvider>
           <HydroFabricProvider>
               <ModelRunsComponent />
-              {/* <MapContainer fullScreen={singleRowOn}>
+              <MapContainer fullScreen={singleRowOn}>
                 <MapComponent />
-              </MapContainer> */}
+              </MapContainer>
               {/* <HydroFabricContainer fullScreen={singleRowOn} >
                 <Suspense fallback={<LoadingAnimation />}>
                   <HydroFabricView 

@@ -5,6 +5,7 @@ import Map, { Source, Layer } from 'react-map-gl/maplibre';
 import { Protocol } from 'pmtiles';
 import appAPI from 'services/api/app';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
+import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import useTheme from 'hooks/useTheme';
 // Define the onMapLoad function
 const onMapLoad = (event) => {
@@ -44,6 +45,7 @@ const onMapLoad = (event) => {
 
 const MapComponent = () => {
   const { actions: hydroFabricActions } = useHydroFabricContext();
+  const { state: modelRunsState, actions: modelRunsActions  } = useModelRunsContext();
   const [nexusPoints, setNexusPoints] = useState(null);
   const [catchmentConfig, setCatchmentConfig] = useState(null);
   const [flowPathsConfig, setFlowPathsConfig] = useState(null);
@@ -121,9 +123,11 @@ const MapComponent = () => {
   useEffect(() => {
     const protocol = new Protocol({ metadata: true });
     maplibregl.addProtocol('pmtiles', protocol.tile);
-
+    if (modelRunsState.base_model_id === null) {
+      return
+    }
     appAPI
-      .getGeoSpatialData()
+      .getGeoSpatialData({ model_run_id: modelRunsState.base_model_id })
       .then((response) => {
         const { nexus, bounds } = response;
         setNexusPoints(nexus);
@@ -198,7 +202,7 @@ const MapComponent = () => {
     return () => {
       maplibregl.removeProtocol('pmtiles');
     };
-  }, [theme]); // Add theme to dependency array
+  }, [theme,modelRunsState.base_model_id]); // Add theme to dependency array
 
   // Define the PMTiles source URL
   const pmtilesUrl =
