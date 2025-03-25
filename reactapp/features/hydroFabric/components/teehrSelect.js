@@ -2,16 +2,20 @@
 
 import {useEffect, Fragment} from 'react';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
+import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
+
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 
 
 const TeehrSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
-
+  const {state: modelRunsState} = useModelRunsContext();
   useEffect(() => {
     if (!state.teehr.id) return;
-    var params = {}   
+    var params = {
+      model_run_id: modelRunsState.base_model_id
+    }   
     appAPI.getTeehrVariables(params).then((response) => {
       actions.set_teehr_variable_list(response.teehr_variables);
       props.toggleSingleRow(false);
@@ -32,7 +36,8 @@ const TeehrSelect = (props) => {
     props.setIsLoading(true);
     var params = {
       teehr_id: state.teehr.id,
-      teehr_variable: state.teehr.variable
+      teehr_variable: state.teehr.variable,
+      model_run_id: modelRunsState.base_model_id
     }
     appAPI.getTeehrTimeSeries(params).then((response) => {
       actions.set_series(response.data);

@@ -168,18 +168,19 @@ def getNexusTimeSeries(request):
                 "xaxis": "",
                 "title": "",
             },
-            "nexus_ids": getNexusIDs(app_workspace),
+            "nexus_ids": getNexusIDs(model_run_id),
             "usgs_id": usgs_id,
         }
     )
 
 
-@controller(app_workspace=True)
-def getTrouteVariables(request, app_workspace):
+@controller
+def getTrouteVariables(request):
     vars = []
+    model_run_id = request.GET.get("model_run_id")
     troute_id = request.GET.get("troute_id")
     clean_troute_id = troute_id.split("-")[1]
-    df = get_troute_df(app_workspace)
+    df = get_troute_df(model_run_id)
 
     if df is None:
         vars = []
@@ -195,12 +196,13 @@ def getTrouteVariables(request, app_workspace):
     return JsonResponse({"troute_variables": vars})
 
 
-@controller(app_workspace=True)
-def getTrouteTimeSeries(request, app_workspace):
+@controller
+def getTrouteTimeSeries(request):
+    model_run_id = request.GET.get("model_run_id")
     troute_id = request.GET.get("troute_id")
     clean_troute_id = troute_id.split("-")[1]
     variable_column = request.GET.get("troute_variable")
-    df = get_troute_df(app_workspace)
+    df = get_troute_df(model_run_id)
 
     try:
         if isinstance(df.index, pd.MultiIndex):
@@ -246,17 +248,19 @@ def getTrouteTimeSeries(request, app_workspace):
     )
 
 
-@controller(app_workspace=True)
-def getTeehrTimeSeries(request, app_workspace):
+@controller
+def getTeehrTimeSeries(request):
+
     teehr_id = request.GET.get("teehr_id")
+    model_run_id = request.GET.get("model_run_id")
     teehr_config_variable = request.GET.get("teehr_variable")
     teehr_configuration = teehr_config_variable.split("-")[0]
     teehr_variable = teehr_config_variable.split("-")[1]
     teehr_ts_path = get_teehr_joined_ts_path(
-        app_workspace, teehr_configuration, teehr_variable
+        model_run_id, teehr_configuration, teehr_variable
     )
     teehr_ts = get_teehr_ts(teehr_ts_path, teehr_id, teehr_configuration)
-    teehr_metrics = get_teehr_metrics(app_workspace, teehr_id)
+    teehr_metrics = get_teehr_metrics(model_run_id, teehr_id)
     return JsonResponse(
         {
             "metrics": teehr_metrics,
@@ -266,10 +270,11 @@ def getTeehrTimeSeries(request, app_workspace):
     )
 
 
-@controller(app_workspace=True)
-def getTeehrVariables(request, app_workspace):
+@controller
+def getTeehrVariables(request):
+    model_run_id = request.GET.get("model_run_id")
     try:
-        vars = get_configuration_variable_pairs(app_workspace)
+        vars = get_configuration_variable_pairs(model_run_id)
     except Exception:
         vars = []
     return JsonResponse({"teehr_variables": vars})
