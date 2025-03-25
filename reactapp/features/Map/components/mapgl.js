@@ -43,6 +43,8 @@ const onMapLoad = (event) => {
 
 const MapComponent = () => {
   const { actions: hydroFabricActions } = useHydroFabricContext();
+  console.log("Map context nexus:", hydroFabricActions.nexus);
+
   const { state: modelRunsState } = useModelRunsContext();
   const [nexusPoints, setNexusPoints] = useState(null);
   const [catchmentConfig, setCatchmentConfig] = useState(null);
@@ -224,6 +226,7 @@ const MapComponent = () => {
           // Handle single point click
           hydroFabricActions.reset_teehr();
           const nexus_id = feature.properties.id;
+          console.log('Nexus ID:', nexus_id);
           hydroFabricActions.set_nexus_id(nexus_id);
           if (feature.properties.ngen_usgs !== 'none') {
             hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);

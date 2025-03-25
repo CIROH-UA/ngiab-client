@@ -18,11 +18,11 @@ const HydroFabricView = (props) => {
 
     <Fragment>
         <Suspense fallback={<LoadingAnimation />}>
-            <SelectionView
+            {/* <SelectionView
                 toggleSingleRow = {props.toggleSingleRow}
                 singleRowOn={props.singleRowOn}
                 setIsLoading={props.setIsLoading}
-            />
+            /> */}
         </Suspense>
         {
             state.teehr.metrics &&
