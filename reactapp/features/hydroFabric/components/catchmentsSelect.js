@@ -2,6 +2,7 @@
 
 import {useEffect, Suspense, Fragment,lazy} from 'react';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
+import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import appAPI from 'services/api/app';
 
 import SelectComponent from './selectComponent';
@@ -10,13 +11,16 @@ import SelectComponent from './selectComponent';
 
 const CatchmentSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
+  const {state: modelRunsState} = useModelRunsContext();
+
 
   useEffect(() => {
     if (!state.catchment.id) return;
     actions.reset_nexus();
     props.setIsLoading(true);
     var params = {
-      catchment_id: state.catchment.id
+      catchment_id: state.catchment.id,
+      model_run_id: modelRunsState.base_model_id
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
       actions.set_series(response.data);

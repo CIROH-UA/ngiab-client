@@ -4,7 +4,7 @@ import { ModelRunsProvider } from 'features/ModelRuns/providers/modelRunsProvide
 import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 
-// const HydroFabricView = lazy(() => import('./hydroFabricView.js'));
+const HydroFabricView = lazy(() => import('./hydroFabricView.js'));
 const MapComponent = lazy(() => import('features/Map/components/mapgl.js'));
 const ModelRunsComponent = lazy(() => import('features/ModelRuns/views/modelsView.js'));
 
@@ -20,7 +20,7 @@ const NGIABView = () => {
               <MapContainer fullScreen={singleRowOn}>
                 <MapComponent />
               </MapContainer>
-              {/* <HydroFabricContainer fullScreen={singleRowOn} >
+              <HydroFabricContainer fullScreen={singleRowOn} >
                 <Suspense fallback={<LoadingAnimation />}>
                   <HydroFabricView 
                     toggleSingleRow = {toggleSingleRow} 
@@ -28,7 +28,7 @@ const NGIABView = () => {
                     setIsLoading={setIsLoading} 
                   />
                 </Suspense>
-              </HydroFabricContainer> */}
+              </HydroFabricContainer>
           </HydroFabricProvider>
         </ModelRunsProvider>
 

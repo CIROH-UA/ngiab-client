@@ -49,11 +49,12 @@ def getModelRuns(request):
     })
 
 
-@controller(app_workspace=True)
-def getCatchmentTimeSeries(request, app_workspace):
+@controller
+def getCatchmentTimeSeries(request):
+    model_run_id = request.GET.get("model_run_id")
     catchment_id = request.GET.get("catchment_id")
     variable_column = request.GET.get("variable_column")
-    base_output_path = get_base_output(app_workspace)
+    base_output_path = get_base_output(model_run_id)
 
     catchment_output_file_path = os.path.join(
         base_output_path,
@@ -96,7 +97,7 @@ def getCatchmentTimeSeries(request, app_workspace):
                 "xaxis": "",
                 "title": "",
             },
-            "catchment_ids": getCatchmentsIds(app_workspace),
+            "catchment_ids": getCatchmentsIds(model_run_id),
         }
     )
 
@@ -134,10 +135,11 @@ def getGeoSpatialData(request):
     return JsonResponse(response_object)
 
 
-@controller(app_workspace=True)
-def getNexusTimeSeries(request, app_workspace):
+@controller
+def getNexusTimeSeries(request):
+    model_run_id = request.GET.get("model_run_id")
     nexus_id = request.GET.get("nexus_id")
-    base_output_path = get_base_output(app_workspace)
+    base_output_path = get_base_output(model_run_id)
 
     nexus_output_file_path = os.path.join(
         base_output_path,
@@ -152,7 +154,7 @@ def getNexusTimeSeries(request, app_workspace):
         for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
     ]
 
-    usgs_id = get_usgs_from_ngen_id(app_workspace, nexus_id)
+    usgs_id = get_usgs_from_ngen_id(model_run_id, nexus_id)
     return JsonResponse(
         {
             "data": [
