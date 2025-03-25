@@ -138,19 +138,20 @@ def append_nwm_usgs_column(gdf, model_id):
     return gdf
 
 
-def _get_base_troute_output(app_workspace):
+def _get_base_troute_output(model_id):
+    base_path = _get_model_run_path_by_id(model_id)    
     base_output_path = os.path.join(
-        app_workspace.path, "ngen-data", "outputs", "troute"
+        base_path, "outputs", "troute"
     )
     return base_output_path
 
 
-def get_troute_df(app_workspace):
+def get_troute_df(model_id):
     """
     Load the first T-Route data file from the workspace as a DataFrame.
     Supports both CSV and NetCDF (.nc) files, and replaces NaN values with -9999.
     """
-    base_output_path = _get_base_troute_output(app_workspace)
+    base_output_path = _get_base_troute_output(model_id)
 
     # Search for supported file types in priority order
     file_types = [("CSV", "*.csv"), ("NetCDF", "*.nc")]
@@ -281,7 +282,7 @@ def getNexusList(model_id):
     return [id.split(".csv")[0].split("_output")[0] for id in nexus_ids_list]
 
 
-def getNexusIDs(app_workspace):
+def getNexusIDs(model_run_id):
     """
     Get a list of Nexus IDs.
 
@@ -291,7 +292,7 @@ def getNexusIDs(app_workspace):
     Returns:
         list: A list of dictionaries containing the Nexus IDs. Each dictionary has a 'value' and 'label' key.
     """
-    output_base_file = get_base_output(app_workspace)
+    output_base_file = get_base_output(model_run_id)
     nexus_prefix = "nex-"
     nexus_ids_list = _list_prefixed_csv_files(output_base_file, nexus_prefix)
     return [
@@ -330,8 +331,8 @@ def get_usgs_from_ngen(app_workspace, ngen_id):
         return None
 
 
-def get_configuration_variable_pairs(app_workspace):
-    base_output_teehr_path = get_base_teehr_path(app_workspace)
+def get_configuration_variable_pairs(model_run_id):
+    base_output_teehr_path = get_base_teehr_path(model_run_id)
     joined_timeseries_base_path = os.path.join(
         base_output_teehr_path, "dataset", "joined_timeseries"
     )
@@ -363,8 +364,8 @@ def get_configuration_variable_pairs(app_workspace):
     return configurations_variables
 
 
-def get_teehr_joined_ts_path(app_workspace, configuration, variable):
-    base_output_teehr_path = get_base_teehr_path(app_workspace)
+def get_teehr_joined_ts_path(model_run_id,configuration, variable):
+    base_output_teehr_path = get_base_teehr_path(model_run_id)
     joined_timeseries_path = os.path.join(
         base_output_teehr_path, "dataset", "joined_timeseries"
     )
@@ -456,8 +457,8 @@ def get_teehr_ts(parquet_file_path, primary_location_id_value, teehr_configurati
     return series
 
 
-def get_teehr_metrics(app_workspace, primary_location_id):
-    base_output_teehr_path = get_base_teehr_path(app_workspace)
+def get_teehr_metrics(model_run_id, primary_location_id):
+    base_output_teehr_path = get_base_teehr_path(model_run_id)
     metrics_path = os.path.join(base_output_teehr_path, "metrics.csv")
 
     # Load the CSV file

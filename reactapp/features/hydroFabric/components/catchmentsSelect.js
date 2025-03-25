@@ -7,8 +7,6 @@ import appAPI from 'services/api/app';
 
 import SelectComponent from './selectComponent';
 
-// const SelectComponent = lazy(() => import('selectComponent'));
-
 const CatchmentSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
   const {state: modelRunsState} = useModelRunsContext();
