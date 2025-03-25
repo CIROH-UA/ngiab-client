@@ -247,7 +247,7 @@ def _list_prefixed_csv_files(directory, prefix):
     return csv_files
 
 
-def getCatchmentsIds(app_workspace):
+def getCatchmentsIds(model_run_id):
     """
     Get a list of catchment IDs.
 
@@ -258,7 +258,7 @@ def getCatchmentsIds(app_workspace):
         list: A list of dictionaries containing catchment IDs and labels.
               Each dictionary has the keys 'value' and 'label'.
     """
-    output_base_file = get_base_output(app_workspace)
+    output_base_file = get_base_output(model_run_id)
     catchment_prefix = "cat-"
     catchment_ids_list = _list_prefixed_csv_files(output_base_file, catchment_prefix)
     return [
@@ -385,8 +385,8 @@ def get_teehr_joined_ts_path(app_workspace, configuration, variable):
         return None
 
 
-def get_usgs_from_ngen_id(app_workspace, nexgen_id):
-    base_output_teehr_path = get_base_teehr_path(app_workspace)
+def get_usgs_from_ngen_id(model_run_id, nexgen_id):
+    base_output_teehr_path = get_base_teehr_path(model_run_id)
     negen_usgs_path = os.path.join(
         base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
     )

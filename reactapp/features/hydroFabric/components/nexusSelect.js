@@ -2,17 +2,20 @@
 
 import {useEffect, Fragment,lazy} from 'react';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
+import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 
 const NexusSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
+  const {state: modelRunsState} = useModelRunsContext();
 
   useEffect(() => {
     if (!state.nexus.id) return;
     actions.reset_catchment();
     var params = {
-      nexus_id: state.nexus.id
+      nexus_id: state.nexus.id,
+      model_run_id: modelRunsState.base_model_id
     }    
     appAPI.getNexusTimeSeries(params).then((response) => {
       actions.set_series(response.data);
