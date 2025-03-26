@@ -4,7 +4,6 @@ import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 
 
-
 const ModelRunsSelect = (props) => {
   const {state,actions} = useModelRunsContext();
   
@@ -41,12 +40,11 @@ const ModelRunsSelect = (props) => {
     <Fragment>
         {state.model_runs.length > 0 &&
             <Fragment>
-                <h5>Model Runs</h5>
+                {/* <h5>Model Runs</h5> */}
                 <SelectComponent 
                   optionsList={state.model_runs} 
                   onChangeHandler={actions.set_current_model_runs}
                 />
-                {props.selectionView}
 
             </Fragment>
         }

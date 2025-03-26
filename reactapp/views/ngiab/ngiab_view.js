@@ -18,15 +18,12 @@ const NGIABView = () => {
     <Fragment>
         <ModelRunsProvider>
           <HydroFabricProvider>
-              <ModelRunsComponent 
-                selectionView={
-                  <SelectionView
-                    singleRowOn={singleRowOn}
-                    toggleSingleRow={toggleSingleRow}
-                    setIsLoading={setIsLoading}
-                  />
-                }
-              />
+              
+            <ModelRunsComponent
+              singleRowOn={singleRowOn}
+              toggleSingleRow={toggleSingleRow}
+              setIsLoading={setIsLoading}
+            />
               <MapContainer fullScreen={singleRowOn}>
                 <MapComponent />
               </MapContainer>
