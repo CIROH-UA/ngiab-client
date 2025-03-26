@@ -25,12 +25,12 @@ const StyledTabs = styled(Tabs)`
 
   /* Style each tab link */
   .nav-tabs .nav-link {
-    color: #555;
+    color: #fff;
     font-weight: 600;
     border: 1px solid #aaa;
     border-bottom: none;
     margin-right: 4px;
-    background-color: #6b6b6b !important;
+    background: #6b6b6b !important;
     border-radius: 5px 5px 0 0; /* Rounded top corners */
   }
 
