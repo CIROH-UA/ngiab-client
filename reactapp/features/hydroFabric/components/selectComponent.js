@@ -29,11 +29,12 @@ class MenuList extends Component {
 
 // Custom styles for react-select
 const customStyles = {
-  menu: (provided) => ({
-    ...provided,
-    maxHeight: '500px', // Adjust dropdown height here
-    overflowY: 'auto',
-  }),
+  // menu: (provided) => ({
+  //   ...provided,
+  //   maxHeight: '500px', // Adjust dropdown height here
+  //   overflowY: 'auto',
+  // }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
   option: (provided) => ({
     ...provided,
     color: 'black',

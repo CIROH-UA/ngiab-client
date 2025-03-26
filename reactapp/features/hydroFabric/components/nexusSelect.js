@@ -8,8 +8,6 @@ import SelectComponent from './selectComponent';
 
 const NexusSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
-  console.log("NexusSelect context nexus:", state.nexus);
-
   const {state: modelRunsState} = useModelRunsContext();
 
   useEffect(() => {
@@ -31,6 +29,7 @@ const NexusSelect = (props) => {
       }
       
       actions.set_nexus_list(response.nexus_ids);
+      
       actions.set_troute_id(state.nexus.id);
       props.toggleSingleRow(false);
     }).catch((error) => {
@@ -43,7 +42,11 @@ const NexusSelect = (props) => {
 
   }, [state.nexus.id]);
 
-
+  useEffect(() => {
+    console.log("NexusSelect", state.nexus.list)
+  }
+  , [state.nexus.list]);
+  
   return (
     <Fragment>
         {state.nexus.id &&
