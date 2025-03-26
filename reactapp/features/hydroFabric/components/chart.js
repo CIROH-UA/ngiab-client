@@ -294,15 +294,6 @@ function LineChart({ width, height, data, layout }) {
                   width={innerWidth}
                   height={innerHeight}
                 />
-                {/* Background */}
-                <rect
-                  x={0}
-                  y={0}
-                  width={width}
-                  height={height}
-                  fill={theme === 'dark' ? '#34495e' : '#ffffff'}
-                  rx={14}
-                />
                 <Group left={margin.left} top={margin.top}>
                   <GridRows
                     scale={newYScale}

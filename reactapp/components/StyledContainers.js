@@ -5,6 +5,7 @@ import useTheme from 'hooks/useTheme'; // Adjust the import path as needed
 // HydroFabricContainer
 const StyledHydroFabricContainer = styled.div`
   flex: ${(props) => (props.fullScreen ? '1 1 0%' : '1 1 40%')};
+  height: 40%;
   order: 2;
   width: 80%;
   margin-left: 20%;
@@ -24,7 +25,8 @@ export const HydroFabricContainer = (props) => {
 // HydroFabricPlotContainer
 const StyledHydroFabricPlotContainer = styled.div`
   width: 500px;
-  height: 250px;
+  padding: 5px;
+  height: 95%;
   order: 1;
   flex: 1 1 80%;
   background-color: ${(props) =>
