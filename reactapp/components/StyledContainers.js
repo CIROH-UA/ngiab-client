@@ -9,9 +9,9 @@ const StyledHydroFabricContainer = styled.div`
   order: 2;
   width: 80%;
   margin-left: 20%;
-  display: ${(props) => (props.fullScreen ? 'none' : 'flex')};
+  // display: ${(props) => (props.fullScreen ? 'none' : 'flex')};
   padding: 10px;
-  flex-direction: row;
+  // flex-direction: row;
   background-color: ${(props) =>
     props.theme === 'dark' ? '#2c3e50' : '#ffffff'};
   color: ${(props) => (props.theme === 'dark' ? '#ffffff' : '#000000')};
@@ -24,9 +24,9 @@ export const HydroFabricContainer = (props) => {
 
 // HydroFabricPlotContainer
 const StyledHydroFabricPlotContainer = styled.div`
-  width: 500px;
+  width: 100%;
   padding: 5px;
-  height: 95%;
+  height: 300px;
   order: 1;
   flex: 1 1 80%;
   background-color: ${(props) =>

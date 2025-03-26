@@ -22,7 +22,7 @@ import useTheme from 'hooks/useTheme'; // Adjust the import path as needed
 function LineChart({ width, height, data, layout }) {
   const theme = useTheme();
   const visxTheme = theme === 'dark' ? darkTheme : lightTheme;
-
+  console.log(data)
   // Tooltip parameters
   const {
     tooltipData,

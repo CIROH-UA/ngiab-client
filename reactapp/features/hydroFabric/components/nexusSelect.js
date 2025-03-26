@@ -11,7 +11,6 @@ const NexusSelect = (props) => {
   const {state: modelRunsState} = useModelRunsContext();
 
   useEffect(() => {
-    console.log("NexusSelect", state.nexus.id)
     if (!state.nexus.id) return;
     actions.reset_catchment();
     var params = {
@@ -19,8 +18,10 @@ const NexusSelect = (props) => {
       model_run_id: modelRunsState.base_model_id
     }    
     appAPI.getNexusTimeSeries(params).then((response) => {
-      actions.set_series(response.data);
-      actions.set_chart_layout(response.layout);
+      // actions.set_series(response.data);
+      actions.set_nexus_series(response.data);
+      actions.set_nexus_chart_layout(response.layout);
+      // actions.set_chart_layout(response.layout);
       if(response.usgs_id){
         actions.set_teehr_id(response.usgs_id);
       }
@@ -42,10 +43,7 @@ const NexusSelect = (props) => {
 
   }, [state.nexus.id]);
 
-  useEffect(() => {
-    console.log("NexusSelect", state.nexus.list)
-  }
-  , [state.nexus.list]);
+
   
   return (
     <Fragment>
