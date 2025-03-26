@@ -44,7 +44,6 @@ const onMapLoad = (event) => {
 const MapComponent = () => {
   const { state: hydroFabricState, actions: hydroFabricActions } = useHydroFabricContext();
   console.log("Map context nexus:", hydroFabricState.nexus);
-
   const { state: modelRunsState } = useModelRunsContext();
   const [nexusPoints, setNexusPoints] = useState(null);
   const [catchmentConfig, setCatchmentConfig] = useState(null);

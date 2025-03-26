@@ -21,7 +21,8 @@ const CatchmentSelect = (props) => {
       model_run_id: modelRunsState.base_model_id
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
-      actions.set_series(response.data);
+      // actions.set_series(response.data);
+      actions.set_catchment_series(response.data);
       actions.set_catchment_variable_list(response.variables);
       actions.set_catchment_variable(null);
       actions.set_catchment_list(response.catchment_ids);
@@ -50,8 +51,10 @@ const CatchmentSelect = (props) => {
       model_run_id: modelRunsState.base_model_id
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
-      actions.set_series(response.data);
-      actions.set_chart_layout(response.layout);
+      // actions.set_series(response.data);
+      actions.set_catchment_series(response.data);
+      actions.set_catchment_chart_layout(response.layout);
+      // actions.set_chart_layout(response.layout);
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     }).catch((error) => {

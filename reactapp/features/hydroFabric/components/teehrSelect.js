@@ -40,8 +40,10 @@ const TeehrSelect = (props) => {
       model_run_id: modelRunsState.base_model_id
     }
     appAPI.getTeehrTimeSeries(params).then((response) => {
-      actions.set_series(response.data);
-      actions.set_chart_layout(response.layout);
+      actions.set_teehr_series(response.data);
+      actions.set_teehr_chart_layout(response.layout);
+      // actions.set_series(response.data);
+      // actions.set_chart_layout(response.layout);
       actions.set_teehr_metrics(response.metrics)
       props.toggleSingleRow(false);
       props.setIsLoading(false);
