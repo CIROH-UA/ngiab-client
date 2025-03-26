@@ -1,6 +1,8 @@
 
 
 import {Suspense, Fragment,lazy} from 'react';
+import styled from 'styled-components';
+
 import Tab from 'react-bootstrap/Tab';
 import Tabs from 'react-bootstrap/Tabs';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
@@ -14,16 +16,41 @@ const  TeehrMetricsTable = lazy(() => import('../../features/hydroFabric/compone
 const SelectionView = lazy(() => import('./selections'));
 
 
+const StyledTabs = styled(Tabs)`
+  /* Modify the entire .nav-tabs region */
+  .nav-tabs {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #aaa;
+  }
+
+  /* Style each tab link */
+  .nav-tabs .nav-link {
+    color: #555;
+    font-weight: 600;
+    border: 1px solid #aaa;
+    border-bottom: none;
+    margin-right: 4px;
+    background-color: #6b6b6b !important;
+    border-radius: 5px 5px 0 0; /* Rounded top corners */
+  }
+
+  /* Highlight the active tab */
+  .nav-tabs .nav-link.active {
+    background-color: #fff;
+    color: #000;
+    border-bottom: 2px solid #fff;
+  }
+`;
+
 const HydroFabricView = () => {
   const {state} = useHydroFabricContext();
   return (
 
     <Fragment>
-        <Tabs
+        <StyledTabs
           defaultActiveKey="nexus_plot"
           id="uncontrolled-tab-hydrofabtic"
-          className="mb-3"
-          
+          className="mb-3"          
         >
           {
             state.nexus.id &&
@@ -103,7 +130,7 @@ const HydroFabricView = () => {
             </Tab>
           }
 
-        </Tabs>
+        </StyledTabs>
     </Fragment>
 
 
