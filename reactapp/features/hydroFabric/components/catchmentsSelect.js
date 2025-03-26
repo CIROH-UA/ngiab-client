@@ -68,7 +68,7 @@ const CatchmentSelect = (props) => {
     <Fragment>
           {state.catchment.id &&
             <Fragment>
-              <h5>Time Series Menu</h5>
+
                 <label>Catchment ID </label>
                 <SelectComponent 
                   optionsList={state.catchment.list} 

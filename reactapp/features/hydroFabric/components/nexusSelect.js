@@ -48,7 +48,6 @@ const NexusSelect = (props) => {
     <Fragment>
         {state.nexus.id &&
             <Fragment>
-                <h5>Time Series Menu</h5>
                 <label>Nexus ID</label>
                 <SelectComponent 
                 optionsList={state.nexus.list} 

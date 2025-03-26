@@ -1,6 +1,7 @@
 import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
 import ModelRunsSelect from 'features/ModelRuns/components/modelRunsSelect';
+import TimeSeriesSelection from 'features/ModelRuns/components/timSeriesSelect';
 // The main container for the panel.
 // It has absolute positioning, a responsive width, and a CSS transition for sliding.
 const Container = styled.div`
@@ -8,7 +9,7 @@ const Container = styled.div`
   top: 0;
   left: 0;
   height: 100vh;
-  width: 30%;
+  width: 20%;
   background-color: #2c3e50;
   z-index: 1000;
   transition: transform 0.3s ease;
@@ -46,7 +47,11 @@ const Content = styled.div`
   margin-top: 100px;
 `;
 
-const ModelRunsView = () => {
+const ModelRunsView = ({
+  singleRowOn,
+  toggleSingleRow,
+  setIsLoading
+}) => {
   const [isOpen, setIsOpen] = useState(true);
 
   const toggleContainer = () => {
@@ -65,6 +70,11 @@ const ModelRunsView = () => {
         <p>This is your model runs container content.</p>
         <ModelRunsSelect />
 
+        <TimeSeriesSelection
+            singleRowOn={singleRowOn}
+            toggleSingleRow={toggleSingleRow}
+            setIsLoading={setIsLoading}
+        />
       </Content>
     </Container>
 

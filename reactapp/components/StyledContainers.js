@@ -6,7 +6,8 @@ import useTheme from 'hooks/useTheme'; // Adjust the import path as needed
 const StyledHydroFabricContainer = styled.div`
   flex: ${(props) => (props.fullScreen ? '1 1 0%' : '1 1 40%')};
   order: 2;
-  width: 100%;
+  width: 80%;
+  margin-left: 20%;
   display: ${(props) => (props.fullScreen ? 'none' : 'flex')};
   padding: 10px;
   flex-direction: row;
