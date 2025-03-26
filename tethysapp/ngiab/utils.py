@@ -185,6 +185,7 @@ def get_troute_df(model_id):
 
 def get_base_output(model_id):
     base_path = _get_model_run_path_by_id(model_id)
+    # print(base_path)
     output_relative_path = get_output_path(base_path).split("outputs")[-1]
     base_output_path = os.path.join(
         base_path, "outputs", output_relative_path.strip("/")
