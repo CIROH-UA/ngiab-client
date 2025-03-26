@@ -46,7 +46,8 @@ const CatchmentSelect = (props) => {
 
     var params = {
       catchment_id: state.catchment.id,
-      variable_column: state.catchment.variable
+      variable_column: state.catchment.variable,
+      model_run_id: modelRunsState.base_model_id
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
       actions.set_series(response.data);
