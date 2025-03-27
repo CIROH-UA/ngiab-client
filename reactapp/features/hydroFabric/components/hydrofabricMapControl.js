@@ -20,7 +20,6 @@ const StyledSwitch = styled(Form.Switch)`
 const HydrofabricMapControl = ({
   isVisible
 }) => {
-  console.log("HydrofabricMapControl", isVisible)
   const { state, actions } = useHydroFabricContext();
 
   const handleToggleNexusClustering = () => {

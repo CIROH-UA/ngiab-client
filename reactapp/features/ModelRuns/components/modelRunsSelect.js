@@ -10,8 +10,6 @@ const ModelRunsSelect = (props) => {
   useEffect(() => {
 
     appAPI.getModelRuns().then((response) => {
-
-      // console.log("Model Runs", response.model_runs)
       actions.set_model_run_list(response.model_runs);
 
     }).catch((error) => {
@@ -28,7 +26,6 @@ const ModelRunsSelect = (props) => {
     if (state.current_model_runs.length < 1){
       return
     }
-    console.log("Model Runs", state.current_model_runs)
     actions.set_base_model_id(state.current_model_runs[0].value)
   }
   , [state.current_model_runs]);

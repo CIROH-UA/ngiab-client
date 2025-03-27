@@ -269,8 +269,10 @@ const MapComponent = () => {
       if (layerId === 'all-points' || layerId === 'unclustered-point') {
         // Single point
         hydroFabricActions.reset_teehr();
+        hydroFabricActions.reset_troute();
         const nexus_id = feature.properties.id;
         hydroFabricActions.set_nexus_id(nexus_id);
+        hydroFabricActions.set_troute_id(nexus_id);
         if (feature.properties.ngen_usgs !== 'none') {
           hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);
         }
@@ -289,7 +291,9 @@ const MapComponent = () => {
       } else if (layerId === 'catchments-layer') {
         // It's a catchment
         hydroFabricActions.reset_teehr();
+        hydroFabricActions.reset_troute();
         hydroFabricActions.set_catchment_id(feature.properties.divide_id);
+        hydroFabricActions.set_troute_id(feature.properties.divide_id);
         return;
       }
     }

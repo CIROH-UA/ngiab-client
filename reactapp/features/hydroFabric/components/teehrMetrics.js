@@ -24,14 +24,14 @@ const TeehrMetricsTable = ({ data }) => {
         },
         rows: {
             style: {
-                backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+                backgroundColor: theme === 'dark' ? '#4f5b67' : '#4f5b67',
                 '&:nth-of-type(odd)': {
-                    backgroundColor: theme === 'dark' ? '#2c2c2c' : '#f9f9f9',
+                    backgroundColor: theme === 'dark' ? '#4f5b67' : '#4f5b67',
                 },
             },
             highlightOnHoverStyle: {
-                backgroundColor: theme === 'dark' ? '#333333' : '#f5f5f5',
-                color: theme === 'dark' ? '#ffffff' : '#333333',
+                backgroundColor: '#7c8895',
+                color: '#fff',
                 transitionDuration: '0.15s',
                 transitionProperty: 'background-color, color',
             },
