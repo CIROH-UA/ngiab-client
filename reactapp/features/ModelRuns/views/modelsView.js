@@ -2,8 +2,8 @@ import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
 import ModelRunsSelect from 'features/ModelRuns/components/modelRunsSelect';
 import TimeSeriesSelection from 'features/ModelRuns/components/timSeriesSelect';
-// The main container for the panel.
-// It has absolute positioning, a responsive width, and a CSS transition for sliding.
+import NexusClusteredInput from 'features/ModelRuns/components/nexusClusteredInput';
+
 const Container = styled.div`
   position: absolute;
   top: 0;
@@ -73,6 +73,9 @@ const ModelRunsView = ({
             singleRowOn={singleRowOn}
             toggleSingleRow={toggleSingleRow}
             setIsLoading={setIsLoading}
+        />
+        <NexusClusteredInput
+          singleRowOn={singleRowOn}
         />
       </Content>
     </Container>
