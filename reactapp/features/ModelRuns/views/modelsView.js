@@ -1,9 +1,9 @@
 import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
 import ModelRunsSelect from 'features/ModelRuns/components/modelRunsSelect';
-import TimeSeriesSelection from 'features/ModelRuns/components/timSeriesSelect';
-import NexusClusteredInput from 'features/ModelRuns/components/nexusClusteredInput';
-
+import TimeSeriesSelection from 'features/ModelRuns/components/timeSeriesSelect';
+import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
+import { useModelRunsContext } from '../hooks/useModelRunsContext';
 const Container = styled.div`
   position: absolute;
   top: 0;
@@ -50,7 +50,10 @@ const ModelRunsView = ({
   setIsLoading,
   setIsModelRunListOpen
 }) => {
+  
   const [isOpen, setIsOpen] = useState(true);
+  const { state } = useModelRunsContext();
+  const isVisible = state.base_model_id ? true : false;
 
   const toggleContainer = () => {
     setIsOpen(prev => !prev);
@@ -66,7 +69,6 @@ const ModelRunsView = ({
 
       <Content>
         <h2>Model Runs</h2>
-        <p>This is your model runs container content.</p>
         <ModelRunsSelect />
 
         <TimeSeriesSelection
@@ -74,8 +76,8 @@ const ModelRunsView = ({
             toggleSingleRow={toggleSingleRow}
             setIsLoading={setIsLoading}
         />
-        <NexusClusteredInput
-          singleRowOn={singleRowOn}
+        <HydrofabricMapControl
+            isVisible={isVisible}
         />
       </Content>
     </Container>

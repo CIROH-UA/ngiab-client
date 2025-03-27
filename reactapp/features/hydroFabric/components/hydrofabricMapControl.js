@@ -3,12 +3,24 @@ import { Fragment } from 'react';
 import Form from 'react-bootstrap/Form';
 import styled from 'styled-components';
 
-// Create a styled switch component
+
+
+
+const StyledControllerContainer = styled.div`
+    display: ${props => props.isVisible ? 'block' : 'none'};
+    margin-top: 1rem;
+    width: 100%;
+    border-radius: 0.5rem;
+`;
+
 const StyledSwitch = styled(Form.Switch)`
     margin-top: 10px;  
 `;
 
-const NexusClusteredInput = () => {
+const HydrofabricMapControl = ({
+  isVisible
+}) => {
+  console.log("HydrofabricMapControl", isVisible)
   const { state, actions } = useHydroFabricContext();
 
   const handleToggleNexusClustering = () => {
@@ -22,8 +34,10 @@ const NexusClusteredInput = () => {
   };
 
   return (
+    
     <Fragment>
-          <h5>Layers</h5>
+        <StyledControllerContainer isVisible={isVisible}>        
+          <h6>Layers</h6>
           <StyledSwitch
             label="Nexus Layer"
             id="nexus-layer-switch"
@@ -45,8 +59,9 @@ const NexusClusteredInput = () => {
             onChange={handleToggleCatchmentLayer}
             title="Toggle Catchment Layer visualization"
           />
+        </StyledControllerContainer>
     </Fragment>
   );
 };
 
-export default NexusClusteredInput;
+export default HydrofabricMapControl;

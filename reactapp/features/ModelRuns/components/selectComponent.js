@@ -54,13 +54,12 @@ const SelectComponent = ({
   // defaultValue 
 }) => {
   const handleChange = useCallback((option) => {
-    onChangeHandler(option);
+    onChangeHandler([option]);
   }, [onChangeHandler]);
 
   return (
     <Select
       components={{ MenuList }}
-      isMulti
       styles={customStyles}
       filterOption={createFilter({ ignoreAccents: false })}
       options={optionsList}
