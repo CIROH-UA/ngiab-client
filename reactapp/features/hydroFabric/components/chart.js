@@ -12,6 +12,7 @@ import {
   TooltipWithBounds,
   defaultStyles,
 } from '@visx/tooltip';
+import { LuExpand } from "react-icons/lu";
 import { localPoint } from '@visx/event';
 import { GlyphCircle } from '@visx/glyph';
 import { timeParse, timeFormat } from 'd3-time-format';
@@ -275,7 +276,8 @@ function LineChart({ width, height, data, layout }) {
                     cursor: 'pointer',
                   }}
                 >
-                  Reset Zoom
+                  <LuExpand size={20} />
+
                 </button>
               </div>
 
