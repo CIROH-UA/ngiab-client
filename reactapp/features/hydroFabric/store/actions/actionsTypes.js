@@ -3,7 +3,8 @@ const hydroFabricActionsTypes = {
     set_nexus_list: 'SET_NEXUS_LIST',
     set_nexus_series: 'SET_NEXUS_SERIES',
     set_nexus_chart_layout: 'SET_NEXUS_CHART_LAYOUT',
-    set_nexus_geometry_clusters: 'SET_NEXUS_GEOMETRY_CLUSTERS',
+    toggle_nexus_geometry_clusters: 'TOGGLE_NEXUS_GEOMETRY_CLUSTERS',
+    toggle_nexus_geometry_hidden: 'TOGGLE_NEXUS_GEOMETRY_HIDDEN',
 
     set_catchment_list: 'SET_CATCHMENT_LIST',
     set_catchment_id: 'SET_CATCHMENT_ID',
@@ -11,7 +12,8 @@ const hydroFabricActionsTypes = {
     set_catchment_variable_list: 'SET_CATCHMENT_VARIABLE_LIST',
     set_catchment_series: 'SET_CATCHMENT_SERIES',
     set_catchment_chart_layout: 'SET_CATCHMENT_CHART_LAYOUT',
-    
+    toggle_catchment_geometry_hidden: 'TOGGLE_CATCHMENT_GEOMETRY_HIDDEN',
+
     set_troute_id: 'SET_TROUTE_ID',
     set_troute_variable: 'SET_TROUTE_VARIABLE',
     set_troute_variable_list: 'SET_TROUTE_VARIABLE_LIST',

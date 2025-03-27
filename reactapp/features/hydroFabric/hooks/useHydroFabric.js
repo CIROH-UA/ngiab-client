@@ -11,9 +11,8 @@ const useHydroFabric = () => {
         set_nexus_list: (list) => dispatch({ type: hydroFabricActionsTypes.set_nexus_list, payload: list}),
         set_nexus_series: (series) => dispatch({ type: hydroFabricActionsTypes.set_nexus_series, payload: series }),
         set_nexus_chart_layout: (layout) => dispatch({ type: hydroFabricActionsTypes.set_nexus_chart_layout, payload: layout }),
-        set_nexus_geometry_clusters_on: () => dispatch({ type: hydroFabricActionsTypes.set_nexus_geometry_clusters, payload: true}),
-        set_nexus_geometry_clusters_off: () => dispatch({ type: hydroFabricActionsTypes.set_nexus_geometry_clusters, payload: false}),
-        toggle_nexus_geometry_clusters: () => dispatch({ type: hydroFabricActionsTypes.set_nexus_geometry_clusters}),
+        toggle_nexus_geometry_clusters: () => dispatch({ type: hydroFabricActionsTypes.toggle_nexus_geometry_clusters}),
+        toggle_nexus_geometry_hidden: () => dispatch({ type: hydroFabricActionsTypes.toggle_nexus_geometry_hidden}),
 
         set_catchment_id: (id) => dispatch({ type: hydroFabricActionsTypes.set_catchment_id, payload: id }),
         set_catchment_variable: (variable) => dispatch({ type: hydroFabricActionsTypes.set_catchment_variable, payload: variable }),
@@ -21,6 +20,7 @@ const useHydroFabric = () => {
         set_catchment_variable_list: (list) => dispatch({ type: hydroFabricActionsTypes.set_catchment_variable_list, payload: list}),
         set_catchment_series: (series) => dispatch({ type: hydroFabricActionsTypes.set_catchment_series, payload: series }),
         set_catchment_chart_layout: (layout) => dispatch({ type: hydroFabricActionsTypes.set_catchment_chart_layout, payload: layout }),
+        toggle_catchment_geometry_hidden: () => dispatch({ type: hydroFabricActionsTypes.toggle_catchment_geometry_hidden}),
 
         set_troute_id: (id) => dispatch({ type: hydroFabricActionsTypes.set_troute_id, payload: id }),
         set_troute_variable: (variable) => dispatch({ type: hydroFabricActionsTypes.set_troute_variable, payload: variable }),
