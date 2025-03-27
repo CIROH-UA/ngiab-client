@@ -7,11 +7,12 @@ import LoadingAnimation from 'components/loader/LoadingAnimation';
 
 const HydroFabricView = lazy(() => import('./hydroFabricView.js'));
 const MapComponent = lazy(() => import('features/Map/components/mapgl.js'));
-const ModelRunsComponent = lazy(() => import('features/ModelRuns/views/modelsView.js'));
+const ModelRunsView = lazy(() => import('features/ModelRuns/views/modelsView.js'));
 // const SelectionView = lazy(() => import('./selections'));
 
 const NGIABView = () => {
   const [singleRowOn, toggleSingleRow] = useState(true);
+  const [isModelRunListOpen, setIsModelRunListOpen] = useState(true);
   const [ isLoading, setIsLoading ] = useState(false);
 
   return (
@@ -19,15 +20,22 @@ const NGIABView = () => {
         <ModelRunsProvider>
           <HydroFabricProvider>
               
-            <ModelRunsComponent
+            <ModelRunsView
               singleRowOn={singleRowOn}
               toggleSingleRow={toggleSingleRow}
               setIsLoading={setIsLoading}
+              setIsModelRunListOpen={setIsModelRunListOpen}
             />
-              <MapContainer fullScreen={singleRowOn}>
+              <MapContainer 
+                fullScreen={singleRowOn}
+                
+              >
                 <MapComponent />
               </MapContainer>
-              <HydroFabricContainer fullScreen={singleRowOn} >
+              <HydroFabricContainer 
+                fullScreen={singleRowOn} 
+                isModelRunListOpen={isModelRunListOpen}  
+              >
                 <Suspense fallback={<LoadingAnimation />}>
                   <HydroFabricView 
                     toggleSingleRow = {toggleSingleRow} 

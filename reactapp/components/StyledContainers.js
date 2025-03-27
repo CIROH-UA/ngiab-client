@@ -1,20 +1,27 @@
 // containers.js
 import styled from 'styled-components';
-import useTheme from 'hooks/useTheme'; // Adjust the import path as needed
+import useTheme from 'hooks/useTheme';
 
 // HydroFabricContainer
 const StyledHydroFabricContainer = styled.div`
   flex: ${(props) => (props.fullScreen ? '1 1 0%' : '1 1 40%')};
   height: 40%;
   order: 2;
-  width: 80%;
-  margin-left: 20%;
-  // display: ${(props) => (props.fullScreen ? 'none' : 'flex')};
-  padding: 10px;
-  // flex-direction: row;
+  width: ${(props) => (props.isModelRunListOpen ? '80%' : '100%')};
+  margin-left: ${(props) => (props.isModelRunListOpen ? '20%' : '0%')};
+  padding: 5px;
   background-color: ${(props) =>
     props.theme === 'dark' ? '#2c3e50' : '#ffffff'};
   color: ${(props) => (props.theme === 'dark' ? '#ffffff' : '#000000')};
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* For even smoother animation, include width in the transition */
+  @media (min-width: 768px) {
+    transition: margin-left 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+                width 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 `;
 
 export const HydroFabricContainer = (props) => {

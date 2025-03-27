@@ -59,11 +59,8 @@ const HydroFabricView = () => {
                 <HydroFabricPlotContainer>
                   <ParentSize>
                     {({ width, height }) => 
-                              // state.chart.series &&
-                              // <LineChart width={width} height={height} data={state.chart.series} layout={state.chart.layout}/>
-
-                              state.nexus.chart.series &&
-                              <LineChart width={width} height={height} data={state.nexus.chart.series} layout={state.nexus.chart.layout}/>
+                         state.nexus.chart.series &&
+                        <LineChart width={width} height={height} data={state.nexus.chart.series} layout={state.nexus.chart.layout}/>
                       }
                   </ParentSize>
 
