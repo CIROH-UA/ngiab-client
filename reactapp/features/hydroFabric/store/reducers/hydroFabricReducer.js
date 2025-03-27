@@ -6,7 +6,8 @@ const hydroFabricInitialStore = {
       id: null,
       list: null,
       geometry:{
-        clustered: true
+        clustered: true,
+        hidden: false
       },
       chart: {
         series: [],
@@ -29,7 +30,10 @@ const hydroFabricInitialStore = {
           xaxis: null,
           title: null
         }
-      }
+      },
+      geometry:{
+        hidden: false
+      },
     },
     troute: {
       id: null,
@@ -120,7 +124,7 @@ const hydroFabricReducer = (state, action) => {
           }
         }
       };
-    case hydroFabricActionsTypes.set_nexus_geometry_clusters:
+    case hydroFabricActionsTypes.toggle_nexus_geometry_clusters:
       return {
         ...state,
         state: {
@@ -129,7 +133,21 @@ const hydroFabricReducer = (state, action) => {
             ...state.state.nexus,
             geometry: {
               ...state.state.nexus.geometry,
-              clustered: action.payload !== undefined ? action.payload : !state.state.nexus.geometry.clustered
+              clustered: !state.state.nexus.geometry.clustered
+            }
+          }
+        }
+      };
+    case hydroFabricActionsTypes.toggle_nexus_geometry_hidden:
+      return {
+        ...state,
+        state: {
+          ...state.state,
+          nexus: {
+            ...state.state.nexus,
+            geometry: {
+              ...state.state.nexus.geometry,
+              hidden: !state.state.nexus.geometry.hidden
             }
           }
         }
@@ -149,6 +167,10 @@ const hydroFabricReducer = (state, action) => {
                 xaxis: null,
                 title: null
               }
+            },
+            geometry:{
+              clustered: true,
+              hidden: false
             }
           }
         }
@@ -230,6 +252,21 @@ const hydroFabricReducer = (state, action) => {
           }
         }
       };
+    case hydroFabricActionsTypes.toggle_catchment_geometry_hidden:
+      return {
+        ...state,
+        state: {
+          ...state.state,
+          catchment: {
+            ...state.state.catchment,
+            geometry: {
+              ...state.state.catchment.geometry,
+              hidden: !state.state.catchment.geometry.hidden
+            }
+          }
+        }
+      };
+
     case hydroFabricActionsTypes.reset_catchment:
       return {
         ...state,
@@ -247,7 +284,10 @@ const hydroFabricReducer = (state, action) => {
                 xaxis: null,
                 title: null
               }
-            }
+            },
+            geometry:{
+              hidden: false
+            },
           }
         }
       };
