@@ -11,6 +11,9 @@ const Container = styled.div`
   height: 100vh;
   width: 20%;
   background-color: #2c3e50;
+  background-color: #4f5b67;
+
+  
   z-index: 1000;
   transition: transform 0.3s ease;
   /* When closed, shift left so that only 40px remains visible */
