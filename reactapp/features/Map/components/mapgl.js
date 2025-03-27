@@ -9,9 +9,9 @@ import useTheme from 'hooks/useTheme';
 
 const onMapLoad = (event) => {
   const map = event.target;
-  // We now match the layer IDs we defined in configs:
-  const hoverLayers = ['catchments-layer', 'unclustered-point', 'clusters'];
 
+  // Hover pointer on these layers (if present)
+  const hoverLayers = ['catchments-layer', 'unclustered-point', 'clusters'];
   hoverLayers.forEach((layer) => {
     map.on('mouseenter', layer, () => {
       map.getCanvas().style.cursor = 'pointer';
@@ -21,16 +21,12 @@ const onMapLoad = (event) => {
     });
   });
 
-  // Move cluster layers to the top (above catchments-layer)
-  if (map.getLayer('unclustered-point')) {
-    map.moveLayer('unclustered-point');
-  }
-  if (map.getLayer('clusters')) {
-    map.moveLayer('clusters');
-  }
-  if (map.getLayer('cluster-count')) {
-    map.moveLayer('cluster-count');
-  }
+  // Move cluster layers on top (if they exist)
+  ['unclustered-point', 'clusters', 'cluster-count'].forEach((layerId) => {
+    if (map.getLayer(layerId)) {
+      map.moveLayer(layerId);
+    }
+  });
 
   // Fix the filter references:
   if (map.getLayer('catchments-layer')) {
@@ -43,7 +39,6 @@ const onMapLoad = (event) => {
 
 const MapComponent = () => {
   const { state: hydroFabricState, actions: hydroFabricActions } = useHydroFabricContext();
-  console.log("Map context nexus:", hydroFabricState.nexus);
   const { state: modelRunsState } = useModelRunsContext();
   const [nexusPoints, setNexusPoints] = useState(null);
   const [catchmentConfig, setCatchmentConfig] = useState(null);
@@ -52,12 +47,16 @@ const MapComponent = () => {
   const mapRef = useRef(null);
   const theme = useTheme();
 
+  // Map style URL
   const mapStyleUrl =
     theme === 'dark'
       ? 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/dark-style.json'
       : 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/light-style.json';
 
-  // Cluster circles
+  // Decide if we should cluster (true) or show all points (false)
+  const isClustered = !!hydroFabricState.nexus.geometry?.clustered;
+
+  // Layer styles for cluster mode
   const clusterLayer = {
     id: 'clusters',
     type: 'circle',
@@ -85,21 +84,6 @@ const MapComponent = () => {
     },
   };
 
-  // Unclustered single-point circles
-  const unclusteredPointLayer = {
-    id: 'unclustered-point',
-    type: 'circle',
-    source: 'nexus-points',
-    filter: ['!', ['has', 'point_count']],
-    paint: {
-      'circle-color': theme === 'dark' ? '#2c3e50' : '#1f78b4',
-      'circle-radius': 7,
-      'circle-stroke-width': 2,
-      'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
-    },
-  };
-
-  // Cluster label
   const clusterCountLayer = {
     id: 'cluster-count',
     type: 'symbol',
@@ -118,6 +102,35 @@ const MapComponent = () => {
     },
   };
 
+  // Single circle style for leftover unclustered features (when cluster is on)
+  const unclusteredPointLayer = {
+    id: 'unclustered-point',
+    type: 'circle',
+    source: 'nexus-points',
+    filter: ['!', ['has', 'point_count']],
+    paint: {
+      'circle-color': theme === 'dark' ? '#2c3e50' : '#1f78b4',
+      'circle-radius': 7,
+      'circle-stroke-width': 2,
+      'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
+    },
+  };
+
+  // Show all features as a single layer if cluster=false
+  const allPointsNoClusterLayer = {
+    id: 'all-points',
+    type: 'circle',
+    source: 'nexus-points',
+    // No filter => shows everything
+    paint: {
+      'circle-color': theme === 'dark' ? '#2c3e50' : '#1f78b4',
+      'circle-radius': 5,
+      'circle-stroke-width': 1,
+      'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
+    },
+  };
+
+  // Load data from backend
   useEffect(() => {
     const protocol = new Protocol({ metadata: true });
     maplibregl.addProtocol('pmtiles', protocol.tile);
@@ -132,15 +145,11 @@ const MapComponent = () => {
         const { nexus, bounds } = response;
         setNexusPoints(nexus);
 
-        // Fit to bounds if provided
         if (bounds && mapRef.current) {
-          mapRef.current.fitBounds(bounds, {
-            padding: 20,
-            duration: 1000,
-          });
+          mapRef.current.fitBounds(bounds, { padding: 20, duration: 1000 });
         }
 
-        // Fill layer for catchments
+        // catchments
         const catchmentLayerConfig = {
           id: 'catchments-layer',
           type: 'fill',
@@ -161,7 +170,7 @@ const MapComponent = () => {
         };
         setCatchmentConfig(catchmentLayerConfig);
 
-        // Line layer for flowpaths
+        // flowpaths
         const flowPathsLayerConfig = {
           id: 'flowpaths-layer',
           type: 'line',
@@ -179,7 +188,7 @@ const MapComponent = () => {
         };
         setFlowPathsConfig(flowPathsLayerConfig);
 
-        // Gauges
+        // gauges
         const conusGaugesLayerConfig = {
           id: 'gauges-layer',
           type: 'circle',
@@ -206,53 +215,55 @@ const MapComponent = () => {
     };
   }, [theme, modelRunsState.base_model_id]);
 
-  // PMTiles source
-  const pmtilesUrl =
-    'pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles';
-
+  // Build the handleMapClick to query only existing layers
   const handleMapClick = async (event) => {
     const map = event.target;
-    // Query features from top to bottom priority
-    const features = map.queryRenderedFeatures(event.point, {
-      layers: ['unclustered-point', 'clusters', 'catchments-layer'],
-    });
+    // Re-check if cluster is on or off
+    const isClusteredNow = !!hydroFabricState.nexus.geometry?.clustered;
 
-    if (features.length > 0) {
-      for (const feature of features) {
-        const layerId = feature.layer.id;
+    const layersToQuery = isClusteredNow
+      ? ['unclustered-point', 'clusters', 'catchments-layer']
+      : ['all-points', 'catchments-layer'];
 
-        if (layerId === 'unclustered-point') {
-          // Handle single point click
-          hydroFabricActions.reset_teehr();
-          const nexus_id = feature.properties.id;
-          console.log('Nexus ID:', nexus_id);
-          hydroFabricActions.set_nexus_id(nexus_id);
-          if (feature.properties.ngen_usgs !== 'none') {
-            hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);
-          }
-          return;
-        } else if (layerId === 'clusters') {
-          // Handle cluster click
-          const clusterId = feature.properties.cluster_id;
-          const zoom = await map
-            .getSource('nexus-points')
-            .getClusterExpansionZoom(clusterId);
-          map.flyTo({
-            center: feature.geometry.coordinates,
-            zoom,
-            speed: 1.2,
-            curve: 1,
-          });
-          return;
-        } else if (layerId === 'catchments-layer') {
-          // Handle catchment click
-          hydroFabricActions.reset_teehr();
-          hydroFabricActions.set_catchment_id(feature.properties.divide_id);
-          return;
+    const features = map.queryRenderedFeatures(event.point, { layers: layersToQuery });
+    if (!features.length) return;
+
+    for (const feature of features) {
+      const layerId = feature.layer.id;
+
+      if (layerId === 'all-points' || layerId === 'unclustered-point') {
+        // Single point click
+        hydroFabricActions.reset_teehr();
+        const nexus_id = feature.properties.id;
+        hydroFabricActions.set_nexus_id(nexus_id);
+        if (feature.properties.ngen_usgs !== 'none') {
+          hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);
         }
+        return;
+      } else if (layerId === 'clusters') {
+        // Handle cluster expansion
+        const clusterId = feature.properties.cluster_id;
+        const zoom = await map
+          .getSource('nexus-points')
+          .getClusterExpansionZoom(clusterId);
+
+        map.flyTo({
+          center: feature.geometry.coordinates,
+          zoom,
+          speed: 1.2,
+          curve: 1,
+        });
+        return;
+      } else if (layerId === 'catchments-layer') {
+        hydroFabricActions.reset_teehr();
+        hydroFabricActions.set_catchment_id(feature.properties.divide_id);
+        return;
       }
     }
   };
+
+  // Using a dynamic key so <Source> re-mounts if isClustered toggles
+  const sourceKey = isClustered ? 'clustered-nexus' : 'unclustered-nexus';
 
   return (
     <Map
@@ -268,26 +279,35 @@ const MapComponent = () => {
       onClick={handleMapClick}
       onLoad={onMapLoad}
     >
-      {/* Vector layers (catchments, flowpaths, gauges) */}
-      <Source id="conus" type="vector" url={pmtilesUrl}>
+      {/* Vector layers: catchments, flowpaths, gauges */}
+      <Source id="conus" type="vector" url="pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles">
         {catchmentConfig && <Layer {...catchmentConfig} />}
         {flowPathsConfig && <Layer {...flowPathsConfig} />}
         {conusGaugesConfig && <Layer {...conusGaugesConfig} />}
       </Source>
 
-      {/* GeoJSON source for nexus points (clusters + unclustered points) */}
+      {/* This source shows either cluster or no-cluster mode, depending on isClustered. */}
       {nexusPoints && (
         <Source
+          key={sourceKey}            // This forces the source to re-mount when toggled
           id="nexus-points"
           type="geojson"
           data={nexusPoints}
-          cluster={true}
+          cluster={isClustered}
           clusterRadius={50}
           clusterMaxZoom={14}
         >
-          <Layer {...clusterLayer} />
-          <Layer {...clusterCountLayer} />
-          <Layer {...unclusteredPointLayer} />
+          {isClustered ? (
+            <>
+              {/* Normal cluster layers */}
+              <Layer {...clusterLayer} />
+              <Layer {...clusterCountLayer} />
+              <Layer {...unclusteredPointLayer} />
+            </>
+          ) : (
+            // Single "all-points" layer with no filter
+            <Layer {...allPointsNoClusterLayer} />
+          )}
         </Source>
       )}
     </Map>

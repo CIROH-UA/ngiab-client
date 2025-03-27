@@ -5,6 +5,9 @@ const hydroFabricInitialStore = {
     nexus: {
       id: null,
       list: null,
+      geometry:{
+        clustered: true
+      },
       chart: {
         series: [],
         layout: {
@@ -117,6 +120,20 @@ const hydroFabricReducer = (state, action) => {
           }
         }
       };
+    case hydroFabricActionsTypes.set_nexus_geometry_clusters:
+      return {
+        ...state,
+        state: {
+          ...state.state,
+          nexus: {
+            ...state.state.nexus,
+            geometry: {
+              ...state.state.nexus.geometry,
+              clustered: action.payload !== undefined ? action.payload : !state.state.nexus.geometry.clustered
+            }
+          }
+        }
+      };
     case hydroFabricActionsTypes.reset_nexus:
       return {
         ...state,
@@ -136,6 +153,7 @@ const hydroFabricReducer = (state, action) => {
           }
         }
       };
+
 
     // -----------------------------
     // CATCHMENT
