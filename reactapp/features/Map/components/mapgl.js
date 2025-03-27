@@ -10,7 +10,7 @@ import useTheme from 'hooks/useTheme';
 const onMapLoad = (event) => {
   const map = event.target;
 
-  // Hover pointer on these layers (if present)
+  // Let the cursor become a pointer when hovering certain layers
   const hoverLayers = ['catchments-layer', 'unclustered-point', 'clusters'];
   hoverLayers.forEach((layer) => {
     map.on('mouseenter', layer, () => {
@@ -21,14 +21,14 @@ const onMapLoad = (event) => {
     });
   });
 
-  // Move cluster layers on top (if they exist)
+  // Bring cluster layers up front if present
   ['unclustered-point', 'clusters', 'cluster-count'].forEach((layerId) => {
     if (map.getLayer(layerId)) {
       map.moveLayer(layerId);
     }
   });
 
-  // Fix the filter references:
+  // (Optional) Fix up filtering on these layers if needed
   if (map.getLayer('catchments-layer')) {
     map.setFilter('catchments-layer', ['any', ['in', 'divide_id', '']]);
   }
@@ -44,19 +44,29 @@ const MapComponent = () => {
   const [catchmentConfig, setCatchmentConfig] = useState(null);
   const [flowPathsConfig, setFlowPathsConfig] = useState(null);
   const [conusGaugesConfig, setConusGaugesConfig] = useState(null);
+
   const mapRef = useRef(null);
   const theme = useTheme();
 
-  // Map style URL
+  // Dark/light style
   const mapStyleUrl =
     theme === 'dark'
       ? 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/dark-style.json'
       : 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/light-style.json';
 
-  // Decide if we should cluster (true) or show all points (false)
+  // Are we clustering nexus points or not?
   const isClustered = !!hydroFabricState.nexus.geometry?.clustered;
+  // Are we hiding nexus points entirely?
+  const isNexusHidden = !!hydroFabricState.nexus.geometry?.hidden;
 
-  // Layer styles for cluster mode
+  // Are we hiding catchments?
+  const isCatchmentHidden = !!hydroFabricState.catchment.geometry?.hidden;
+
+  // --------------
+  // LAYER CONFIGS
+  // --------------
+
+  // (1) For cluster mode, cluster circles
   const clusterLayer = {
     id: 'clusters',
     type: 'circle',
@@ -82,8 +92,13 @@ const MapComponent = () => {
         35,
       ],
     },
+    // Use layout visibility to hide them if isNexusHidden is true
+    layout: {
+      visibility: isNexusHidden ? 'none' : 'visible',
+    },
   };
 
+  // (2) For cluster mode, label each cluster
   const clusterCountLayer = {
     id: 'cluster-count',
     type: 'symbol',
@@ -96,13 +111,14 @@ const MapComponent = () => {
       'text-anchor': 'center',
       'text-justify': 'center',
       'symbol-placement': 'point',
+      visibility: isNexusHidden ? 'none' : 'visible',
     },
     paint: {
       'text-color': theme === 'dark' ? '#ffffff' : '#000000',
     },
   };
 
-  // Single circle style for leftover unclustered features (when cluster is on)
+  // (3) For cluster mode, leftover single points
   const unclusteredPointLayer = {
     id: 'unclustered-point',
     type: 'circle',
@@ -114,30 +130,36 @@ const MapComponent = () => {
       'circle-stroke-width': 2,
       'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
     },
+    layout: {
+      visibility: isNexusHidden ? 'none' : 'visible',
+    },
   };
 
-  // Show all features as a single layer if cluster=false
+  // (4) For no-cluster mode, show everything in one layer
   const allPointsNoClusterLayer = {
     id: 'all-points',
     type: 'circle',
     source: 'nexus-points',
-    // No filter => shows everything
     paint: {
       'circle-color': theme === 'dark' ? '#2c3e50' : '#1f78b4',
       'circle-radius': 5,
       'circle-stroke-width': 1,
       'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
     },
+    // Hide them entirely if isNexusHidden is true
+    layout: {
+      visibility: isNexusHidden ? 'none' : 'visible',
+    },
   };
 
-  // Load data from backend
+  // --------------
+  // LOAD DATA
+  // --------------
   useEffect(() => {
     const protocol = new Protocol({ metadata: true });
     maplibregl.addProtocol('pmtiles', protocol.tile);
 
-    if (modelRunsState.base_model_id === null) {
-      return;
-    }
+    if (modelRunsState.base_model_id == null) return;
 
     appAPI
       .getGeoSpatialData({ model_run_id: modelRunsState.base_model_id })
@@ -145,11 +167,15 @@ const MapComponent = () => {
         const { nexus, bounds } = response;
         setNexusPoints(nexus);
 
+        // Fit the map to returned bounding box if present
         if (bounds && mapRef.current) {
-          mapRef.current.fitBounds(bounds, { padding: 20, duration: 1000 });
+          mapRef.current.fitBounds(bounds, {
+            padding: 20,
+            duration: 1000,
+          });
         }
 
-        // catchments
+        // (a) Catchments
         const catchmentLayerConfig = {
           id: 'catchments-layer',
           type: 'fill',
@@ -167,10 +193,14 @@ const MapComponent = () => {
                 : ['rgba', 91, 44, 111, 0.7],
             'fill-opacity': { stops: [[7, 0], [11, 1]] },
           },
+          // If isCatchmentHidden is true, hide the layer
+          layout: {
+            visibility: isCatchmentHidden ? 'none' : 'visible',
+          },
         };
         setCatchmentConfig(catchmentLayerConfig);
 
-        // flowpaths
+        // (b) Flowpaths
         const flowPathsLayerConfig = {
           id: 'flowpaths-layer',
           type: 'line',
@@ -188,7 +218,7 @@ const MapComponent = () => {
         };
         setFlowPathsConfig(flowPathsLayerConfig);
 
-        // gauges
+        // (c) Gauges
         const conusGaugesLayerConfig = {
           id: 'gauges-layer',
           type: 'circle',
@@ -203,6 +233,7 @@ const MapComponent = () => {
                 : ['rgba', 100, 100, 100, 1],
             'circle-opacity': { stops: [[3, 0], [9, 1]] },
           },
+          // (You didn't mention hiding these, but you could if you wanted)
         };
         setConusGaugesConfig(conusGaugesLayerConfig);
       })
@@ -213,26 +244,30 @@ const MapComponent = () => {
     return () => {
       maplibregl.removeProtocol('pmtiles');
     };
-  }, [theme, modelRunsState.base_model_id]);
+  }, [theme, modelRunsState.base_model_id, isCatchmentHidden]);
 
-  // Build the handleMapClick to query only existing layers
+  // --------------
+  // ON CLICK
+  // --------------
   const handleMapClick = async (event) => {
     const map = event.target;
-    // Re-check if cluster is on or off
     const isClusteredNow = !!hydroFabricState.nexus.geometry?.clustered;
 
+    // If cluster is on, query cluster layers
+    // If cluster is off, query all-points
+    // We'll always check 'catchments-layer', if not hidden
+    // (Though if it's hidden, there's no layer to click.)
     const layersToQuery = isClusteredNow
       ? ['unclustered-point', 'clusters', 'catchments-layer']
       : ['all-points', 'catchments-layer'];
 
     const features = map.queryRenderedFeatures(event.point, { layers: layersToQuery });
-    if (!features.length) return;
+    if (!features || !features.length) return;
 
     for (const feature of features) {
       const layerId = feature.layer.id;
-
       if (layerId === 'all-points' || layerId === 'unclustered-point') {
-        // Single point click
+        // Single point
         hydroFabricActions.reset_teehr();
         const nexus_id = feature.properties.id;
         hydroFabricActions.set_nexus_id(nexus_id);
@@ -241,12 +276,9 @@ const MapComponent = () => {
         }
         return;
       } else if (layerId === 'clusters') {
-        // Handle cluster expansion
+        // It's a cluster - expand
         const clusterId = feature.properties.cluster_id;
-        const zoom = await map
-          .getSource('nexus-points')
-          .getClusterExpansionZoom(clusterId);
-
+        const zoom = await map.getSource('nexus-points').getClusterExpansionZoom(clusterId);
         map.flyTo({
           center: feature.geometry.coordinates,
           zoom,
@@ -255,6 +287,7 @@ const MapComponent = () => {
         });
         return;
       } else if (layerId === 'catchments-layer') {
+        // It's a catchment
         hydroFabricActions.reset_teehr();
         hydroFabricActions.set_catchment_id(feature.properties.divide_id);
         return;
@@ -262,7 +295,7 @@ const MapComponent = () => {
     }
   };
 
-  // Using a dynamic key so <Source> re-mounts if isClustered toggles
+  // We set a dynamic key so the source re-mounts if isClustered changes
   const sourceKey = isClustered ? 'clustered-nexus' : 'unclustered-nexus';
 
   return (
@@ -286,10 +319,10 @@ const MapComponent = () => {
         {conusGaugesConfig && <Layer {...conusGaugesConfig} />}
       </Source>
 
-      {/* This source shows either cluster or no-cluster mode, depending on isClustered. */}
+      {/* If we have nexusPoints, show them either cluster or unclustered */}
       {nexusPoints && (
         <Source
-          key={sourceKey}            // This forces the source to re-mount when toggled
+          key={sourceKey}
           id="nexus-points"
           type="geojson"
           data={nexusPoints}
@@ -299,13 +332,12 @@ const MapComponent = () => {
         >
           {isClustered ? (
             <>
-              {/* Normal cluster layers */}
+              {/* 3 layers: cluster circles, cluster labels, leftover unclustered */}
               <Layer {...clusterLayer} />
               <Layer {...clusterCountLayer} />
               <Layer {...unclusteredPointLayer} />
             </>
           ) : (
-            // Single "all-points" layer with no filter
             <Layer {...allPointsNoClusterLayer} />
           )}
         </Source>
