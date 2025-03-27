@@ -14,17 +14,15 @@ const Container = styled.div`
   z-index: 1000;
   transition: transform 0.3s ease;
   /* When closed, shift left so that only 40px remains visible */
-  transform: ${({ isOpen }) => isOpen ? 'translateX(0)' : 'translateX(calc(-100% + 40px))'};
+  transform: ${({ isOpen }) => isOpen ? 'translateX(0)' : 'translateX(calc(-100% ))'};
 
   /* On small screens, use 100% width */
   @media (max-width: 768px) {
     width: 100%;
-    transform: ${({ isOpen }) => isOpen ? 'translateX(0)' : 'translateX(calc(-100% + 40px))'};
+    transform: ${({ isOpen }) => isOpen ? 'translateX(0)' : 'translateX(calc(-100%))'};
   }
 `;
 
-// The toggle button is positioned on the left edge of the panel.
-// When open, it shows a '<' icon; when closed, it shows a '>' icon.
 const ToggleButton = styled.button`
   position: absolute;
   top: 80px;
@@ -32,7 +30,6 @@ const ToggleButton = styled.button`
   transform: translate(-50%, -50%);
   width: 40px;
   height: 40px;
-  background-color: rgba(255,255,255,0.1);
   border: none;
   color: #fff;
   font-size: 1.5rem;
@@ -50,12 +47,14 @@ const Content = styled.div`
 const ModelRunsView = ({
   singleRowOn,
   toggleSingleRow,
-  setIsLoading
+  setIsLoading,
+  setIsModelRunListOpen
 }) => {
   const [isOpen, setIsOpen] = useState(true);
 
   const toggleContainer = () => {
     setIsOpen(prev => !prev);
+    setIsModelRunListOpen(prev => !prev);
   };
 
   return (
