@@ -228,8 +228,21 @@ const MapComponent = () => {
             "pauseOnHover": false,
             "autoClose": 1000
           });
+          setNexusPoints(null);
+          setCatchmentConfig(null);
+          setFlowPathsConfig(null);
+          setConusGaugesConfig(null);
+          setSelectedNexusId(null);
+          setSelectedCatchmentId(null);
+          setIsLoading(false);
+          
           return;
         }
+        toast.success("Successfully retrieved Model Run Data", {
+          "closeOnClick": true,
+          "pauseOnHover": false,
+          "autoClose": 1000
+        });
         const { nexus, bounds } = response;
         setNexusPoints(nexus);
 
