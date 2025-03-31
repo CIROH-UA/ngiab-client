@@ -108,10 +108,12 @@ def getGeoSpatialData(request):
     model_run_id = request.GET.get("model_run_id")
 
     # gepackage_file_name = find_gpkg_file(model_run_id)
-    gepackage_file_path = find_gpkg_file_path(model_run_id)
-    print(gepackage_file_path)
-    gdf = gpd.read_file(gepackage_file_path, layer="nexus")
+    try:
+        gepackage_file_path = find_gpkg_file_path(model_run_id)
+    except Exception as e:
+        return JsonResponse({"error": "Failed to read GeoPackage file."})
     # Append ngen_usgs and nwm_usgs columns
+    gdf = gpd.read_file(gepackage_file_path, layer="nexus")
     gdf = append_ngen_usgs_column(gdf, model_run_id)
     gdf = append_nwm_usgs_column(gdf, model_run_id)
 
@@ -122,9 +124,6 @@ def getGeoSpatialData(request):
     bounds = gdf.total_bounds.tolist()
 
     data = json.loads(gdf.to_json())
-
-    # teerh_gdf = gdf[gdf["ngen_usgs"] != "none"]
-    # teerh_data = json.loads(teerh_gdf.to_json())
 
     response_object["nexus"] = data
     response_object["nexus_ids"] = getNexusList(model_run_id)
