@@ -6,6 +6,7 @@ import appAPI from 'services/api/app';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import useTheme from 'hooks/useTheme';
+import { toast } from 'react-toastify';
 
 const onMapLoad = (event) => {
   const map = event.target;
@@ -219,6 +220,16 @@ const MapComponent = () => {
     appAPI
       .getGeoSpatialData({ model_run_id: modelRunsState.base_model_id })
       .then((response) => {
+        
+        if (response.error) {
+          console.error('Error fetching geospatial data:', response.error);
+          toast.error("Error fetching Model Run Data", {
+            "closeOnClick": true,
+            "pauseOnHover": false,
+            "autoClose": 1000
+          });
+          return;
+        }
         const { nexus, bounds } = response;
         setNexusPoints(nexus);
 

@@ -2,7 +2,9 @@ import { Fragment, useState, lazy,Suspense } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
 import { ModelRunsProvider } from 'features/ModelRuns/providers/modelRunsProvider';
 import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
-import SelectionView  from './selections';
+import { ToastContainer } from 'react-toastify';
+
+
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 
 const HydroFabricView = lazy(() => import('./hydroFabricView.js'));
@@ -19,7 +21,7 @@ const NGIABView = () => {
     <Fragment>
         <ModelRunsProvider>
           <HydroFabricProvider>
-              
+            <ToastContainer stacked  />
             <ModelRunsView
               singleRowOn={singleRowOn}
               toggleSingleRow={toggleSingleRow}
