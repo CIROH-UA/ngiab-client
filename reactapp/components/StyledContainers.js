@@ -11,7 +11,7 @@ const StyledHydroFabricContainer = styled.div`
   margin-left: ${(props) => (props.isModelRunListOpen ? '20%' : '0%')};
   padding: 5px;
   background-color: ${(props) =>
-    props.theme === 'dark' ? '#2c3e50' : '#ffffff'};
+    props.theme === 'dark' ? '#4f5b67' : '#ffffff'};
   color: ${(props) => (props.theme === 'dark' ? '#ffffff' : '#000000')};
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
@@ -37,7 +37,7 @@ const StyledHydroFabricPlotContainer = styled.div`
   order: 1;
   flex: 1 1 80%;
   background-color: ${(props) =>
-    props.theme === 'dark' ? '#2c3e50' : '#f9f9f9'};
+    props.theme === 'dark' ? '#4f5b67' : '#f9f9f9'};
 `;
 
 export const HydroFabricPlotContainer = (props) => {
@@ -54,7 +54,7 @@ const StyledSelectContainer = styled.div`
   padding: 5px;
   flex: 1 1 20%;
   background-color: ${(props) =>
-    props.theme === 'dark' ? '#2c3e50' : '#ffffff'};
+    props.theme === 'dark' ? '#4f5b67' : '#ffffff'};
   color: ${(props) => (props.theme === 'dark' ? '#ffffff' : '#000000')};
 `;
 
@@ -85,7 +85,7 @@ const StyledTeehrMetricsWrapper = styled.div`
   height: 100%;
   padding: 10px;
   background-color: ${(props) =>
-    props.theme === 'dark' ? '#2c3e50' : '#f8f8f8'};
+    props.theme === 'dark' ? '#4f5b67' : '#f8f8f8'};
   border-bottom: 1px solid
     ${(props) => (props.theme === 'dark' ? '#444444' : '#ddd')};
   display: flex;
@@ -109,7 +109,7 @@ const StyledTimeSeriesContainer = styled.div`
     left: 0.5rem;
     padding: 10px;
     background-color: ${(props) =>
-      props.theme === 'dark' ? '#2c3e50' : '#f8f8f8'};
+      props.theme === 'dark' ? '#4f5b67' : '#f8f8f8'};
     ${(props) => (props.theme === 'dark' ? '#444444' : '#ddd')};
     width: 300px;
     border-radius: 0.5rem;  

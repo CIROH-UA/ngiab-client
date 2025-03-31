@@ -8,7 +8,7 @@ const TeehrMetricsTable = ({ data }) => {
     const customStyles = {
         header: {
             style: {
-                backgroundColor: theme === 'dark' ? '#2c3e50' : '#ffffff',
+                backgroundColor: theme === 'dark' ? '#4f5b67' : '#ffffff',
                 color: theme === 'dark' ? '#ffffff' : '#000000',
                 fontSize: '16px',
                 fontWeight: 'bold',
@@ -17,7 +17,7 @@ const TeehrMetricsTable = ({ data }) => {
         },
         headRow: {
             style: {
-                backgroundColor: theme === 'dark' ? '#2c3e50' : '#f0f0f0',
+                backgroundColor: theme === 'dark' ? '#4f5b67' : '#f0f0f0',
                 color: theme === 'dark' ? '#ffffff' : '#000000',
                 borderBottomColor: '#d1d5db',
             },
@@ -44,7 +44,7 @@ const TeehrMetricsTable = ({ data }) => {
         },
         pagination: {
             style: {
-                backgroundColor: theme === 'dark' ? '#2c3e50' : '#ffffff',
+                backgroundColor: theme === 'dark' ? '#4f5b67' : '#ffffff',
                 color: theme === 'dark' ? '#ffffff' : '#000000',
             },
         },
