@@ -1,4 +1,3 @@
-import { subset } from 'd3-array';
 import { modelRunActionsTypes } from '../actions/actionsTypes';
 
 const modelRunsInitialStore = {
