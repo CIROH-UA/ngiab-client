@@ -11,30 +11,23 @@ const LineChart = lazy(() => import('../../features/hydroFabric/components/chart
 const TeehrMetricsTable = lazy(() => import('../../features/hydroFabric/components/teehrMetrics'));
 const SelectionView = lazy(() => import('./selections'));
 
-const StyledTabs = styled(Tabs)`
-  /* Modify the entire .nav-tabs region */
-  .nav-tabs {
-    background-color: #f8f9fa;
-    border-bottom: 2px solid #aaa;
+const StyledTabs = styled.div`
+  .nav-tabs .nav-item.show .nav-link,
+  .nav-tabs .nav-link{
+      color: #fff;
+      border-width: 2px;
   }
 
-  /* Style each tab link */
-  .nav-tabs .nav-link {
-    color: #fff;
-    font-weight: 600;
-    border: 1px solid #aaa;
-    border-bottom: none;
-    margin-right: 4px;
-    background: #6b6b6b !important;
-    border-radius: 5px 5px 0 0; /* Rounded top corners */
-  }
-
-  /* Highlight the active tab */
+  .nav-tabs .nav-item.show .nav-link,
   .nav-tabs .nav-link.active {
-    background-color: #fff;
-    color: #000;
-    border-bottom: 2px solid #fff;
+      color: #2c3e50;
+      border-width: 2px;
   }
+
+  .nav-tabs{
+    border-bottom: none;
+  }
+
 `;
 
 /* Returns an array of available tab keys based on the current state */
@@ -66,15 +59,15 @@ const HydroFabricView = () => {
   }, [state, activeKey]);
 
   return (
-    <Fragment>
-      <StyledTabs
+    <StyledTabs>
+      <Tabs
         id="uncontrolled-tab-hydrofabtic"
         activeKey={activeKey}
         onSelect={(k) => setActiveKey(k)}
         className="mb-3"
       >
         {state.nexus.id && (
-          <Tab eventKey="nexus_plot" title="Nexus Plot">
+          <Tab eventKey="nexus_plot" title="Nexus">
             <Suspense fallback={<LoadingAnimation />}>
               <HydroFabricPlotContainer>
                 <ParentSize>
@@ -94,7 +87,7 @@ const HydroFabricView = () => {
           </Tab>
         )}
         {state.catchment.id && (
-          <Tab eventKey="catchment_plot" title="Catchment Plot">
+          <Tab eventKey="catchment_plot" title="Catchment">
             <Suspense fallback={<LoadingAnimation />}>
               <HydroFabricPlotContainer>
                 <ParentSize>
@@ -114,7 +107,7 @@ const HydroFabricView = () => {
           </Tab>
         )}
         {state.troute.variable && (
-          <Tab eventKey="troute_plot" title="Troute Plot">
+          <Tab eventKey="troute_plot" title="Troute">
             <Suspense fallback={<LoadingAnimation />}>
               <HydroFabricPlotContainer>
                 <ParentSize>
@@ -160,8 +153,8 @@ const HydroFabricView = () => {
             </TeehrMetricsWrapper>
           </Tab>
         )}
-      </StyledTabs>
-    </Fragment>
+      </Tabs>
+    </StyledTabs>
   );
 };
 

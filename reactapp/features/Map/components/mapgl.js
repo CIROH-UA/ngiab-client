@@ -137,7 +137,7 @@ const MapComponent = () => {
     source: 'nexus-points',
     filter: ['!', ['has', 'point_count']],
     paint: {
-      'circle-color': theme === 'dark' ? '#2c3e50' : '#1f78b4',
+      'circle-color': theme === 'dark' ? '#4f5b67' : '#1f78b4',
       'circle-radius': 7,
       'circle-stroke-width': 2,
       'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
@@ -153,7 +153,7 @@ const MapComponent = () => {
     type: 'circle',
     source: 'nexus-points',
     paint: {
-      'circle-color': theme === 'dark' ? '#2c3e50' : '#1f78b4',
+      'circle-color': theme === 'dark' ? '#4f5b67' : '#1f78b4',
       'circle-radius': 5,
       'circle-stroke-width': 1,
       'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',

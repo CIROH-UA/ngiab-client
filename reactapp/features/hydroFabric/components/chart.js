@@ -239,7 +239,7 @@ function LineChart({ width, height, data, layout }) {
                         border: '1px solid #ddd',
                         borderRadius: 4,
                         backgroundColor:
-                          theme === 'dark' ? '#2c3e50' : '#f0f0f0',
+                          theme === 'dark' ? '#4f5b67' : '#f0f0f0',
                       }}
                     >
                       <div
@@ -267,10 +267,11 @@ function LineChart({ width, height, data, layout }) {
                   onClick={zoom.reset}
                   style={{
                     backgroundColor:
-                      theme === 'dark' ? '#2c3e50' : '#ffffff',
+                      theme === 'dark' ? '#4f5b67' : '#ffffff',
                     color: theme === 'dark' ? '#ffffff' : '#000000',
+                    border: '1px solid #ddd',
                     fontWeight: 'bold',
-                    border: 'none',
+                    // border: 'none',
                     borderRadius: 4,
                     padding: '4px 8px',
                     cursor: 'pointer',
@@ -334,7 +335,7 @@ function LineChart({ width, height, data, layout }) {
                       fontWeight: 'bold',
                       textAnchor: 'end',
                     })}
-                    label={layout.yaxis}
+                    // label={layout.yaxis}
                     labelProps={{
                       fill:
                         theme === 'dark' ? '#e0e0e0' : '#000000',

@@ -37,7 +37,6 @@ const ModelRunsSelect = (props) => {
     <Fragment>
         {state.model_runs.length > 0 &&
             <Fragment>
-                {/* <h5>Model Runs</h5> */}
                 <SelectComponent 
                   optionsList={state.model_runs} 
                   onChangeHandler={actions.set_current_model_runs}
