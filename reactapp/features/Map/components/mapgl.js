@@ -35,11 +35,24 @@ const onMapLoad = (event) => {
   if (map.getLayer('flowpaths-layer')) {
     map.setFilter('flowpaths-layer', ['any', ['in', 'id', '']]);
   }
+
+  // Ensure highlight layers are on top
+  if (map.getLayer('nexus-highlight')) {
+    map.moveLayer('nexus-highlight');
+  }
+  if (map.getLayer('catchment-highlight')) {
+    map.moveLayer('catchment-highlight');
+  }
 };
 
 const MapComponent = () => {
   const { state: hydroFabricState, actions: hydroFabricActions } = useHydroFabricContext();
   const { state: modelRunsState } = useModelRunsContext();
+
+  // Track selected features (only one can be highlighted at a time)
+  const [selectedNexusId, setSelectedNexusId] = useState(null);
+  const [selectedCatchmentId, setSelectedCatchmentId] = useState(null);
+
   const [nexusPoints, setNexusPoints] = useState(null);
   const [catchmentConfig, setCatchmentConfig] = useState(null);
   const [flowPathsConfig, setFlowPathsConfig] = useState(null);
@@ -58,7 +71,6 @@ const MapComponent = () => {
   const isClustered = !!hydroFabricState.nexus.geometry?.clustered;
   // Are we hiding nexus points entirely?
   const isNexusHidden = !!hydroFabricState.nexus.geometry?.hidden;
-
   // Are we hiding catchments?
   const isCatchmentHidden = !!hydroFabricState.catchment.geometry?.hidden;
 
@@ -92,7 +104,6 @@ const MapComponent = () => {
         35,
       ],
     },
-    // Use layout visibility to hide them if isNexusHidden is true
     layout: {
       visibility: isNexusHidden ? 'none' : 'visible',
     },
@@ -118,7 +129,7 @@ const MapComponent = () => {
     },
   };
 
-  // (3) For cluster mode, leftover single points
+  // (3) For cluster mode, leftover single points (unclustered)
   const unclusteredPointLayer = {
     id: 'unclustered-point',
     type: 'circle',
@@ -146,9 +157,53 @@ const MapComponent = () => {
       'circle-stroke-width': 1,
       'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
     },
-    // Hide them entirely if isNexusHidden is true
     layout: {
       visibility: isNexusHidden ? 'none' : 'visible',
+    },
+  };
+
+  // --------------------------------------------
+  // HIGHLIGHT LAYERS (Only one feature at a time)
+  // --------------------------------------------
+
+  // Highlight for a single *unclustered nexus* point (by ID)
+  const nexusHighlightLayer = {
+    id: 'nexus-highlight',
+    type: 'circle',
+    source: 'nexus-points',
+    // Only highlight unclustered points, matching the "id"
+    filter: selectedNexusId
+      ? [
+          'all',
+          ['!', ['has', 'point_count']], // ensure it's unclustered
+          ['==', ['get', 'id'], selectedNexusId],
+        ]
+      : // fallback: show nothing if no selection
+        ['==', ['get', 'id'], ''],
+    paint: {
+      'circle-radius': 10,
+      'circle-stroke-width': 3,
+      'circle-stroke-color': '#ffffff',
+      'circle-color': '#ff0000', // highlight color
+    },
+  };
+
+  // Highlight for a single catchment (by divide_id)
+  const catchmentHighlightLayer = {
+    id: 'catchment-highlight',
+    type: 'fill',
+    source: 'hydrofabric',
+    'source-layer': 'conus_divides',
+    filter: selectedCatchmentId
+      ? ['==', ['get', 'divide_id'], selectedCatchmentId]
+      : ['==', ['get', 'divide_id'], ''],
+    paint: {
+      'fill-color': '#ff0000',
+      'fill-outline-color': '#ffffff',
+      'fill-opacity': 0.5,
+    },
+    layout: {
+      visibility: isCatchmentHidden ? 'none' : 'visible',
     },
   };
 
@@ -193,7 +248,6 @@ const MapComponent = () => {
                 : ['rgba', 91, 44, 111, 0.7],
             'fill-opacity': { stops: [[7, 0], [11, 1]] },
           },
-          // If isCatchmentHidden is true, hide the layer
           layout: {
             visibility: isCatchmentHidden ? 'none' : 'visible',
           },
@@ -233,7 +287,6 @@ const MapComponent = () => {
                 : ['rgba', 100, 100, 100, 1],
             'circle-opacity': { stops: [[3, 0], [9, 1]] },
           },
-          // (You didn't mention hiding these, but you could if you wanted)
         };
         setConusGaugesConfig(conusGaugesLayerConfig);
       })
@@ -253,10 +306,9 @@ const MapComponent = () => {
     const map = event.target;
     const isClusteredNow = !!hydroFabricState.nexus.geometry?.clustered;
 
-    // If cluster is on, query cluster layers
-    // If cluster is off, query all-points
-    // We'll always check 'catchments-layer', if not hidden
-    // (Though if it's hidden, there's no layer to click.)
+    // If cluster is on, query cluster layers + unclustered leftover
+    // If cluster is off, query the no-cluster layer
+    // Also always check 'catchments-layer'
     const layersToQuery = isClusteredNow
       ? ['unclustered-point', 'clusters', 'catchments-layer']
       : ['all-points', 'catchments-layer'];
@@ -266,13 +318,20 @@ const MapComponent = () => {
 
     for (const feature of features) {
       const layerId = feature.layer.id;
+
       if (layerId === 'all-points' || layerId === 'unclustered-point') {
-        // Single point
+        // Single nexus point (unclustered)
         hydroFabricActions.reset_teehr();
         hydroFabricActions.reset_troute();
+
         const nexus_id = feature.properties.id;
         hydroFabricActions.set_nexus_id(nexus_id);
         hydroFabricActions.set_troute_id(nexus_id);
+
+        // We only highlight a single layer at a time
+        setSelectedNexusId(nexus_id);
+        setSelectedCatchmentId(null);
+
         if (feature.properties.ngen_usgs !== 'none') {
           hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);
         }
@@ -287,19 +346,27 @@ const MapComponent = () => {
           speed: 1.2,
           curve: 1,
         });
+        // No highlight for a cluster
         return;
       } else if (layerId === 'catchments-layer') {
         // It's a catchment
         hydroFabricActions.reset_teehr();
         hydroFabricActions.reset_troute();
-        hydroFabricActions.set_catchment_id(feature.properties.divide_id);
-        hydroFabricActions.set_troute_id(feature.properties.divide_id);
+
+        const divide_id = feature.properties.divide_id;
+        hydroFabricActions.set_catchment_id(divide_id);
+        hydroFabricActions.set_troute_id(divide_id);
+
+        // We only highlight a single layer at a time
+        setSelectedCatchmentId(divide_id);
+        setSelectedNexusId(null);
+
         return;
       }
     }
   };
 
-  // We set a dynamic key so the source re-mounts if isClustered changes
+  // Re-mount the source if isClustered changes
   const sourceKey = isClustered ? 'clustered-nexus' : 'unclustered-nexus';
 
   return (
@@ -317,13 +384,20 @@ const MapComponent = () => {
       onLoad={onMapLoad}
     >
       {/* Vector layers: catchments, flowpaths, gauges */}
-      <Source id="conus" type="vector" url="pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles">
+      <Source
+        id="conus"
+        type="vector"
+        url="pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles"
+      >
         {catchmentConfig && <Layer {...catchmentConfig} />}
         {flowPathsConfig && <Layer {...flowPathsConfig} />}
         {conusGaugesConfig && <Layer {...conusGaugesConfig} />}
+
+        {/* Catchment highlight layer (on top of normal catchments) */}
+        <Layer {...catchmentHighlightLayer} />
       </Source>
 
-      {/* If we have nexusPoints, show them either cluster or unclustered */}
+      {/* If we have nexusPoints, show them (clustered or not) */}
       {nexusPoints && (
         <Source
           key={sourceKey}
@@ -336,13 +410,22 @@ const MapComponent = () => {
         >
           {isClustered ? (
             <>
-              {/* 3 layers: cluster circles, cluster labels, leftover unclustered */}
+              {/* cluster circles, cluster labels, leftover unclustered */}
               <Layer {...clusterLayer} />
               <Layer {...clusterCountLayer} />
               <Layer {...unclusteredPointLayer} />
+
+              {/* Nexus highlight layer only for unclustered points */}
+              <Layer {...nexusHighlightLayer} />
             </>
           ) : (
-            <Layer {...allPointsNoClusterLayer} />
+            <>
+              {/* non-clustered points */}
+              <Layer {...allPointsNoClusterLayer} />
+
+              {/* Nexus highlight layer */}
+              <Layer {...nexusHighlightLayer} />
+            </>
           )}
         </Source>
       )}
