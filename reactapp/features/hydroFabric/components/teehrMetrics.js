@@ -65,7 +65,6 @@ const TeehrMetricsTable = ({ data }) => {
 
     return (
         <DataTable
-            title="Teehr Metrics"
             columns={columns}
             data={data}
             defaultSortField="metric"
