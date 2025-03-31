@@ -20,9 +20,9 @@ def _get_list_model_runs():
                     "label": "run1",
                     "path": "/home/aquagio/tethysdev/ciroh/ngen/ngen-data/AWI_16_2863657_007",
                     "date": "2021-01-01:00:00:00",
-                    "subset": "cat-2863657_subset",
-                    "tags": ["tag1", "tag2"],
-                    "id": "AWI_16_2863657_007_agas_asgasg_asfgasfg"
+                    "id": "AWI_16_2863657_007",
+                    "subset": "cat-2863657_subset", #to_implement
+                    "tags": ["tag1", "tag2"], #to_implement
                 },
                 ....
             ]
