@@ -36,7 +36,7 @@ const HydrofabricMapControl = ({
     
     <Fragment>
         <StyledControllerContainer isVisible={isVisible}>        
-          <h6>Layers</h6>
+          <h6>Layer's Control</h6>
           <StyledSwitch
             label="Nexus Layer"
             id="nexus-layer-switch"
