@@ -2,6 +2,10 @@
 
 This app was created using an experimental Tethys + React app scaffold. It uses React for the frontend of the app and Tethys as the backend.
 
+| | |
+| --- | --- |
+| ![CIROH Logo](https://ciroh.ua.edu/wp-content/uploads/2022/08/CIROHLogo_200x200.png) | Funding for this project was provided by the National Oceanic & Atmospheric Administration (NOAA), awarded to the Cooperative Institute for Research to Operations in Hydrology (CIROH) through the NOAA Cooperative Agreement with The University of Alabama (NA22NWS4320003). |
+
 ## Development Installation
 
 You need to install both the Tethys dependencies and the node dependencies:
