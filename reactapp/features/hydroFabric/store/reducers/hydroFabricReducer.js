@@ -152,6 +152,65 @@ const hydroFabricReducer = (state, action) => {
           }
         }
       };
+    // NEW: Show/hide nexus
+    case hydroFabricActionsTypes.show_nexus_geometry:
+      return {
+        ...state,
+        state: {
+          ...state.state,
+          nexus: {
+            ...state.state.nexus,
+            geometry: {
+              ...state.state.nexus.geometry,
+              hidden: false
+            }
+          }
+        }
+      };
+    case hydroFabricActionsTypes.hide_nexus_geometry:
+      return {
+        ...state,
+        state: {
+          ...state.state,
+          nexus: {
+            ...state.state.nexus,
+            geometry: {
+              ...state.state.nexus.geometry,
+              hidden: true
+            }
+          }
+        }
+      };
+    // OPTIONAL: enable/disable clustering
+    case hydroFabricActionsTypes.enable_nexus_geometry_clusters:
+      return {
+        ...state,
+        state: {
+          ...state.state,
+          nexus: {
+            ...state.state.nexus,
+            geometry: {
+              ...state.state.nexus.geometry,
+              clustered: true
+            }
+          }
+        }
+      };
+    case hydroFabricActionsTypes.disable_nexus_geometry_clusters:
+      return {
+        ...state,
+        state: {
+          ...state.state,
+          nexus: {
+            ...state.state.nexus,
+            geometry: {
+              ...state.state.nexus.geometry,
+              clustered: false
+            }
+          }
+        }
+      };
+
     case hydroFabricActionsTypes.reset_nexus:
       return {
         ...state,
@@ -168,14 +227,13 @@ const hydroFabricReducer = (state, action) => {
                 title: null
               }
             },
-            geometry:{
+            geometry: {
               clustered: true,
               hidden: false
             }
           }
         }
       };
-
 
     // -----------------------------
     // CATCHMENT
@@ -267,6 +325,36 @@ const hydroFabricReducer = (state, action) => {
         }
       };
 
+    // NEW: show/hide catchment
+    case hydroFabricActionsTypes.show_catchment_geometry:
+      return {
+        ...state,
+        state: {
+          ...state.state,
+          catchment: {
+            ...state.state.catchment,
+            geometry: {
+              ...state.state.catchment.geometry,
+              hidden: false
+            }
+          }
+        }
+      };
+    case hydroFabricActionsTypes.hide_catchment_geometry:
+      return {
+        ...state,
+        state: {
+          ...state.state,
+          catchment: {
+            ...state.state.catchment,
+            geometry: {
+              ...state.state.catchment.geometry,
+              hidden: true
+            }
+          }
+        }
+      };
+
     case hydroFabricActionsTypes.reset_catchment:
       return {
         ...state,
@@ -285,13 +373,12 @@ const hydroFabricReducer = (state, action) => {
                 title: null
               }
             },
-            geometry:{
+            geometry: {
               hidden: false
             },
           }
         }
       };
-
     // -----------------------------
     // T-ROUTE
     // -----------------------------
