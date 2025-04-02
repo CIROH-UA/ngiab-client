@@ -5,7 +5,7 @@ on:
     branches:
       - hpc-compatible
       - multiple-runs
-      
+
   workflow_dispatch:
 
 jobs:
@@ -87,12 +87,4 @@ jobs:
            # Clean up
            rm "$TOKEN_FILE"
         
-      - name: Login and Push to Github Registry
-        env:
-          REGISTRY: ghcr.io
-          IMAGE_NAME: ${{ github.repository }}
-          GHCR_USERNAME: ${{ github.actor }}
-        run: |         
-              echo ${{ secrets.GITHUB_TOKEN }} | singularity remote login -u ${{ env.GHCR_USERNAME }} --password-stdin oras://${{ env.REGISTRY }}
-              singularity push container.sif oras://${{ env.REGISTRY }}/${{ IMAGE_NAME }}:latest_x86
             
