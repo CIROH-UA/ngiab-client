@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - hpc-compatible
-  pull_request:
-    branches: [ main ]
+      - multiple-runs
+      
   workflow_dispatch:
 
 jobs:

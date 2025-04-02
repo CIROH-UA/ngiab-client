@@ -37,6 +37,7 @@ From: gioelkin/tethys-ngiab:dev-r1
     export CSRF_TRUSTED_ORIGINS="\"[http://localhost:8080, http://127.0.0.1:8080]\""
     export MICRO_TETHYS=true
     export TETHYS_PERSIST="/var/lib/tethys_persist"
+    export VISUALIZER_CONF="$TETHYS_PERSIST/ngiab_visualizer.json"
     export NGINX_PORT=8080
     export TETHYS_PORT=8000
     export CLIENT_MAX_BODY_SIZE='512M'
@@ -58,6 +59,7 @@ From: gioelkin/tethys-ngiab:dev-r1
 %post
     export TETHYS_HOME="/usr/lib/tethys"
     export TETHYS_PERSIST="/var/lib/tethys_persist"
+    export VISUALIZER_CONF="$TETHYS_PERSIST/ngiab_visualizer.json"
     export SKIP_DB_SETUP=true
     export MICRO_TETHYS=true
     export NVM_DIR=/usr/local/nvm
