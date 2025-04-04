@@ -28,20 +28,6 @@ const Container = styled.div`
   }
 `;
 
-// const ToggleButton = styled.button`
-//   position: absolute;
-//   top: 80px;
-//   left: 25px;
-//   transform: translate(-50%, -50%);
-//   width: 40px;
-//   height: 40px;
-//   border: none;
-//   color: #fff;
-//   font-size: 1.5rem;
-//   cursor: pointer;
-//   border-radius: 4px;
-//   z-index: 1001;
-// `;
 const ToggleButton = styled(Button)`
   top: 80px;
   left: 25px;
