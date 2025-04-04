@@ -5,11 +5,11 @@ import useTheme from 'hooks/useTheme';
 // HydroFabricContainer
 const StyledHydroFabricContainer = styled.div`
   flex: ${(props) => (props.fullScreen ? '1 1 0%' : '1 1 40%')};
-  height: 40%;
+  height: ${(props) => (props.fullScreen ? '0' : '40%;')};
   order: 2;
   width: ${(props) => (props.isModelRunListOpen ? '80%' : '100%')};
   margin-left: ${(props) => (props.isModelRunListOpen ? '20%' : '0%')};
-  padding: 5px;
+  padding: ${(props) => (props.fullScreen ? '0px' : '5px;')}; 
   background-color: ${(props) =>
     props.theme === 'dark' ? '#4f5b67' : '#ffffff'};
   color: ${(props) => (props.theme === 'dark' ? '#ffffff' : '#000000')};

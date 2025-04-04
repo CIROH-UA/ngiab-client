@@ -12,7 +12,6 @@ const NexusSelect = (props) => {
 
   useEffect(() => {
     if (!state.nexus.id) return;
-    actions.reset_catchment();
     var params = {
       nexus_id: state.nexus.id,
       model_run_id: modelRunsState.base_model_id

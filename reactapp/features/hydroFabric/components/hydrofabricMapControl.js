@@ -1,5 +1,5 @@
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
-import { Fragment } from 'react';
+import { Fragment, useEffect } from 'react';
 import Form from 'react-bootstrap/Form';
 import styled from 'styled-components';
 
@@ -32,6 +32,7 @@ const HydrofabricMapControl = ({
     actions.toggle_catchment_geometry_hidden();
   };
 
+
   return (
     
     <Fragment>
@@ -40,21 +41,21 @@ const HydrofabricMapControl = ({
           <StyledSwitch
             label="Nexus Layer"
             id="nexus-layer-switch"
-            checked={!state.nexus?.geometry?.hidden ?? true}
+            checked={!state.nexus.geometry.hidden}
             onChange={handleToggleNexusLayer}
             title="Toggle Nexus Layer visualization"
           />
           <StyledSwitch
             label="Nexus Clustering"
             id="nexus-clustering-switch"
-            checked={state.nexus?.geometry?.clustered ?? false}
+            checked={state.nexus.geometry.clustered}
             onChange={handleToggleNexusClustering}
             title="Toggle nexus clustering visualization"
           />
           <StyledSwitch
             label="Catchment Layer"
             id="catchment-layer-switch"
-            checked={!state.catchment?.geometry?.hidden ?? true}
+            checked={!state.catchment.geometry.hidden}
             onChange={handleToggleCatchmentLayer}
             title="Toggle Catchment Layer visualization"
           />
