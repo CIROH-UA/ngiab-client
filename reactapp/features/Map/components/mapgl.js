@@ -244,10 +244,13 @@ const MapComponent = () => {
       .then((response) => {
         if (response.error) {
           toast.error("Error fetching Model Run Data", { autoClose: 1000 });
+          hydroFabricActions.reset();
           setNexusPoints(null);
           setCatchmentsFilterIds(null);
           setFlowPathsFilterIds(null);
           setNexusFilterIds(null);
+          setSelectedCatchmentId(null);
+          setSelectedNexusId(null);
           return;
         }
 
