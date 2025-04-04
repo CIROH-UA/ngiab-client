@@ -14,7 +14,6 @@ const CatchmentSelect = (props) => {
 
   useEffect(() => {
     if (!state.catchment.id) return;
-    actions.reset_nexus();
     props.setIsLoading(true);
     var params = {
       catchment_id: state.catchment.id,

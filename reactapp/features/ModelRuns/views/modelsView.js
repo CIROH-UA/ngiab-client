@@ -4,6 +4,9 @@ import ModelRunsSelect from 'features/ModelRuns/components/modelRunsSelect';
 import TimeSeriesSelection from 'features/ModelRuns/components/timeSeriesSelect';
 import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
 import { useModelRunsContext } from '../hooks/useModelRunsContext';
+import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import Button from 'react-bootstrap/Button';
+
 const Container = styled.div`
   position: absolute;
   top: 0;
@@ -25,20 +28,41 @@ const Container = styled.div`
   }
 `;
 
-const ToggleButton = styled.button`
-  position: absolute;
+// const ToggleButton = styled.button`
+//   position: absolute;
+//   top: 80px;
+//   left: 25px;
+//   transform: translate(-50%, -50%);
+//   width: 40px;
+//   height: 40px;
+//   border: none;
+//   color: #fff;
+//   font-size: 1.5rem;
+//   cursor: pointer;
+//   border-radius: 4px;
+//   z-index: 1001;
+// `;
+const ToggleButton = styled(Button)`
   top: 80px;
   left: 25px;
+  position: absolute;
+
   transform: translate(-50%, -50%);
-  width: 40px;
-  height: 40px;
+  background-color: #2c3e50;
   border: none;
-  color: #fff;
-  font-size: 1.5rem;
-  cursor: pointer;
-  border-radius: 4px;
+  color: white;
+  border-radius: 5px;
+  padding: 7px 8px;
   z-index: 1001;
+
+  &:hover, &:focus {
+    background-color: rgba(0, 0, 0, 0.1)!important;
+    color: white;
+    border: none;
+    box-shadow: none;
+  }
 `;
+
 
 // Content inside the panel.
 const Content = styled.div`
@@ -65,7 +89,7 @@ const ModelRunsView = ({
   return (
     <Fragment>
     <ToggleButton onClick={toggleContainer}>
-    {isOpen ? '<' : '>'}
+    {isOpen ? <FaChevronLeft size={20} /> : <FaChevronRight size={20} />}
   </ToggleButton>
     <Container isOpen={isOpen}>
 
