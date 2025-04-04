@@ -15,6 +15,7 @@ const StyledControllerContainer = styled.div`
 
 const StyledSwitch = styled(Form.Switch)`
     margin-top: 10px;  
+
 `;
 
 const HydrofabricMapControl = ({
