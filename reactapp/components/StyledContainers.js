@@ -5,7 +5,8 @@ import useTheme from 'hooks/useTheme';
 // HydroFabricContainer
 const StyledHydroFabricContainer = styled.div`
   flex: ${(props) => (props.fullScreen ? '1 1 0%' : '1 1 40%')};
-  height: ${(props) => (props.fullScreen ? '0' : '40%;')};
+  height: ${(props) => (props.fullScreen ? '0%' : '40%;')};
+  // display: ${(props) => (props.fullScreen ? 'none' : 'block')};
   order: 2;
   width: ${(props) => (props.isModelRunListOpen ? '80%' : '100%')};
   margin-left: ${(props) => (props.isModelRunListOpen ? '20%' : '0%')};

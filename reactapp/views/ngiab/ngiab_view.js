@@ -32,6 +32,13 @@ const ToggleButton = styled(Button)`
   }
 `;
 
+const ViewContainer = styled.div`
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+`;
+
 
 const NGIABView = () => {
   const [singleRowOn, toggleSingleRow] = useState(true);
@@ -39,7 +46,7 @@ const NGIABView = () => {
   const [ isLoading, setIsLoading ] = useState(false);
 
   return (
-    <Fragment>
+    <ViewContainer>
         <ModelRunsProvider>
           <HydroFabricProvider>
             <ToastContainer stacked  />
@@ -64,9 +71,7 @@ const NGIABView = () => {
                 </ToggleButton>
                 <Suspense fallback={<LoadingAnimation />}>
                   <HydroFabricView 
-                    toggleSingleRow = {toggleSingleRow} 
                     singleRowOn={singleRowOn} 
-                    setIsLoading={setIsLoading} 
                   />
                 </Suspense>
               </HydroFabricContainer>
@@ -74,7 +79,7 @@ const NGIABView = () => {
         </ModelRunsProvider>
 
 
-    </Fragment>
+    </ViewContainer>
   );
 };
 
