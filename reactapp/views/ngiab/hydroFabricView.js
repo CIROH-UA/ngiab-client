@@ -9,7 +9,14 @@ import ParentSize from '@visx/responsive/lib/components/ParentSize';
 
 const LineChart = lazy(() => import('../../features/hydroFabric/components/chart'));
 const TeehrMetricsTable = lazy(() => import('../../features/hydroFabric/components/teehrMetrics'));
-const SelectionView = lazy(() => import('./selections'));
+
+
+const ViewContainer = styled.div`
+  height: 100%;
+  width: 100%;
+  display: ${(props) => (props.fullScreen ? 'none' : 'block')};
+`;
+
 
 const StyledTabs = styled.div`
   .nav-tabs .nav-item.show .nav-link,
@@ -41,7 +48,7 @@ const getAvailableTabs = (state) => {
   return tabs;
 };
 
-const HydroFabricView = () => {
+const HydroFabricView = ({singleRowOn}) => {
   const { state } = useHydroFabricContext();
   
   // Compute available tabs from the state
@@ -59,6 +66,7 @@ const HydroFabricView = () => {
   }, [state, activeKey]);
 
   return (
+    <ViewContainer fullScreen={singleRowOn}>
     <StyledTabs>
       <Tabs
         id="uncontrolled-tab-hydrofabtic"
@@ -155,6 +163,7 @@ const HydroFabricView = () => {
         )}
       </Tabs>
     </StyledTabs>
+    </ViewContainer>
   );
 };
 
