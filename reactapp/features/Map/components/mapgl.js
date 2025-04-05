@@ -219,7 +219,7 @@ const MapComponent = () => {
           source="nexus-points"
           paint={{
             'circle-color': theme === 'dark' ? '#4f5b67' : '#1f78b4',
-            'circle-radius': 5,
+            'circle-radius': 7,
             'circle-stroke-width': 1,
             'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
           }}
