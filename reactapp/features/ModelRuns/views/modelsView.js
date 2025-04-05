@@ -34,7 +34,7 @@ const ToggleButton = styled(Button)`
   position: absolute;
 
   transform: translate(-50%, -50%);
-  background-color: #2c3e50;
+  background-color: rgba(255, 255, 255, 0.1);
   border: none;
   color: white;
   border-radius: 5px;
