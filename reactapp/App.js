@@ -3,10 +3,10 @@ import { Route } from 'react-router-dom';
 import ErrorBoundary from 'components/error/ErrorBoundary';
 import Layout from 'components/layout/Layout';
 import Loader from 'components/loader/Loader';
+import 'App.scss';
 
 import NGIABView from 'views/ngiab/ngiab_view';
 
-import 'App.scss';
 
 function App() {
   const PATH_HOME = '/';

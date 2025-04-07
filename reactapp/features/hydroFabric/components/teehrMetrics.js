@@ -8,7 +8,7 @@ const TeehrMetricsTable = ({ data }) => {
     const customStyles = {
         header: {
             style: {
-                backgroundColor: theme === 'dark' ? '#2c3e50' : '#ffffff',
+                backgroundColor: theme === 'dark' ? '#4f5b67' : '#ffffff',
                 color: theme === 'dark' ? '#ffffff' : '#000000',
                 fontSize: '16px',
                 fontWeight: 'bold',
@@ -17,21 +17,21 @@ const TeehrMetricsTable = ({ data }) => {
         },
         headRow: {
             style: {
-                backgroundColor: theme === 'dark' ? '#2c3e50' : '#f0f0f0',
+                backgroundColor: theme === 'dark' ? '#4f5b67' : '#f0f0f0',
                 color: theme === 'dark' ? '#ffffff' : '#000000',
                 borderBottomColor: '#d1d5db',
             },
         },
         rows: {
             style: {
-                backgroundColor: theme === 'dark' ? '#1f1f1f' : '#ffffff',
+                backgroundColor: theme === 'dark' ? '#4f5b67' : '#4f5b67',
                 '&:nth-of-type(odd)': {
-                    backgroundColor: theme === 'dark' ? '#2c2c2c' : '#f9f9f9',
+                    backgroundColor: theme === 'dark' ? '#4f5b67' : '#4f5b67',
                 },
             },
             highlightOnHoverStyle: {
-                backgroundColor: theme === 'dark' ? '#333333' : '#f5f5f5',
-                color: theme === 'dark' ? '#ffffff' : '#333333',
+                backgroundColor: '#7c8895',
+                color: '#fff',
                 transitionDuration: '0.15s',
                 transitionProperty: 'background-color, color',
             },
@@ -44,7 +44,7 @@ const TeehrMetricsTable = ({ data }) => {
         },
         pagination: {
             style: {
-                backgroundColor: theme === 'dark' ? '#2c3e50' : '#ffffff',
+                backgroundColor: theme === 'dark' ? '#4f5b67' : '#ffffff',
                 color: theme === 'dark' ? '#ffffff' : '#000000',
             },
         },
@@ -65,7 +65,6 @@ const TeehrMetricsTable = ({ data }) => {
 
     return (
         <DataTable
-            title="Teehr Metrics"
             columns={columns}
             data={data}
             defaultSortField="metric"

@@ -1,0 +1,137 @@
+Bootstrap: docker
+From: gioelkin/tethys-ngiab:dev-r1
+
+%files
+    .git                                        /usr/lib/tethys/apps/ngiab/.git
+    .gitignore                                  /usr/lib/tethys/apps/ngiab/.gitignore
+    reactapp                                    /usr/lib/tethys/apps/ngiab/reactapp
+    tethysapp                                   /usr/lib/tethys/apps/ngiab/tethysapp
+    install.yml                                 /usr/lib/tethys/apps/ngiab/install.yml
+    pyproject.toml                              /usr/lib/tethys/apps/ngiab/pyproject.toml
+    package-lock.json                           /usr/lib/tethys/apps/ngiab/package-lock.json
+    package.json                                /usr/lib/tethys/apps/ngiab/package.json
+    pdm.lock                                    /usr/lib/tethys/apps/ngiab/pdm.lock
+    jsconfig.json                               /usr/lib/tethys/apps/ngiab/jsconfig.json
+
+    singularity/salt/tethyscore.sls             /srv/salt/tethyscore.sls
+    singularity/salt/post_app.sls               /srv/salt/post_app.sls
+    singularity/run.sh                          /usr/lib/tethys/run.sh
+    salt/patches.sls                            /srv/salt/patches.sls
+    salt/top.sls                                /srv/salt/top.sls
+    
+%environment
+    # Database configuration
+    export SHELL="/bin/bash"
+    export TETHYS_DB_ENGINE="django.db.backends.sqlite3"
+    export SKIP_DB_SETUP=true
+    export TETHYS_DB_NAME=""
+    export TETHYS_DB_USERNAME=""
+    export TETHYS_DB_PASSWORD=""
+    export TETHYS_DB_HOST=""
+    export TETHYS_DB_PORT=""
+    # Portal configuration
+    export TETHYS_HOME="/usr/lib/tethys"
+    export ENABLE_OPEN_PORTAL=True
+    export PORTAL_SUPERUSER_NAME="admin"
+    export PORTAL_SUPERUSER_PASSWORD="pass"
+    export CSRF_TRUSTED_ORIGINS="\"[http://localhost:8080, http://127.0.0.1:8080]\""
+    export MICRO_TETHYS=true
+    export TETHYS_PERSIST="/var/lib/tethys_persist"
+    export VISUALIZER_CONF="$TETHYS_PERSIST/ngiab_visualizer.json"
+    export NGINX_PORT=8080
+    export TETHYS_PORT=8000
+    export CLIENT_MAX_BODY_SIZE='512M'
+    # System paths
+    export CONDA_ENV_PATH="/opt/conda/envs/tethys"
+    export PROJ_LIB="${CONDA_ENV_PATH}/share/proj"
+    export NVM_DIR="/usr/local/nvm"
+    export NODE_VERSION="20.12.2"
+    export NODE_VERSION_DIR="$NVM_DIR/versions/node/v${NODE_VERSION}"
+    export NODE_PATH="$NODE_VERSION_DIR/lib/node_modules"
+    export PATH="$NODE_VERSION_DIR/bin:$PATH"
+    export NPM="$NODE_VERSION_DIR/bin/npm"
+    export PDM="/root/.local/bin/pdm"
+    export APP_SRC_ROOT="$TETHYS_HOME/apps/ngiab"
+    export CONDA_TETHYS_PATH="/opt/conda/envs/tethys/bin/tethys"
+    export PATH="/opt/conda/envs/tethys/bin:$PATH"
+    export PATH=$PDM:$PATH
+    export NGINX_USER=www
+%post
+    export TETHYS_HOME="/usr/lib/tethys"
+    export TETHYS_PERSIST="/var/lib/tethys_persist"
+    export VISUALIZER_CONF="$TETHYS_PERSIST/ngiab_visualizer.json"
+    export SKIP_DB_SETUP=true
+    export MICRO_TETHYS=true
+    export NVM_DIR=/usr/local/nvm
+    export NODE_VERSION=20.12.2
+    export NODE_VERSION_DIR=${NVM_DIR}/versions/node/v${NODE_VERSION}
+    export PATH=${NODE_VERSION_DIR}/bin:$PATH
+    export PDM="/root/.local/bin/pdm"
+    export APP_SRC_ROOT="$TETHYS_HOME/apps/ngiab"
+    export NPM="$NODE_VERSION_DIR/bin/npm"
+    export CONDA_ENV_PATH="/opt/conda/envs/tethys"
+    export PATH="/opt/conda/envs/tethys/bin:$PATH"
+    export PATH=$PDM:$PATH
+    export NGINX_USER=www
+    # Commands that are run only during the image build process
+
+    #Install nvm
+    mkdir -p $NVM_DIR
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | /bin/bash
+    . $NVM_DIR/nvm.sh
+    nvm install $NODE_VERSION
+    nvm alias default $NODE_VERSION
+    nvm use default
+    
+
+    cd $APP_SRC_ROOT
+    $NPM install
+    $NPM run build
+    rm -rf node_modules
+
+    pip install --user pdm
+    $PDM self update
+    $PDM use -f $CONDA_ENV_PATH && $PDM install --no-editable --production
+    
+    # Set permissions for the Salt directories
+    #https://docs.saltproject.io/en/latest/ref/configuration/nonroot.html
+    chmod -R 777 /etc/salt /var/cache/salt /var/log/salt /var/run/salt
+
+    # Set permissions for the Tethys directories, this is done on the Tethys_Persist_Permissions salt job at post_app.sls
+    chown -R $NGINX_USER: $TETHYS_PERSIST $TETHYS_HOME && chmod -R 777 $TETHYS_HOME $TETHYS_PERSIST
+    
+    # Set permissions for the ASGI and Nginx directories
+    # The directory creation of /run/asgi and the change of permissions cover the tethyscore.sls job /run/asgi
+    mkdir -p /run/asgi
+    mkdir -p /var/lib/nginx/body
+    chmod -R 777 /run /var/lib/nginx
+
+    # Remove the user=www line from the Supervisor config, no needed since is not the user that runs the process
+    sed -i '/^\s*user\s*=\s*www\s*$/d' /etc/supervisor/supervisord.conf
+
+    ## nginx and supervisor permission
+    chmod -R 777 /etc/nginx /etc/supervisor
+
+    ## supervisor logs
+    ## /var/log needs to have write permissions or supervisor will not be able to write the logs, and it will fail to start the nginx and asgi process
+    touch /var/log/supervisor/supervisord.log
+    chmod -R 777 /var/log/supervisor
+
+    ## nginx logs
+    chmod -R 777 /var/log/nginx/
+
+    # tethys logs
+    touch /var/log/tethys/tethys.log
+    # This is a salt stack job to create an change permissions at /var/log/tethys/tethys.log on tethyscore.sls
+    chown -R $NGINX_USER:$NGINX_USER /var/log/tethys/tethys.log
+    chmod 777 /var/log/tethys/tethys.log
+    
+    touch /var/log/tethys/salt.log
+    chmod 777 /var/log/tethys/salt.log
+
+
+    echo "***** Build tasks completed in %post *****"
+
+%startscript
+    echo "Container starting..."
+    exec /usr/lib/tethys/run.sh 2>&1 | tee /var/log/tethys/salt.log

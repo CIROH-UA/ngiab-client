@@ -12,6 +12,7 @@ import {
   TooltipWithBounds,
   defaultStyles,
 } from '@visx/tooltip';
+import { LuExpand } from "react-icons/lu";
 import { localPoint } from '@visx/event';
 import { GlyphCircle } from '@visx/glyph';
 import { timeParse, timeFormat } from 'd3-time-format';
@@ -22,7 +23,7 @@ import useTheme from 'hooks/useTheme'; // Adjust the import path as needed
 function LineChart({ width, height, data, layout }) {
   const theme = useTheme();
   const visxTheme = theme === 'dark' ? darkTheme : lightTheme;
-
+  
   // Tooltip parameters
   const {
     tooltipData,
@@ -238,7 +239,7 @@ function LineChart({ width, height, data, layout }) {
                         border: '1px solid #ddd',
                         borderRadius: 4,
                         backgroundColor:
-                          theme === 'dark' ? '#2c3e50' : '#f0f0f0',
+                          theme === 'dark' ? '#4f5b67' : '#f0f0f0',
                       }}
                     >
                       <div
@@ -266,16 +267,18 @@ function LineChart({ width, height, data, layout }) {
                   onClick={zoom.reset}
                   style={{
                     backgroundColor:
-                      theme === 'dark' ? '#2c3e50' : '#ffffff',
+                      theme === 'dark' ? '#4f5b67' : '#ffffff',
                     color: theme === 'dark' ? '#ffffff' : '#000000',
+                    border: '1px solid #ddd',
                     fontWeight: 'bold',
-                    border: 'none',
+                    // border: 'none',
                     borderRadius: 4,
                     padding: '4px 8px',
                     cursor: 'pointer',
                   }}
                 >
-                  Reset Zoom
+                  <LuExpand size={20} />
+
                 </button>
               </div>
 
@@ -293,15 +296,6 @@ function LineChart({ width, height, data, layout }) {
                   y={0}
                   width={innerWidth}
                   height={innerHeight}
-                />
-                {/* Background */}
-                <rect
-                  x={0}
-                  y={0}
-                  width={width}
-                  height={height}
-                  fill={theme === 'dark' ? '#34495e' : '#ffffff'}
-                  rx={14}
                 />
                 <Group left={margin.left} top={margin.top}>
                   <GridRows
@@ -341,7 +335,7 @@ function LineChart({ width, height, data, layout }) {
                       fontWeight: 'bold',
                       textAnchor: 'end',
                     })}
-                    label={layout.yaxis}
+                    // label={layout.yaxis}
                     labelProps={{
                       fill:
                         theme === 'dark' ? '#e0e0e0' : '#000000',

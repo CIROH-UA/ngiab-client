@@ -18,9 +18,10 @@ from .utils import (
     get_teehr_metrics,
     get_usgs_from_ngen_id,
     getCatchmentsList,
-    find_gpkg_file,
+    find_gpkg_file_path,
     append_ngen_usgs_column,
     append_nwm_usgs_column,
+    get_model_runs_selectable
 )
 
 from .app import App
@@ -39,11 +40,21 @@ def home(request):
     return App.render(request, "index.html")
 
 
-@controller(app_workspace=True)
-def getCatchmentTimeSeries(request, app_workspace):
+
+@controller
+def getModelRuns(request):
+    model_run_select =  get_model_runs_selectable()
+    return JsonResponse({
+        "model_runs": model_run_select
+    })
+
+
+@controller
+def getCatchmentTimeSeries(request):
+    model_run_id = request.GET.get("model_run_id")
     catchment_id = request.GET.get("catchment_id")
     variable_column = request.GET.get("variable_column")
-    base_output_path = get_base_output(app_workspace)
+    base_output_path = get_base_output(model_run_id)
 
     catchment_output_file_path = os.path.join(
         base_output_path,
@@ -86,23 +97,25 @@ def getCatchmentTimeSeries(request, app_workspace):
                 "xaxis": "",
                 "title": "",
             },
-            "catchment_ids": getCatchmentsIds(app_workspace),
+            "catchment_ids": getCatchmentsIds(model_run_id),
         }
     )
 
 
-@controller(app_workspace=True)
-def getGeoSpatialData(request, app_workspace):
+@controller
+def getGeoSpatialData(request):
     response_object = {}
+    model_run_id = request.GET.get("model_run_id")
 
-    gepackage_file_name = find_gpkg_file(app_workspace)
-    gepackage_file_path = os.path.join(
-        app_workspace.path, "ngen-data", "config", gepackage_file_name
-    )
-    gdf = gpd.read_file(gepackage_file_path, layer="nexus")
+    # gepackage_file_name = find_gpkg_file(model_run_id)
+    try:
+        gepackage_file_path = find_gpkg_file_path(model_run_id)
+    except Exception as e:
+        return JsonResponse({"error": "Failed to read GeoPackage file."})
     # Append ngen_usgs and nwm_usgs columns
-    gdf = append_ngen_usgs_column(gdf, app_workspace)
-    gdf = append_nwm_usgs_column(gdf, app_workspace)
+    gdf = gpd.read_file(gepackage_file_path, layer="nexus")
+    gdf = append_ngen_usgs_column(gdf, model_run_id)
+    gdf = append_nwm_usgs_column(gdf, model_run_id)
 
     # Load the GeoJSON file into a GeoPandas DataFrame
     gdf = gdf.to_crs("EPSG:4326")
@@ -112,22 +125,20 @@ def getGeoSpatialData(request, app_workspace):
 
     data = json.loads(gdf.to_json())
 
-    # teerh_gdf = gdf[gdf["ngen_usgs"] != "none"]
-    # teerh_data = json.loads(teerh_gdf.to_json())
-
     response_object["nexus"] = data
-    response_object["nexus_ids"] = getNexusList(app_workspace)
+    response_object["nexus_ids"] = getNexusList(model_run_id)
     response_object["bounds"] = bounds
     # response_object["teerh"] = teerh_data
-    response_object["catchments"] = getCatchmentsList(app_workspace)
+    response_object["catchments"] = getCatchmentsList(model_run_id)
     response_object["flow_paths_ids"] = flow_paths_ids
     return JsonResponse(response_object)
 
 
-@controller(app_workspace=True)
-def getNexusTimeSeries(request, app_workspace):
+@controller
+def getNexusTimeSeries(request):
+    model_run_id = request.GET.get("model_run_id")
     nexus_id = request.GET.get("nexus_id")
-    base_output_path = get_base_output(app_workspace)
+    base_output_path = get_base_output(model_run_id)
 
     nexus_output_file_path = os.path.join(
         base_output_path,
@@ -142,7 +153,7 @@ def getNexusTimeSeries(request, app_workspace):
         for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
     ]
 
-    usgs_id = get_usgs_from_ngen_id(app_workspace, nexus_id)
+    usgs_id = get_usgs_from_ngen_id(model_run_id, nexus_id)
     return JsonResponse(
         {
             "data": [
@@ -156,18 +167,19 @@ def getNexusTimeSeries(request, app_workspace):
                 "xaxis": "",
                 "title": "",
             },
-            "nexus_ids": getNexusIDs(app_workspace),
+            "nexus_ids": getNexusIDs(model_run_id),
             "usgs_id": usgs_id,
         }
     )
 
 
-@controller(app_workspace=True)
-def getTrouteVariables(request, app_workspace):
+@controller
+def getTrouteVariables(request):
     vars = []
+    model_run_id = request.GET.get("model_run_id")
     troute_id = request.GET.get("troute_id")
     clean_troute_id = troute_id.split("-")[1]
-    df = get_troute_df(app_workspace)
+    df = get_troute_df(model_run_id)
 
     if df is None:
         vars = []
@@ -183,12 +195,13 @@ def getTrouteVariables(request, app_workspace):
     return JsonResponse({"troute_variables": vars})
 
 
-@controller(app_workspace=True)
-def getTrouteTimeSeries(request, app_workspace):
+@controller
+def getTrouteTimeSeries(request):
+    model_run_id = request.GET.get("model_run_id")
     troute_id = request.GET.get("troute_id")
     clean_troute_id = troute_id.split("-")[1]
     variable_column = request.GET.get("troute_variable")
-    df = get_troute_df(app_workspace)
+    df = get_troute_df(model_run_id)
 
     try:
         if isinstance(df.index, pd.MultiIndex):
@@ -234,17 +247,19 @@ def getTrouteTimeSeries(request, app_workspace):
     )
 
 
-@controller(app_workspace=True)
-def getTeehrTimeSeries(request, app_workspace):
+@controller
+def getTeehrTimeSeries(request):
+
     teehr_id = request.GET.get("teehr_id")
+    model_run_id = request.GET.get("model_run_id")
     teehr_config_variable = request.GET.get("teehr_variable")
     teehr_configuration = teehr_config_variable.split("-")[0]
     teehr_variable = teehr_config_variable.split("-")[1]
     teehr_ts_path = get_teehr_joined_ts_path(
-        app_workspace, teehr_configuration, teehr_variable
+        model_run_id, teehr_configuration, teehr_variable
     )
     teehr_ts = get_teehr_ts(teehr_ts_path, teehr_id, teehr_configuration)
-    teehr_metrics = get_teehr_metrics(app_workspace, teehr_id)
+    teehr_metrics = get_teehr_metrics(model_run_id, teehr_id)
     return JsonResponse(
         {
             "metrics": teehr_metrics,
@@ -254,10 +269,11 @@ def getTeehrTimeSeries(request, app_workspace):
     )
 
 
-@controller(app_workspace=True)
-def getTeehrVariables(request, app_workspace):
+@controller
+def getTeehrVariables(request):
+    model_run_id = request.GET.get("model_run_id")
     try:
-        vars = get_configuration_variable_pairs(app_workspace)
+        vars = get_configuration_variable_pairs(model_run_id)
     except Exception:
         vars = []
     return JsonResponse({"teehr_variables": vars})

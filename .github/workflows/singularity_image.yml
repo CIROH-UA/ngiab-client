@@ -1,0 +1,90 @@
+name: Build and Push Singularity Image
+
+on:
+  push:
+    branches:
+      - hpc-compatible
+      - multiple-runs
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Singularity setup
+        uses: singularityhub/install-singularity@main
+
+
+      - name: Import and Verify Singularity key
+        env:
+          KEY_B64: ${{ secrets.SIGNING_KEY }}
+          KEY_PASS: ${{ secrets.KEY_PASSPHRASE }}
+        run: |
+          # Decode key and verify format
+          echo "$KEY_B64" | base64 -d > private.asc
+          echo "=== Key File Header ==="
+          head -n 1 private.asc  # Should show "-----BEGIN PGP PRIVATE KEY BLOCK-----"
+          
+          # Import key with passphrase validation
+          echo "=== Key Import ==="
+          echo "$KEY_PASS" | singularity key import private.asc 2>&1 | tee import.log
+          
+          # Verify successful import
+          echo "=== Imported Keys ==="
+          singularity key list
+          
+      - name: Build Singularity Image
+        run: |
+            sudo -E singularity build ciroh-ngen-visualizer-singularity.sif singularity_tethys_ngiab.def
+
+
+      - name: Sign the image
+        run: |
+           echo "${{ secrets.KEY_PASSPHRASE }}" | singularity sign --keyidx 0 ciroh-ngen-visualizer-singularity.sif
+
+
+      - name: Login and Push Singularity Image
+        env:
+           SYLABS_AUTH_TOKEN: ${{ secrets.SYLABS_AUTH_TOKEN }}
+        run: |
+           # Debug: Check token length (don't print the actual token)
+           echo "Token length: ${#SYLABS_AUTH_TOKEN}"
+        
+           # Create a temporary file for the token
+           TOKEN_FILE=$(mktemp)
+           echo "$SYLABS_AUTH_TOKEN" > "$TOKEN_FILE"
+        
+           # Debug: Check file content length
+           echo "Token file content length: $(wc -c < "$TOKEN_FILE")"
+        
+           # Attempt to login
+           if singularity remote login --tokenfile "$TOKEN_FILE"; then
+              echo "Login successful"
+              # 1) Check if the image exists by searching for the exact tag
+              #    We grep for 'latest_x86' to confirm a match
+              echo "Searching for existing image: library://gioelkin/ngiab/ciroh-ngen-visualizer-singularity:latest_x86"
+              if singularity search ciroh-ngen-visualizer-singularity | grep -q 'latest_x86'; then
+                echo "Image found in library, deleting it first..."
+                singularity delete --force library://gioelkin/ngiab/ciroh-ngen-visualizer-singularity:latest_x86
+              else
+                echo "Image does not exist, skipping delete step."
+              fi
+
+              # 2) Now push the new image
+              singularity push ciroh-ngen-visualizer-singularity.sif library://gioelkin/ngiab/ciroh-ngen-visualizer-singularity:latest_x86              
+           else
+              echo "Login failed"
+              exit 1
+           fi
+        
+           # Clean up
+           rm "$TOKEN_FILE"
+        
+            

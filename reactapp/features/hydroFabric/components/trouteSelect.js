@@ -2,18 +2,21 @@
 
 import {useEffect,Fragment,lazy} from 'react';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
+import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
+import { mode } from 'd3-array';
 
 const TRouteSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
-
+  const {state: modelRunsState} = useModelRunsContext();
 
   useEffect(() => {
     if (!state.troute.id) return;
     props.setIsLoading(true);
     var params = {
-      troute_id: state.troute.id
+      troute_id: state.troute.id,
+      model_run_id: modelRunsState.base_model_id
     }
     appAPI.getTrouteVariables(params).then((response) => {
       if (response.troute_variables.length === 0){
@@ -40,11 +43,14 @@ const TRouteSelect = (props) => {
     props.setIsLoading(true);
     var params = {
       troute_id: state.troute.id,
-      troute_variable: state.troute.variable
+      troute_variable: state.troute.variable,
+      model_run_id: modelRunsState.base_model_id
     }
     appAPI.getTrouteTimeSeries(params).then((response) => {
-      actions.set_series(response.data);
-      actions.set_chart_layout(response.layout);
+      actions.set_troute_series(response.data);
+      actions.set_troute_chart_layout(response.layout);
+      // actions.set_series(response.data);
+      // actions.set_chart_layout(response.layout);
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     }).catch((error) => {
