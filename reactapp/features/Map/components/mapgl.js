@@ -277,11 +277,6 @@ const MapComponent = () => {
   }, [theme, modelRunsState.base_model_id]);
 
 
-  useEffect(() => {
-    console.log('Nexus hidden hidden:', isNexusHidden);
-    
-  },[isNexusHidden])
-
   // ------------------------------------
   // ON CLICK: update state based on clicked layer
   // ------------------------------------
