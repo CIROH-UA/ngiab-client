@@ -2,24 +2,26 @@
 
 import {useEffect, Suspense, Fragment,lazy} from 'react';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
+import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import appAPI from 'services/api/app';
 
 import SelectComponent from './selectComponent';
 
-// const SelectComponent = lazy(() => import('selectComponent'));
-
 const CatchmentSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
+  const {state: modelRunsState} = useModelRunsContext();
+
 
   useEffect(() => {
     if (!state.catchment.id) return;
-    actions.reset_nexus();
     props.setIsLoading(true);
     var params = {
-      catchment_id: state.catchment.id
+      catchment_id: state.catchment.id,
+      model_run_id: modelRunsState.base_model_id
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
-      actions.set_series(response.data);
+      // actions.set_series(response.data);
+      actions.set_catchment_series(response.data);
       actions.set_catchment_variable_list(response.variables);
       actions.set_catchment_variable(null);
       actions.set_catchment_list(response.catchment_ids);
@@ -44,11 +46,14 @@ const CatchmentSelect = (props) => {
 
     var params = {
       catchment_id: state.catchment.id,
-      variable_column: state.catchment.variable
+      variable_column: state.catchment.variable,
+      model_run_id: modelRunsState.base_model_id
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
-      actions.set_series(response.data);
-      actions.set_chart_layout(response.layout);
+      // actions.set_series(response.data);
+      actions.set_catchment_series(response.data);
+      actions.set_catchment_chart_layout(response.layout);
+      // actions.set_chart_layout(response.layout);
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     }).catch((error) => {
@@ -66,7 +71,7 @@ const CatchmentSelect = (props) => {
     <Fragment>
           {state.catchment.id &&
             <Fragment>
-              <h5>Time Series Menu</h5>
+
                 <label>Catchment ID </label>
                 <SelectComponent 
                   optionsList={state.catchment.list} 

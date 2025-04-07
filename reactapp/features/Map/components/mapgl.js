@@ -1,289 +1,425 @@
-// MapComponent.jsx
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
 import Map, { Source, Layer } from 'react-map-gl/maplibre';
 import { Protocol } from 'pmtiles';
 import appAPI from 'services/api/app';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
+import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import useTheme from 'hooks/useTheme';
-// Define the onMapLoad function
+import { toast } from 'react-toastify';
+
 const onMapLoad = (event) => {
+  // console.log('Map loaded:', event);
   const map = event.target;
+
+  // Set pointer interactions
   const hoverLayers = ['catchments-layer', 'unclustered-point', 'clusters'];
-
   hoverLayers.forEach((layer) => {
-    // Change cursor to pointer on mouse enter
-    map.on('mouseenter', layer, () => {
-      map.getCanvas().style.cursor = 'pointer';
-    });
-
-    // Revert cursor to default on mouse leave
-    map.on('mouseleave', layer, () => {
-      map.getCanvas().style.cursor = '';
-    });
+    map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
   });
-  // Ensure 'unclustered-point' and 'clusters' layers are rendered on top of others
 
-  if (map.getLayer('unclustered-point')) {
-    map.moveLayer('unclustered-point');
+  // Bring specific layers to front
+  ['unclustered-point', 'clusters', 'cluster-count'].forEach((layerId) => {
+    if (map.getLayer(layerId)) map.moveLayer(layerId);
+  });
+
+  // Optional filtering fix (if needed)
+  if (map.getLayer('catchments-layer')) {
+    map.setFilter('catchments-layer', ['any', ['in', 'divide_id', '']]);
   }
-  if (map.getLayer('clusters')) {
-    map.moveLayer('clusters');
+  if (map.getLayer('flowpaths-layer')) {
+    map.setFilter('flowpaths-layer', ['any', ['in', 'id', '']]);
   }
 
-  if (map.getLayer('catchments')) {
-    map.setFilter('catchments', ['any', ['in', 'divide_id', '']]);
-  }
-  if (map.getLayer('flowpaths')) {
-    map.setFilter('flowpaths', ['any', ['in', 'id', '']]);
-  }
-  if (map.getLayer('cluster-count')) {
-    map.moveLayer('cluster-count');
-  }
+  // Ensure highlight layers are on top
+  ['nexus-highlight', 'catchment-highlight'].forEach((layerId) => {
+    if (map.getLayer(layerId)) map.moveLayer(layerId);
+  });
 };
 
 const MapComponent = () => {
-  const { actions: hydroFabricActions } = useHydroFabricContext();
-  const [nexusPoints, setNexusPoints] = useState(null);
-  const [catchmentConfig, setCatchmentConfig] = useState(null);
-  const [flowPathsConfig, setFlowPathsConfig] = useState(null);
-  const [conusGaugesConfig, setConusGaugesConfig] = useState(null);
-  const mapRef = useRef(null);
+  const { state: hydroFabricState, actions: hydroFabricActions } = useHydroFabricContext();
+  const { state: modelRunsState } = useModelRunsContext();
   const theme = useTheme();
+  const mapRef = useRef(null);
+
+  // Highlight states
+  const [selectedNexusId, setSelectedNexusId] = useState(null);
+  const [selectedCatchmentId, setSelectedCatchmentId] = useState(null);
+
+  // Data/config states
+  const [nexusPoints, setNexusPoints] = useState(null);
+  const [catchmentsFilterIds, setCatchmentsFilterIds] = useState(null);
+  const [flowPathsFilterIds, setFlowPathsFilterIds] = useState(null);
+  const [nexusFilterIds, setNexusFilterIds] = useState(null);
+
+  // Derived booleans from store
+  const isClustered = hydroFabricState.nexus.geometry.clustered;
+  const isNexusHidden = hydroFabricState.nexus.geometry.hidden;
+  const isCatchmentHidden = hydroFabricState.catchment.geometry.hidden; // default false
 
   const mapStyleUrl =
     theme === 'dark'
       ? 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/dark-style.json'
       : 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/light-style.json';
 
-  // Adjust clusterLayer with theme-based colors
-  const clusterLayer = {
-    id: 'clusters',
-    type: 'circle',
-    source: 'nexus-points',
-    filter: ['has', 'point_count'],
-    paint: {
-      'circle-color': [
-        'step',
-        ['get', 'point_count'],
-        theme === 'dark' ? '#51bbd6' : '#1f78b4',
-        10,
-        theme === 'dark' ? '#6610f2' : '#33a02c',
-        50,
-        theme === 'dark' ? '#20c997' : '#e31a1c',
-      ],
-      'circle-radius': [
-        'step',
-        ['get', 'point_count'],
-        15,
-        10,
-        25,
-        50,
-        35,
-      ],
-    },
-  };
+  // Memoized layer config for catchments
+  const catchmentConfig = useMemo(() => {
+    if (!catchmentsFilterIds) return null;
+    return {
+      id: 'catchments-layer',
+      type: 'fill',
+      source: 'hydrofabric',
+      'source-layer': 'conus_divides',
+      filter: ['any', ['in', 'divide_id', ...catchmentsFilterIds]],
+      paint: {
+        'fill-color': theme === 'dark'
+          ? 'rgba(238, 51, 119, 0.316)'
+          : 'rgba(91, 44, 111, 0.316)',
+        'fill-outline-color': theme === 'dark'
+          ? 'rgba(238, 51, 119, 0.7)'
+          : 'rgba(91, 44, 111, 0.7)',
+        'fill-opacity': { stops: [[7, 0], [11, 1]] },
+      },
+      // Force catchments visible if not toggled hidden
+      layout: {
+        visibility: isCatchmentHidden ? 'none' : 'visible',
+      },
+    };
+  }, [catchmentsFilterIds, theme, isCatchmentHidden]);
 
-  // Adjust unclusteredPointLayer with theme-based colors
-  const unclusteredPointLayer = {
-    id: 'unclustered-point',
-    type: 'circle',
-    source: 'nexus-points',
-    filter: ['!', ['has', 'point_count']],
-    paint: {
-      'circle-color': theme === 'dark' ? '#2c3e50' : '#1f78b4',
-      'circle-radius': 7,
-      'circle-stroke-width': 2,
-      'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
-    },
-  };
+  // Memoized layer config for flowpaths
+  const flowPathsConfig = useMemo(() => {
+    if (!flowPathsFilterIds) return null;
+    return {
+      id: 'flowpaths-layer',
+      type: 'line',
+      source: 'hydrofabric',
+      'source-layer': 'conus_flowpaths',
+      filter: ['any', ['in', 'id', ...flowPathsFilterIds]],
+      paint: {
+        'line-color': theme === 'dark' ? '#0077bb' : '#000000',
+        'line-width': { stops: [[7, 1], [10, 2]] },
+        'line-opacity': { stops: [[7, 0], [11, 1]] },
+      }
+    };
+  }, [flowPathsFilterIds, theme]);
 
-  // Adjust clusterCountLayer text color
-  const clusterCountLayer = {
-    id: 'cluster-count',
-    type: 'symbol',
-    source: 'nexus-points',
-    filter: ['has', 'point_count'],
-    layout: {
-      'text-field': '{point_count_abbreviated}',
-      'text-font': ['Noto Sans Regular'],
-      'text-size': 12,
-      'text-anchor': 'center',
-      'text-justify': 'center',
-      'symbol-placement': 'point',
-    },
-    paint: {
-      'text-color': theme === 'dark' ? '#ffffff' : '#000000',
-    },
-  };
+  // Memoized layer config for gauges
+  const conusGaugesConfig = useMemo(() => {
+    if (!nexusFilterIds) return null;
+    return {
+      id: 'gauges-layer',
+      type: 'circle',
+      source: 'hydrofabric',
+      'source-layer': 'conus_gages',
+      filter: ['any', ['in', 'nex_id', ...nexusFilterIds]],
+      paint: {
+        'circle-radius': { stops: [[3, 2], [11, 5]] },
+        'circle-color': theme === 'dark' ? '#c8c8c8' : '#646464',
+        'circle-opacity': { stops: [[3, 0], [9, 1]] },
+      }
+    };
+  }, [nexusFilterIds, theme]);
 
+  // Memoized nexus layers
+  const nexusLayers = useMemo(() => {
+    // console.log('Nexus layers updated', nexusPoints, isNexusHidden);
+    if (!nexusPoints || isNexusHidden) return null;
 
+    const baseLayers = [];
+    const highlightLayer = (
+      <Layer
+        key="nexus-highlight"
+        id="nexus-highlight"
+        type="circle"
+        source="nexus-points"
+        filter={selectedNexusId ? [
+          'all',
+          ['!', ['has', 'point_count']],
+          ['==', ['get', 'id'], selectedNexusId]
+        ] : ['==', ['get', 'id'], '']}
+        paint={{
+          'circle-radius': 10,
+          'circle-stroke-width': 3,
+          'circle-stroke-color': '#ffffff',
+          'circle-color': '#ff0000',
+        }}
+      />
+    );
+
+    if (isClustered) {
+      baseLayers.push(
+        <Layer
+          key="clusters"
+          id="clusters"
+          type="circle"
+          source="nexus-points"
+          filter={['has', 'point_count']}
+          paint={{
+            'circle-color': [
+              'step',
+              ['get', 'point_count'],
+              theme === 'dark' ? '#51bbd6' : '#1f78b4',
+              10,
+              theme === 'dark' ? '#6610f2' : '#33a02c',
+              50,
+              theme === 'dark' ? '#20c997' : '#e31a1c',
+            ],
+            'circle-radius': [
+              'step',
+              ['get', 'point_count'],
+              15,
+              10,
+              25,
+              50,
+              35,
+            ],
+          }}
+        />,
+        <Layer
+          key="cluster-count"
+          id="cluster-count"
+          type="symbol"
+          source="nexus-points"
+          filter={['has', 'point_count']}
+          layout={{
+            'text-field': '{point_count_abbreviated}',
+            'text-font': ['Noto Sans Regular'],
+            'text-size': 12,
+            'text-anchor': 'center',
+            'text-justify': 'center',
+            'symbol-placement': 'point',
+          }}
+          paint={{
+            'text-color': theme === 'dark' ? '#ffffff' : '#000000',
+          }}
+        />,
+        <Layer
+          key="unclustered-point"
+          id="unclustered-point"
+          type="circle"
+          source="nexus-points"
+          filter={['!', ['has', 'point_count']]}
+          paint={{
+            'circle-color': theme === 'dark' ? '#4f5b67' : '#1f78b4',
+            'circle-radius': 7,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
+          }}
+        />
+      );
+    } else {
+      baseLayers.push(
+        <Layer
+          key="all-points"
+          id="all-points"
+          type="circle"
+          source="nexus-points"
+          paint={{
+            'circle-color': theme === 'dark' ? '#4f5b67' : '#1f78b4',
+            'circle-radius': 7,
+            'circle-stroke-width': 1,
+            'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
+          }}
+        />
+      );
+    }
+
+    return [...baseLayers, highlightLayer];
+  }, [nexusPoints, isClustered, isNexusHidden, theme, selectedNexusId]);
+
+  // --------------------------------------------
+  // Data fetching: get geospatial data and filters
+  // --------------------------------------------
   useEffect(() => {
+    // console.log('MapComponent mounted');
     const protocol = new Protocol({ metadata: true });
     maplibregl.addProtocol('pmtiles', protocol.tile);
 
-    appAPI
-      .getGeoSpatialData()
+    if (!modelRunsState.base_model_id) return;
+
+    appAPI.getGeoSpatialData({ model_run_id: modelRunsState.base_model_id })
       .then((response) => {
-        const { nexus, bounds } = response;
-        setNexusPoints(nexus);
-        // Fit the map to the bounds from the backend response
-        if (bounds && mapRef.current) {
-          mapRef.current.fitBounds(bounds, {
+        if (response.error) {
+          toast.error("Error fetching Model Run Data", { autoClose: 1000 });
+          hydroFabricActions.reset();
+          setNexusPoints(null);
+          setCatchmentsFilterIds(null);
+          setFlowPathsFilterIds(null);
+          setNexusFilterIds(null);
+          setSelectedCatchmentId(null);
+          setSelectedNexusId(null);
+          return;
+        }
+
+        toast.success("Successfully retrieved Model Run Data", { autoClose: 1000 });
+        setNexusPoints(response.nexus);
+        setCatchmentsFilterIds(response.catchments);
+        setFlowPathsFilterIds(response.flow_paths_ids);
+        setNexusFilterIds(response.nexus_ids);
+
+        if (response.bounds && mapRef.current) {
+          mapRef.current.fitBounds(response.bounds, {
             padding: 20,
             duration: 1000,
           });
         }
-
-        const catchmentLayerConfig = {
-          id: 'catchments-layer',
-          type: 'fill',
-          source: 'hydrofabric',
-          'source-layer': 'conus_divides',
-          filter: ['any', ['in', 'divide_id', ...response.catchments]],
-          paint: {
-            'fill-color':
-              theme === 'dark'
-                ? ['rgba', 238, 51, 119, 0.316]
-                : ['rgba', 91, 44, 111, 0.316],
-            'fill-outline-color':
-              theme === 'dark'
-                ? ['rgba', 238, 51, 119, 0.7]
-                : ['rgba', 91, 44, 111, 0.7],
-            'fill-opacity': { stops: [[7, 0], [11, 1]] },
-          },
-        };
-        setCatchmentConfig(catchmentLayerConfig);
-
-        const flowPathsLayerConfig = {
-          id: 'flowpaths-layer',
-          type: 'line',
-          source: 'hydrofabric',
-          'source-layer': 'conus_flowpaths',
-          paint: {
-            'line-color':
-              theme === 'dark'
-                ? ['rgba', 0, 119, 187, 1]
-                : ['rgba', 0, 0, 0, 1], // Adjusted color for light theme
-            'line-width': { stops: [[7, 1], [10, 2]] },
-            'line-opacity': { stops: [[7, 0], [11, 1]] },
-          },
-          filter: ['any', ['in', 'id', ...response.flow_paths_ids]],
-        };
-
-        setFlowPathsConfig(flowPathsLayerConfig);
-
-        const conusGaugesLayerConfig = {
-          id: 'gauges-layer',
-          type: 'circle',
-          source: 'hydrofabric',
-          'source-layer': 'conus_gages',
-          filter: ['any', ['in', 'nex_id', ...response.nexus_ids]],
-          paint: {
-            'circle-radius': { stops: [[3, 2], [11, 5]] },
-            'circle-color':
-              theme === 'dark'
-                ? ['rgba', 200, 200, 200, 1]
-                : ['rgba', 100, 100, 100, 1],
-            'circle-opacity': { stops: [[3, 0], [9, 1]] },
-          },
-        };
-
-        setConusGaugesConfig(conusGaugesLayerConfig);
       })
       .catch((error) => {
-        console.log(error);
+        console.error('Geospatial data fetch failed:', error);
       });
 
     return () => {
       maplibregl.removeProtocol('pmtiles');
     };
-  }, [theme]); // Add theme to dependency array
+  }, [theme, modelRunsState.base_model_id]);
 
-  // Define the PMTiles source URL
-  const pmtilesUrl =
-    'pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles';
 
+  // ------------------------------------
+  // ON CLICK: update state based on clicked layer
+  // ------------------------------------
   const handleMapClick = async (event) => {
+    // console.log('Map clicked:', event);
     const map = event.target;
+    const isClusteredNow = !!hydroFabricState.nexus.geometry?.clustered;
 
-    // Prioritize clicking on 'unclustered-point' and 'clusters' layers first
-    const features = map.queryRenderedFeatures(event.point, {
-      layers: ['unclustered-point', 'clusters', 'catchments-layer'],
-    });
+    // Build layersToQuery based on current hidden states
+    const layersToQuery = [];
+    if (!isNexusHidden) {
+      layersToQuery.push(isClusteredNow ? 'unclustered-point' : 'all-points');
+      if (isClusteredNow) layersToQuery.push('clusters');
+    }
+    if (!isCatchmentHidden) {
+      layersToQuery.push('catchments-layer');
+    }
+    if (layersToQuery.length === 0) return;
 
-    if (features.length > 0) {
-      // Loop through all features at the click point
-      for (const feature of features) {
-        const layerId = feature.layer.id;
-        // Priority click handling for 'unclustered-point' and 'clusters'
-        if (layerId === 'unclustered-point') {
-          hydroFabricActions.reset_teehr();
-          const nexus_id = feature.properties.id;
-          hydroFabricActions.set_nexus_id(nexus_id);
-          if (feature.properties.ngen_usgs !== 'none') {
-            hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);
-          }
-          return; // Exit after handling unclustered point click
-        } else if (layerId === 'clusters') {
-          const clusterId = feature.properties.cluster_id;
-          const zoom = await map
-            .getSource('nexus-points')
-            .getClusterExpansionZoom(clusterId);
-          map.flyTo({
-            center: feature.geometry.coordinates,
-            zoom: zoom,
-            speed: 1.2,
-            curve: 1,
-          });
-          return; // Exit after handling cluster click
+    const features = map.queryRenderedFeatures(event.point, { layers: layersToQuery });
+    if (!features || !features.length) return;
+
+    for (const feature of features) {
+      const layerId = feature.layer.id;
+
+      if (layerId === 'all-points' || layerId === 'unclustered-point') {
+        // Clicked a nexus point.
+        hydroFabricActions.reset_teehr();
+        hydroFabricActions.reset_troute();
+
+        const nexusId = feature.properties.id;
+        hydroFabricActions.set_nexus_id(nexusId);
+        hydroFabricActions.set_troute_id(nexusId);
+        setSelectedNexusId(nexusId);
+        setSelectedCatchmentId(null);
+
+        // When clicking a nexus point, ensure catchments remain hidden.
+        if (!isNexusHidden) {
+          hydroFabricActions.show_nexus_geometry();
         }
 
-        // Handle other layers, like 'catchments-layer', only if unclustered/clustered layers weren't clicked
-        if (layerId === 'catchments-layer') {
-          hydroFabricActions.reset_teehr();
-          hydroFabricActions.set_catchment_id(feature.properties.divide_id);
-          return;
+        if (feature.properties.ngen_usgs !== 'none') {
+          hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);
         }
+        return;
+      }
+      
+      if (layerId === 'clusters') {
+        // Expand cluster.
+        const clusterId = feature.properties.cluster_id;
+        const zoom = await map.getSource('nexus-points').getClusterExpansionZoom(clusterId);
+        map.flyTo({
+          center: feature.geometry.coordinates,
+          zoom,
+          speed: 1.2,
+        });
+        return;
+      }
+      
+      if (layerId === 'catchments-layer') {
+        // Clicked a catchment.
+        hydroFabricActions.reset_teehr();
+        hydroFabricActions.reset_troute();
+
+        const divideId = feature.properties.divide_id;
+        hydroFabricActions.set_catchment_id(divideId);
+        hydroFabricActions.set_troute_id(divideId);
+        setSelectedCatchmentId(divideId);
+        setSelectedNexusId(null);
+
+        // When clicking a catchment, ensure nexus remains hidden.
+        if (!isCatchmentHidden) {
+          hydroFabricActions.show_catchment_geometry();
+        }
+        
+        return;
       }
     }
   };
 
+  // Re-mount the source if clustering state changes.
+  const sourceKey = isClustered ? 'clustered-nexus' : 'unclustered-nexus';
 
   return (
     <Map
       ref={mapRef}
-      initialViewState={{
-        longitude: -96,
-        latitude: 40,
-        zoom: 4,
-      }}
+      initialViewState={{ longitude: -96, latitude: 40, zoom: 4 }}
       style={{ width: '100%', height: '100%' }}
       mapLib={maplibregl}
       mapStyle={mapStyleUrl}
       onClick={handleMapClick}
       onLoad={onMapLoad}
     >
-      {nexusPoints && (
-        <Source
+      <Source
+        id="conus"
+        type="vector"
+        url="pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles"
+      >
+        {catchmentConfig && <Layer {...catchmentConfig} />}
+        {flowPathsConfig && <Layer {...flowPathsConfig} />}
+        {conusGaugesConfig && <Layer {...conusGaugesConfig} />}
+        <Layer
+          id="catchment-highlight"
+          type="fill"
+          source="hydrofabric"
+          source-layer="conus_divides"
+          filter={selectedCatchmentId 
+            ? ['==', ['get', 'divide_id'], selectedCatchmentId]
+            : ['==', ['get', 'divide_id'], '']}
+          paint={{
+            'fill-color': '#ff0000',
+            'fill-outline-color': '#ffffff',
+            'fill-opacity': 0.5,
+          }}
+          layout={{ visibility: isCatchmentHidden ? 'none' : 'visible' }}
+        />
+      </Source>
+
+      <Source
+          key={`nexus-source-${isClustered}`}
           id="nexus-points"
           type="geojson"
           data={nexusPoints}
-          cluster={true}
+          cluster={isClustered}
           clusterRadius={50}
           clusterMaxZoom={14}
         >
-          <Layer {...clusterLayer} />
-          <Layer {...clusterCountLayer} />
-          <Layer {...unclusteredPointLayer} />
+          {nexusLayers}
         </Source>
-      )}
 
-      <Source id="conus" type="vector" url={pmtilesUrl}>
-        {conusGaugesConfig && <Layer {...conusGaugesConfig} />}
-        {catchmentConfig && <Layer {...catchmentConfig} />}
-        {flowPathsConfig && <Layer {...flowPathsConfig} />}
-      </Source>
+      {/* {nexusPoints && (
+        <Source
+          key={`nexus-source-${isClustered}`}
+          id="nexus-points"
+          type="geojson"
+          data={nexusPoints}
+          cluster={isClustered}
+          clusterRadius={50}
+          clusterMaxZoom={14}
+        >
+          {nexusLayers}
+        </Source>
+      )} */}
     </Map>
   );
 };

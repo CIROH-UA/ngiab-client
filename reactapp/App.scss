@@ -60,3 +60,9 @@ body {
   /* Offset for fixed header */
   padding-top: var(--ts-header-height);
 }
+
+.form-switch .form-check-input {
+  width: 3em ;
+  height: 1.5em ;
+  margin-right: 10px;
+}

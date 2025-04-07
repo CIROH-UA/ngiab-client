@@ -1,18 +1,28 @@
 // containers.js
 import styled from 'styled-components';
-import useTheme from 'hooks/useTheme'; // Adjust the import path as needed
+import useTheme from 'hooks/useTheme';
 
 // HydroFabricContainer
 const StyledHydroFabricContainer = styled.div`
   flex: ${(props) => (props.fullScreen ? '1 1 0%' : '1 1 40%')};
+  height: ${(props) => (props.fullScreen ? '0%' : '40%;')};
+  // display: ${(props) => (props.fullScreen ? 'none' : 'block')};
   order: 2;
-  width: 100%;
-  display: ${(props) => (props.fullScreen ? 'none' : 'flex')};
-  padding: 10px;
-  flex-direction: row;
+  width: ${(props) => (props.isModelRunListOpen ? '80%' : '100%')};
+  margin-left: ${(props) => (props.isModelRunListOpen ? '20%' : '0%')};
+  padding: ${(props) => (props.fullScreen ? '0px' : '5px;')}; 
   background-color: ${(props) =>
-    props.theme === 'dark' ? '#2c3e50' : '#ffffff'};
+    props.theme === 'dark' ? '#4f5b67' : '#ffffff'};
   color: ${(props) => (props.theme === 'dark' ? '#ffffff' : '#000000')};
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* For even smoother animation, include width in the transition */
+  @media (min-width: 768px) {
+    transition: margin-left 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+                width 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
 `;
 
 export const HydroFabricContainer = (props) => {
@@ -22,12 +32,13 @@ export const HydroFabricContainer = (props) => {
 
 // HydroFabricPlotContainer
 const StyledHydroFabricPlotContainer = styled.div`
-  width: 500px;
-  height: 250px;
+  width: 100%;
+  padding: 5px;
+  height: 300px;
   order: 1;
   flex: 1 1 80%;
   background-color: ${(props) =>
-    props.theme === 'dark' ? '#2c3e50' : '#f9f9f9'};
+    props.theme === 'dark' ? '#4f5b67' : '#f9f9f9'};
 `;
 
 export const HydroFabricPlotContainer = (props) => {
@@ -44,7 +55,7 @@ const StyledSelectContainer = styled.div`
   padding: 5px;
   flex: 1 1 20%;
   background-color: ${(props) =>
-    props.theme === 'dark' ? '#2c3e50' : '#ffffff'};
+    props.theme === 'dark' ? '#4f5b67' : '#ffffff'};
   color: ${(props) => (props.theme === 'dark' ? '#ffffff' : '#000000')};
 `;
 
@@ -75,7 +86,7 @@ const StyledTeehrMetricsWrapper = styled.div`
   height: 100%;
   padding: 10px;
   background-color: ${(props) =>
-    props.theme === 'dark' ? '#2c3e50' : '#f8f8f8'};
+    props.theme === 'dark' ? '#4f5b67' : '#f8f8f8'};
   border-bottom: 1px solid
     ${(props) => (props.theme === 'dark' ? '#444444' : '#ddd')};
   display: flex;
@@ -99,7 +110,7 @@ const StyledTimeSeriesContainer = styled.div`
     left: 0.5rem;
     padding: 10px;
     background-color: ${(props) =>
-      props.theme === 'dark' ? '#2c3e50' : '#f8f8f8'};
+      props.theme === 'dark' ? '#4f5b67' : '#f8f8f8'};
     ${(props) => (props.theme === 'dark' ? '#444444' : '#ddd')};
     width: 300px;
     border-radius: 0.5rem;  

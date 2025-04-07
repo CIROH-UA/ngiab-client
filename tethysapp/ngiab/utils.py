@@ -3,16 +3,79 @@ import json
 import pandas as pd
 import glob
 import duckdb
-from datetime import datetime
 import xarray as xr
-
-
 import os
 
 
-def append_ngen_usgs_column(gdf, app_workspace):
+def _get_conf_file():
+    home_path = os.environ.get("HOME", "/tmp")
+    conf_base_path = os.environ.get("VISUALIZER_CONF", f"{home_path}/ngiab_visualizer.json")
+    return conf_base_path
+
+def _get_list_model_runs():
+    """
+        {
+            "model_runs": [
+                {
+                    "label": "run1",
+                    "path": "/home/aquagio/tethysdev/ciroh/ngen/ngen-data/AWI_16_2863657_007",
+                    "date": "2021-01-01:00:00:00",
+                    "id": "AWI_16_2863657_007",
+                    "subset": "cat-2863657_subset", #to_implement
+                    "tags": ["tag1", "tag2"], #to_implement
+                },
+                ....
+            ]
+        }
+    """
+    conf_file = _get_conf_file()
+    with open(conf_file, "r") as f:
+        data = json.load(f)
+    return data
+
+def get_model_runs_selectable():
+    model_runs = _get_list_model_runs()
+    return [
+        {
+            "value": model_run["id"], 
+            "label": model_run["label"]
+        }
+        for model_run in model_runs["model_runs"]
+    ]
+
+def _find_gpkg_file_path(model_path):
+    config_path = os.path.join(model_path, "config")
+    gpkg_files = []
+
+    for root, dirs, files in os.walk(config_path):
+        for file in files:
+            if file.endswith(".gpkg"):
+                gpkg_files.append(os.path.join(root, file))
+
+    return gpkg_files[0]
+
+def _get_model_run_path_by_id(id):
+    model_runs = _get_list_model_runs()
+    for model_run in model_runs["model_runs"]:
+
+        if model_run["id"] == id:
+            return model_run["path"]
+    return None
+
+def find_gpkg_file_path(model_run_id):
+    gpkg_model_run_path = None
+    model_path = _get_model_run_path_by_id(model_run_id)
+    if model_path is not None:
+        gpkg_model_run_path = _find_gpkg_file_path(model_path)
+        # breakpoint()
+        # gpkg_model_run_path = f'{model_path}/config/{file_name}'
+    return gpkg_model_run_path
+
+
+
+def append_ngen_usgs_column(gdf, model_id):
     # Load ngen_usgs_crosswalk.parquet into DuckDB
-    base_output_teehr_path = get_base_teehr_path(app_workspace)
+    base_output_teehr_path = get_base_teehr_path(model_id)
     # Define the path to the ngen_usgs_crosswalk.parquet file
     ngen_usgs_crosswalk_path = os.path.join(
         base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
@@ -44,9 +107,9 @@ def append_ngen_usgs_column(gdf, app_workspace):
     return gdf
 
 
-def append_nwm_usgs_column(gdf, app_workspace):
+def append_nwm_usgs_column(gdf, model_id):
     # Load nwm_usgs_crosswalk.parquet into DuckDB
-    base_output_teehr_path = get_base_teehr_path(app_workspace)
+    base_output_teehr_path = get_base_teehr_path(model_id)
     # Define the path to the ngen_usgs_crosswalk.parquet file
     nwm_usgs_crosswalk_path = os.path.join(
         base_output_teehr_path, "nwm_usgs_crosswalk.parquet"
@@ -75,19 +138,20 @@ def append_nwm_usgs_column(gdf, app_workspace):
     return gdf
 
 
-def _get_base_troute_output(app_workspace):
+def _get_base_troute_output(model_id):
+    base_path = _get_model_run_path_by_id(model_id)    
     base_output_path = os.path.join(
-        app_workspace.path, "ngen-data", "outputs", "troute"
+        base_path, "outputs", "troute"
     )
     return base_output_path
 
 
-def get_troute_df(app_workspace):
+def get_troute_df(model_id):
     """
     Load the first T-Route data file from the workspace as a DataFrame.
     Supports both CSV and NetCDF (.nc) files, and replaces NaN values with -9999.
     """
-    base_output_path = _get_base_troute_output(app_workspace)
+    base_output_path = _get_base_troute_output(model_id)
 
     # Search for supported file types in priority order
     file_types = [("CSV", "*.csv"), ("NetCDF", "*.nc")]
@@ -119,15 +183,16 @@ def get_troute_df(app_workspace):
     return None
 
 
-def get_base_output(app_workspace):
-    output_relative_path = get_output_path(app_workspace).split("outputs")[-1]
+def get_base_output(model_id):
+    base_path = _get_model_run_path_by_id(model_id)
+    # print(base_path)
+    output_relative_path = get_output_path(base_path).split("outputs")[-1]
     base_output_path = os.path.join(
-        app_workspace.path, "ngen-data", "outputs", output_relative_path.strip("/")
+        base_path, "outputs", output_relative_path.strip("/")
     )
     return base_output_path
 
-
-def get_output_path(app_workspace):
+def get_output_path(base_path):
     """
     Retrieve the value of the 'output_root' key from a JSON file.
 
@@ -137,8 +202,9 @@ def get_output_path(app_workspace):
     Returns:
     str: The value of the 'output_root' key or None if the key doesn't exist.
     """
+    
     realizations_output_path = os.path.join(
-        app_workspace.path, "ngen-data", "config", "realization.json"
+        base_path, "config", "realization.json"
     )
 
     try:
@@ -183,7 +249,7 @@ def _list_prefixed_csv_files(directory, prefix):
     return csv_files
 
 
-def getCatchmentsIds(app_workspace):
+def getCatchmentsIds(model_run_id):
     """
     Get a list of catchment IDs.
 
@@ -194,7 +260,7 @@ def getCatchmentsIds(app_workspace):
         list: A list of dictionaries containing catchment IDs and labels.
               Each dictionary has the keys 'value' and 'label'.
     """
-    output_base_file = get_base_output(app_workspace)
+    output_base_file = get_base_output(model_run_id)
     catchment_prefix = "cat-"
     catchment_ids_list = _list_prefixed_csv_files(output_base_file, catchment_prefix)
     return [
@@ -203,21 +269,21 @@ def getCatchmentsIds(app_workspace):
     ]
 
 
-def getCatchmentsList(app_workspace):
-    output_base_file = get_base_output(app_workspace)
+def getCatchmentsList(model_id):
+    output_base_file = get_base_output(model_id)
     catchment_prefix = "cat-"
     catchment_ids_list = _list_prefixed_csv_files(output_base_file, catchment_prefix)
     return [id.split(".csv")[0] for id in catchment_ids_list]
 
 
-def getNexusList(app_workspace):
-    output_base_file = get_base_output(app_workspace)
+def getNexusList(model_id):
+    output_base_file = get_base_output(model_id)
     nexus_prefix = "nex-"
     nexus_ids_list = _list_prefixed_csv_files(output_base_file, nexus_prefix)
     return [id.split(".csv")[0].split("_output")[0] for id in nexus_ids_list]
 
 
-def getNexusIDs(app_workspace):
+def getNexusIDs(model_run_id):
     """
     Get a list of Nexus IDs.
 
@@ -227,7 +293,7 @@ def getNexusIDs(app_workspace):
     Returns:
         list: A list of dictionaries containing the Nexus IDs. Each dictionary has a 'value' and 'label' key.
     """
-    output_base_file = get_base_output(app_workspace)
+    output_base_file = get_base_output(model_run_id)
     nexus_prefix = "nex-"
     nexus_ids_list = _list_prefixed_csv_files(output_base_file, nexus_prefix)
     return [
@@ -236,8 +302,9 @@ def getNexusIDs(app_workspace):
     ]
 
 
-def get_base_teehr_path(app_workspace):
-    base_output_teehr_path = os.path.join(app_workspace.path, "ngen-data", "teehr")
+def get_base_teehr_path(model_id):
+    model_path = _get_model_run_path_by_id(model_id)
+    base_output_teehr_path = os.path.join(model_path, "teehr")
     return base_output_teehr_path
 
 
@@ -265,8 +332,8 @@ def get_usgs_from_ngen(app_workspace, ngen_id):
         return None
 
 
-def get_configuration_variable_pairs(app_workspace):
-    base_output_teehr_path = get_base_teehr_path(app_workspace)
+def get_configuration_variable_pairs(model_run_id):
+    base_output_teehr_path = get_base_teehr_path(model_run_id)
     joined_timeseries_base_path = os.path.join(
         base_output_teehr_path, "dataset", "joined_timeseries"
     )
@@ -298,8 +365,8 @@ def get_configuration_variable_pairs(app_workspace):
     return configurations_variables
 
 
-def get_teehr_joined_ts_path(app_workspace, configuration, variable):
-    base_output_teehr_path = get_base_teehr_path(app_workspace)
+def get_teehr_joined_ts_path(model_run_id,configuration, variable):
+    base_output_teehr_path = get_base_teehr_path(model_run_id)
     joined_timeseries_path = os.path.join(
         base_output_teehr_path, "dataset", "joined_timeseries"
     )
@@ -320,8 +387,8 @@ def get_teehr_joined_ts_path(app_workspace, configuration, variable):
         return None
 
 
-def get_usgs_from_ngen_id(app_workspace, nexgen_id):
-    base_output_teehr_path = get_base_teehr_path(app_workspace)
+def get_usgs_from_ngen_id(model_run_id, nexgen_id):
+    base_output_teehr_path = get_base_teehr_path(model_run_id)
     negen_usgs_path = os.path.join(
         base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
     )
@@ -391,8 +458,8 @@ def get_teehr_ts(parquet_file_path, primary_location_id_value, teehr_configurati
     return series
 
 
-def get_teehr_metrics(app_workspace, primary_location_id):
-    base_output_teehr_path = get_base_teehr_path(app_workspace)
+def get_teehr_metrics(model_run_id, primary_location_id):
+    base_output_teehr_path = get_base_teehr_path(model_run_id)
     metrics_path = os.path.join(base_output_teehr_path, "metrics.csv")
 
     # Load the CSV file
@@ -436,19 +503,6 @@ def get_teehr_metrics(app_workspace, primary_location_id):
     ]
 
     return metrics_data
-
-
-def find_gpkg_file(app_workspace):
-    config_path = os.path.join(app_workspace.path, "ngen-data", "config")
-    gpkg_files = []
-
-    for root, dirs, files in os.walk(config_path):
-        for file in files:
-            if file.endswith(".gpkg"):
-                gpkg_files.append(os.path.join(root, file))
-
-    return gpkg_files[0]
-
 
 def get_troute_vars(df):
     # Check if the DataFrame has a MultiIndex

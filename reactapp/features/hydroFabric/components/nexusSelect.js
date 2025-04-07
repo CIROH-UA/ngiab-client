@@ -2,21 +2,24 @@
 
 import {useEffect, Fragment,lazy} from 'react';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
+import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 
 const NexusSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
+  const {state: modelRunsState} = useModelRunsContext();
 
   useEffect(() => {
     if (!state.nexus.id) return;
-    actions.reset_catchment();
     var params = {
-      nexus_id: state.nexus.id
+      nexus_id: state.nexus.id,
+      model_run_id: modelRunsState.base_model_id
     }    
     appAPI.getNexusTimeSeries(params).then((response) => {
-      actions.set_series(response.data);
-      actions.set_chart_layout(response.layout);
+      
+      actions.set_nexus_series(response.data);
+      actions.set_nexus_chart_layout(response.layout);
       if(response.usgs_id){
         actions.set_teehr_id(response.usgs_id);
       }
@@ -25,6 +28,7 @@ const NexusSelect = (props) => {
       }
       
       actions.set_nexus_list(response.nexus_ids);
+      
       actions.set_troute_id(state.nexus.id);
       props.toggleSingleRow(false);
     }).catch((error) => {
@@ -38,11 +42,11 @@ const NexusSelect = (props) => {
   }, [state.nexus.id]);
 
 
+  
   return (
     <Fragment>
         {state.nexus.id &&
             <Fragment>
-                <h5>Time Series Menu</h5>
                 <label>Nexus ID</label>
                 <SelectComponent 
                 optionsList={state.nexus.list} 
