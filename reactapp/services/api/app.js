@@ -26,6 +26,9 @@ const appAPI = {
     },
     getModelRuns: () => {
         return apiClient.get(`${APP_ROOT_URL}getModelRuns/`);
+    },
+    importModelRuns: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}importModelRuns/`, { params });
     }
 
 

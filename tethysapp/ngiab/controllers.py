@@ -40,6 +40,17 @@ def home(request):
     return App.render(request, "index.html")
 
 
+@controller
+def importModelRuns(request):
+    
+    response_object = {}
+    model_run_name = request.GET.get("model_run_name")
+    model_run_s3_path = request.GET.get("model_run_s3_path")
+    response_object["model_run_name"] = model_run_name
+    response_object["model_run_s3_path"] = model_run_s3_path
+    return JsonResponse(response_object)
+    
+
 
 @controller
 def getModelRuns(request):
@@ -277,3 +288,4 @@ def getTeehrVariables(request):
     except Exception:
         vars = []
     return JsonResponse({"teehr_variables": vars})
+
