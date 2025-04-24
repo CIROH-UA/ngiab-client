@@ -67,6 +67,7 @@ const NGIABView = () => {
                 fullScreen={singleRowOn} 
                 isModelRunListOpen={isModelRunListOpen}  
               >
+                
                 <ToggleButton fullScreen={singleRowOn}  onClick={() => toggleSingleRow(prev => !prev)}>
                   {singleRowOn ? <GoGraph size={20} /> : <GoChevronDown size={20} />}
                 </ToggleButton>

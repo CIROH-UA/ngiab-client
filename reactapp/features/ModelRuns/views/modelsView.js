@@ -1,5 +1,7 @@
 import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
+import AddModelForm from 'features/ModelRuns/components/AddModelForm';
+import CenteredButtons from 'features/ModelRuns/components/menuButton';
 import ModelRunsSelect from 'features/ModelRuns/components/modelRunsSelect';
 import TimeSeriesSelection from 'features/ModelRuns/components/timeSeriesSelect';
 import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
@@ -28,7 +30,7 @@ const Container = styled.div`
   }
 `;
 
-const ToggleButton = styled(Button)`
+const TogggledButton = styled(Button)`
   top: 80px;
   left: 25px;
   position: absolute;
@@ -60,10 +62,13 @@ const ModelRunsView = ({
   singleRowOn,
   toggleSingleRow,
   setIsLoading,
-  setIsModelRunListOpen
+  setIsModelRunListOpen,
+  // showImportModelRun,
 }) => {
   
   const [isOpen, setIsOpen] = useState(true);
+  const [isImportFormOpen, setIsImportFormOpen] = useState(false);
+  const [isModelRunListVisible, setIsModelRunListVisible] = useState(true);
   const { state } = useModelRunsContext();
   const isVisible = state.base_model_id ? true : false;
 
@@ -72,27 +77,48 @@ const ModelRunsView = ({
     setIsModelRunListOpen(prev => !prev);
   };
 
+  const showImportModelRunForm = () => {
+    setIsImportFormOpen(prev => !prev);
+    setIsModelRunListVisible(prev => !prev);
+
+  };
+
+
   return (
     <Fragment>
-    <ToggleButton onClick={toggleContainer}>
-    {isOpen ? <FaChevronLeft size={20} /> : <FaChevronRight size={20} />}
-  </ToggleButton>
-    <Container isOpen={isOpen}>
+      <TogggledButton onClick={toggleContainer}>
+        {isOpen ? <FaChevronLeft size={20} /> : <FaChevronRight size={20} />}
+      </TogggledButton>
 
-      <Content>
-        <h2>Model Runs</h2>
-        <ModelRunsSelect />
+    
+      <Container isOpen={isOpen}>
+        <Content>
+          {
+            isModelRunListVisible &&(
+              <Fragment>
+              <h2>Model Runs</h2>
+              <ModelRunsSelect />
+              
+              <TimeSeriesSelection
+                  singleRowOn={singleRowOn}
+                  toggleSingleRow={toggleSingleRow}
+                  setIsLoading={setIsLoading}
+              />
+              <HydrofabricMapControl
+                  isVisible={isVisible}
+              />
+            </Fragment>
+            )
+          }
 
-        <TimeSeriesSelection
-            singleRowOn={singleRowOn}
-            toggleSingleRow={toggleSingleRow}
-            setIsLoading={setIsLoading}
-        />
-        <HydrofabricMapControl
-            isVisible={isVisible}
-        />
-      </Content>
-    </Container>
+
+          <AddModelForm
+              isVisible={isImportFormOpen}
+              
+          />
+        </Content>
+      </Container>
+      <CenteredButtons showImportModelRunForm={showImportModelRunForm}/>
 
     </Fragment>
 
