@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import DataStreamModelRunsContext from '../contexts/dataStreamModelRunsContext';
-import useDataStreamModelRuns from '../hooks/useDataStreamModelRuns';
+import {useDataStreamModelRuns} from '../hooks/useDataStreamModelRuns';
 
 export const DataStreamModelRunsProvider = ({ children }) => {
 

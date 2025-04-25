@@ -1,6 +1,7 @@
 import { Fragment, useState,Suspense, useEffect } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
 import { ModelRunsProvider } from 'features/ModelRuns/providers/modelRunsProvider';
+// import { DataStreamModelRunsProvider } from 'features/DataStream/providers/dataStreamModelRunsProvider';
 import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
 import { ToastContainer } from 'react-toastify';
 import Button from 'react-bootstrap/Button';
@@ -43,7 +44,7 @@ const ViewContainer = styled.div`
 
 const DataStreamView = () => {
   const [singleRowOn, toggleSingleRow] = useState(true);
-  const [isModelRunListOpen, setIsModelRunListOpen] = useState(true);
+  const [isDataStreamMenuOpen, setIsDataStreamMenuOpen] = useState(true);
   const [ isLoading, setIsLoading ] = useState(false);
 
   useEffect(() => {
@@ -72,13 +73,15 @@ const DataStreamView = () => {
               >
                 <MapComponent />
               </MapContainer>
-              <DataStreamMenuView 
+              <DataStreamMenuView
+                  singleRowOn={singleRowOn}
+                  toggleSingleRow={toggleSingleRow} 
                   setIsLoading={setIsLoading}
-                  setIsModelRunListOpen={setIsModelRunListOpen}
+                  setIsDataStreamMenuOpen={setIsDataStreamMenuOpen}
               />
               <HydroFabricContainer 
                 $fullScreen={singleRowOn} 
-                isModelRunListOpen={isModelRunListOpen}  
+                isModelRunListOpen={isDataStreamMenuOpen}  
               >
                 
                 <ToggleButton $fullScreen={singleRowOn}  onClick={() => toggleSingleRow(prev => !prev)}>
