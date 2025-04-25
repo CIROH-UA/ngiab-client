@@ -358,7 +358,7 @@ def getDataStreamTarFile(request):
     avail_date = request.GET.get("avail_date")
     ngen_forecast = request.GET.get("ngen_forecast")
     ngen_vpu = request.GET.get("ngen_vpu")
-    prefix_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_vpu}/"
-    extract_path = download_and_extract_tar_from_s3(tar_key=prefix_path)
-    
-    pass
+    tar_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_vpu}/ngen-run.tar.gz"
+    name_folder = f"{avail_date}_{ngen_forecast}_{ngen_vpu}"
+    extract_path = download_and_extract_tar_from_s3(tar_key=tar_path,name_folder=name_folder) 
+    return JsonResponse({"extract_path": extract_path})
