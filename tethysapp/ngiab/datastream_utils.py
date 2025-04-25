@@ -42,3 +42,10 @@ def list_public_s3_folders(
             folders.append(cp["Prefix"].rstrip("/").split("/")[-1])
 
     return sorted(folders)
+
+def get_select_from_s3(list_of_interest: list[str]) -> list[str]:
+
+    return [
+        {"value": item_, "label": item_}
+        for item_ in list_of_interest
+    ]

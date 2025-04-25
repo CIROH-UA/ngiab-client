@@ -24,7 +24,8 @@ from .utils import (
     get_model_runs_selectable
 )
 from .datastream_utils import (
-    list_public_s3_folders
+    list_public_s3_folders,
+    get_select_from_s3
 )
 
 from .app import App
@@ -293,15 +294,26 @@ def getTeehrVariables(request):
     return JsonResponse({"teehr_variables": vars})
 
 @controller
-def getDataStreamNgenDates(request):
+def getDataStreamNgiabDates(request):
     """
     Get the list of dates in the bucket.
     """
-
+    print("Getting list of dates in the bucket...")
     ngen_dates = list_public_s3_folders(prefix="v2.2/")
+    list_dates = get_select_from_s3(ngen_dates)
+    # print("Dates in the bucket: ", list_dates)
     
-    
-    return JsonResponse({"ngen_dates": ngen_dates})
+    return JsonResponse({"ngen_dates": list_dates})
 
+@controller
+def getDataStreamNgiabAvailableForecast(request):
+    """
+    Get the list of available forecast in the bucket.
+    """
+    print("Getting list of available forecast in the bucket...")
+    avail_date = request.GET.get("avail_date")
+    ngen_forecast = list_public_s3_folders(prefix=f"v2.2/{avail_date}/")
+    list_forecast = get_select_from_s3(ngen_forecast)
+    return JsonResponse({"ngen_forecast": list_forecast})
 
 

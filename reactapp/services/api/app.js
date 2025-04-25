@@ -28,12 +28,16 @@ const appAPI = {
         return apiClient.get(`${APP_ROOT_URL}getModelRuns/`);
     },
     // Data Stream API
-    getDataStreamNgenDates: (params) => {
-        return apiClient.get(`${APP_ROOT_URL}getDataStreamNgenDates/`, { params });
+    getDataStreamNgiabDates: () => {
+        return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabDates/`);
+    },
+    getDataStreamNgiabAvailableForecast: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabAvailableForecast/`, { params });
     },
     importModelRuns: (params) => {
         return apiClient.get(`${APP_ROOT_URL}importModelRuns/`, { params });
     }
+    
 
 
 }
