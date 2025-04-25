@@ -40,6 +40,9 @@ const appAPI = {
     getDataStreamNgiabAvailableVpus: (params) => {
         return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabAvailableVpus/`, { params });
     },
+    getDataStreamTarFile: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}getDataStreamTarFile/`, { params });
+    },
     importModelRuns: (params) => {
         return apiClient.get(`${APP_ROOT_URL}importModelRuns/`, { params });
     }

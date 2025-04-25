@@ -3,6 +3,8 @@ import json
 import os
 import tarfile
 import uuid
+import shutil
+from pathlib import Path
 from botocore import UNSIGNED
 from botocore.client import Config
 
@@ -142,7 +144,7 @@ def _add_datastream_data_to_conf(label: str, bucket:str, local_path: str, prefix
         "date": "2021-01-01:00:00:00",
         "id": uuid.uuid4().hex,
     }
-    conf["datastream"] = individual_datastream
+    conf["datastream"].append(individual_datastream)
 
     with open(conf_base_path, "w") as f:
         json.dump(conf, f, indent=4)
@@ -164,25 +166,59 @@ def _download_tar_from_s3(bucket: str, tar_key: str, download_path: str) -> None
     s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
     s3.download_file(Bucket=bucket, Key=tar_key, Filename=download_path)
 
-def _extract_tar_file(tar_path: str, extract_path: str) -> None:
-    """
-    Extract a tar file to a specified directory.
 
-    Parameters
-    ----------
-    tar_path : str
-        The path to the tar file.
-    extract_path : str
-        The directory where the contents of the tar file will be extracted.
+def _extract_keep_ngen_run(
+    tar_path: str,
+    work_dir: str,
+    dst_name: str = "ngen-run",
+) -> Path:
     """
+    Extract only the subtree  home/ec2-user/outputs/ngen-run/
+    from *tar_path* into *work_dir*, rename it to *dst_name*, delete the
+    tarball, and prune any *new* empty directories that were created.
 
-    with tarfile.open(tar_path, "r") as tar:
-        tar.extractall(path=extract_path)
-        tar.close()
-    # Remove the tar file after extraction
+    Anything that already existed inside *work_dir* is left untouched.
+    """
+    work_dir = Path(work_dir).resolve()
+    KEEP_PREFIX = "home/ec2-user/outputs/ngen-run/"
+
+    # ── record what was already in work_dir ──────────────────────────────
+    preexisting = {p for p in work_dir.rglob("*") if p.is_dir()}
+
+    # ── 1. selective extraction ──────────────────────────────────────────
+    with tarfile.open(tar_path, "r:*") as tar:
+        wanted = [m for m in tar.getmembers()
+                  if m.name.startswith(KEEP_PREFIX)]
+        if not wanted:
+            raise FileNotFoundError(
+                f"{KEEP_PREFIX!r} not found inside {tar_path}"
+            )
+        tar.extractall(path=work_dir, members=wanted)
+
+    # ── 2. remove the tarball itself ─────────────────────────────────────
     os.remove(tar_path)
 
-def download_and_extract_tar_from_s3(bucket: str = "ciroh-community-ngen-datastream", tar_key: str="") -> None:
+    # ── 3. move/rename the kept subtree ─────────────────────────────────
+    kept_src = work_dir / KEEP_PREFIX.rstrip("/")
+    kept_dst = work_dir / dst_name
+    kept_dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(kept_src), kept_dst)
+
+    # ── 4. prune *new* empty directories (bottom-up) ────────────────────
+    for path in sorted(work_dir.rglob("*"), reverse=True):
+        if (
+            path.is_dir()
+            and path not in preexisting
+            and path != kept_dst
+        ):
+            try:
+                path.rmdir()          # succeeds only if directory is empty
+            except OSError:
+                pass                  # not empty → keep it
+
+    return kept_dst
+
+def download_and_extract_tar_from_s3(bucket: str = "ciroh-community-ngen-datastream", tar_key: str="", name_folder: str="") -> None:
     """
     Download a tar file from an S3 bucket and extract its contents.
 
@@ -196,25 +232,26 @@ def download_and_extract_tar_from_s3(bucket: str = "ciroh-community-ngen-datastr
         The directory where the contents of the tar file will be extracted.
     """
     datastream_conf_dir_path = _get_datastream_conf_dir()
-    dir_name = tar_key.split("/")[-1]
-    extract_path = os.path.join(datastream_conf_dir_path, dir_name)
-    # Create the directory if it doesn't exist
-    os.makedirs(extract_path, exist_ok=True)
-
+    
     # Define the local path for the downloaded tar file
-    local_tar_path = os.path.join(extract_path, os.path.basename(tar_key))
+    local_tar_path = os.path.join(datastream_conf_dir_path, os.path.basename(tar_key))
 
     # Download the tar file from S3
     _download_tar_from_s3(bucket, tar_key, local_tar_path)
 
     # Extract the contents of the tar file
-    _extract_tar_file(local_tar_path, extract_path)
+    
+    extracted_path = _extract_keep_ngen_run(
+        tar_path=local_tar_path,
+        work_dir=datastream_conf_dir_path,
+        dst_name=name_folder,
+    )
     # Add the datastream data to the configuration file
     _add_datastream_data_to_conf(
-        label=os.path.basename(tar_key),
+        label=name_folder,
         bucket=bucket,
-        local_path=extract_path,
+        local_path=f"{datastream_conf_dir_path}/{name_folder}",
         prefix=tar_key
     )
     # Return the path to the extracted files
-    return extract_path
+    return str(extracted_path)
