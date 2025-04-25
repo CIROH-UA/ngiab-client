@@ -43,6 +43,9 @@ const appAPI = {
     getDataStreamTarFile: (params) => {
         return apiClient.get(`${APP_ROOT_URL}getDataStreamTarFile/`, { params });
     },
+    getDataStreamModelRuns: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}getDataStreamModelRuns/`, { params });
+    },
     importModelRuns: (params) => {
         return apiClient.get(`${APP_ROOT_URL}importModelRuns/`, { params });
     }

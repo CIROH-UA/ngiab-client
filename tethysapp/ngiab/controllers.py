@@ -29,7 +29,8 @@ from .datastream_utils import (
     remove_forcings_from_forecast_list,
     make_datastream_conf,
     download_and_extract_tar_from_s3,
-    get_dates_select_from_s3
+    get_dates_select_from_s3,
+    get_model_runs_selectable
 )
 
 from .app import App
@@ -360,5 +361,13 @@ def getDataStreamTarFile(request):
     ngen_vpu = request.GET.get("ngen_vpu")
     tar_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_vpu}/ngen-run.tar.gz"
     name_folder = f"{avail_date}_{ngen_forecast}_{ngen_vpu}"
-    extract_path = download_and_extract_tar_from_s3(tar_key=tar_path,name_folder=name_folder) 
-    return JsonResponse({"extract_path": extract_path})
+    unique_id = download_and_extract_tar_from_s3(tar_key=tar_path,name_folder=name_folder) 
+    return JsonResponse({"id": unique_id})
+
+
+@controller
+def getDataStreamModelRuns(request):
+    datastream_model_run_select =  get_model_runs_selectable()
+    return JsonResponse({
+        "datastream_model_runs": datastream_model_run_select
+    })

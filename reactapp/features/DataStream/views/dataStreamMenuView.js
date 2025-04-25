@@ -1,14 +1,14 @@
 import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
-// import AddModelForm from 'features/ModelRuns/components/AddModelForm';
-// import CenteredButtons from 'features/ModelRuns/components/menuButton';
-// import ModelRunsSelect from 'features/ModelRuns/components/modelRunsSelect';
-// import TimeSeriesSelection from 'features/ModelRuns/components/timeSeriesSelect';
-// import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
-// import { useModelRunsContext } from '../hooks/useModelRunsContext';
+
+import TimeSeriesSelection from 'features/ModelRuns/components/timeSeriesSelect';
+import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
+import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
+// import { useDataStreamModelRunsContext } from 'features/DataStream/hooks/useDataStreamModelRunsContext';
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import Button from 'react-bootstrap/Button';
 import DataStreamMenu from 'features/DataStream/components/dataStreamMenu';
+
 const Container = styled.div`
   position: absolute;
   top: 0;
@@ -59,30 +59,23 @@ const Content = styled.div`
 `;
 
 const DataStreamMenuView = ({
-  // singleRowOn,
-  // toggleSingleRow,
+  singleRowOn,
+  toggleSingleRow,
   setIsLoading,
-  setIsModelRunListOpen,
+  setIsDataStreamMenuOpen,
   
 }) => {
   
   const [isOpen, setIsOpen] = useState(true);
   const [isDataStreamOpen, setIsDataStreamOpen] = useState(true);
-  const [isModelRunListVisible, setIsModelRunListVisible] = useState(true);
-  // const { state } = useModelRunsContext();
-  // const isVisible = state.base_model_id ? true : false;
+  
+  const { state } = useModelRunsContext();
+  const isVisible = state.base_model_id ? true : false;
 
   const toggleContainer = () => {
     setIsOpen(prev => !prev);
-    setIsModelRunListOpen(prev => !prev);
+    setIsDataStreamMenuOpen(prev => !prev);
   };
-
-  // const showImportModelRunForm = () => {
-  //   setIsImportFormOpen(prev => !prev);
-  //   setIsModelRunListVisible(prev => !prev);
-
-  // };
-
 
   return (
     <Fragment>
@@ -93,6 +86,14 @@ const DataStreamMenuView = ({
         <Content>
           <DataStreamMenu
               isVisible={isDataStreamOpen}
+          />
+          <TimeSeriesSelection
+              singleRowOn={singleRowOn}
+              toggleSingleRow={toggleSingleRow}
+              setIsLoading={setIsLoading}
+          />
+          <HydrofabricMapControl
+              isVisible={isVisible}
           />
         </Content>
       </Container>

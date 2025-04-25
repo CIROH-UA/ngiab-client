@@ -135,20 +135,21 @@ def _add_datastream_data_to_conf(label: str, bucket:str, local_path: str, prefix
     conf_base_path = _get_datastream_conf_file()
     with open(conf_base_path, "r") as f:
         conf = json.load(f)
-
+    unique_id =  uuid.uuid4().hex
     individual_datastream = {
         "label": label,
         "bucket": bucket,
         "prefix": prefix,
         "path": local_path,
         "date": "2021-01-01:00:00:00",
-        "id": uuid.uuid4().hex,
+        "id": unique_id,
     }
     conf["datastream"].append(individual_datastream)
 
     with open(conf_base_path, "w") as f:
         json.dump(conf, f, indent=4)
 
+    return str(unique_id)
 
 def _download_tar_from_s3(bucket: str, tar_key: str, download_path: str) -> None:
     """
@@ -247,11 +248,42 @@ def download_and_extract_tar_from_s3(bucket: str = "ciroh-community-ngen-datastr
         dst_name=name_folder,
     )
     # Add the datastream data to the configuration file
-    _add_datastream_data_to_conf(
+    unique_id = _add_datastream_data_to_conf(
         label=name_folder,
         bucket=bucket,
         local_path=f"{datastream_conf_dir_path}/{name_folder}",
         prefix=tar_key
     )
     # Return the path to the extracted files
-    return str(extracted_path)
+    return unique_id
+
+def _get_list_datastream_model_runs():
+    """
+        {
+            "model_runs": [
+                {
+                    "label": "run1",
+                    "path": "/home/aquagio/tethysdev/ciroh/ngen/ngen-data/AWI_16_2863657_007",
+                    "date": "2021-01-01:00:00:00",
+                    "id": "AWI_16_2863657_007",
+                    "subset": "cat-2863657_subset", #to_implement
+                    "tags": ["tag1", "tag2"], #to_implement
+                },
+                ....
+            ]
+        }
+    """
+    conf_file = _get_datastream_conf_file()
+    with open(conf_file, "r") as f:
+        data = json.load(f)
+    return data
+
+def get_model_runs_selectable():
+    datastream_model_runs = _get_list_datastream_model_runs()
+    return [
+        {
+            "value": datastream_model_run["id"], 
+            "label": datastream_model_run["label"]
+        }
+        for datastream_model_run in datastream_model_runs["datastream"]
+    ]

@@ -3,6 +3,8 @@ import styled from 'styled-components';
 import { Form, Button, Alert, Spinner, Stack } from 'react-bootstrap';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
+import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
+import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 
 const StyledButton = styled(Button)`
   
@@ -33,6 +35,9 @@ export default function BucketNamesSelect() {
   const [selectedForecast, setSelectedForecast] = useState('');
   const [selectedVpu, setSelectedVpu] = useState('');
 
+  const {state,actions} = useModelRunsContext();
+  const {actions: hydroFabricActions} = useHydroFabricContext();
+
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState(null);
   const [success, setSuccess] = useState(false);
@@ -44,11 +49,13 @@ export default function BucketNamesSelect() {
       ngen_vpu: selectedVpu,
     }
     appAPI.getDataStreamTarFile(params)
-    .then((data) => {        
+    .then((data) => {
+          console.log('Success', data);
           if (data.error) {
             // toast.error("Error fetching Model Run Data", { autoClose: 1000 });
             return;
           }
+          actions.set_base_model_id(data.id)
           // toast.success("Successfully retrieved Model Run Data", { autoClose: 1000 });
         })
         .catch((error) => {
