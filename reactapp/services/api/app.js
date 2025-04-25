@@ -34,6 +34,9 @@ const appAPI = {
     getDataStreamNgiabAvailableForecast: (params) => {
         return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabAvailableForecast/`, { params });
     },
+    getDataStreamNgiabAvailableVpus: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabAvailableVpus/`, { params });
+    },
     importModelRuns: (params) => {
         return apiClient.get(`${APP_ROOT_URL}importModelRuns/`, { params });
     }

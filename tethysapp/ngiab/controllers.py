@@ -319,3 +319,15 @@ def getDataStreamNgiabAvailableForecast(request):
     return JsonResponse({"ngen_forecast": list_forecast})
 
 
+@controller
+def getDataStreamNgiabAvailableVpus(request):
+    """
+    Get the list of available vpus
+    """
+    print("Getting list of available vpus in the bucket...")
+    avail_date = request.GET.get("avail_date")
+    ngen_forecast = request.GET.get("ngen_forecast")
+    ngen_vpu = list_public_s3_folders(prefix=f"v2.2/{avail_date}/{ngen_forecast}")
+    dict_vpus = get_select_from_s3(ngen_vpu)
+    return JsonResponse({"ngen_vpus": dict_vpus})
+
