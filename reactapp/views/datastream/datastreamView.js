@@ -1,4 +1,4 @@
-import { Fragment, useState, lazy,Suspense } from 'react';
+import { Fragment, useState,Suspense, useEffect } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
 import { ModelRunsProvider } from 'features/ModelRuns/providers/modelRunsProvider';
 import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
@@ -10,8 +10,7 @@ import LoadingAnimation from 'components/loader/LoadingAnimation';
 import HydroFabricView from '../ngiab/hydroFabricView.js';
 import MapComponent from 'features/Map/components/mapgl.js';
 import DataStreamMenuView from 'features/DataStream/views/dataStreamMenuView.js';
-// const HydroFabricView = lazy(() => import('./hydroFabricView.js'));
-// const MapComponent = lazy(() => import('features/Map/components/mapgl.js'));
+import appAPI from 'services/api/app';
 
 const ToggleButton = styled(Button)`
   top: ${(props) => (props.$fullScreen ? '95%' : '65%;')};
@@ -46,6 +45,21 @@ const DataStreamView = () => {
   const [singleRowOn, toggleSingleRow] = useState(true);
   const [isModelRunListOpen, setIsModelRunListOpen] = useState(true);
   const [ isLoading, setIsLoading ] = useState(false);
+
+  useEffect(() => {
+    appAPI.makeDatastreamConf()
+      .then((data) => {
+        console.log('Success', data);
+        if (data.error) {
+          return;
+        }
+        // toast.success("Successfully retrieved Model Run Data", { autoClose: 1000 });
+      })
+      .catch((error) => {
+        console.error('Failed', error);
+      });
+  }
+  , []);
 
   return (
     <ViewContainer>
