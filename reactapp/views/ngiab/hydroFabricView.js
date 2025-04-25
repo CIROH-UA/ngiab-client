@@ -6,9 +6,11 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
 import { HydroFabricPlotContainer, TeehrMetricsWrapper } from '../../components/StyledContainers';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 import ParentSize from '@visx/responsive/lib/components/ParentSize';
+import LineChart from 'features/hydroFabric/components/chart';
+import TeehrMetricsTable from 'features/hydroFabric/components/teehrMetrics';
 
-const LineChart = lazy(() => import('../../features/hydroFabric/components/chart'));
-const TeehrMetricsTable = lazy(() => import('../../features/hydroFabric/components/teehrMetrics'));
+// const LineChart = lazy(() => import('../../features/hydroFabric/components/chart'));
+// const TeehrMetricsTable = lazy(() => import('../../features/hydroFabric/components/teehrMetrics'));
 
 
 const ViewContainer = styled.div`

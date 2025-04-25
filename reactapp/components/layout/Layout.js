@@ -3,6 +3,7 @@ import Nav from 'react-bootstrap/Nav';
 import PropTypes from 'prop-types';
 import { useState, useContext } from 'react';
 import { LinkContainer } from 'react-router-bootstrap';
+import { startTransition } from 'react';
 
 import Header from 'components/layout/Header';
 import NavMenu from 'components/layout/NavMenu';
@@ -20,7 +21,7 @@ function Layout({navLinks, routes, children}) {
           <Nav variant="pills" defaultActiveKey={tethysApp.rootUrl} className="flex-column">
             {navLinks.map((link, idx) => {
               return (
-                <LinkContainer to={link.to} onClick={() => setNavVisible(false)} key={`link-container-${idx}`}>
+                <LinkContainer to={link.to} onClick={() =>  startTransition(() => setNavVisible(false))} key={`link-container-${idx}`}>
                   <Nav.Link eventKey={link.eventKey} key={`link-${idx}`}>{link.title}</Nav.Link>
                 </LinkContainer>
               )

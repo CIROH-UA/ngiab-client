@@ -27,6 +27,10 @@ const appAPI = {
     getModelRuns: () => {
         return apiClient.get(`${APP_ROOT_URL}getModelRuns/`);
     },
+    // Data Stream API
+    getDataStreamNgenDates: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}getDataStreamNgenDates/`, { params });
+    },
     importModelRuns: (params) => {
         return apiClient.get(`${APP_ROOT_URL}importModelRuns/`, { params });
     }

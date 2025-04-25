@@ -23,6 +23,9 @@ from .utils import (
     append_nwm_usgs_column,
     get_model_runs_selectable
 )
+from .datastream_utils import (
+    list_public_s3_folders
+)
 
 from .app import App
 
@@ -42,7 +45,7 @@ def home(request):
 
 @controller
 def importModelRuns(request):
-    
+    print("Importing model runs...")
     response_object = {}
     model_run_name = request.GET.get("model_run_name")
     model_run_s3_path = request.GET.get("model_run_s3_path")
@@ -288,4 +291,17 @@ def getTeehrVariables(request):
     except Exception:
         vars = []
     return JsonResponse({"teehr_variables": vars})
+
+@controller
+def getDataStreamNgenDates(request):
+    """
+    Get the list of dates in the bucket.
+    """
+
+    ngen_dates = list_public_s3_folders(prefix="v2.2/")
+    
+    
+    return JsonResponse({"ngen_dates": ngen_dates})
+
+
 
