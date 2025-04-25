@@ -25,7 +25,8 @@ from .utils import (
 )
 from .datastream_utils import (
     list_public_s3_folders,
-    get_select_from_s3
+    get_select_from_s3,
+    remove_forcings_from_forecast_list
 )
 
 from .app import App
@@ -313,7 +314,8 @@ def getDataStreamNgiabAvailableForecast(request):
     print("Getting list of available forecast in the bucket...")
     avail_date = request.GET.get("avail_date")
     ngen_forecast = list_public_s3_folders(prefix=f"v2.2/{avail_date}/")
-    list_forecast = get_select_from_s3(ngen_forecast)
+    clean_forecast_list = remove_forcings_from_forecast_list(ngen_forecast)
+    list_forecast = get_select_from_s3(clean_forecast_list)
     return JsonResponse({"ngen_forecast": list_forecast})
 
 

@@ -42,8 +42,6 @@ export default function BucketNamesSelect() {
 
   const handleChangeForecast = (e) => {
     console.log('Selected forecast:', e);
-
-
   }
 
   useEffect(() => {    
@@ -66,22 +64,26 @@ export default function BucketNamesSelect() {
 
   return (
     <Fragment>
-    {datesBucket.length > 0 &&
+      {datesBucket.length > 0 &&
         <Fragment>
-            <SelectComponent 
-              optionsList={datesBucket} 
-              onChangeHandler={handleChangeDate}
-            />
+          <p>Available Dates</p>
+          <SelectComponent 
+            optionsList={datesBucket} 
+            onChangeHandler={handleChangeDate}
+          />
         </Fragment>
-    }
-    {availableForecastList.length > 0 &&
+      }
+      <br />
+      {availableForecastList.length > 0 &&
         <Fragment>
-            <SelectComponent 
-              optionsList={availableForecastList} 
-              onChangeHandler={handleChangeForecast}
-            />
+          <p>Available Forecasts</p>
+          <SelectComponent 
+            optionsList={availableForecastList} 
+            onChangeHandler={handleChangeForecast}
+          />
         </Fragment>
-    }
+      
+      }
 
     </Fragment>
   );

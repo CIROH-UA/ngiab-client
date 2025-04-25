@@ -44,8 +44,19 @@ def list_public_s3_folders(
     return sorted(folders)
 
 def get_select_from_s3(list_of_interest: list[str]) -> list[str]:
-
     return [
         {"value": item_, "label": item_}
         for item_ in list_of_interest
     ]
+
+def remove_forcings_from_forecast_list(forecast_list: list[str]) -> list[str]:
+    """
+    Clean the forecast list to remove duplicates and sort it.
+    """
+    # Remove duplicates
+    for forecast_type in forecast_list:
+        if forecast_type.startswith("forcing_"):
+            forecast_list.remove(forecast_type)
+    # Sort the list
+    forecast_list.sort()
+    return forecast_list
