@@ -29,7 +29,7 @@ const DataStreamMenu = ({
     <Fragment>    
       <Container isVisible={isVisible}>
         <Content>
-          <h2>NGIAB DataStream S3 Data</h2>
+          <h3>NGIAB DataStream S3 Data</h3>
           <BucketNamesSelect />
         </Content>
       </Container>
