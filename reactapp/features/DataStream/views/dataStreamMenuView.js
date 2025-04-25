@@ -1,14 +1,14 @@
 import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
-import AddModelForm from 'features/ModelRuns/components/AddModelForm';
-import CenteredButtons from 'features/ModelRuns/components/menuButton';
-import ModelRunsSelect from 'features/ModelRuns/components/modelRunsSelect';
-import TimeSeriesSelection from 'features/ModelRuns/components/timeSeriesSelect';
-import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
-import { useModelRunsContext } from '../hooks/useModelRunsContext';
+// import AddModelForm from 'features/ModelRuns/components/AddModelForm';
+// import CenteredButtons from 'features/ModelRuns/components/menuButton';
+// import ModelRunsSelect from 'features/ModelRuns/components/modelRunsSelect';
+// import TimeSeriesSelection from 'features/ModelRuns/components/timeSeriesSelect';
+// import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
+// import { useModelRunsContext } from '../hooks/useModelRunsContext';
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import Button from 'react-bootstrap/Button';
-
+import DataStreamMenu from 'features/DataStream/components/dataStreamMenu';
 const Container = styled.div`
   position: absolute;
   top: 0;
@@ -58,30 +58,30 @@ const Content = styled.div`
   margin-top: 100px;
 `;
 
-const ModelRunsView = ({
-  singleRowOn,
-  toggleSingleRow,
+const DataStreamMenuView = ({
+  // singleRowOn,
+  // toggleSingleRow,
   setIsLoading,
   setIsModelRunListOpen,
   
 }) => {
   
   const [isOpen, setIsOpen] = useState(true);
-  const [isImportFormOpen, setIsImportFormOpen] = useState(false);
+  const [isDataStreamOpen, setIsDataStreamOpen] = useState(true);
   const [isModelRunListVisible, setIsModelRunListVisible] = useState(true);
-  const { state } = useModelRunsContext();
-  const isVisible = state.base_model_id ? true : false;
+  // const { state } = useModelRunsContext();
+  // const isVisible = state.base_model_id ? true : false;
 
   const toggleContainer = () => {
     setIsOpen(prev => !prev);
     setIsModelRunListOpen(prev => !prev);
   };
 
-  const showImportModelRunForm = () => {
-    setIsImportFormOpen(prev => !prev);
-    setIsModelRunListVisible(prev => !prev);
+  // const showImportModelRunForm = () => {
+  //   setIsImportFormOpen(prev => !prev);
+  //   setIsModelRunListVisible(prev => !prev);
 
-  };
+  // };
 
 
   return (
@@ -89,40 +89,16 @@ const ModelRunsView = ({
       <TogggledButton onClick={toggleContainer}>
         {isOpen ? <FaChevronLeft size={20} /> : <FaChevronRight size={20} />}
       </TogggledButton>
-
-    
       <Container isOpen={isOpen}>
         <Content>
-          {
-            isModelRunListVisible &&(
-              <Fragment>
-              <h2>Model Runs</h2>
-              <ModelRunsSelect />
-              
-              <TimeSeriesSelection
-                  singleRowOn={singleRowOn}
-                  toggleSingleRow={toggleSingleRow}
-                  setIsLoading={setIsLoading}
-              />
-              <HydrofabricMapControl
-                  isVisible={isVisible}
-              />
-            </Fragment>
-            )
-          }
-
-
-          <AddModelForm
-              isVisible={isImportFormOpen}
-              
+          <DataStreamMenu
+              isVisible={isDataStreamOpen}
           />
         </Content>
       </Container>
-      <CenteredButtons showImportModelRunForm={showImportModelRunForm}/>
-
     </Fragment>
 
   );
 };
 
-export default ModelRunsView;
+export default DataStreamMenuView;

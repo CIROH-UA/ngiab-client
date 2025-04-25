@@ -7,13 +7,11 @@ import Button from 'react-bootstrap/Button';
 import styled from 'styled-components';
 import { GoGraph,GoChevronDown  } from "react-icons/go";
 import LoadingAnimation from 'components/loader/LoadingAnimation';
-import HydroFabricView from './hydroFabricView.js';
+import HydroFabricView from '../ngiab/hydroFabricView.js';
 import MapComponent from 'features/Map/components/mapgl.js';
-import ModelRunsView from 'features/ModelRuns/views/modelsView.js';
-
+import DataStreamMenuView from 'features/DataStream/views/dataStreamMenuView.js';
 // const HydroFabricView = lazy(() => import('./hydroFabricView.js'));
 // const MapComponent = lazy(() => import('features/Map/components/mapgl.js'));
-// const ModelRunsView = lazy(() => import('features/ModelRuns/views/modelsView.js'));
 
 const ToggleButton = styled(Button)`
   top: ${(props) => (props.$fullScreen ? '95%' : '65%;')};
@@ -44,7 +42,7 @@ const ViewContainer = styled.div`
 `;
 
 
-const NGIABView = () => {
+const DataStreamView = () => {
   const [singleRowOn, toggleSingleRow] = useState(true);
   const [isModelRunListOpen, setIsModelRunListOpen] = useState(true);
   const [ isLoading, setIsLoading ] = useState(false);
@@ -54,18 +52,16 @@ const NGIABView = () => {
         <ModelRunsProvider>
           <HydroFabricProvider>
             <ToastContainer stacked  />
-            <ModelRunsView
-              singleRowOn={singleRowOn}
-              toggleSingleRow={toggleSingleRow}
-              setIsLoading={setIsLoading}
-              setIsModelRunListOpen={setIsModelRunListOpen}
-            />
+
               <MapContainer 
                 $fullScreen={singleRowOn}
-                
               >
                 <MapComponent />
               </MapContainer>
+              <DataStreamMenuView 
+                  setIsLoading={setIsLoading}
+                  setIsModelRunListOpen={setIsModelRunListOpen}
+              />
               <HydroFabricContainer 
                 $fullScreen={singleRowOn} 
                 isModelRunListOpen={isModelRunListOpen}  
@@ -88,4 +84,4 @@ const NGIABView = () => {
   );
 };
 
-export default NGIABView;
+export default DataStreamView;

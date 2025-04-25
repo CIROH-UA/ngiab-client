@@ -47,14 +47,6 @@ const CenteredButtons = (
         <StyledButton onClick={showImportModelRunForm}>
             <FaPlus  size={20} />
         </StyledButton>
-
-        <StyledButton >
-            <FaCoffee size={20} />
-        </StyledButton>
-
-        <StyledButton>
-            <FaBolt size={20} />
-        </StyledButton>
       </ButtonGroup>
     </CenteredContainer>
   );
