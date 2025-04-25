@@ -8,6 +8,7 @@ from pathlib import Path
 from botocore import UNSIGNED
 from botocore.client import Config
 
+from .utils import _get_conf_file
 
 def list_public_s3_folders(
     bucket: str = "ciroh-community-ngen-datastream",
@@ -149,7 +150,24 @@ def _add_datastream_data_to_conf(label: str, bucket:str, local_path: str, prefix
     with open(conf_base_path, "w") as f:
         json.dump(conf, f, indent=4)
 
-    return str(unique_id)
+    return individual_datastream
+
+def _add_datastream_data_to_model_conf(individual_datastream) -> None:
+    """
+    Add the datastream data to the configuration file.
+    """
+    conf_base_path = _get_conf_file()
+    with open(conf_base_path, "r") as f:
+        conf = json.load(f)
+
+    conf["model_runs"].append(individual_datastream)
+
+    with open(conf_base_path, "w") as f:
+        json.dump(conf, f, indent=4)
+    
+    return
+
+
 
 def _download_tar_from_s3(bucket: str, tar_key: str, download_path: str) -> None:
     """
@@ -166,7 +184,6 @@ def _download_tar_from_s3(bucket: str, tar_key: str, download_path: str) -> None
     """
     s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
     s3.download_file(Bucket=bucket, Key=tar_key, Filename=download_path)
-
 
 def _extract_keep_ngen_run(
     tar_path: str,
@@ -248,14 +265,16 @@ def download_and_extract_tar_from_s3(bucket: str = "ciroh-community-ngen-datastr
         dst_name=name_folder,
     )
     # Add the datastream data to the configuration file
-    unique_id = _add_datastream_data_to_conf(
+    individual_datastream = _add_datastream_data_to_conf(
         label=name_folder,
         bucket=bucket,
         local_path=f"{datastream_conf_dir_path}/{name_folder}",
         prefix=tar_key
     )
+    # add it also to the model runs
+    _add_datastream_data_to_model_conf(individual_datastream)
     # Return the path to the extracted files
-    return unique_id
+    return individual_datastream["id"]
 
 def _get_list_datastream_model_runs():
     """
