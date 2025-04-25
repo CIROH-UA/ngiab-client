@@ -26,7 +26,10 @@ from .utils import (
 from .datastream_utils import (
     list_public_s3_folders,
     get_select_from_s3,
-    remove_forcings_from_forecast_list
+    remove_forcings_from_forecast_list,
+    make_datastream_conf,
+    download_and_extract_tar_from_s3,
+    get_dates_select_from_s3
 )
 
 from .app import App
@@ -294,6 +297,19 @@ def getTeehrVariables(request):
         vars = []
     return JsonResponse({"teehr_variables": vars})
 
+
+@controller
+def makeDatastreamConf(request):
+    """
+    Create the datastream configuration file.
+    """
+    print("Creating datastream configuration file...")
+    try:
+        make_datastream_conf()
+        return JsonResponse({"status": "success"})
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)})
+
 @controller
 def getDataStreamNgiabDates(request):
     """
@@ -301,8 +317,8 @@ def getDataStreamNgiabDates(request):
     """
     print("Getting list of dates in the bucket...")
     ngen_dates = list_public_s3_folders(prefix="v2.2/")
-    list_dates = get_select_from_s3(ngen_dates)
-    # print("Dates in the bucket: ", list_dates)
+    list_dates = get_dates_select_from_s3(ngen_dates)
+    
     
     return JsonResponse({"ngen_dates": list_dates})
 
@@ -327,7 +343,22 @@ def getDataStreamNgiabAvailableVpus(request):
     print("Getting list of available vpus in the bucket...")
     avail_date = request.GET.get("avail_date")
     ngen_forecast = request.GET.get("ngen_forecast")
-    ngen_vpu = list_public_s3_folders(prefix=f"v2.2/{avail_date}/{ngen_forecast}")
+    prefix_path = f"v2.2/{avail_date}/{ngen_forecast}/"
+    ngen_vpu = list_public_s3_folders(prefix=prefix_path)
     dict_vpus = get_select_from_s3(ngen_vpu)
     return JsonResponse({"ngen_vpus": dict_vpus})
 
+
+@controller
+def getDataStreamTarFile(request):
+    """
+    Get the tar file from the bucket.
+    """
+    print("Getting tar file from the bucket...")
+    avail_date = request.GET.get("avail_date")
+    ngen_forecast = request.GET.get("ngen_forecast")
+    ngen_vpu = request.GET.get("ngen_vpu")
+    prefix_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_vpu}/"
+    extract_path = download_and_extract_tar_from_s3(tar_key=prefix_path)
+    
+    pass

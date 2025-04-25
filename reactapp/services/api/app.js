@@ -28,6 +28,9 @@ const appAPI = {
         return apiClient.get(`${APP_ROOT_URL}getModelRuns/`);
     },
     // Data Stream API
+    makeDatastreamConf:()   => {
+        return apiClient.get(`${APP_ROOT_URL}makeDatastreamConf/`);
+    },
     getDataStreamNgiabDates: () => {
         return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabDates/`);
     },
