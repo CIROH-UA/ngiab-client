@@ -71,7 +71,7 @@ const DataStreamMenuView = ({
   
   const { state } = useModelRunsContext();
   const isVisible = state.base_model_id ? true : false;
-
+  console.log('isVisible', state.base_model_id);
   const toggleContainer = () => {
     setIsOpen(prev => !prev);
     setIsDataStreamMenuOpen(prev => !prev);
@@ -84,9 +84,7 @@ const DataStreamMenuView = ({
       </TogggledButton>
       <Container isOpen={isOpen}>
         <Content>
-          <DataStreamMenu
-              isVisible={isDataStreamOpen}
-          />
+          <DataStreamMenu/>
           <TimeSeriesSelection
               singleRowOn={singleRowOn}
               toggleSingleRow={toggleSingleRow}
