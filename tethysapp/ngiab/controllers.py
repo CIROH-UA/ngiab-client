@@ -21,7 +21,7 @@ from .utils import (
     find_gpkg_file_path,
     append_ngen_usgs_column,
     append_nwm_usgs_column,
-    get_model_runs_selectable
+    get_model_runs_selectable,
 )
 from .datastream_utils import (
     list_public_s3_folders,
@@ -30,7 +30,9 @@ from .datastream_utils import (
     make_datastream_conf,
     download_and_extract_tar_from_s3,
     get_dates_select_from_s3,
-    get_datastream_model_runs_selectable
+    get_datastream_model_runs_selectable,
+    check_if_datastream_data_exists,
+    get_datastream_id_from_conf_file
 )
 
 from .app import App
@@ -362,7 +364,11 @@ def getDataStreamTarFile(request):
     ngen_vpu = request.GET.get("ngen_vpu")
     tar_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_vpu}/ngen-run.tar.gz"
     name_folder = f"{avail_date}_{ngen_forecast}_{ngen_vpu}"
-    unique_id = download_and_extract_tar_from_s3(tar_key=tar_path,name_folder=name_folder) 
+    data_was_downloaded = check_if_datastream_data_exists(name_folder)
+    if data_was_downloaded:
+        unique_id = get_datastream_id_from_conf_file(name_folder)
+    else:
+        unique_id = download_and_extract_tar_from_s3(tar_key=tar_path,name_folder=name_folder) 
     return JsonResponse({"id": unique_id})
 
 

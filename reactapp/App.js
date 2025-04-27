@@ -20,7 +20,7 @@ function App() {
           <Loader>
             <Layout 
               navLinks={[
-                {title: 'Model Ouput Visualization', to: PATH_HOME, eventKey: 'link-home'},
+                {title: 'Ouputs Visualization', to: PATH_HOME, eventKey: 'link-home'},
                 {title: 'Datastream Visualization', to: PATH_DATASTREAM, eventKey: 'link-datastream'},
 
               ]}
