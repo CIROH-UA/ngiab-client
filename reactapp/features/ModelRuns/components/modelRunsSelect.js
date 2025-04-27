@@ -8,11 +8,11 @@ import SelectComponent from './selectComponent';
 const ModelRunsSelect = (props) => {
   const {state,actions} = useModelRunsContext();
   const {actions: hydroFabricActions} = useHydroFabricContext();
+
   useEffect(() => {
-
     appAPI.getModelRuns().then((response) => {
+      
       actions.set_model_run_list(response.model_runs);
-
     }).catch((error) => {
       console.log("Error fetching Model Runs", error);
       hydroFabricActions.reset();

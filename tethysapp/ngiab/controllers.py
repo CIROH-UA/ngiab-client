@@ -30,7 +30,7 @@ from .datastream_utils import (
     make_datastream_conf,
     download_and_extract_tar_from_s3,
     get_dates_select_from_s3,
-    get_model_runs_selectable
+    get_datastream_model_runs_selectable
 )
 
 from .app import App
@@ -63,6 +63,7 @@ def importModelRuns(request):
 
 @controller
 def getModelRuns(request):
+    print("Getting model runs...")
     model_run_select =  get_model_runs_selectable()
     return JsonResponse({
         "model_runs": model_run_select
@@ -367,7 +368,7 @@ def getDataStreamTarFile(request):
 
 @controller
 def getDataStreamModelRuns(request):
-    datastream_model_run_select =  get_model_runs_selectable()
+    datastream_model_run_select =  get_datastream_model_runs_selectable()
     return JsonResponse({
         "datastream_model_runs": datastream_model_run_select
     })
