@@ -1,10 +1,10 @@
 import React, { useState, useEffect, Fragment  } from 'react';
 import styled from 'styled-components';
-import { Form, Button, Alert, Spinner, Stack } from 'react-bootstrap';
+import { Button, Spinner} from 'react-bootstrap';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
-import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
+import { toast } from 'react-toastify';
 
 const StyledButton = styled(Button)`
   
@@ -24,9 +24,6 @@ const StyledButton = styled(Button)`
   }
 `;
 
-
-
-
 export default function BucketNamesSelect() {
   const [datesBucket, setDatesBucket] = useState([]);
   const [availableForecastList, setAvailableForecastList] = useState([]);
@@ -36,13 +33,33 @@ export default function BucketNamesSelect() {
   const [selectedVpu, setSelectedVpu] = useState('');
 
   const {state,actions} = useModelRunsContext();
-  const {actions: hydroFabricActions} = useHydroFabricContext();
 
   const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState(null);
+  // const [error,   setError]   = useState(null);
   const [success, setSuccess] = useState(false);
+  const [loadingText, setLoadingText] = useState("");
+
+
+  const handleLoading = (text) => {
+    setLoading(true);
+    setLoadingText(text);
+  }
+  const handleSuccess = () => {
+    // setSuccess(true);
+    setLoading(false);
+    setLoadingText("");
+  }
+  
+  const handleError = (text) => {
+    setSuccess(false);
+    toast.error(text, { autoClose: 1000 });
+    setLoading(false);
+    setLoadingText("");
+  }
+  
 
   const handleVisulization = () => {
+    handleLoading("Loading Datastream Data");
     const params = {
       avail_date: selectedDate,
       ngen_forecast: selectedForecast,
@@ -50,46 +67,45 @@ export default function BucketNamesSelect() {
     }
     appAPI.getDataStreamTarFile(params)
     .then((data) => {
-          console.log('Success', data);
           if (data.error) {
-            // toast.error("Error fetching Model Run Data", { autoClose: 1000 });
+            handleError("Error fetching Datastream Data");
             return;
           }
-          actions.set_base_model_id(data.id)
+          actions.set_base_model_id(data.id);
+          handleSuccess();
           // toast.success("Successfully retrieved Model Run Data", { autoClose: 1000 });
         })
         .catch((error) => {
-          setSuccess(false);
+          handleError("Error Loading Datastream Data");
           console.error('Failed', error);
         });
   }
 
   const handleChangeDate = (e) => {
+    handleLoading("Loading Available Forecast...");
     setSelectedDate(e[0].value);
     const params = {
       avail_date: e[0].value,
     }
     appAPI.getDataStreamNgiabAvailableForecast(params)
     .then((data) => {
-        console.log('Success', data);
-        setAvailableForecastList(data.ngen_forecast);
           if (data.error) {
-            // toast.error("Error fetching Model Run Data", { autoClose: 1000 });
+            handleError("Error fetching Available Forecast...");
             return;
           }
-  
-          // toast.success("Successfully retrieved Model Run Data", { autoClose: 1000 });
+          setAvailableForecastList(data.ngen_forecast);
+          handleSuccess();
         })
         .catch((error) => {
           setSelectedDate("");
-
+          handleError("Error Loading Datastream Data");
           console.error('Failed', error);
         });
 
   }
 
   const handleChangeForecast = (e) => {
-    
+    handleLoading("Loading Available VPUs...");
     const params = {
       avail_date: selectedDate,
       ngen_forecast: e[0].value,
@@ -97,17 +113,16 @@ export default function BucketNamesSelect() {
     setSelectedForecast(e[0].value);
     appAPI.getDataStreamNgiabAvailableVpus(params)
     .then((data) => {
-        console.log('Success', data);
-        setAvailableVpuList(data.ngen_vpus);
           if (data.error) {
-            // toast.error("Error fetching Model Run Data", { autoClose: 1000 });
+            handleError("Error fetching Available VPUs...");
             return;
           }
-  
-          // toast.success("Successfully retrieved Model Run Data", { autoClose: 1000 });
+          setAvailableVpuList(data.ngen_vpus);
+          handleSuccess();
         })
         .catch((error) => {
           setSelectedForecast("");
+          handleError("Error Loading Available VPUs...");
           console.error('Failed', error);
         });
   }
@@ -120,15 +135,13 @@ export default function BucketNamesSelect() {
   useEffect(() => {    
       appAPI.getDataStreamNgiabDates()
         .then((data) => {
-          // console.log('Success', data);
-            console.log('Success', data);
-            setDatesBucket(data.ngen_dates);
+              
               if (data.error) {
-                // toast.error("Error fetching Model Run Data", { autoClose: 1000 });
+                toast.error("Error Datastream Dates From S3 Bucket", { autoClose: 1000 });
                 return;
               }
-      
-              // toast.success("Successfully retrieved Model Run Data", { autoClose: 1000 });
+              setDatesBucket(data.ngen_dates);
+              toast.success("Successfully retrieved Datastream Dates From S3 Bucket", { autoClose: 1000 });
             })
             .catch((error) => {
               console.error('Failed', error);
@@ -166,6 +179,14 @@ export default function BucketNamesSelect() {
           />
         </Fragment>
       }
+       <br />
+      {
+        loading &&
+        <>
+          <Spinner as="span" size="sm" animation="border" role="status" aria-hidden="true" />
+          &nbsp; {loadingText}
+        </>
+      }
       <br />
       {
         success && 
@@ -173,8 +194,6 @@ export default function BucketNamesSelect() {
           Visualize 
         </StyledButton>
       }
-
-
     </Fragment>
   );
 }
