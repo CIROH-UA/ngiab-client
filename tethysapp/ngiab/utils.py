@@ -10,6 +10,7 @@ import os
 def _get_conf_file():
     home_path = os.environ.get("HOME", "/tmp")
     conf_base_path = os.environ.get("VISUALIZER_CONF", f"{home_path}/ngiab_visualizer.json")
+    print(conf_base_path)
     return conf_base_path
 
 def _get_list_model_runs():
@@ -28,12 +29,15 @@ def _get_list_model_runs():
             ]
         }
     """
+    print("get_list_model_runs")
     conf_file = _get_conf_file()
+    print(conf_file)
     with open(conf_file, "r") as f:
         data = json.load(f)
     return data
 
 def get_model_runs_selectable():
+    
     model_runs = _get_list_model_runs()
     return [
         {

@@ -85,8 +85,6 @@ def remove_forcings_from_forecast_list(forecast_list: list[str]) -> list[str]:
     clean_list.sort()
     return clean_list
 
-
-
 def _create_datastream_conf_dir():
     """
     Create the datastream configuration directory if it does not exist.
@@ -297,7 +295,7 @@ def _get_list_datastream_model_runs():
         data = json.load(f)
     return data
 
-def get_model_runs_selectable():
+def get_datastream_model_runs_selectable():
     datastream_model_runs = _get_list_datastream_model_runs()
     return [
         {
