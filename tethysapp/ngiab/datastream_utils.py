@@ -165,8 +165,6 @@ def _add_datastream_data_to_model_conf(individual_datastream) -> None:
     
     return
 
-
-
 def _download_tar_from_s3(bucket: str, tar_key: str, download_path: str) -> None:
     """
     Download a tar file from an S3 bucket.
@@ -257,7 +255,7 @@ def download_and_extract_tar_from_s3(bucket: str = "ciroh-community-ngen-datastr
 
     # Extract the contents of the tar file
     
-    extracted_path = _extract_keep_ngen_run(
+    _extract_keep_ngen_run(
         tar_path=local_tar_path,
         work_dir=datastream_conf_dir_path,
         dst_name=name_folder,
@@ -304,3 +302,49 @@ def get_datastream_model_runs_selectable():
         }
         for datastream_model_run in datastream_model_runs["datastream"]
     ]
+
+def check_if_datastream_data_exists(datastream_folder_name: str) -> bool:
+    """
+    Check if the datastream data exists in the configuration file.
+
+    Parameters
+    ----------
+    datastream_folder_name : str
+        The name of the datastream folder to check.
+
+    Returns
+    -------
+    bool
+        True if the datastream data exists, False otherwise.
+    """
+    conf_dir_path = _get_datastream_conf_dir()
+    datastream_folder_path = os.path.join(conf_dir_path, datastream_folder_name)
+    
+    if not os.path.exists(datastream_folder_path):
+        return False
+    else:
+        return True
+    
+def get_datastream_id_from_conf_file(datastream_folder_name: str) -> str:
+    """
+    Get the datastream ID from the configuration file.
+
+    Parameters
+    ----------
+    datastream_folder_name : str
+        The name of the datastream folder to check.
+
+    Returns
+    -------
+    str
+        The datastream ID if it exists, None otherwise.
+    """
+    conf_file = _get_datastream_conf_file()
+    with open(conf_file, "r") as f:
+        data = json.load(f)
+    
+    for datastream in data["datastream"]:
+        if datastream["label"] == datastream_folder_name:
+            return datastream["id"]
+    
+    return None
