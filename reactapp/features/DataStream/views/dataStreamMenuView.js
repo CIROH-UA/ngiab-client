@@ -8,7 +8,9 @@ import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContex
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import Button from 'react-bootstrap/Button';
 import DataStreamMenu from 'features/DataStream/components/dataStreamMenu';
-
+import HydrofabricLayerMenu from 'features/DataStream/components/hydroFabricLayerMenu';
+import HydroFabricSelectMenu from 'features/DataStream/components/hydroFabricSelectMenu';
+import DataStreamMenuWrapper from 'features/DataStream/components/dataStreamMenuWrapper';
 const Container = styled.div`
   position: absolute;
   top: 0;
@@ -66,12 +68,12 @@ const DataStreamMenuView = ({
   
 }) => {
   
-  const [isOpen, setIsOpen] = useState(true);
+  const [isopen, setIsOpen] = useState(false);
   const [isDataStreamOpen, setIsDataStreamOpen] = useState(true);
   
   const { state } = useModelRunsContext();
   const isVisible = state.base_model_id ? true : false;
-  console.log('isVisible', state.base_model_id);
+  
   const toggleContainer = () => {
     setIsOpen(prev => !prev);
     setIsDataStreamMenuOpen(prev => !prev);
@@ -79,7 +81,31 @@ const DataStreamMenuView = ({
 
   return (
     <Fragment>
-      <TogggledButton onClick={toggleContainer}>
+      <DataStreamMenuWrapper/>
+      {/* <DataStreamMenu 
+        isopen={isopen}
+        setIsOpen={setIsOpen}
+      />
+      <HydrofabricLayerMenu 
+        isopen={isopen}
+        setIsOpen={setIsOpen}
+      /> */}
+      {/* <HydroFabricSelectMenu
+        isopen={isopen}
+        setIsOpen={setIsOpen}
+        // singleRowOn={singleRowOn}
+        toggleSingleRow={toggleSingleRow}
+        setIsLoading={setIsLoading}
+      /> */}
+      {/* <TimeSeriesMenu
+        isOpen={isOpen}
+        setIsOpen={setIsOpen}
+        singleRowOn={singleRowOn}
+        toggleSingleRow={toggleSingleRow}
+        setIsLoading={setIsLoading}
+      /> */}
+      
+      {/* <TogggledButton onClick={toggleContainer}>
         {isOpen ? <FaChevronLeft size={20} /> : <FaChevronRight size={20} />}
       </TogggledButton>
       <Container isOpen={isOpen}>
@@ -94,7 +120,7 @@ const DataStreamMenuView = ({
               isVisible={isVisible}
           />
         </Content>
-      </Container>
+      </Container> */}
     </Fragment>
 
   );

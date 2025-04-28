@@ -1,9 +1,10 @@
 import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
-import BucketNamesSelect from './bucketNamesSelect';
+import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
+
 import Button from 'react-bootstrap/Button';
-import { FaList } from "react-icons/fa";
 import { IoMdClose } from "react-icons/io";
+import { IoLayers } from "react-icons/io5";
 
 const Container = styled.div`
   position: absolute;
@@ -27,7 +28,7 @@ const Container = styled.div`
 `;
 
 // const TogggledButton = styled(Button)`
-//   top: ${({ isOpen }) => isOpen ? '80px;' : '100px;'};
+//   top: ${({ isOpen }) => isOpen ? '80px;' : '140px;'};
 //   left: ${({ isOpen }) => isOpen ? '18%;' : '25px;'};
 //   position: absolute;
   
@@ -53,7 +54,7 @@ const Container = styled.div`
 // `;
 
 const TogggledButton = styled(Button)`
-  top: 80px;
+  top: 140px;
   left: 25px;
   position: absolute;
   
@@ -78,6 +79,8 @@ const TogggledButton = styled(Button)`
   }
 `;
 
+
+
 const Content = styled.div`
   padding: 16px;
   margin-top: 100px;
@@ -85,34 +88,35 @@ const Content = styled.div`
 
 
 
-const DataStreamMenu = ({
+const HydrofabricLayerMenu = ({
   isopen,
-  // setIsOpen,
-  handleIsOpen,
+  // setIsOpen
+  handleIsOpen
 }) => {
   // const [isOpen, setIsOpen] = useState(false);
   
-  // const toggleContainer = () => {
-  //   // setIsOpen(prev => !prev);
-  //   handleClose();
-  //   // setIsOpen();
-  // };
+  const toggleContainer = () => {
+    setIsOpen();
+    // setIsOpen(prev => !prev);
+    
+  };
 
 
   
   return (
     <Fragment>
-          
+          {/* <TogggledButton onClick={toggleContainer} isOpen={isopen}>
+            {isopen ? <IoMdClose size={20} /> : <IoLayers size={20} />}
+          </TogggledButton> */}
           {
             !isopen && <TogggledButton onClick={handleIsOpen}>
-               <FaList size={20} />
+               <IoLayers size={20} />
             </TogggledButton>
           }
+
           <Container isOpen={isopen}>
             <Content>
-              <h3>NGIAB DataStream S3 Data</h3>
-
-              <BucketNamesSelect />
+                <HydrofabricMapControl isVisible={isopen} />
             </Content>
           </Container>
     </Fragment>
@@ -120,4 +124,4 @@ const DataStreamMenu = ({
   );
 };
 
-export default DataStreamMenu;
+export default HydrofabricLayerMenu;

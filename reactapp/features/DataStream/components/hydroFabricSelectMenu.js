@@ -1,9 +1,11 @@
 import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
-import BucketNamesSelect from './bucketNamesSelect';
+// import TimeSeriesSelection from 'features/ModelRuns/components/timeSeriesSelect';
+import HydroFabricSelect from 'features/ModelRuns/components/hydroFabricSelect';
+
 import Button from 'react-bootstrap/Button';
-import { FaList } from "react-icons/fa";
-import { IoMdClose } from "react-icons/io";
+import { IoMdClose, IoIosOptions  } from "react-icons/io";
+
 
 const Container = styled.div`
   position: absolute;
@@ -26,35 +28,9 @@ const Container = styled.div`
   }
 `;
 
-// const TogggledButton = styled(Button)`
-//   top: ${({ isOpen }) => isOpen ? '80px;' : '100px;'};
-//   left: ${({ isOpen }) => isOpen ? '18%;' : '25px;'};
-//   position: absolute;
-  
-//   margin-top: 10px;
-
-//   // transform: translate(-50%, -50%);
-//   transition: transform 0.3s ease;
-//   // transform: ${({ isOpen }) => isOpen ? 'translateX(0)' : 'translateX(calc(-90%))'};
-
-//   background-color: rgba(255, 255, 255, 0.1);
-//   border: none;
-//   color: white;
-//   border-radius: 5px;
-//   padding: 7px 8px;
-//   z-index: 1001;
-
-//   &:hover, &:focus {
-//     background-color: rgba(0, 0, 0, 0.1)!important;
-//     color: white;
-//     border: none;
-//     box-shadow: none;
-//   }
-// `;
-
 const TogggledButton = styled(Button)`
-  top: 80px;
-  left: 25px;
+  top: ${({ isOpen }) => isOpen ? '80px;' : '140px;'};
+  left: ${({ isOpen }) => isOpen ? '18%;' : '25px;'};
   position: absolute;
   
   margin-top: 10px;
@@ -78,6 +54,7 @@ const TogggledButton = styled(Button)`
   }
 `;
 
+
 const Content = styled.div`
   padding: 16px;
   margin-top: 100px;
@@ -85,34 +62,32 @@ const Content = styled.div`
 
 
 
-const DataStreamMenu = ({
+const HydroFabricSelectMenu = ({
   isopen,
-  // setIsOpen,
-  handleIsOpen,
+  setIsOpen,
+  // singleRowOn,
+  toggleSingleRow,
+  setIsLoading
 }) => {
-  // const [isOpen, setIsOpen] = useState(false);
   
-  // const toggleContainer = () => {
-  //   // setIsOpen(prev => !prev);
-  //   handleClose();
-  //   // setIsOpen();
-  // };
+  
+  const toggleContainer = () => {
+    setIsOpen(prev => !prev);
+  };
 
 
-  
   return (
     <Fragment>
-          
-          {
-            !isopen && <TogggledButton onClick={handleIsOpen}>
-               <FaList size={20} />
-            </TogggledButton>
-          }
+          <TogggledButton onClick={toggleContainer} isOpen={isopen}>
+            {isopen ? <IoMdClose size={20} /> : <IoIosOptions size={20} />}
+          </TogggledButton>
           <Container isOpen={isopen}>
             <Content>
-              <h3>NGIAB DataStream S3 Data</h3>
-
-              <BucketNamesSelect />
+                <HydroFabricSelect
+                    isOpen={isopen}
+                    toggleSingleRow={toggleSingleRow}
+                    setIsLoading={setIsLoading}
+                />
             </Content>
           </Container>
     </Fragment>
@@ -120,4 +95,4 @@ const DataStreamMenu = ({
   );
 };
 
-export default DataStreamMenu;
+export default HydroFabricSelectMenu;
