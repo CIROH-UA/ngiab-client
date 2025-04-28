@@ -11,9 +11,11 @@ const StyledHydroFabricContainer = styled.div`
   width: ${(props) => (props.isModelRunListOpen ? '80%' : '100%')};
   margin-left: ${(props) => (props.isModelRunListOpen ? '20%' : '0%')};
   padding: ${(props) => (props.$fullScreen ? '0px' : '5px;')}; 
-  background-color: ${(props) =>
-    props.theme === 'dark' ? '#4f5b67' : '#ffffff'};
-  color: ${(props) => (props.theme === 'dark' ? '#ffffff' : '#000000')};
+  background-color: ${(props) => props.theme === 'dark' ? '#4f5b67' : '#ffffff'};
+  background-color: ${(props) => props.theme === 'dark' ? '#4f5b67' : '#ffffff'};
+  // background-color: #4f5b679e;
+  // color: #cafeff;
+  // color: ${(props) => (props.theme === 'dark' ? '#ffffff' : '#000000')};
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   
@@ -37,8 +39,7 @@ const StyledHydroFabricPlotContainer = styled.div`
   height: 300px;
   order: 1;
   flex: 1 1 80%;
-  background-color: ${(props) =>
-    props.theme === 'dark' ? '#4f5b67' : '#f9f9f9'};
+  background-color: ${(props) => props.theme === 'dark' ? '#4f5b67' : '#f9f9f9'};
 `;
 
 export const HydroFabricPlotContainer = (props) => {

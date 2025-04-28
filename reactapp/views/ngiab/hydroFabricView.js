@@ -23,7 +23,7 @@ const ViewContainer = styled.div`
 const StyledTabs = styled.div`
   .nav-tabs .nav-item.show .nav-link,
   .nav-tabs .nav-link{
-      color: #fff;
+      color:rgb(152, 191, 228);
       border-width: 2px;
   }
 
