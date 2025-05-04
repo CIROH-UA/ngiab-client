@@ -64,15 +64,15 @@ const TogggledButton = styled(Button)`
   transition: transform 0.3s ease;
   // transform: ${({ isOpen }) => isOpen ? 'translateX(0)' : 'translateX(calc(-90%))'};
 
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: #009989;
   border: none;
   color: white;
   border-radius: 5px;
-  padding: 7px 8px;
+  padding: 3px 10px;
   z-index: 1001;
 
   &:hover, &:focus {
-    background-color: rgba(0, 0, 0, 0.1)!important;
+    background-color: #000000b3 !important;
     color: white;
     border: none;
     box-shadow: none;
@@ -111,7 +111,7 @@ const HydrofabricLayerMenu = ({
           </TogggledButton> */}
           {
             !isopen && <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu}>
-               <IoLayers size={20} />
+               <IoLayers size={10} />
             </TogggledButton>
           }
 
