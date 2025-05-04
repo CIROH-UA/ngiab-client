@@ -6,6 +6,7 @@ const DataStreamMenuView = ({
   toggleSingleRow,
   setIsLoading,
   setIsDataStreamMenuOpen,
+  singleRowOn
   
 }) => {
   
@@ -14,7 +15,8 @@ const DataStreamMenuView = ({
       <DataStreamMenuWrapper 
           toggleSingleRow={toggleSingleRow}
           setIsLoading={setIsLoading}
-          setIsDataStreamMenuOpen={setIsDataStreamMenuOpen} 
+          setIsDataStreamMenuOpen={setIsDataStreamMenuOpen}
+          singleRowOn={singleRowOn}
       />
     </Fragment>
 

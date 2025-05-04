@@ -35,7 +35,6 @@ export default function BucketNamesSelect() {
   const {state,actions} = useModelRunsContext();
 
   const [loading, setLoading] = useState(false);
-  // const [error,   setError]   = useState(null);
   const [success, setSuccess] = useState(false);
   const [loadingText, setLoadingText] = useState("");
 
