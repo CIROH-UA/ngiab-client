@@ -18,7 +18,7 @@ import appAPI from 'services/api/app';
 const ToggleButton = styled(Button)`
   // top: ${(props) => (props.$fullScreen ? '95%' : '65%;')};
   top: 300px;
-  left: ${(props) => (props.$fullScreen ? '22%;' : '38px;')}
+  left: ${(props) => (props.$fullScreen ? '21%;' : '38px;')}
   // right: 0px;
   position: absolute;
   transform: translate(-50%, -50%);
@@ -81,15 +81,14 @@ const DataStreamView = () => {
                   toggleSingleRow={toggleSingleRow} 
                   setIsLoading={setIsLoading}
                   setIsDataStreamMenuOpen={setIsDataStreamMenuOpen}
+                  singleRowOn={singleRowOn}
               />
+
+              
               <HydroFabricContainer 
                 $fullScreen={singleRowOn} 
                 isModelRunListOpen={isDataStreamMenuOpen}  
               >
-                
-                <ToggleButton $fullScreen={isDataStreamMenuOpen}  onClick={() => toggleSingleRow(prev => !prev)}>
-                  {singleRowOn ? <GoGraph size={10} /> : <IoMdClose size={10} />}
-                </ToggleButton>
                 <Suspense fallback={<LoadingAnimation />}>
                   <HydroFabricView 
                     singleRowOn={singleRowOn} 

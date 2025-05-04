@@ -5,13 +5,14 @@ import Button from 'react-bootstrap/Button';
 import DataStreamMenu from 'features/DataStream/components/dataStreamMenu';
 import HydrofabricLayerMenu from 'features/DataStream/components/hydroFabricLayerMenu';
 import HydroFabricSelectMenu from 'features/DataStream/components/hydroFabricSelectMenu';
+import HydroFabricTimeSeriesMenu from 'features/DataStream/components/hydroFabricTimeSeriesMenu';
 
 import { IoMdClose } from "react-icons/io";
 
 
 const TogggledButton = styled(Button)`
   top: 60px;
-  left: 18%;
+  left: 1%;
   position: absolute;
   margin-top: 10px;
 
@@ -38,7 +39,8 @@ const TogggledButton = styled(Button)`
 const DataStreamMenuWrapper = ({
   toggleSingleRow,
   setIsLoading,
-  setIsDataStreamMenuOpen
+  setIsDataStreamMenuOpen,
+  singleRowOn
 }) => {
   const [isBucketDatesOpen, setIsBucketDatesOpen] = useState(false);
   const [isHydroFabricSelectOpen, setIsHydroFabricSelectOpen] = useState(false);
@@ -104,11 +106,15 @@ const DataStreamMenuWrapper = ({
         <HydroFabricSelectMenu
           isopen={isHydroFabricSelectOpen}
           handleIsOpen={handleHydroSelectMenu}
-          // setIsOpen={handleHydroSelectMenu}
           toggleSingleRow={toggleSingleRow}
           setIsLoading={setIsLoading}
           currentMenu={currentMenu}
-        /> 
+        />
+        <HydroFabricTimeSeriesMenu
+          toggleSingleRow={toggleSingleRow}
+          currentMenu={currentMenu}
+          singleRowOn={singleRowOn}
+        />
 
     </Fragment>
 

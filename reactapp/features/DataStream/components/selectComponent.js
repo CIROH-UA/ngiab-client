@@ -31,7 +31,7 @@ const customStyles = {
   menuPortal: (base) => ({ ...base, zIndex: 9999 }),
   menu: (provided) => ({
     ...provided,
-    maxHeight: '500px',
+    // maxHeight: '500px',
     overflowY: 'auto',
   }),
   option: (provided) => ({

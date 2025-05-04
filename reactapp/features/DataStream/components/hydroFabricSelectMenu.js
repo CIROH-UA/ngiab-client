@@ -1,6 +1,5 @@
 import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
-// import TimeSeriesSelection from 'features/ModelRuns/components/timeSeriesSelect';
 import HydroFabricSelect from 'features/DataStream/components/hydroFabricSelect';
 
 import Button from 'react-bootstrap/Button';
@@ -29,18 +28,13 @@ const Container = styled.div`
 `;
 
 const TogggledButton = styled(Button)`
-  // top: ${({ isOpen }) => isOpen ? '80px;' : '140px;'};
-  // left: ${({ isOpen }) => isOpen ? '18%;' : '25px;'};
-
   top: 200px;
   left: ${({ currentMenu }) => currentMenu ? '21%' : '20px'};
   position: absolute;
   
   margin-top: 10px;
 
-  // transform: translate(-50%, -50%);
   transition: transform 0.3s ease;
-  // transform: ${({ isOpen }) => isOpen ? 'translateX(0)' : 'translateX(calc(-90%))'};
 
   background-color: #009989;
   border: none;
@@ -68,19 +62,12 @@ const Content = styled.div`
 const HydroFabricSelectMenu = ({
   isopen,
   handleIsOpen,
-  // setIsOpen,
-  // singleRowOn,
   toggleSingleRow,
   setIsLoading,
   currentMenu
 }) => {
   
   
-  const toggleContainer = () => {
-    setIsOpen(prev => !prev);
-  };
-
-
   return (
     <Fragment>
           {
@@ -88,10 +75,6 @@ const HydroFabricSelectMenu = ({
                <IoIosOptions size={10} />
             </TogggledButton>
           }
-
-          {/* <TogggledButton onClick={toggleContainer} isOpen={isopen}>
-            {isopen ? <IoMdClose size={20} /> : <IoIosOptions size={20} />}
-          </TogggledButton> */}
           <Container isOpen={isopen}>
             <Content>
                 <HydroFabricSelect

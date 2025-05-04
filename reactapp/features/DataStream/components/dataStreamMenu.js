@@ -1,9 +1,8 @@
-import React, { Fragment, useState } from 'react';
+import React, { Fragment } from 'react';
 import styled from 'styled-components';
 import BucketNamesSelect from './bucketNamesSelect';
 import Button from 'react-bootstrap/Button';
 import { FaList } from "react-icons/fa";
-import { IoMdClose } from "react-icons/io";
 
 const Container = styled.div`
   position: absolute;
@@ -25,32 +24,6 @@ const Container = styled.div`
     transform: ${({ isOpen }) => isOpen ? 'translateX(0)' : 'translateX(calc(-100%))'};
   }
 `;
-
-// const TogggledButton = styled(Button)`
-//   top: ${({ isOpen }) => isOpen ? '80px;' : '100px;'};
-//   left: ${({ isOpen }) => isOpen ? '18%;' : '25px;'};
-//   position: absolute;
-  
-//   margin-top: 10px;
-
-//   // transform: translate(-50%, -50%);
-//   transition: transform 0.3s ease;
-//   // transform: ${({ isOpen }) => isOpen ? 'translateX(0)' : 'translateX(calc(-90%))'};
-
-//   background-color: rgba(255, 255, 255, 0.1);
-//   border: none;
-//   color: white;
-//   border-radius: 5px;
-//   padding: 7px 8px;
-//   z-index: 1001;
-
-//   &:hover, &:focus {
-//     background-color: rgba(0, 0, 0, 0.1)!important;
-//     color: white;
-//     border: none;
-//     box-shadow: none;
-//   }
-// `;
 
 const TogggledButton = styled(Button)`
   top: 80px;
@@ -88,20 +61,11 @@ const Content = styled.div`
 
 const DataStreamMenu = ({
   isopen,
-  // setIsOpen,
   handleIsOpen,
   currentMenu
 }) => {
-  // const [isOpen, setIsOpen] = useState(false);
-  
-  // const toggleContainer = () => {
-  //   // setIsOpen(prev => !prev);
-  //   handleClose();
-  //   // setIsOpen();
-  // };
 
 
-  
   return (
     <Fragment>
           
@@ -112,7 +76,7 @@ const DataStreamMenu = ({
           }
           <Container isOpen={isopen}>
             <Content>
-              <h3>NGIAB DataStream S3 Data</h3>
+              <h4>NGIAB DataStream S3 Data</h4>
 
               <BucketNamesSelect />
             </Content>

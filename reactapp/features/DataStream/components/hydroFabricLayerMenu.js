@@ -1,9 +1,8 @@
-import React, { Fragment, useState } from 'react';
+import React, { Fragment } from 'react';
 import styled from 'styled-components';
 import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
 
 import Button from 'react-bootstrap/Button';
-import { IoMdClose } from "react-icons/io";
 import { IoLayers } from "react-icons/io5";
 
 const Container = styled.div`
@@ -27,31 +26,6 @@ const Container = styled.div`
   }
 `;
 
-// const TogggledButton = styled(Button)`
-//   top: ${({ isOpen }) => isOpen ? '80px;' : '140px;'};
-//   left: ${({ isOpen }) => isOpen ? '18%;' : '25px;'};
-//   position: absolute;
-  
-//   margin-top: 10px;
-
-//   // transform: translate(-50%, -50%);
-//   transition: transform 0.3s ease;
-//   // transform: ${({ isOpen }) => isOpen ? 'translateX(0)' : 'translateX(calc(-90%))'};
-
-//   background-color: rgba(255, 255, 255, 0.1);
-//   border: none;
-//   color: white;
-//   border-radius: 5px;
-//   padding: 7px 8px;
-//   z-index: 1001;
-
-//   &:hover, &:focus {
-//     background-color: rgba(0, 0, 0, 0.1)!important;
-//     color: white;
-//     border: none;
-//     box-shadow: none;
-//   }
-// `;
 
 const TogggledButton = styled(Button)`
   top: 140px;
