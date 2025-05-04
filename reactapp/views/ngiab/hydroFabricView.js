@@ -1,4 +1,4 @@
-import { Suspense, Fragment, lazy, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import styled from 'styled-components';
 import Tab from 'react-bootstrap/Tab';
 import Tabs from 'react-bootstrap/Tabs';
@@ -8,9 +8,6 @@ import LoadingAnimation from 'components/loader/LoadingAnimation';
 import ParentSize from '@visx/responsive/lib/components/ParentSize';
 import LineChart from 'features/hydroFabric/components/chart';
 import TeehrMetricsTable from 'features/hydroFabric/components/teehrMetrics';
-
-// const LineChart = lazy(() => import('../../features/hydroFabric/components/chart'));
-// const TeehrMetricsTable = lazy(() => import('../../features/hydroFabric/components/teehrMetrics'));
 
 
 const ViewContainer = styled.div`

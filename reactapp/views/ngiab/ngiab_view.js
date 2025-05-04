@@ -11,10 +11,6 @@ import HydroFabricView from './hydroFabricView.js';
 import MapComponent from 'features/Map/components/mapgl.js';
 import ModelRunsView from 'features/ModelRuns/views/modelsView.js';
 
-// const HydroFabricView = lazy(() => import('./hydroFabricView.js'));
-// const MapComponent = lazy(() => import('features/Map/components/mapgl.js'));
-// const ModelRunsView = lazy(() => import('features/ModelRuns/views/modelsView.js'));
-
 const ToggleButton = styled(Button)`
   top: ${(props) => (props.$fullScreen ? '95%' : '65%;')};
   right: 0px;
