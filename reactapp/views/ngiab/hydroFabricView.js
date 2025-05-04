@@ -69,102 +69,102 @@ const HydroFabricView = ({singleRowOn}) => {
 
   return (
     <ViewContainer fullScreen={singleRowOn}>
-    <StyledTabs>
-      <Tabs
-        id="uncontrolled-tab-hydrofabtic"
-        activeKey={activeKey}
-        onSelect={(k) => setActiveKey(k)}
-        className="mb-3"
-      >
-        {state.nexus.id && (
-          <Tab eventKey="nexus_plot" title="Nexus">
-            <Suspense fallback={<LoadingAnimation />}>
-              <HydroFabricPlotContainer>
-                <ParentSize>
-                  {({ width, height }) =>
-                    state.nexus.chart.series && (
-                      <LineChart
-                        width={width}
-                        height={height}
-                        data={state.nexus.chart.series}
-                        layout={state.nexus.chart.layout}
-                      />
-                    )
-                  }
-                </ParentSize>
-              </HydroFabricPlotContainer>
-            </Suspense>
-          </Tab>
-        )}
-        {state.catchment.id && (
-          <Tab eventKey="catchment_plot" title="Catchment">
-            <Suspense fallback={<LoadingAnimation />}>
-              <HydroFabricPlotContainer>
-                <ParentSize>
-                  {({ width, height }) =>
-                    state.catchment.chart.series && (
-                      <LineChart
-                        width={width}
-                        height={height}
-                        data={state.catchment.chart.series}
-                        layout={state.catchment.chart.layout}
-                      />
-                    )
-                  }
-                </ParentSize>
-              </HydroFabricPlotContainer>
-            </Suspense>
-          </Tab>
-        )}
-        {state.troute.variable && (
-          <Tab eventKey="troute_plot" title="Troute">
-            <Suspense fallback={<LoadingAnimation />}>
-              <HydroFabricPlotContainer>
-                <ParentSize>
-                  {({ width, height }) =>
-                    state.troute.chart.series && (
-                      <LineChart
-                        width={width}
-                        height={height}
-                        data={state.troute.chart.series}
-                        layout={state.troute.chart.layout}
-                      />
-                    )
-                  }
-                </ParentSize>
-              </HydroFabricPlotContainer>
-            </Suspense>
-          </Tab>
-        )}
-        {state.teehr.variable && (
-          <Tab eventKey="teerh_plot" title="TEERH Plot">
-            <Suspense fallback={<LoadingAnimation />}>
-              <HydroFabricPlotContainer>
-                <ParentSize>
-                  {({ width, height }) =>
-                    state.teehr.chart.series && (
-                      <LineChart
-                        width={width}
-                        height={height}
-                        data={state.teehr.chart.series}
-                        layout={state.teehr.chart.layout}
-                      />
-                    )
-                  }
-                </ParentSize>
-              </HydroFabricPlotContainer>
-            </Suspense>
-          </Tab>
-        )}
-        {state.teehr.metrics && (
-          <Tab eventKey="teerh_metrics" title="TEERH Metrics">
-            <TeehrMetricsWrapper>
-              <TeehrMetricsTable data={state.teehr.metrics} />
-            </TeehrMetricsWrapper>
-          </Tab>
-        )}
-      </Tabs>
-    </StyledTabs>
+      <StyledTabs>
+        <Tabs
+          id="uncontrolled-tab-hydrofabtic"
+          activeKey={activeKey}
+          onSelect={(k) => setActiveKey(k)}
+          className="mb-3"
+        >
+          {state.nexus.id && (
+            <Tab eventKey="nexus_plot" title="Nexus">
+              <Suspense fallback={<LoadingAnimation />}>
+                <HydroFabricPlotContainer>
+                  <ParentSize>
+                    {({ width, height }) =>
+                      state.nexus.chart.series && (
+                        <LineChart
+                          width={width}
+                          height={height}
+                          data={state.nexus.chart.series}
+                          layout={state.nexus.chart.layout}
+                        />
+                      )
+                    }
+                  </ParentSize>
+                </HydroFabricPlotContainer>
+              </Suspense>
+            </Tab>
+          )}
+          {state.catchment.id && (
+            <Tab eventKey="catchment_plot" title="Catchment">
+              <Suspense fallback={<LoadingAnimation />}>
+                <HydroFabricPlotContainer>
+                  <ParentSize>
+                    {({ width, height }) =>
+                      state.catchment.chart.series && (
+                        <LineChart
+                          width={width}
+                          height={height}
+                          data={state.catchment.chart.series}
+                          layout={state.catchment.chart.layout}
+                        />
+                      )
+                    }
+                  </ParentSize>
+                </HydroFabricPlotContainer>
+              </Suspense>
+            </Tab>
+          )}
+          {state.troute.variable && (
+            <Tab eventKey="troute_plot" title="Troute">
+              <Suspense fallback={<LoadingAnimation />}>
+                <HydroFabricPlotContainer>
+                  <ParentSize>
+                    {({ width, height }) =>
+                      state.troute.chart.series && (
+                        <LineChart
+                          width={width}
+                          height={height}
+                          data={state.troute.chart.series}
+                          layout={state.troute.chart.layout}
+                        />
+                      )
+                    }
+                  </ParentSize>
+                </HydroFabricPlotContainer>
+              </Suspense>
+            </Tab>
+          )}
+          {state.teehr.variable && (
+            <Tab eventKey="teerh_plot" title="TEERH Plot">
+              <Suspense fallback={<LoadingAnimation />}>
+                <HydroFabricPlotContainer>
+                  <ParentSize>
+                    {({ width, height }) =>
+                      state.teehr.chart.series && (
+                        <LineChart
+                          width={width}
+                          height={height}
+                          data={state.teehr.chart.series}
+                          layout={state.teehr.chart.layout}
+                        />
+                      )
+                    }
+                  </ParentSize>
+                </HydroFabricPlotContainer>
+              </Suspense>
+            </Tab>
+          )}
+          {state.teehr.metrics && (
+            <Tab eventKey="teerh_metrics" title="TEERH Metrics">
+              <TeehrMetricsWrapper>
+                <TeehrMetricsTable data={state.teehr.metrics} />
+              </TeehrMetricsWrapper>
+            </Tab>
+          )}
+        </Tabs>
+      </StyledTabs>
     </ViewContainer>
   );
 };

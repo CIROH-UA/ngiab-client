@@ -54,7 +54,8 @@ const Container = styled.div`
 
 const TogggledButton = styled(Button)`
   top: 80px;
-  left: 25px;
+  // left: 25px;
+  left: ${({ currentMenu }) => currentMenu ? '21%' : '20px'};
   position: absolute;
   
   margin-top: 10px;
@@ -89,6 +90,7 @@ const DataStreamMenu = ({
   isopen,
   // setIsOpen,
   handleIsOpen,
+  currentMenu
 }) => {
   // const [isOpen, setIsOpen] = useState(false);
   
@@ -104,7 +106,7 @@ const DataStreamMenu = ({
     <Fragment>
           
           {
-            !isopen && <TogggledButton onClick={handleIsOpen}>
+            !isopen && <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu} >
                <FaList size={20} />
             </TogggledButton>
           }

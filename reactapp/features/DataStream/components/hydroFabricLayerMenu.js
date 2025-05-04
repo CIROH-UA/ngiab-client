@@ -55,7 +55,7 @@ const Container = styled.div`
 
 const TogggledButton = styled(Button)`
   top: 140px;
-  left: 25px;
+  left: ${({ currentMenu }) => currentMenu ? '21%' : '20px'};
   position: absolute;
   
   margin-top: 10px;
@@ -91,7 +91,8 @@ const Content = styled.div`
 const HydrofabricLayerMenu = ({
   isopen,
   // setIsOpen
-  handleIsOpen
+  handleIsOpen,
+  currentMenu
 }) => {
   // const [isOpen, setIsOpen] = useState(false);
   
@@ -109,7 +110,7 @@ const HydrofabricLayerMenu = ({
             {isopen ? <IoMdClose size={20} /> : <IoLayers size={20} />}
           </TogggledButton> */}
           {
-            !isopen && <TogggledButton onClick={handleIsOpen}>
+            !isopen && <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu}>
                <IoLayers size={20} />
             </TogggledButton>
           }

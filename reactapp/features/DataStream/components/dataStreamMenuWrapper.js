@@ -4,14 +4,15 @@ import Button from 'react-bootstrap/Button';
 
 import DataStreamMenu from 'features/DataStream/components/dataStreamMenu';
 import HydrofabricLayerMenu from 'features/DataStream/components/hydroFabricLayerMenu';
+import HydroFabricSelectMenu from 'features/DataStream/components/hydroFabricSelectMenu';
+
 import { IoMdClose } from "react-icons/io";
 
 
 const TogggledButton = styled(Button)`
-  top: 100px;
+  top: 60px;
   left: 18%;
   position: absolute;
-  
   margin-top: 10px;
 
   // transform: translate(-50%, -50%);
@@ -34,7 +35,11 @@ const TogggledButton = styled(Button)`
 
 
 
-const DataStreamMenuWrapper = ({ children }) => {
+const DataStreamMenuWrapper = ({
+  toggleSingleRow,
+  setIsLoading,
+  setIsDataStreamMenuOpen
+}) => {
   const [isBucketDatesOpen, setIsBucketDatesOpen] = useState(false);
   const [isHydroFabricSelectOpen, setIsHydroFabricSelectOpen] = useState(false);
   const [isHydroFabricLayerOpen, setIsHydroFabricLayerOpen] = useState(false);
@@ -45,6 +50,8 @@ const DataStreamMenuWrapper = ({ children }) => {
     setIsHydroFabricSelectOpen(false);
     setIsHydroFabricLayerOpen(false);
     setCurrentMenu(true);
+    setIsDataStreamMenuOpen(true);
+
   };
 
   const handleHydroLayerMenu = () => {
@@ -52,6 +59,16 @@ const DataStreamMenuWrapper = ({ children }) => {
     setIsHydroFabricSelectOpen(false);
     setIsHydroFabricLayerOpen(prev => !prev);
     setCurrentMenu(true);
+    setIsDataStreamMenuOpen(true);
+  };
+
+  const handleHydroSelectMenu = () => {
+    setIsBucketDatesOpen(false);
+    setIsHydroFabricSelectOpen(prev => !prev);
+    setIsHydroFabricLayerOpen(false);
+    setCurrentMenu(true);
+    setIsDataStreamMenuOpen(true);
+
   };
 
   const handleClose = () => {
@@ -59,6 +76,7 @@ const DataStreamMenuWrapper = ({ children }) => {
     setIsHydroFabricSelectOpen(false);
     setIsHydroFabricLayerOpen(false);
     setCurrentMenu(null);
+    setIsDataStreamMenuOpen(false);
 
   }
 
@@ -74,13 +92,24 @@ const DataStreamMenuWrapper = ({ children }) => {
         <DataStreamMenu  
             isopen={isBucketDatesOpen}
             handleIsOpen={handleBucketS3Menu}
+            currentMenu={currentMenu}
         />
 
         <HydrofabricLayerMenu
             isopen={isHydroFabricLayerOpen}
             handleIsOpen={handleHydroLayerMenu}
+            currentMenu={currentMenu}
         />
           
+        <HydroFabricSelectMenu
+          isopen={isHydroFabricSelectOpen}
+          handleIsOpen={handleHydroSelectMenu}
+          // setIsOpen={handleHydroSelectMenu}
+          toggleSingleRow={toggleSingleRow}
+          setIsLoading={setIsLoading}
+          currentMenu={currentMenu}
+        /> 
+
     </Fragment>
 
   );
