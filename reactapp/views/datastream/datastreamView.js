@@ -6,7 +6,9 @@ import { HydroFabricContainer, MapContainer } from '../../components/StyledConta
 import { ToastContainer } from 'react-toastify';
 import Button from 'react-bootstrap/Button';
 import styled from 'styled-components';
-import { GoGraph,GoChevronDown  } from "react-icons/go";
+import { GoGraph  } from "react-icons/go";
+import { IoMdClose } from "react-icons/io";
+
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 import HydroFabricView from '../ngiab/hydroFabricView.js';
 import MapComponent from 'features/Map/components/mapgl.js';
@@ -14,8 +16,10 @@ import DataStreamMenuView from 'features/DataStream/views/dataStreamMenuView.js'
 import appAPI from 'services/api/app';
 
 const ToggleButton = styled(Button)`
-  top: ${(props) => (props.$fullScreen ? '95%' : '65%;')};
-  right: 0px;
+  // top: ${(props) => (props.$fullScreen ? '95%' : '65%;')};
+  top: 300px;
+  left: ${(props) => (props.$fullScreen ? '22%;' : '38px;')}
+  // right: 0px;
   position: absolute;
   transform: translate(-50%, -50%);
   background-color:rgba(255, 255, 255, 0.1);
@@ -44,7 +48,7 @@ const ViewContainer = styled.div`
 
 const DataStreamView = () => {
   const [singleRowOn, toggleSingleRow] = useState(true);
-  const [isDataStreamMenuOpen, setIsDataStreamMenuOpen] = useState(true);
+  const [isDataStreamMenuOpen, setIsDataStreamMenuOpen] = useState(false);
   const [ isLoading, setIsLoading ] = useState(false);
 
   useEffect(() => {
@@ -74,7 +78,6 @@ const DataStreamView = () => {
                 <MapComponent />
               </MapContainer>
               <DataStreamMenuView
-                  singleRowOn={singleRowOn}
                   toggleSingleRow={toggleSingleRow} 
                   setIsLoading={setIsLoading}
                   setIsDataStreamMenuOpen={setIsDataStreamMenuOpen}
@@ -84,8 +87,8 @@ const DataStreamView = () => {
                 isModelRunListOpen={isDataStreamMenuOpen}  
               >
                 
-                <ToggleButton $fullScreen={singleRowOn}  onClick={() => toggleSingleRow(prev => !prev)}>
-                  {singleRowOn ? <GoGraph size={20} /> : <GoChevronDown size={20} />}
+                <ToggleButton $fullScreen={isDataStreamMenuOpen}  onClick={() => toggleSingleRow(prev => !prev)}>
+                  {singleRowOn ? <GoGraph size={20} /> : <IoMdClose size={20} />}
                 </ToggleButton>
                 <Suspense fallback={<LoadingAnimation />}>
                   <HydroFabricView 

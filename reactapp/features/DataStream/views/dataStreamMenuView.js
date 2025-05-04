@@ -61,7 +61,6 @@ const Content = styled.div`
 `;
 
 const DataStreamMenuView = ({
-  singleRowOn,
   toggleSingleRow,
   setIsLoading,
   setIsDataStreamMenuOpen,
@@ -74,14 +73,18 @@ const DataStreamMenuView = ({
   const { state } = useModelRunsContext();
   const isVisible = state.base_model_id ? true : false;
   
-  const toggleContainer = () => {
-    setIsOpen(prev => !prev);
-    setIsDataStreamMenuOpen(prev => !prev);
-  };
+  // const toggleContainer = () => {
+  //   // setIsOpen(prev => !prev);
+  //   setIsDataStreamMenuOpen(prev => !prev);
+  // };
 
   return (
     <Fragment>
-      <DataStreamMenuWrapper/>
+      <DataStreamMenuWrapper 
+          toggleSingleRow={toggleSingleRow}
+          setIsLoading={setIsLoading}
+          setIsDataStreamMenuOpen={setIsDataStreamMenuOpen} 
+      />
       {/* <DataStreamMenu 
         isopen={isopen}
         setIsOpen={setIsOpen}
