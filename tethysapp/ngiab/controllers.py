@@ -321,6 +321,7 @@ def getDataStreamNgiabDates(request):
     """
     print("Getting list of dates in the bucket...")
     ngen_dates = list_public_s3_folders(prefix="v2.2/")
+    ngen_dates = [date for date in ngen_dates if date != "ngen.20250429"] # small patch, this date has both the new and old format
     list_dates = get_dates_select_from_s3(ngen_dates)
     
     
@@ -358,9 +359,6 @@ def getDataStreamNgiabAvailableVpus(request):
     ngen_vpu = list_public_s3_folders(prefix=prefix_path)
     dict_vpus = get_select_from_s3(ngen_vpu)
     return JsonResponse({"ngen_vpus": dict_vpus})
-
-
-
 
 
 @controller
