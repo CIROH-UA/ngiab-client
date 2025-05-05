@@ -98,7 +98,7 @@ const ModelRunsView = ({
           {
             isModelRunListVisible &&(
               <Fragment>
-              <h2>Model Runs</h2>
+              <h4>Model Runs</h4>
               <ModelRunsSelect />
               
               <TimeSeriesSelection
