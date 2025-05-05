@@ -348,10 +348,41 @@ def getDataStreamNgiabAvailableVpus(request):
     avail_date = request.GET.get("avail_date")
     ngen_forecast = request.GET.get("ngen_forecast")
     prefix_path = f"v2.2/{avail_date}/{ngen_forecast}/"
+    if request.GET.get("ngen_cycle") is not None:
+        ngen_cycle = request.GET.get("ngen_cycle")
+        prefix_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_cycle}/"
+    if request.GET.get("ngen_ensemble") is not None:
+        ngen_ensemble = request.GET.get("ngen_ensemble")
+        prefix_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_cycle}/{ngen_ensemble}/"
+
     ngen_vpu = list_public_s3_folders(prefix=prefix_path)
     dict_vpus = get_select_from_s3(ngen_vpu)
     return JsonResponse({"ngen_vpus": dict_vpus})
 
+
+
+
+
+@controller
+def getDataStreamNgiabAvailableCycles(request):
+    print("Getting list of available cycles in the bucket...")
+    avail_date = request.GET.get("avail_date")
+    ngen_forecast = request.GET.get("ngen_forecast")
+    prefix_path = f"v2.2/{avail_date}/{ngen_forecast}/"
+    ngen_cycles = list_public_s3_folders(prefix=prefix_path)
+    dict_cycles = get_select_from_s3(ngen_cycles)
+    return JsonResponse({"ngen_cycles": dict_cycles})
+
+@controller
+def getDataStreamNgiabAvailableEnsembles(request):
+    print("Getting list of available ensembles in the bucket...")
+    avail_date = request.GET.get("avail_date")
+    ngen_forecast = request.GET.get("ngen_forecast")
+    ngen_cycle = request.GET.get("ngen_cycle")
+    prefix_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_cycle}/"
+    ngen_ensembles = list_public_s3_folders(prefix=prefix_path)
+    dict_ensembles = get_select_from_s3(ngen_ensembles)
+    return JsonResponse({"ngen_ensembles": dict_ensembles, "need_ensembles": True})
 
 @controller
 def getDataStreamTarFile(request):
@@ -363,6 +394,12 @@ def getDataStreamTarFile(request):
     ngen_forecast = request.GET.get("ngen_forecast")
     ngen_vpu = request.GET.get("ngen_vpu")
     tar_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_vpu}/ngen-run.tar.gz"
+    if request.GET.get("ngen_cycle") is not None:
+        ngen_cycle = request.GET.get("ngen_cycle")
+        tar_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_cycle}/{ngen_vpu}/ngen-run.tar.gz"
+    if request.GET.get("ngen_ensemble") is not None:
+        ngen_ensemble = request.GET.get("ngen_ensemble")
+        tar_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_cycle}/{ngen_ensemble}/{ngen_vpu}/ngen-run.tar.gz"
     name_folder = f"{avail_date}_{ngen_forecast}_{ngen_vpu}"
     data_was_downloaded = check_if_datastream_data_exists(name_folder)
     if data_was_downloaded:

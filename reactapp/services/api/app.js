@@ -37,6 +37,12 @@ const appAPI = {
     getDataStreamNgiabAvailableForecast: (params) => {
         return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabAvailableForecast/`, { params });
     },
+    getDataStreamNgiabAvailableCycles: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabAvailableCycles/`, { params });
+    },
+    getDataStreamNgiabAvailableEnsembles:(params) => {
+        return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabAvailableEnsembles/`, { params });
+    },
     getDataStreamNgiabAvailableVpus: (params) => {
         return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabAvailableVpus/`, { params });
     },
