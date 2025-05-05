@@ -64,25 +64,14 @@ const Content = styled.div`
 
 const HydrofabricLayerMenu = ({
   isopen,
-  // setIsOpen
   handleIsOpen,
   currentMenu
 }) => {
-  // const [isOpen, setIsOpen] = useState(false);
-  
-  const toggleContainer = () => {
-    setIsOpen();
-    // setIsOpen(prev => !prev);
-    
-  };
 
 
-  
   return (
     <Fragment>
-          {/* <TogggledButton onClick={toggleContainer} isOpen={isopen}>
-            {isopen ? <IoMdClose size={20} /> : <IoLayers size={20} />}
-          </TogggledButton> */}
+
           {
             !isopen && <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu}>
                <IoLayers size={10} />

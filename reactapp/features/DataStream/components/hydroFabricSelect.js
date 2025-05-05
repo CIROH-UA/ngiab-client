@@ -31,18 +31,14 @@ const HydroFabricSelect = ({
   const {state,actions} = useHydroFabricContext();
   const [promptMessage, setPromptMessage] = useState(null);
   useEffect(() => {
-    if (!state.catchment.id && !state.nexus.id && !state.troute.id && !state.teehr.id){
+    console.log("HydroFabricSelect: ", state);
+    if (!state.nexus.id){
         setPromptMessage("Please select a catchment, nexus, troute or teehr to view time series data.");
     }
   }
   , []);
     useEffect(() => {
         if (!promptMessage) return;
-        else{
-            setTimeout(() => {
-                setPromptMessage(null);
-            }, 500);
-        }
     }
     , [promptMessage]);
     
