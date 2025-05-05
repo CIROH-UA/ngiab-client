@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import HydroFabricSelect from 'features/DataStream/components/hydroFabricSelect';
 
 import Button from 'react-bootstrap/Button';
-import { IoMdClose, IoIosOptions  } from "react-icons/io";
+import { IoIosOptions  } from "react-icons/io";
 
 
 const Container = styled.div`
@@ -12,8 +12,8 @@ const Container = styled.div`
   left: 0;
   height: 100vh;
   width: 20%;
-  background-color: #4f5b67;
-
+  background-color: #4f5b679e;
+  color: #fff;
   
   z-index: 1000;
   transition: transform 0.3s ease;
