@@ -75,7 +75,7 @@ const DataStreamMenu = ({
           }
           <Container isOpen={isopen}>
             <Content>
-              <h4>NGIAB DataStream S3 Data</h4>
+              <h5>NGIAB DataStream S3 Data</h5>
 
               <BucketNamesSelect />
             </Content>
