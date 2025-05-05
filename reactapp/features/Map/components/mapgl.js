@@ -161,11 +161,16 @@ const MapComponent = () => {
             'circle-color': [
               'step',
               ['get', 'point_count'],
-              theme === 'dark' ? '#51bbd6' : '#1f78b4',
+              // theme === 'dark' ? '#51bbd6' : '#1f78b4',
+              // 10,
+              // theme === 'dark' ? '#6610f2' : '#33a02c',
+              // 50,
+              // theme === 'dark' ? '#20c997' : '#e31a1c',
+              '#51bbd6' ,
               10,
-              theme === 'dark' ? '#6610f2' : '#33a02c',
+              '#6610f2',
               50,
-              theme === 'dark' ? '#20c997' : '#e31a1c',
+              '#20c997',
             ],
             'circle-radius': [
               'step',
@@ -193,7 +198,8 @@ const MapComponent = () => {
             'symbol-placement': 'point',
           }}
           paint={{
-            'text-color': theme === 'dark' ? '#ffffff' : '#000000',
+            // 'text-color': theme === 'dark' ? '#ffffff' : '#000000',
+            'text-color': '#ffffff',
           }}
         />,
         <Layer
