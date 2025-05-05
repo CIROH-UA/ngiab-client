@@ -1,8 +1,9 @@
 import React, { Fragment } from 'react';
 import styled from 'styled-components';
 import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
-
 import Button from 'react-bootstrap/Button';
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
+import Tooltip from 'react-bootstrap/Tooltip';
 import { IoLayers } from "react-icons/io5";
 
 const Container = styled.div`
@@ -31,12 +32,8 @@ const TogggledButton = styled(Button)`
   top: 140px;
   left: ${({ currentMenu }) => currentMenu ? '21%' : '20px'};
   position: absolute;
-  
   margin-top: 10px;
-
-  // transform: translate(-50%, -50%);
   transition: transform 0.3s ease;
-  // transform: ${({ isOpen }) => isOpen ? 'translateX(0)' : 'translateX(calc(-90%))'};
 
   background-color: #009989;
   border: none;
@@ -73,9 +70,21 @@ const HydrofabricLayerMenu = ({
     <Fragment>
 
           {
-            !isopen && <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu}>
-               <IoLayers size={10} />
-            </TogggledButton>
+            !isopen && 
+            <OverlayTrigger
+              key={'right'}
+              placement={'right'}
+              overlay={
+                <Tooltip id={`tooltip-right`}>
+                  Hydrofabric Layers
+                </Tooltip>
+              }
+            >
+              <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu}>
+                <IoLayers size={10} />
+              </TogggledButton>
+            </OverlayTrigger>
+
           }
 
           <Container isOpen={isopen}>
