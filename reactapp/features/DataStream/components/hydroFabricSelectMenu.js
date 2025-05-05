@@ -1,7 +1,8 @@
 import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
 import HydroFabricSelect from 'features/DataStream/components/hydroFabricSelect';
-
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
+import Tooltip from 'react-bootstrap/Tooltip';
 import Button from 'react-bootstrap/Button';
 import { IoIosOptions  } from "react-icons/io";
 
@@ -71,9 +72,22 @@ const HydroFabricSelectMenu = ({
   return (
     <Fragment>
           {
-            !isopen && <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu}>
+            !isopen && 
+            <OverlayTrigger
+              key={'right'}
+              placement={'right'}
+              overlay={
+                <Tooltip id={`tooltip-right`}>
+                  HydroFabric Menu
+                </Tooltip>
+              }
+            >
+            <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu}>
                <IoIosOptions size={10} />
             </TogggledButton>
+            </OverlayTrigger>            
+            
+
           }
           <Container isOpen={isopen}>
             <Content>

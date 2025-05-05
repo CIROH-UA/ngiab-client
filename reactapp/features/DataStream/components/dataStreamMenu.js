@@ -3,6 +3,8 @@ import styled from 'styled-components';
 import BucketNamesSelect from './bucketNamesSelect';
 import Button from 'react-bootstrap/Button';
 import { FaList } from "react-icons/fa";
+import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
+import Tooltip from 'react-bootstrap/Tooltip';
 
 const Container = styled.div`
   position: absolute;
@@ -69,9 +71,20 @@ const DataStreamMenu = ({
     <Fragment>
           
           {
-            !isopen && <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu} >
-               <FaList size={10} />
-            </TogggledButton>
+            !isopen && 
+            <OverlayTrigger
+              key={'right'}
+              placement={'right'}
+              overlay={
+                <Tooltip id={`tooltip-right`}>
+                  DataSrtream S3 Data
+                </Tooltip>
+              }
+            >
+              <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu} >
+                <FaList size={10} />
+              </TogggledButton>
+            </OverlayTrigger>
           }
           <Container isOpen={isopen}>
             <Content>
