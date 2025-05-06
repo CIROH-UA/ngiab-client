@@ -1,7 +1,5 @@
 import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
-import AddModelForm from 'features/ModelRuns/components/AddModelForm';
-import CenteredButtons from 'features/ModelRuns/components/menuButton';
 import ModelRunsSelect from 'features/ModelRuns/components/modelRunsSelect';
 import TimeSeriesSelection from 'features/ModelRuns/components/timeSeriesSelect';
 import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
@@ -69,7 +67,6 @@ const ModelRunsView = ({
 }) => {
   
   const [isOpen, setIsOpen] = useState(true);
-  const [isImportFormOpen, setIsImportFormOpen] = useState(false);
   const [isModelRunListVisible, setIsModelRunListVisible] = useState(true);
   const { state } = useModelRunsContext();
   const isVisible = state.base_model_id ? true : false;
@@ -77,12 +74,6 @@ const ModelRunsView = ({
   const toggleContainer = () => {
     setIsOpen(prev => !prev);
     setIsModelRunListOpen(prev => !prev);
-  };
-
-  const showImportModelRunForm = () => {
-    setIsImportFormOpen(prev => !prev);
-    setIsModelRunListVisible(prev => !prev);
-
   };
 
 
@@ -112,15 +103,8 @@ const ModelRunsView = ({
             </Fragment>
             )
           }
-
-
-          <AddModelForm
-              isVisible={isImportFormOpen}
-              
-          />
         </Content>
       </Container>
-      <CenteredButtons showImportModelRunForm={showImportModelRunForm}/>
 
     </Fragment>
 
