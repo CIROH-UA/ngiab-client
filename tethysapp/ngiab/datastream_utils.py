@@ -116,7 +116,8 @@ def make_datastream_conf():
  
 def _get_datastream_conf_file():
     home_path = os.environ.get("HOME", "/tmp")
-    conf_base_path = os.environ.get("DATASTREAM_CONF", f"{home_path}/.datastream_ngiab/datastream_ngiab.json")
+    conf_dir_base_path = os.environ.get("DATASTREAM_CONF", f"{home_path}/.datastream_ngiab")
+    conf_base_path = os.path.join(conf_dir_base_path, "datastream_ngiab.json")
     return conf_base_path
 
 def _get_datastream_conf_dir():
