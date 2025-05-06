@@ -392,13 +392,16 @@ def getDataStreamTarFile(request):
     ngen_forecast = request.GET.get("ngen_forecast")
     ngen_vpu = request.GET.get("ngen_vpu")
     tar_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_vpu}/ngen-run.tar.gz"
+    name_folder = f"{avail_date}_{ngen_forecast}_{ngen_vpu}"
     if request.GET.get("ngen_cycle") is not None:
         ngen_cycle = request.GET.get("ngen_cycle")
         tar_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_cycle}/{ngen_vpu}/ngen-run.tar.gz"
+        name_folder = f"{avail_date}_{ngen_forecast}_{ngen_cycle}_{ngen_vpu}"
     if request.GET.get("ngen_ensemble") is not None:
         ngen_ensemble = request.GET.get("ngen_ensemble")
         tar_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_cycle}/{ngen_ensemble}/{ngen_vpu}/ngen-run.tar.gz"
-    name_folder = f"{avail_date}_{ngen_forecast}_{ngen_vpu}"
+        name_folder = f"{avail_date}_{ngen_forecast}_{ngen_cycle}_{ngen_ensemble}_{ngen_vpu}"
+    
     data_was_downloaded = check_if_datastream_data_exists(name_folder)
     if data_was_downloaded:
         unique_id = get_datastream_id_from_conf_file(name_folder)
