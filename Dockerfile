@@ -19,6 +19,7 @@ COPY run.sh ${TETHYS_HOME}/run.sh
 # ENVIRONMENT #
 ###############
 ENV VISUALIZER_CONF=${TETHYS_PERSIST}/ngiab_visualizer.json
+ENV DATASTREAM_CONF=${TETHYS_PERSIST}/.datastream_ngiab
 ENV TETHYS_DB_ENGINE=django.db.backends.sqlite3
 ENV SKIP_DB_SETUP=True
 ENV TETHYS_DB_NAME=
