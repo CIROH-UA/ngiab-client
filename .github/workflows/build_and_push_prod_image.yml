@@ -3,7 +3,7 @@ name: build_push_prod_image
 on:
   push:
     tags:
-      - 'v*'
+      - '*'
 env:
   DOCKER_HUB_ORG: awiciroh
   DOCKER_REPO: tethys-ngiab
