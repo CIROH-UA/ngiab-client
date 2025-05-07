@@ -134,7 +134,7 @@ const HydroFabricView = ({singleRowOn}) => {
             </Tab>
           )}
           {state.teehr.variable && (
-            <Tab eventKey="teerh_plot" title="TEERH Plot">
+            <Tab eventKey="teerh_plot" title="TEEHR Plot">
               <Suspense fallback={<LoadingAnimation />}>
                 <HydroFabricPlotContainer>
                   <ParentSize>
@@ -154,7 +154,7 @@ const HydroFabricView = ({singleRowOn}) => {
             </Tab>
           )}
           {state.teehr.metrics && (
-            <Tab eventKey="teerh_metrics" title="TEERH Metrics">
+            <Tab eventKey="teerh_metrics" title="TEEHR Metrics">
               <TeehrMetricsWrapper>
                 <TeehrMetricsTable data={state.teehr.metrics} />
               </TeehrMetricsWrapper>
