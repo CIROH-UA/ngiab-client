@@ -48,16 +48,19 @@ jobs:
           push: true                     # pushes the arch‑specific image
           provenance: false              # (keeps digest stable)
 
-      # save the digest for the merge job
+      - name: Set safe file name
+        id: plat
+        run: echo "SAFE=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> "$GITHUB_ENV"
+
       - name: Export digest
         run: |
           mkdir -p /tmp/digests
-          echo "${{ steps.build.outputs.digest }}" > "/tmp/digests/${{ matrix.platform }}"
+          echo "${{ steps.build.outputs.digest }}" > "/tmp/digests/${SAFE}"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ matrix.platform }}
-          path: /tmp/digests/*
+          name: digests-${{ env.SAFE }}
+          path: /tmp/digests/${{ env.SAFE }}
           if-no-files-found: error
           retention-days: 1
 
