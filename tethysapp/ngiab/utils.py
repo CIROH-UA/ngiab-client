@@ -534,23 +534,3 @@ def check_troute_id(df, id):
         # Flat-indexed DataFrame: Check in the `featureID` column
         return int(id) in df["featureID"].values
 
-
-# def get_troute_time_series_nc(troute_id, variable_column, app_workspace):
-#     clean_troute_id = troute_id.split("-")[1]
-#     df = get_troute_df(app_workspace)
-
-#     try:
-#         # Filter by `feature_id` in the multi-index
-#         df_sliced_by_id = df.xs(int(clean_troute_id), level="feature_id")
-#         time_col = df_sliced_by_id.index.get_level_values("time")  # Get the time index
-#         var_col = df_sliced_by_id[variable_column]  # Get the requested variable column
-
-#         data = [
-#             {"x": time.strftime("%Y-%m-%d %H:%M:%S"), "y": val}
-#             for time, val in zip(time_col.tolist(), var_col.tolist())
-#         ]
-#     except Exception as e:
-#         print(f"Error: {e}")
-#         data = []
-
-#     return data
