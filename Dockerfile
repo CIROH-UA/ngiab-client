@@ -63,6 +63,8 @@ RUN cd ${APP_SRC_ROOT} \
     && rm -rf node_modules \
     && ${PDM} install --no-editable --production
 
+ADD salt/ /srv/salt/
+
 CMD bash run.sh
 
 HEALTHCHECK --start-period=30s --retries=12 \
