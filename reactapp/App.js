@@ -20,8 +20,8 @@ function App() {
           <Loader>
             <Layout 
               navLinks={[
-                {title: 'Ouputs Visualization', to: PATH_HOME, eventKey: 'link-home'},
-                {title: 'Datastream Visualization', to: PATH_DATASTREAM, eventKey: 'link-datastream'},
+                {title: 'NextGen In A Box Outputs Visualization', to: PATH_HOME, eventKey: 'link-home'},
+                {title: 'Datastream S3 Bucket Visualization', to: PATH_DATASTREAM, eventKey: 'link-datastream'},
 
               ]}
               routes={[
