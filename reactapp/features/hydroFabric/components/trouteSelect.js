@@ -5,6 +5,7 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
 import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
+import { toast } from 'react-toastify';
 import { mode } from 'd3-array';
 
 const TRouteSelect = (props) => {
@@ -47,6 +48,9 @@ const TRouteSelect = (props) => {
       model_run_id: modelRunsState.base_model_id
     }
     appAPI.getTrouteTimeSeries(params).then((response) => {
+      if (response.data.length === 0) {
+       toast.info("No data available for this troute and model run", { autoClose: 1000 });
+      }
       actions.set_troute_series(response.data);
       actions.set_troute_chart_layout(response.layout);
       // actions.set_series(response.data);
@@ -55,6 +59,7 @@ const TRouteSelect = (props) => {
       props.setIsLoading(false);
     }).catch((error) => {
       props.setIsLoading(false);
+      toast.error("Error fetching troute time series", { autoClose: 1000 });
       console.log("Error fetching troute time series", error);
     })
     return  () => {

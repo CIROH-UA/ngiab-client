@@ -5,6 +5,7 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
 import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
+import { toast } from 'react-toastify';
 
 const NexusSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
@@ -17,7 +18,10 @@ const NexusSelect = (props) => {
       model_run_id: modelRunsState.base_model_id
     }    
     appAPI.getNexusTimeSeries(params).then((response) => {
-      
+      if (response.data.length === 0) {
+        toast.info("No data available for this nexus and model run", { autoClose: 1000 });
+      }
+
       actions.set_nexus_series(response.data);
       actions.set_nexus_chart_layout(response.layout);
       if(response.usgs_id){
@@ -32,6 +36,7 @@ const NexusSelect = (props) => {
       actions.set_troute_id(state.nexus.id);
       props.toggleSingleRow(false);
     }).catch((error) => {
+      toast.error("Error fetching nexus time series", { autoClose: 1000 });      
       console.log("Error fetching nexus time series", error);
     })
     return  () => {

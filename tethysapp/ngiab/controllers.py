@@ -84,18 +84,22 @@ def getCatchmentTimeSeries(request):
         "{}.csv".format(catchment_id),
     )
 
-    df = pd.read_csv(catchment_output_file_path)
-    list_variables = df.columns.tolist()[2:]  # remove time and timestep
-    time_col = df.iloc[:, 1]
-    if variable_column is None:
-        second_col = df.iloc[:, 2]
-    else:
-        second_col = df[variable_column]
+    try:
+        df = pd.read_csv(catchment_output_file_path)
+        list_variables = df.columns.tolist()[2:]  # remove time and timestep
+        time_col = df.iloc[:, 1]
+        if variable_column is None:
+            second_col = df.iloc[:, 2]
+        else:
+            second_col = df[variable_column]
 
-    data = [
-        {"x": time, "y": val}
-        for time, val in zip(time_col.tolist(), second_col.tolist())
-    ]
+        data = [
+            {"x": time, "y": val}
+            for time, val in zip(time_col.tolist(), second_col.tolist())
+        ]
+    except Exception as e:
+        print(f"Error: {e}")
+        data = []
 
     return JsonResponse(
         {
@@ -167,16 +171,21 @@ def getNexusTimeSeries(request):
         base_output_path,
         "{}_output.csv".format(nexus_id),
     )
-    df = pd.read_csv(nexus_output_file_path, header=None)
+    try:
+        df = pd.read_csv(nexus_output_file_path, header=None)
 
-    time_col = df.iloc[:, 1]
-    streamflow_cms_col = df.iloc[:, 2]
-    data = [
-        {"x": time, "y": streamflow}
-        for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
-    ]
+        time_col = df.iloc[:, 1]
+        streamflow_cms_col = df.iloc[:, 2]
+        data = [
+            {"x": time, "y": streamflow}
+            for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
+        ]
+    except Exception as e:
+        print(f"Error: {e}")
+        data = []
 
     usgs_id = get_usgs_from_ngen_id(model_run_id, nexus_id)
+    
     return JsonResponse(
         {
             "data": [
