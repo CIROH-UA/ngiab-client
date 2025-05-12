@@ -16,7 +16,7 @@ const ToggleButton = styled(Button)`
   right: 0px;
   position: absolute;
   transform: translate(-50%, -50%);
-  background-color:rgba(255, 255, 255, 0.1);
+  background-color:rgba(153, 116, 116, 0.4);
   border: none;
   color: white;
   border-radius: 5px;
@@ -62,14 +62,13 @@ const NGIABView = () => {
               >
                 <MapComponent />
               </MapContainer>
+              <ToggleButton $fullScreen={singleRowOn}  onClick={() => toggleSingleRow(prev => !prev)}>
+                {singleRowOn ? <GoGraph size={20} /> : <GoChevronDown size={20} />}
+              </ToggleButton>
               <HydroFabricContainer 
                 $fullScreen={singleRowOn} 
                 isModelRunListOpen={isModelRunListOpen}  
               >
-                
-                <ToggleButton $fullScreen={singleRowOn}  onClick={() => toggleSingleRow(prev => !prev)}>
-                  {singleRowOn ? <GoGraph size={20} /> : <GoChevronDown size={20} />}
-                </ToggleButton>
                 <Suspense fallback={<LoadingAnimation />}>
                   <HydroFabricView 
                     singleRowOn={singleRowOn} 
