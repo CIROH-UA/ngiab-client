@@ -1,54 +1,84 @@
 import React from 'react';
-import DataTable from 'react-data-table-component';
+import DataTable, {createTheme } from 'react-data-table-component';
 import useTheme from '../../../hooks/useTheme'; // Adjust the import path as needed
+
+
+const BRAND_LIGHT_BG = '#f0f0f0';
+const BRAND_DARK_BG  = '#4f5b67';
+const ROW_HOVER      = '#7c8895';
+const BORDER         = '#d1d5db';
+
+// Friendly names so the component code stays readable
+export const LIGHT_TABLE = 'lightTable';
+export const DARK_TABLE  = 'darkTable';
+
+/* --------  Light theme  -------- */
+createTheme(
+  LIGHT_TABLE,
+  {
+    text: {
+      primary:   '#000000',
+      secondary: '#333333',
+    },
+    background: {
+      default:   BRAND_LIGHT_BG,        // table & header background
+    },
+    divider: {
+      default:   BORDER,                // header + row dividers
+    },
+    striped: {
+      default:   BRAND_LIGHT_BG,        // odd rows
+      text:      '#000000',
+    },
+    highlightOnHover: {
+      default:   ROW_HOVER,
+      text:      '#ffffff',
+    },
+    button: {
+      default:   '#000000',             // pagination buttons
+      hover:     ROW_HOVER,
+      focus:     ROW_HOVER,
+    },
+  },
+  'light'
+);
+
+/* --------  Dark theme  -------- */
+createTheme(
+  DARK_TABLE,
+  {
+    text: {
+      primary:   '#ffffff',
+      secondary: '#e0e0e0',
+    },
+    background: {
+      default:   BRAND_DARK_BG,
+    },
+    divider: {
+      default:   BORDER,
+    },
+    striped: {
+      default:   BRAND_DARK_BG,
+      text:      '#ffffff',
+    },
+    highlightOnHover: {
+      default:   ROW_HOVER,
+      text:      '#ffffff',
+    },
+    button: {
+      default:   '#ffffff',
+      hover:     ROW_HOVER,
+      focus:     ROW_HOVER,
+    },
+  },
+  'dark'
+);
+
+
 
 const TeehrMetricsTable = ({ data }) => {
     const theme = useTheme();
-
-    const customStyles = {
-        header: {
-            style: {
-                backgroundColor: theme === 'dark' ? '#4f5b67' : '#ffffff',
-                color: theme === 'dark' ? '#ffffff' : '#000000',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                borderBottomColor: '#d1d5db',
-            },
-        },
-        headRow: {
-            style: {
-                backgroundColor: theme === 'dark' ? '#4f5b67' : '#f0f0f0',
-                color: theme === 'dark' ? '#ffffff' : '#000000',
-                borderBottomColor: '#d1d5db',
-            },
-        },
-        rows: {
-            style: {
-                backgroundColor: theme === 'dark' ? '#4f5b67' : '#4f5b67',
-                '&:nth-of-type(odd)': {
-                    backgroundColor: theme === 'dark' ? '#4f5b67' : '#4f5b67',
-                },
-            },
-            highlightOnHoverStyle: {
-                backgroundColor: '#7c8895',
-                color: '#fff',
-                transitionDuration: '0.15s',
-                transitionProperty: 'background-color, color',
-            },
-        },
-        cells: {
-            style: {
-                color: theme === 'dark' ? '#e0e0e0' : '#333333',
-                fontSize: '14px',
-            },
-        },
-        pagination: {
-            style: {
-                backgroundColor: theme === 'dark' ? '#4f5b67' : '#ffffff',
-                color: theme === 'dark' ? '#ffffff' : '#000000',
-            },
-        },
-    };
+    const tableTheme = theme === 'dark' ? DARK_TABLE : LIGHT_TABLE;
 
     const columns = [
         { name: 'Metric', selector: row => row.metric, sortable: true },
@@ -69,7 +99,7 @@ const TeehrMetricsTable = ({ data }) => {
             data={data}
             defaultSortField="metric"
             pagination
-            customStyles={customStyles}
+            theme={tableTheme}
         />
     );
 };
