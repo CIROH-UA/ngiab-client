@@ -4,7 +4,7 @@ import {useEffect, Suspense, Fragment,lazy} from 'react';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import appAPI from 'services/api/app';
-
+import { toast } from 'react-toastify';
 import SelectComponent from './selectComponent';
 
 const CatchmentSelect = (props) => {
@@ -20,7 +20,9 @@ const CatchmentSelect = (props) => {
       model_run_id: modelRunsState.base_model_id
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
-      // actions.set_series(response.data);
+      if (response.data.length === 0) {
+        toast.info("No data available for this catchment and model run", { autoClose: 1000 });
+      }
       actions.set_catchment_series(response.data);
       actions.set_catchment_variable_list(response.variables);
       actions.set_catchment_variable(null);
@@ -30,6 +32,7 @@ const CatchmentSelect = (props) => {
       props.setIsLoading(false);
     }).catch((error) => {
       props.setIsLoading(false);
+      toast.error("Error fetching catchment time series", { autoClose: 1000 });
       console.log("Error fetching catchment time series", error);
     })
     return  () => {
@@ -50,14 +53,16 @@ const CatchmentSelect = (props) => {
       model_run_id: modelRunsState.base_model_id
     }
     appAPI.getCatchmentTimeSeries(params).then((response) => {
-      // actions.set_series(response.data);
+      if (response.data.length === 0) {
+        toast.info("No data available for this catchment and model run", { autoClose: 1000 });
+      }
       actions.set_catchment_series(response.data);
       actions.set_catchment_chart_layout(response.layout);
-      // actions.set_chart_layout(response.layout);
       props.toggleSingleRow(false);
       props.setIsLoading(false);
     }).catch((error) => {
       props.setIsLoading(false);
+      toast.error("Error fetching catchment time series", { autoClose: 1000 });
       console.log("Error fetching nexus time series", error);
     })
     return  () => {
