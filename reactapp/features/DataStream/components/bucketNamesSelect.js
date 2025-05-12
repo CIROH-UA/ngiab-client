@@ -152,6 +152,10 @@ export default function BucketNamesSelect() {
             handleError("Error fetching Datastream Data");
             return;
           }
+          if (data.msg){
+            handleError(data.msg);
+            return;
+          }
           actions.set_base_model_id(data.id);
           handleSuccess();
           // toast.success("Successfully retrieved Model Run Data", { autoClose: 1000 });
@@ -245,25 +249,25 @@ export default function BucketNamesSelect() {
     }
     resetCycle();
     setSelectedCycle(e[0].value);
-    if (selectedForecast === 'medium_range'){
-      handleLoading("Loading Available Ensembles...");
+    // if (selectedForecast === 'medium_range'){
+    //   handleLoading("Loading Available Ensembles...");
 
-      appAPI.getDataStreamNgiabAvailableEnsembles(params)
-      .then((data) => {
-            if (data.error) {
-              handleError("Error fetching Available Ensembles...");
-              return;
-            }
-            setAvailableEnsembleList(data.ngen_ensembles);
-            handleSuccess();
-          })
-          .catch((error) => {
-            setSelectedCycle(null);
-            handleError("Error Loading Available Ensembles...");
-            console.error('Failed', error);
-          });
-    }
-    else{
+    //   appAPI.getDataStreamNgiabAvailableEnsembles(params)
+    //   .then((data) => {
+    //         if (data.error) {
+    //           handleError("Error fetching Available Ensembles...");
+    //           return;
+    //         }
+    //         setAvailableEnsembleList(data.ngen_ensembles);
+    //         handleSuccess();
+    //       })
+    //       .catch((error) => {
+    //         setSelectedCycle(null);
+    //         handleError("Error Loading Available Ensembles...");
+    //         console.error('Failed', error);
+    //       });
+    // }
+    // else{
       handleLoading("Loading Available VPUs...");
 
       appAPI.getDataStreamNgiabAvailableVpus(params)
@@ -280,7 +284,7 @@ export default function BucketNamesSelect() {
             handleError("Error Loading Available VPUs...");
             console.error('Failed', error);
           });
-    }
+    // }
 
   }   
 
