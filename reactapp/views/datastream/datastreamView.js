@@ -6,36 +6,12 @@ import { HydroFabricContainer, MapContainer } from '../../components/StyledConta
 import { ToastContainer } from 'react-toastify';
 import Button from 'react-bootstrap/Button';
 import styled from 'styled-components';
-import { GoGraph  } from "react-icons/go";
-import { IoMdClose } from "react-icons/io";
-
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 import HydroFabricView from '../ngiab/hydroFabricView.js';
 import MapComponent from 'features/Map/components/mapgl.js';
 import DataStreamMenuView from 'features/DataStream/views/dataStreamMenuView.js';
 import appAPI from 'services/api/app';
 
-const ToggleButton = styled(Button)`
-  // top: ${(props) => (props.$fullScreen ? '95%' : '65%;')};
-  top: 300px;
-  left: ${(props) => (props.$fullScreen ? '21%;' : '38px;')}
-  // right: 0px;
-  position: absolute;
-  transform: translate(-50%, -50%);
-  background-color: #009989;
-  border: none;
-  color: white;
-  border-radius: 5px;
-  padding: 3px 10px;
-  z-index: 1001;
-  
-  &:hover, &:focus {
-    background-color: #000000b3 !important;
-    color: white;
-    border: none;
-    box-shadow: none;
-  }
-`;
 
 const ViewContainer = styled.div`
   height: 100%;
