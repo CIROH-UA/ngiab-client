@@ -49,7 +49,7 @@ const HydroFabricTimeSeriesMenu = ({
               }
             >
                 <ToggleButton $currentMenu={currentMenu}  onClick={() => toggleSingleRow(prev => !prev)}>
-                    {singleRowOn ? <GoGraph size={10} /> : <IoMdClose size={10} />}
+                    {singleRowOn ? <GoGraph size={15} /> : <IoMdClose size={15} />}
                 </ToggleButton>
             </OverlayTrigger>
     </Fragment>

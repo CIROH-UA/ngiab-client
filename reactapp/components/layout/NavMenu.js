@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import useTheme from 'hooks/useTheme';         // the hook you wrote
 import ThemedOffcanvas from './ThemedOffcanvas';
 
+
 const NavMenu = ({ children, navTitle, onNavChange, navVisible, ...props }) => {
   const theme = useTheme();               // 'light' | 'dark'
   const handleClose = () => onNavChange(false);
@@ -16,8 +17,9 @@ const NavMenu = ({ children, navTitle, onNavChange, navVisible, ...props }) => {
       $theme={theme}
       {...props}
     >
-      <ThemedOffcanvas.Header closeButton>
+      <ThemedOffcanvas.Header closeButton >
         <ThemedOffcanvas.Title>{navTitle}</ThemedOffcanvas.Title>
+        
       </ThemedOffcanvas.Header>
 
       <ThemedOffcanvas.Body>{children}</ThemedOffcanvas.Body>

@@ -30,7 +30,7 @@ const DataStreamView = () => {
   useEffect(() => {
     appAPI.makeDatastreamConf()
       .then((data) => {
-        console.log('Success', data);
+        
         if (data.error) {
           return;
         }

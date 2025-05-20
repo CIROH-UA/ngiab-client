@@ -83,7 +83,7 @@ const HydroFabricSelectMenu = ({
               }
             >
             <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu}>
-               <IoIosOptions size={10} />
+               <IoIosOptions size={15} />
             </TogggledButton>
             </OverlayTrigger>            
             
