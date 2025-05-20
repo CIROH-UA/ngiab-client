@@ -32,10 +32,12 @@ from .datastream_utils import (
     get_dates_select_from_s3,
     get_datastream_model_runs_selectable,
     check_if_datastream_data_exists,
-    get_datastream_id_from_conf_file
+    get_datastream_id_from_conf_file,
+    check_if_s3_file_exists
 )
 
 from .app import App
+from botocore.exceptions import ClientError, BotoCoreError
 
 # the following error is fixed with this lines
 # https://stackoverflow.com/a/79163867
@@ -84,22 +86,18 @@ def getCatchmentTimeSeries(request):
         "{}.csv".format(catchment_id),
     )
 
-    try:
-        df = pd.read_csv(catchment_output_file_path)
-        list_variables = df.columns.tolist()[2:]  # remove time and timestep
-        time_col = df.iloc[:, 1]
-        if variable_column is None:
-            second_col = df.iloc[:, 2]
-        else:
-            second_col = df[variable_column]
+    df = pd.read_csv(catchment_output_file_path)
+    list_variables = df.columns.tolist()[2:]  # remove time and timestep
+    time_col = df.iloc[:, 1]
+    if variable_column is None:
+        second_col = df.iloc[:, 2]
+    else:
+        second_col = df[variable_column]
 
-        data = [
-            {"x": time, "y": val}
-            for time, val in zip(time_col.tolist(), second_col.tolist())
-        ]
-    except Exception as e:
-        print(f"Error: {e}")
-        data = []
+    data = [
+        {"x": time, "y": val}
+        for time, val in zip(time_col.tolist(), second_col.tolist())
+    ]
 
     return JsonResponse(
         {
@@ -171,21 +169,16 @@ def getNexusTimeSeries(request):
         base_output_path,
         "{}_output.csv".format(nexus_id),
     )
-    try:
-        df = pd.read_csv(nexus_output_file_path, header=None)
+    df = pd.read_csv(nexus_output_file_path, header=None)
 
-        time_col = df.iloc[:, 1]
-        streamflow_cms_col = df.iloc[:, 2]
-        data = [
-            {"x": time, "y": streamflow}
-            for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
-        ]
-    except Exception as e:
-        print(f"Error: {e}")
-        data = []
+    time_col = df.iloc[:, 1]
+    streamflow_cms_col = df.iloc[:, 2]
+    data = [
+        {"x": time, "y": streamflow}
+        for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
+    ]
 
     usgs_id = get_usgs_from_ngen_id(model_run_id, nexus_id)
-    
     return JsonResponse(
         {
             "data": [
@@ -392,32 +385,108 @@ def getDataStreamNgiabAvailableEnsembles(request):
     return JsonResponse({"ngen_ensembles": dict_ensembles, "need_ensembles": True})
 
 @controller
+def checkForTarFile(request):
+    """
+    Check tar from S3
+
+    Query-string parameters
+    -----------------------
+    avail_date      – YYYY-MM-DD (e.g. 2025-05-11)
+    ngen_forecast   – forecast identifier
+    ngen_vpu        – VPU identifier
+    ngen_cycle      – (optional) cycle identifier
+    ngen_ensemble   – (optional) ensemble identifier
+    """
+    avail_date    = request.GET.get("avail_date")
+    ngen_forecast = request.GET.get("ngen_forecast")
+    ngen_vpu      = request.GET.get("ngen_vpu")
+    ngen_cycle    = request.GET.get("ngen_cycle")      # may be None
+    ngen_ensemble = request.GET.get("ngen_ensemble")   # may be None
+
+    # ── Build the S3 key and local folder name ────────────────────────────
+    parts = ["v2.2", avail_date, ngen_forecast]
+    if ngen_cycle:
+        parts.append(ngen_cycle)
+    if ngen_ensemble:
+        parts.append(ngen_ensemble)
+    parts.append(ngen_vpu)
+
+    tar_key     = "/".join(parts) + "/ngen-run.tar.gz"
+    
+    isDataOnBucket = check_if_s3_file_exists(tar_key=tar_key)
+
+    return JsonResponse({"isDataOnBucket": isDataOnBucket})
+
+@controller
 def getDataStreamTarFile(request):
     """
-    Get the tar file from the bucket.
-    """
-    print("Getting tar file from the bucket...")
-    avail_date = request.GET.get("avail_date")
-    ngen_forecast = request.GET.get("ngen_forecast")
-    ngen_vpu = request.GET.get("ngen_vpu")
-    tar_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_vpu}/ngen-run.tar.gz"
-    name_folder = f"{avail_date}_{ngen_forecast}_{ngen_vpu}"
-    if request.GET.get("ngen_cycle") is not None:
-        ngen_cycle = request.GET.get("ngen_cycle")
-        tar_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_cycle}/{ngen_vpu}/ngen-run.tar.gz"
-        name_folder = f"{avail_date}_{ngen_forecast}_{ngen_cycle}_{ngen_vpu}"
-    if request.GET.get("ngen_ensemble") is not None:
-        ngen_ensemble = request.GET.get("ngen_ensemble")
-        tar_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_cycle}/{ngen_ensemble}/{ngen_vpu}/ngen-run.tar.gz"
-        name_folder = f"{avail_date}_{ngen_forecast}_{ngen_cycle}_{ngen_ensemble}_{ngen_vpu}"
-    
-    data_was_downloaded = check_if_datastream_data_exists(name_folder)
-    if data_was_downloaded:
-        unique_id = get_datastream_id_from_conf_file(name_folder)
-    else:
-        unique_id = download_and_extract_tar_from_s3(tar_key=tar_path,name_folder=name_folder) 
-    return JsonResponse({"id": unique_id})
+    Download a datastream tar from S3 (if not cached locally) and return its ID.
 
+    Query-string parameters
+    -----------------------
+    avail_date      – YYYY-MM-DD (e.g. 2025-05-11)
+    ngen_forecast   – forecast identifier
+    ngen_vpu        – VPU identifier
+    ngen_cycle      – (optional) cycle identifier
+    ngen_ensemble   – (optional) ensemble identifier
+    """
+    avail_date    = request.GET.get("avail_date")
+    ngen_forecast = request.GET.get("ngen_forecast")
+    ngen_vpu      = request.GET.get("ngen_vpu")
+    ngen_cycle    = request.GET.get("ngen_cycle")      # may be None
+    ngen_ensemble = request.GET.get("ngen_ensemble")   # may be None
+
+    # ── Build the S3 key and local folder name ────────────────────────────
+    parts = ["v2.2", avail_date, ngen_forecast]
+    if ngen_cycle:
+        parts.append(ngen_cycle)
+    if ngen_ensemble:
+        parts.append(ngen_ensemble)
+    parts.append(ngen_vpu)
+
+    tar_key     = "/".join(parts) + "/ngen-run.tar.gz"
+    name_folder = "_".join(filter(None, [avail_date, ngen_forecast, ngen_cycle, ngen_ensemble, ngen_vpu]))
+
+    # ── Fast path: already downloaded ─────────────────────────────────────
+    if check_if_datastream_data_exists(name_folder):
+        unique_id = get_datastream_id_from_conf_file(name_folder)
+        return JsonResponse({"id": unique_id}, status=200)
+
+    # ── Slow path: download + extract ─────────────────────────────────────
+    try:
+        unique_id = download_and_extract_tar_from_s3(
+            tar_key=tar_key,
+            name_folder=name_folder,
+        )
+    except FileNotFoundError:
+        # The object simply isn’t in the bucket.
+        msg = (
+            "No datastream archive was found for the requested parameters "
+            f"({avail_date}, forecast={ngen_forecast}, vpu={ngen_vpu}"
+            f"{', cycle='+ngen_cycle if ngen_cycle else ''}"
+            f"{', ensemble='+ngen_ensemble if ngen_ensemble else ''})."
+        )
+        return JsonResponse({"msg": msg}, status=404)
+
+    except (ClientError, BotoCoreError) as e:
+        # Connectivity, permissions, throttling, etc.
+        msg = (
+            "There was a problem downloading the datastream archive from S3. "
+            "Please try again later or contact support."
+        )
+        # Optional: attach a short hint for diagnostics.
+        return JsonResponse({"msg": msg, "detail": str(e)}, status=502)
+
+    except Exception as e:
+        # Any other error (e.g. tar extraction).
+        msg = (
+            "There was a problem extracting the datastream archive. "
+            "Please try again later or contact support."
+        )
+        # Optional: attach a short hint for diagnostics.
+        return JsonResponse({"msg": msg, "detail": str(e)}, status=502)
+    # ── Success ───────────────────────────────────────────────────────────
+    return JsonResponse({"id": unique_id}, status=200)
 
 @controller
 def getDataStreamModelRuns(request):

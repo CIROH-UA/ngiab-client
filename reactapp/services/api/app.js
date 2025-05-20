@@ -49,6 +49,9 @@ const appAPI = {
     getDataStreamTarFile: (params) => {
         return apiClient.get(`${APP_ROOT_URL}getDataStreamTarFile/`, { params });
     },
+    checkForTarFile: (params) => {
+        return apiClient.get(`${APP_ROOT_URL}checkForTarFile/`, { params });
+    },
     getDataStreamModelRuns: (params) => {
         return apiClient.get(`${APP_ROOT_URL}getDataStreamModelRuns/`, { params });
     },
