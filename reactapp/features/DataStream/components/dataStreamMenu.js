@@ -56,6 +56,10 @@ const TogggledButton = styled(Button)`
 const Content = styled.div`
   padding: 16px;
   margin-top: 100px;
+
+  a {
+    color: white;
+  }
 `;
 
 
@@ -82,13 +86,27 @@ const DataStreamMenu = ({
               }
             >
               <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu} >
-                <FaList size={10} />
+                <FaList size={15} />
               </TogggledButton>
             </OverlayTrigger>
           }
           <Container isOpen={isopen}>
             <Content>
               <h5>NGIAB DataStream S3 Data</h5>
+              <p>
+                The following dates are retrieved from the bucket{' '}
+                <a
+                  href="https://datastream.ciroh.org/index.html#v2.2/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  ciroh-community-ngen-datastream
+                </a>{' '}
+                ,feel free to go inside the bucket to explore more
+              </p>
+              <p><strong>Note&nbsp;–</strong> Data are only available for certain dates. Please verify a date’s availability before you proceed.</p>
+
+
 
               <BucketNamesSelect />
             </Content>

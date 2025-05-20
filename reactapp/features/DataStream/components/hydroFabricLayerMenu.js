@@ -81,7 +81,7 @@ const HydrofabricLayerMenu = ({
               }
             >
               <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu}>
-                <IoLayers size={10} />
+                <IoLayers size={15} />
               </TogggledButton>
             </OverlayTrigger>
 

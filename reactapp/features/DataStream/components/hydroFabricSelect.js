@@ -31,7 +31,6 @@ const HydroFabricSelect = ({
   const {state,actions} = useHydroFabricContext();
   const [promptMessage, setPromptMessage] = useState(null);
   useEffect(() => {
-    console.log("HydroFabricSelect: ", state);
     if (!state.nexus.id){
         setPromptMessage("Please select a catchment, nexus, troute or teehr to view time series data.");
     }

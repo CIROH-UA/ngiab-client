@@ -19,7 +19,7 @@ function importFromS3(name, url) {
 
   appAPI.importModelRuns(params)
     .then((data) => {
-        console.log('Success', data);
+        
           if (data.error) {
             // toast.error("Error fetching Model Run Data", { autoClose: 1000 });
             return;
