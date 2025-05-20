@@ -394,10 +394,11 @@ export default function BucketNamesSelect() {
         <br/>
         {
           success && 
-          <StyledButton onClick={handleVisulization}>
+          <StyledButton onClick={handleVisulization} disabled={loading} > 
             Visualize 
           </StyledButton>
         }
+
       </Fragment>
       <StyledLoadingMessage>
             {

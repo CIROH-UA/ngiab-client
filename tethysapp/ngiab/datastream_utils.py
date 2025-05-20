@@ -7,6 +7,8 @@ import shutil
 from pathlib import Path
 from botocore import UNSIGNED
 from botocore.client import Config
+from botocore.exceptions import ClientError, BotoCoreError
+
 
 from .utils import _get_conf_file
 
@@ -166,21 +168,73 @@ def _add_datastream_data_to_model_conf(individual_datastream) -> None:
     
     return
 
+def check_if_s3_file_exists(bucket: str = "ciroh-community-ngen-datastream", tar_key: str= "") -> bool:
+    """
+    Check if a file exists at the given path.
+
+    Parameters
+    ----------
+    file_path : str
+        The path to the file to check.
+
+    Returns
+    -------
+    bool
+        True if the file exists, False otherwise.
+    """
+    s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+
+    # First try a lightweight HEAD request so we fail fast if the key is absent.
+    try:
+        s3.head_object(Bucket=bucket, Key=tar_key)
+        return True
+    except ClientError as e:
+        err_code = e.response["Error"]["Code"]
+        if err_code in ("404", "NoSuchKey", "NotFound"):
+            msg = f"S3 object '{tar_key}' not found in bucket '{bucket}'."
+            return False
+        # Something else (permissions, throttling, etc.) – re-throw.
+        return False
+
 def _download_tar_from_s3(bucket: str, tar_key: str, download_path: str) -> None:
     """
-    Download a tar file from an S3 bucket.
+    Download a tar file from an S3 bucket, raising FileNotFoundError
+    if the object does not exist.
 
     Parameters
     ----------
     bucket : str
-        The name of the S3 bucket.
+        Name of the S3 bucket.
     tar_key : str
-        The S3 object key (path) for the tar file.
+        S3 object key (path) of the tar file.
     download_path : str
-        The local file path where the tar file will be saved.
+        Local destination for the downloaded tar.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the object key is not present in the bucket.
+    BotoCoreError
+        Any other boto3 / botocore-level error is re-raised unchanged.
     """
     s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
-    s3.download_file(Bucket=bucket, Key=tar_key, Filename=download_path)
+
+    # First try a lightweight HEAD request so we fail fast if the key is absent.
+    try:
+        s3.head_object(Bucket=bucket, Key=tar_key)
+    except ClientError as e:
+        err_code = e.response["Error"]["Code"]
+        if err_code in ("404", "NoSuchKey", "NotFound"):
+            msg = f"S3 object '{tar_key}' not found in bucket '{bucket}'."
+            raise FileNotFoundError(msg) from e
+        # Something else (permissions, throttling, etc.) – re-throw.
+        raise
+
+    # Object exists – proceed with the full download.
+    try:
+        s3.download_file(Bucket=bucket, Key=tar_key, Filename=download_path)
+    except (ClientError, BotoCoreError):
+        raise
 
 def _extract_keep_ngen_run(
     tar_path: str,
@@ -233,44 +287,58 @@ def _extract_keep_ngen_run(
 
     return kept_dst
 
-def download_and_extract_tar_from_s3(bucket: str = "ciroh-community-ngen-datastream", tar_key: str="", name_folder: str="") -> None:
+def download_and_extract_tar_from_s3(
+    bucket: str = "ciroh-community-ngen-datastream",
+    tar_key: str = "",
+    name_folder: str = "",
+) -> str:
     """
-    Download a tar file from an S3 bucket and extract its contents.
+    Download a tar file from S3, extract it, add the datastream to the
+    configuration, and return its ID.
 
-    Parameters
-    ----------
-    bucket : str
-        The name of the S3 bucket.
-    tar_key : str
-        The S3 object key (path) for the tar file.
-    extract_path : str
-        The directory where the contents of the tar file will be extracted.
+    Raises
+    ------
+    RuntimeError
+        If the S3 object is missing or any other S3 download error occurs.
     """
     datastream_conf_dir_path = _get_datastream_conf_dir()
-    
-    # Define the local path for the downloaded tar file
     local_tar_path = os.path.join(datastream_conf_dir_path, os.path.basename(tar_key))
 
-    # Download the tar file from S3
-    _download_tar_from_s3(bucket, tar_key, local_tar_path)
-
-    # Extract the contents of the tar file
+    # ── 1. Download ────────────────────────────────────────────────────────
     
+    try:
+        _download_tar_from_s3(bucket, tar_key, local_tar_path)
+    except FileNotFoundError as e:
+        raise RuntimeError(
+            f"Datastream tar '{tar_key}' not found in bucket '{bucket}'."
+        ) from e
+    except (ClientError, BotoCoreError) as e:
+        # Covers permission problems, network hiccups, throttling, etc.
+        raise RuntimeError(
+            f"Failed to download '{tar_key}' from bucket '{bucket}': {e}"
+        ) from e
+    except Exception as e:
+        # Covers any other unexpected errors
+        raise RuntimeError(
+            f"Failed to download '{tar_key}' from bucket '{bucket}': {e}"
+        ) from e
+    # ── 2. Extract ─────────────────────────────────────────────────────────
     _extract_keep_ngen_run(
         tar_path=local_tar_path,
         work_dir=datastream_conf_dir_path,
         dst_name=name_folder,
     )
-    # Add the datastream data to the configuration file
+
+    # ── 3. Update configs ─────────────────────────────────────────────────
     individual_datastream = _add_datastream_data_to_conf(
         label=name_folder,
         bucket=bucket,
         local_path=f"{datastream_conf_dir_path}/{name_folder}",
-        prefix=tar_key
+        prefix=tar_key,
     )
-    # add it also to the model runs
     _add_datastream_data_to_model_conf(individual_datastream)
-    # Return the path to the extracted files
+
+    # ── 4. Return the new datastream ID ───────────────────────────────────
     return individual_datastream["id"]
 
 def _get_list_datastream_model_runs():
