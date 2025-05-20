@@ -17,7 +17,7 @@ function Layout({navLinks, routes, children}) {
   return (
     <div className="h-100">
         <Header onNavChange={setNavVisible} />
-        <NavMenu navTitle="Options"  navVisible={navVisible} onNavChange={setNavVisible}>
+        <NavMenu navTitle="Modes"  navVisible={navVisible} onNavChange={setNavVisible}>
           <Nav variant="pills" defaultActiveKey={tethysApp.rootUrl} className="flex-column">
             {navLinks.map((link, idx) => {
               return (
