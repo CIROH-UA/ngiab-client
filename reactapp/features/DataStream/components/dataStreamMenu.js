@@ -104,7 +104,7 @@ const DataStreamMenu = ({
                 </a>{' '}
                 ,feel free to go inside the bucket to explore more
               </p>
-              <p><strong>Note&nbsp;–</strong> Data are only available for certain dates. Please verify a date’s availability before you proceed.</p>
+              <p><strong>Note:</strong> Data are only available for certain dates. Please verify a date’s availability before you proceed.</p>
 
 
 
