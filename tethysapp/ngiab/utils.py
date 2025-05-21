@@ -9,7 +9,7 @@ import os
 
 def _get_conf_file():
     home_path = os.environ.get("HOME", "/tmp")
-    conf_base_path = os.environ.get("VISUALIZER_CONF", f"{home_path}/ngiab_visualizer.json")
+    conf_base_path = os.environ.get("VISUALIZER_CONF", f"{home_path}/ngiab_visualizer/ngiab_visualizer.json")
     print(conf_base_path)
     return conf_base_path
 
