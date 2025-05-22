@@ -44,22 +44,45 @@ function LineChart({ width, height, data, layout }) {
   const parseDate = timeParse('%Y-%m-%d %H:%M:%S');
 
   // Flatten data to get all data points for scales
-  const allData = data.flatMap((series) => series.data);
-
+  const allData = data.flatMap(s => s.data ?? []);
+  if (allData.length === 0) {
+    /* choose one of the two return paths */
+    return (
+      <div
+        style={{
+          width,
+          height,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          // color: 'var(--ifm-font-color-base)',
+          fontStyle: 'italic',
+          fontSize: '1rem',
+        }}
+      >
+         🛠️ No data to display
+      </div>
+    );
+    // return null;        // ← or simply render nothing
+  }
   // Data accessors
   const getDate = (d) => parseDate(d.x.trim());
   const getYValue = (d) => d.y;
+  const safeExtent = (arr, accessor, fallback = [0, 1]) => {
+    const [min, max] = extent(arr, accessor);
+    return min == null || max == null ? fallback : [min, max];
+  };
 
   // Define initial scales
   const xScale = scaleTime({
-    range: [0, innerWidth],
-    domain: extent(allData, getDate),
+    range: [0, width - 100],            // use your margins
+    domain: safeExtent(allData, getDate, [new Date(), new Date()]),
     nice: true,
   });
 
   const yScale = scaleLinear({
-    range: [innerHeight, 0],
-    domain: extent(allData, getYValue),
+    range: [height - 80, 0],
+    domain: safeExtent(allData, getYValue, [0, 1]),
     nice: true,
   });
 

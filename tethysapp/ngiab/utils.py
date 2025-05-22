@@ -5,7 +5,7 @@ import glob
 import duckdb
 import xarray as xr
 import os
-
+from collections import defaultdict
 
 def _get_conf_file():
     home_path = os.environ.get("HOME", "/tmp")
@@ -31,7 +31,7 @@ def _get_list_model_runs():
     """
     print("get_list_model_runs")
     conf_file = _get_conf_file()
-    print(conf_file)
+    
     with open(conf_file, "r") as f:
         data = json.load(f)
     return data
@@ -423,7 +423,8 @@ def get_usgs_from_ngen_id(model_run_id, nexgen_id):
 def get_teehr_ts(parquet_file_path, primary_location_id_value, teehr_configuration):
     # Open DuckDB connection
     conn = duckdb.connect(database=":memory:")
-
+    # breakpoint()
+    
     # Load and filter the parquet file based on the primary_location_id value
     query = f"""
         SELECT value_time, primary_value, secondary_value
@@ -462,51 +463,59 @@ def get_teehr_ts(parquet_file_path, primary_location_id_value, teehr_configurati
     return series
 
 
-def get_teehr_metrics(model_run_id, primary_location_id):
-    base_output_teehr_path = get_base_teehr_path(model_run_id)
-    metrics_path = os.path.join(base_output_teehr_path, "metrics.csv")
+def get_teehr_metrics(model_run_id: str, primary_location_id: str):
+    """
+    Return a list like
+        [
+            { "metric": "kling_gupta_efficiency",
+              "ngen": 0.81,
+              "nwm30_retrospective": 0.77,
+              ...
+            },
+            { "metric": "nash_sutcliffe_efficiency",
+              "ngen": 0.79,
+              ...
+            },
+            ...
+        ]
 
-    # Load the CSV file
+    The function inspects whatever configurations/metrics are present in the
+    CSV – nothing is hard-coded.
+    """
+    base_output_teehr_path = get_base_teehr_path(model_run_id)
+    metrics_path           = os.path.join(base_output_teehr_path, "metrics.csv")
+
     df = pd.read_csv(metrics_path)
 
-    # Filter the DataFrame by primary_location_id
-    df_filtered = df[df["primary_location_id"] == primary_location_id]
-    if df_filtered.empty:
+    # ── keep only the location we’re interested in ──────────────────────
+    df = df.loc[df["primary_location_id"] == primary_location_id]
+    if df.empty:
         return []
-    # Pivot the DataFrame to make configuration names the columns
-    pivot_df = df_filtered.pivot(
-        index="primary_location_id", columns="configuration_name"
-    )
-    
-    # Flatten the MultiIndex columns
-    pivot_df.columns = [f"{metric}_{config}" for metric, config in pivot_df.columns]
 
-    # Extract metrics into the required structure
-    metrics_data = [
-        {
-            "metric": "kling_gupta_efficiency",
-            "ngen": pivot_df["kling_gupta_efficiency_ngen"].values[0],
-            "nwm30_retrospective": pivot_df[
-                "kling_gupta_efficiency_nwm30_retrospective"
-            ].values[0],
-        },
-        {
-            "metric": "nash_sutcliffe_efficiency",
-            "ngen": pivot_df["nash_sutcliffe_efficiency_ngen"].values[0],
-            "nwm30_retrospective": pivot_df[
-                "nash_sutcliffe_efficiency_nwm30_retrospective"
-            ].values[0],
-        },
-        {
-            "metric": "relative_bias",
-            "ngen": pivot_df["relative_bias_ngen"].values[0],
-            "nwm30_retrospective": pivot_df["relative_bias_nwm30_retrospective"].values[
-                0
-            ],
-        },
-    ]
+    # ── pivot so that             ───────────────────────────────────────
+    #       rows  → primary_location_id  (only 1 row after filter)
+    #       cols  →     metric   ┬ configuration_name
+    #                            └ (MultiIndex)
+    pivot = df.pivot(index="primary_location_id",
+                     columns="configuration_name")
 
-    return metrics_data
+    # pivot.columns.levels[0] == metrics
+    # pivot.columns.levels[1] == configuration names
+    metrics_out = []
+    metrics     = pivot.columns.levels[0]
+    configs     = pivot.columns.levels[1]
+
+    for metric in metrics:
+        row = {"metric": metric}
+        for cfg in configs:
+            try:
+                row[cfg] = pivot[(metric, cfg)].iloc[0]
+            except KeyError:
+                # metric missing for this configuration → skip / set None
+                row[cfg] = None
+        metrics_out.append(row)
+
+    return metrics_out
 
 def get_troute_vars(df):
     # Check if the DataFrame has a MultiIndex
