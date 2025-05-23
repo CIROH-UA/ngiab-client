@@ -169,7 +169,7 @@ def getNexusTimeSeries(request):
         "{}_output.csv".format(nexus_id),
     )
     usgs_id = get_usgs_from_ngen_id(model_run_id, nexus_id)
-
+    
     if os.path.exists(nexus_output_file_path):
         df = pd.read_csv(nexus_output_file_path, header=None)
 
@@ -187,6 +187,7 @@ def getNexusTimeSeries(request):
         ]
     else:
         data_key = []
+    
     return JsonResponse(
         {
             "data": data_key,
