@@ -197,7 +197,7 @@ export default function BucketNamesSelect() {
     }
     resetForecast();
     setSelectedForecast(e[0].value);
-    console.log("Selected Date", selectedDate.split(".")[1]);
+    
 
     const GETCYCLES = isMoreRecent(selectedDate.split(".")[1]);
 
