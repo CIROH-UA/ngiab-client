@@ -25,10 +25,12 @@ const ModelRunsSelect = (props) => {
   }, []);
   
   useEffect(() => {
+    hydroFabricActions.reset();
     if (state.current_model_runs.length < 1){
       return
     }
     actions.set_base_model_id(state.current_model_runs[0].value)
+    
   }
   , [state.current_model_runs]);
 
