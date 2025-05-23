@@ -402,8 +402,8 @@ function LineChart({ width, height, data, layout }) {
                         const point = localPoint(e) || { x: 0, y: 0 };
                         zoom.scale({ scaleX: 1.5, scaleY: 1.5, point });
                       }}
-                      onWheelCapture={(e) => {
-                        e.preventDefault();
+                      onWheel={(e) => {
+                        // e.preventDefault();
                         const point = localPoint(e) || { x: 0, y: 0 };
                         const delta = -e.deltaY / 500; // sensitivity
                         const scale = 1 + delta;
