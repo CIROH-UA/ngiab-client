@@ -9,7 +9,6 @@ import useTheme from 'hooks/useTheme';
 import { toast } from 'react-toastify';
 
 const onMapLoad = (event) => {
-  // console.log('Map loaded:', event);
   const map = event.target;
 
   // Set pointer interactions
@@ -125,7 +124,6 @@ const MapComponent = () => {
 
   // Memoized nexus layers
   const nexusLayers = useMemo(() => {
-    // console.log('Nexus layers updated', nexusPoints, isNexusHidden);
     if (!nexusPoints || isNexusHidden) return null;
 
     const baseLayers = [];
@@ -240,7 +238,6 @@ const MapComponent = () => {
   // Data fetching: get geospatial data and filters
   // --------------------------------------------
   useEffect(() => {
-    // console.log('MapComponent mounted');
     const protocol = new Protocol({ metadata: true });
     maplibregl.addProtocol('pmtiles', protocol.tile);
 
@@ -287,7 +284,6 @@ const MapComponent = () => {
   // ON CLICK: update state based on clicked layer
   // ------------------------------------
   const handleMapClick = async (event) => {
-    // console.log('Map clicked:', event);
     const map = event.target;
     const isClusteredNow = !!hydroFabricState.nexus.geometry?.clustered;
 

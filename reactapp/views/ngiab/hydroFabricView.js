@@ -39,9 +39,9 @@ const StyledTabs = styled.div`
 /* Returns an array of available tab keys based on the current state */
 const getAvailableTabs = (state) => {
   const tabs = [];
-  if (state.nexus.id) tabs.push("nexus_plot");
-  if (state.catchment.id) tabs.push("catchment_plot");
-  if (state.troute.variable) tabs.push("troute_plot");
+  if (state.nexus.id && state.nexus.chart.series.length > 0) tabs.push("nexus_plot");
+  if (state.catchment.id && state.catchment.chart.series.length > 0) tabs.push("catchment_plot");
+  if (state.troute.variable && state.troute.chart.series.length > 0) tabs.push("troute_plot");
   if (state.teehr.variable) tabs.push("teerh_plot");
   if (state.teehr.metrics) tabs.push("teerh_metrics");
   return tabs;
@@ -73,7 +73,7 @@ const HydroFabricView = ({singleRowOn}) => {
           onSelect={(k) => setActiveKey(k)}
           className="mb-3"
         >
-          {state.nexus.id && (
+          {state.nexus.id && state.nexus.chart.series.length > 0 && (
             <Tab eventKey="nexus_plot" title="Nexus">
               <Suspense fallback={<LoadingAnimation />}>
                 <HydroFabricPlotContainer>
@@ -89,11 +89,12 @@ const HydroFabricView = ({singleRowOn}) => {
                       )
                     }
                   </ParentSize>
-                </HydroFabricPlotContainer>
+                </HydroFabricPlotContainer>:
+
               </Suspense>
             </Tab>
           )}
-          {state.catchment.id && (
+          {state.catchment.id && state.catchment.chart.series.length > 0 && (
             <Tab eventKey="catchment_plot" title="Catchment">
               <Suspense fallback={<LoadingAnimation />}>
                 <HydroFabricPlotContainer>
@@ -113,7 +114,7 @@ const HydroFabricView = ({singleRowOn}) => {
               </Suspense>
             </Tab>
           )}
-          {state.troute.variable && (
+          {state.troute.variable && state.troute.chart.series.length > 0 && (
             <Tab eventKey="troute_plot" title="Troute">
               <Suspense fallback={<LoadingAnimation />}>
                 <HydroFabricPlotContainer>

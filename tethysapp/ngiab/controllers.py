@@ -55,7 +55,6 @@ def home(request):
 
 @controller
 def importModelRuns(request):
-    print("Importing model runs...")
     response_object = {}
     model_run_name = request.GET.get("model_run_name")
     model_run_s3_path = request.GET.get("model_run_s3_path")
@@ -169,24 +168,29 @@ def getNexusTimeSeries(request):
         base_output_path,
         "{}_output.csv".format(nexus_id),
     )
-    df = pd.read_csv(nexus_output_file_path, header=None)
-
-    time_col = df.iloc[:, 1]
-    streamflow_cms_col = df.iloc[:, 2]
-    data = [
-        {"x": time, "y": streamflow}
-        for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
-    ]
-
     usgs_id = get_usgs_from_ngen_id(model_run_id, nexus_id)
+    
+    if os.path.exists(nexus_output_file_path):
+        df = pd.read_csv(nexus_output_file_path, header=None)
+
+        time_col = df.iloc[:, 1]
+        streamflow_cms_col = df.iloc[:, 2]
+        data = [
+            {"x": time, "y": streamflow}
+            for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
+        ]
+        data_key =[
+            {
+            "label": f"{nexus_id}-Streamflow",
+            "data": data,
+            }
+        ]
+    else:
+        data_key = []
+    
     return JsonResponse(
         {
-            "data": [
-                {
-                    "label": f"{nexus_id}-Streamflow",
-                    "data": data,
-                }
-            ],
+            "data": data_key,
             "layout": {
                 "yaxis": "Streamflow",
                 "xaxis": "",
