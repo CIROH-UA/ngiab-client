@@ -396,10 +396,11 @@ def get_usgs_from_ngen_id(model_run_id, nexgen_id):
     negen_usgs_path = os.path.join(
         base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
     )
+    # breakpoint()
     # Open DuckDB connection
     corrected_next_id = nexgen_id.replace("nex", "ngen")
     conn = duckdb.connect(database=":memory:")
-
+    
     try:
 
         # Load and filter the parquet file based on the primary_location_id value
