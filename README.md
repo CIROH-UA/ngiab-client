@@ -104,8 +104,7 @@ If the user wants more control and just define the env variables and running the
 
 ```bash
 # Set environment variables
-export CONFIG_FILE="$HOME/.host_data_path.conf"          \
-       TETHYS_CONTAINER_NAME="tethys-ngen-portal"        \
+export TETHYS_CONTAINER_NAME="tethys-ngen-portal"        \
        TETHYS_REPO="awiciroh/tethys-ngiab"               \
        TETHYS_TAG="latest"                               \
        NGINX_PORT=80                                     \
