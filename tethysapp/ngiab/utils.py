@@ -75,16 +75,29 @@ def find_gpkg_file_path(model_run_id):
         # gpkg_model_run_path = f'{model_path}/config/{file_name}'
     return gpkg_model_run_path
 
+def _find_first_parquet_file(directory):
+    # breakpoint()
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.lower().endswith('.parquet'):
+                return os.path.join(root, file)
+    return None
 
 
 def append_ngen_usgs_column(gdf, model_id):
     # Load ngen_usgs_crosswalk.parquet into DuckDB
     base_output_teehr_path = get_base_teehr_path(model_id)
     # Define the path to the ngen_usgs_crosswalk.parquet file
-    ngen_usgs_crosswalk_path = os.path.join(
-        base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
+    location_crosswalks_path = os.path.join(
+        base_output_teehr_path,"dataset","location_crosswalks"
     )
 
+    ngen_usgs_crosswalk_path = _find_first_parquet_file(location_crosswalks_path)
+
+    # ngen_usgs_crosswalk_path = os.path.join(
+    #     location_crosswalks_path, cross_walk_name_file
+    # )
+    print(ngen_usgs_crosswalk_path)
     if not os.path.exists(ngen_usgs_crosswalk_path):
         # File not found, set 'ngen_usgs' column to 'none' for all entries
         gdf["ngen_usgs"] = "none"
@@ -315,9 +328,15 @@ def get_base_teehr_path(model_id):
 def get_usgs_from_ngen(app_workspace, ngen_id):
     base_output_teehr_path = get_base_teehr_path(app_workspace)
     # Define the path to the ngen_usgs_crosswalk.parquet file
-    crosswalk_file_path = os.path.join(
-        base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
+    # crosswalk_file_path = os.path.join(
+    #     base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
+    # )
+
+    location_crosswalks_path = os.path.join(
+        base_output_teehr_path,"dataset","location_crosswalks"
     )
+
+    crosswalk_file_path = _find_first_parquet_file(location_crosswalks_path)
 
     # Query the parquet file with DuckDB
     query = f"""
@@ -379,6 +398,7 @@ def get_teehr_joined_ts_path(model_run_id,configuration, variable):
         joined_timeseries_path,
         f"configuration_name={configuration}",
         f"variable_name={variable}",
+        "reference_time=__HIVE_DEFAULT_PARTITION__",
     )
 
     # Find the parquet file in the target directory
@@ -393,9 +413,15 @@ def get_teehr_joined_ts_path(model_run_id,configuration, variable):
 
 def get_usgs_from_ngen_id(model_run_id, nexgen_id):
     base_output_teehr_path = get_base_teehr_path(model_run_id)
-    negen_usgs_path = os.path.join(
-        base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
+    # negen_usgs_path = os.path.join(
+    #     base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
+    # )
+
+    location_crosswalks_path = os.path.join(
+        base_output_teehr_path,"dataset","location_crosswalks"
     )
+
+    negen_usgs_path = _find_first_parquet_file(location_crosswalks_path)
     # breakpoint()
     # Open DuckDB connection
     corrected_next_id = nexgen_id.replace("nex", "ngen")
