@@ -100,7 +100,28 @@ The user can then run `./ViewOnTethys.sh` script to spin again the container or 
 
 ### Unassisted Usage
 
-If the user wants more control and just define the env variables and running the container
+First create the `MODELS_RUNS_DIRECTORY` directory at `"$HOME/ngiab_visualizer"`, and `DATASTREAM_DIRECTORY`directory at `"$HOME/.datastream_ngiab"`, and `VISUALIZER_CONF`file at `"$MODELS_RUNS_DIRECTORY/ngiab_visualizer.json"`
+
+Copy your `my-ngen-output` into the `MODELS_RUNS_DIRECTORY` directory, and then edit the `"$MODELS_RUNS_DIRECTORY/ngiab_visualizer.json"` fie and add the your output as below.
+
+```bash
+{
+    "model_runs": [
+        ...
+        {
+            "label": "my-ngen-output",
+            "path": "/var/lib/tethys_persist/my-ngen-output",
+            "date": "2025-05-23:13:51:51",
+            "id": "61026834-4235-4d39-8a8e-f076a8854148", #it can be any ID
+            "subset": "",
+            "tags": []
+        },
+        ...
+    ]
+}
+```
+
+Define the env variables and running the container
 
 ```bash
 # Set environment variables
