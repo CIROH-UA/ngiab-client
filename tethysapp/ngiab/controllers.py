@@ -169,22 +169,27 @@ def getNexusTimeSeries(request):
         "{}_output.csv".format(nexus_id),
     )
     usgs_id = get_usgs_from_ngen_id(model_run_id, nexus_id)
+    data_key = []
     
     if os.path.exists(nexus_output_file_path):
-        df = pd.read_csv(nexus_output_file_path, header=None)
-
-        time_col = df.iloc[:, 1]
-        streamflow_cms_col = df.iloc[:, 2]
-        data = [
-            {"x": time, "y": streamflow}
-            for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
-        ]
-        data_key =[
-            {
-            "label": f"{nexus_id}-Streamflow",
-            "data": data,
-            }
-        ]
+        try:
+            df = pd.read_csv(nexus_output_file_path, header=None)
+            time_col = df.iloc[:, 1]
+            streamflow_cms_col = df.iloc[:, 2]
+            data = [
+                {"x": time, "y": streamflow}
+                for time, streamflow in zip(time_col.tolist(), streamflow_cms_col.tolist())
+            ]
+            data_key =[
+                {
+                "label": f"{nexus_id}-Streamflow",
+                "data": data,
+                }
+            ]
+        except Exception as e:
+            print(f"Error reading CSV file: {e}")
+            data_key = []
+        
     else:
         data_key = []
     
