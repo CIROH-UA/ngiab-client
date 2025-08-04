@@ -1,4 +1,4 @@
-import { Fragment, useState, lazy,Suspense } from 'react';
+import { Fragment, useState, lazy,Suspense, useContext  } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
 import { ModelRunsProvider } from 'features/ModelRuns/providers/modelRunsProvider';
 import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
@@ -10,6 +10,7 @@ import LoadingAnimation from 'components/loader/LoadingAnimation';
 import HydroFabricView from './hydroFabricView.js';
 import MapComponent from 'features/Map/components/mapgl.js';
 import ModelRunsView from 'features/ModelRuns/views/modelsView.js';
+import { AppContext } from "context/context";
 
 const ToggleButton = styled(Button)`
   top: ${(props) => (props.$fullScreen ? '95%' : '65%;')};
@@ -41,6 +42,7 @@ const ViewContainer = styled.div`
 
 
 const NGIABView = () => {
+  const { backend } = useContext(AppContext);
   const [singleRowOn, toggleSingleRow] = useState(true);
   const [isModelRunListOpen, setIsModelRunListOpen] = useState(true);
   const [ isLoading, setIsLoading ] = useState(false);
