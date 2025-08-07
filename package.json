@@ -85,7 +85,7 @@
     "jest-environment-jsdom": "^28.1.0",
     "jest-location-mock": "^1.0.9",
     "jest-watch-typeahead": "^1.1.0",
-    "msw": "^0.42.1",
+    "msw": "^2.10.4",
     "react-app-polyfill": "^3.0.0",
     "react-test-renderer": "^18.1.0",
     "size-limit": "^11.1.2",
