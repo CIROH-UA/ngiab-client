@@ -6,6 +6,40 @@ import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContex
 import appAPI from 'services/api/app';
 import { toast } from 'react-toastify';
 import SelectComponent from './selectComponent';
+import styled from 'styled-components';
+
+const StyledLabel = styled.label`
+  color: #ffffff !important;
+  font-weight: 500;
+  font-size: 0.9rem;
+  margin-bottom: 6px;
+  display: block;
+  letter-spacing: 0.3px;
+  
+  /* Reduce font size for smaller screens */
+  @media (max-width: 1366px) {
+    font-size: 0.85rem;
+    margin-bottom: 5px;
+  }
+  
+  @media (max-width: 1024px) {
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+  }
+`;
+
+const SelectContainer = styled.div`
+  margin-bottom: 12px;
+  
+  /* Reduce margin for smaller screens */
+  @media (max-width: 1366px) {
+    margin-bottom: 10px;
+  }
+  
+  @media (max-width: 1024px) {
+    margin-bottom: 8px;
+  }
+`;
 
 const CatchmentSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
@@ -76,30 +110,32 @@ const CatchmentSelect = (props) => {
     <Fragment>
           {state.catchment.id &&
             <Fragment>
-
-                <label>Catchment ID </label>
-                <SelectComponent 
-                  optionsList={state.catchment.list} 
-                  onChangeHandler={actions.set_catchment_id} 
-                  defaultValue={
-                    {
-                      'value': state.catchment.id,
-                      'label': state.catchment.id
+                <SelectContainer>
+                  <StyledLabel>Catchment ID</StyledLabel>
+                  <SelectComponent 
+                    optionsList={state.catchment.list} 
+                    onChangeHandler={actions.set_catchment_id} 
+                    defaultValue={
+                      {
+                        'value': state.catchment.id,
+                        'label': state.catchment.id
+                      }
                     }
-                  }
-                />
-              <label>Variable</label>
-              <SelectComponent 
-                optionsList={state.catchment.variable_list} 
-                onChangeHandler={actions.set_catchment_variable}
-                defaultValue={
-                  {
-                    'value': state.catchment.variable ? state.catchment.variable : state.catchment.variable_list ? state.catchment.variable_list[0].value : 'select variable',
-                    'label': state.catchment.variable ? state.catchment.variable.toLowerCase().replace(/_/g, " ") : state.catchment.variable_list ? state.catchment.variable_list[0].label : 'select variable',
-                  }
-
-                }
-              />
+                  />
+                </SelectContainer>
+                <SelectContainer>
+                  <StyledLabel>Variable</StyledLabel>
+                  <SelectComponent 
+                    optionsList={state.catchment.variable_list} 
+                    onChangeHandler={actions.set_catchment_variable}
+                    defaultValue={
+                      {
+                        'value': state.catchment.variable ? state.catchment.variable : state.catchment.variable_list ? state.catchment.variable_list[0].value : 'select variable',
+                        'label': state.catchment.variable ? state.catchment.variable.toLowerCase().replace(/_/g, " ") : state.catchment.variable_list ? state.catchment.variable_list[0].label : 'select variable',
+                      }
+                    }
+                  />
+                </SelectContainer>
             </Fragment>
           }
     </Fragment>

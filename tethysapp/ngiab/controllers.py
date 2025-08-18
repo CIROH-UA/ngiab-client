@@ -214,6 +214,7 @@ def getTrouteVariables(request):
     troute_id = request.GET.get("troute_id")
     clean_troute_id = troute_id.split("-")[1]
     df = get_troute_df(model_run_id)
+    
 
     if df is None:
         vars = []
@@ -455,7 +456,8 @@ def getDataStreamTarFile(request):
 
     tar_key     = "/".join(parts) + "/ngen-run.tar.gz"
     name_folder = "_".join(filter(None, [avail_date, ngen_forecast, ngen_cycle, ngen_ensemble, ngen_vpu]))
-
+    print(f"Tar key: {tar_key}")
+    print(f"Name folder: {name_folder}")
     # ── Fast path: already downloaded ─────────────────────────────────────
     if check_if_datastream_data_exists(name_folder):
         unique_id = get_datastream_id_from_conf_file(name_folder)

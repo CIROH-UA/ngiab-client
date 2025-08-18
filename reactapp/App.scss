@@ -29,7 +29,7 @@ $theme-colors: (
 
 /* Define CSS variables for theming */
 :root {
-  --ts-header-height: 56px;
+  --ts-header-height: 36px;
   color-scheme: light dark;
 
   /* Light theme variables */
@@ -65,4 +65,11 @@ body {
   width: 3em ;
   height: 1.5em ;
   margin-right: 10px;
+}
+
+.tethys-title-text {
+  padding: 6px 0px 0px 15px;
+  display: inline-block;
+  font-weight: 500;
+  font-size: 1.4rem;
 }

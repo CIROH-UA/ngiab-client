@@ -7,6 +7,20 @@ import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 import { toast } from 'react-toastify';
 import { mode } from 'd3-array';
+import styled from 'styled-components';
+
+const StyledLabel = styled.label`
+  color: #ffffff !important;
+  font-weight: 500;
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+  display: block;
+  letter-spacing: 0.3px;
+`;
+
+const SelectContainer = styled.div`
+  margin-bottom: 15px;
+`;
 
 const TRouteSelect = (props) => {
   const {state,actions} = useHydroFabricContext();
@@ -74,11 +88,13 @@ const TRouteSelect = (props) => {
         {
           state.troute.id &&
           <Fragment>
-            <label>Troute Variable</label>
-            <SelectComponent 
-              optionsList={state.troute.variable_list} 
-              onChangeHandler={actions.set_troute_variable}
-            />
+            <SelectContainer>
+              <StyledLabel>Troute Variable</StyledLabel>
+              <SelectComponent 
+                optionsList={state.troute.variable_list} 
+                onChangeHandler={actions.set_troute_variable}
+              />
+            </SelectContainer>
           </Fragment>
         }
     </Fragment>

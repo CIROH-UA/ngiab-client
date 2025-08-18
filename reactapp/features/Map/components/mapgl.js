@@ -297,13 +297,10 @@ const MapComponent = () => {
       layersToQuery.push('catchments-layer');
     }
     if (layersToQuery.length === 0) return;
-
     const features = map.queryRenderedFeatures(event.point, { layers: layersToQuery });
     if (!features || !features.length) return;
-
     for (const feature of features) {
       const layerId = feature.layer.id;
-
       if (layerId === 'all-points' || layerId === 'unclustered-point') {
         // Clicked a nexus point.
         hydroFabricActions.reset_teehr();
@@ -314,7 +311,6 @@ const MapComponent = () => {
         hydroFabricActions.set_troute_id(nexusId);
         setSelectedNexusId(nexusId);
         setSelectedCatchmentId(null);
-
         // When clicking a nexus point, ensure catchments remain hidden.
         if (!isNexusHidden) {
           hydroFabricActions.show_nexus_geometry();
@@ -322,6 +318,7 @@ const MapComponent = () => {
 
         if (feature.properties.ngen_usgs !== 'none') {
           hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);
+          console.log("Setting TEEHR ID:", feature.properties.ngen_usgs);
         }
         return;
       }
@@ -356,6 +353,7 @@ const MapComponent = () => {
         
         return;
       }
+      console.log("Final Nexus ID:", feature.properties.id);
     }
   };
 
