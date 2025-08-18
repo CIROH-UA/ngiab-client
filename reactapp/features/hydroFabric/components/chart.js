@@ -12,15 +12,16 @@ import {
   TooltipWithBounds,
   defaultStyles,
 } from '@visx/tooltip';
-import { LuExpand } from 'react-icons/lu';
+import { LuExpand, LuPlus, LuMinus } from 'react-icons/lu';
 import { localPoint } from '@visx/event';
 import { GlyphCircle } from '@visx/glyph';
 import { timeParse, timeFormat } from 'd3-time-format';
+import { curveMonotoneX } from 'd3-shape';
 import { RectClipPath } from '@visx/clip-path';
 import { lightTheme, darkTheme } from '@visx/xychart';
 import useTheme from 'hooks/useTheme'; // ← adjust the path if needed
 
-function LineChart({ width, height, data, layout }) {
+function LineChart({ width, height, data, layout, onExpand }) {
   /* ─────────────────────────────────────
      Hooks – always execute, no early-return
      ───────────────────────────────────── */
@@ -36,9 +37,17 @@ function LineChart({ width, height, data, layout }) {
   } = useTooltip();
 
   /* ─────────────────────────────────────
-     Layout helpers
+     Layout helpers (responsive)
      ───────────────────────────────────── */
-  const margin = { top: 40, right: 40, bottom: 40, left: 60 };
+  const isTiny = width < 360 || height < 240;
+  const isSmall = width < 640 || height < 360;
+  const responsiveMargin = {
+    top: isTiny ? 24 : isSmall ? 32 : 40,
+    right: isTiny ? 16 : isSmall ? 24 : 60,
+    bottom: isTiny ? 28 : isSmall ? 40 : 90,
+    left: isTiny ? 44 : isSmall ? 52 : 60,
+  };
+  const margin = responsiveMargin;
   const innerWidth  = Math.max(1, width  - margin.left - margin.right);
   const innerHeight = Math.max(1, height - margin.top  - margin.bottom);
 
@@ -63,13 +72,13 @@ function LineChart({ width, height, data, layout }) {
   const xScale = scaleTime({
     range: [0, innerWidth],
     domain: safeExtent(allData, getDate, [new Date(), new Date()]),
-    nice: true,
+    nice: false,
   });
 
   const yScale = scaleLinear({
     range: [innerHeight, 0],
     domain: safeExtent(allData, getYValue, [0, 1]),
-    nice: true,
+    nice: false,
   });
 
   /* ─────────────────────────────────────
@@ -90,9 +99,16 @@ function LineChart({ width, height, data, layout }) {
     color: theme === 'dark' ? 'white' : 'black',
     fontSize: 14,
     boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+    borderRadius: 8,
+    border: `1px solid ${theme === 'dark' ? '#415164' : '#e5e7eb'}`,
+    padding: '8px 10px',
   };
 
-  const formatDate = timeFormat('%Y-%m-%d');
+  const formatDate = timeFormat('%Y-%m-%d %H:%M');
+  const formatValue = (v) =>
+    typeof v === 'number'
+      ? v.toLocaleString(undefined, { maximumFractionDigits: 3 })
+      : v;
   const bisectDate = bisector((d) => getDate(d)).left;
 
   /* ─────────────────────────────────────
@@ -192,7 +208,16 @@ function LineChart({ width, height, data, layout }) {
      Render
      ───────────────────────────────────── */
   return (
-    <div style={{ position: 'relative', width, height }}>
+    <div
+      style={{
+        position: 'relative',
+        width,
+        height,
+        backgroundColor: theme === 'dark' ? '#0b1220' : '#fafafa',
+        border: `1px solid ${theme === 'dark' ? '#243244' : '#e5e7eb'}`,
+        borderRadius: 8,
+      }}
+    >
       {hasData ? (
         <Zoom
           width={innerWidth}
@@ -223,6 +248,7 @@ function LineChart({ width, height, data, layout }) {
                     display: 'flex',
                     justifyContent: 'space-between',
                     marginTop: 10,
+                    marginLeft: 10,
                     position: 'relative',
                   }}
                 >
@@ -235,10 +261,13 @@ function LineChart({ width, height, data, layout }) {
                           alignItems: 'center',
                           marginRight: 10,
                           padding: '2px 6px',
-                          border: '1px solid #ddd',
+                          border: `1px solid ${theme === 'dark' ? '#334155' : '#e5e7eb'}`,
                           borderRadius: 4,
                           backgroundColor:
-                            theme === 'dark' ? '#4f5b67' : '#f0f0f0',
+                            theme === 'dark' ? '#1f2937' : '#ffffff',
+                          boxShadow: theme === 'dark'
+                            ? '0 1px 2px rgba(0,0,0,0.3)'
+                            : '0 1px 2px rgba(0,0,0,0.08)',
                         }}
                       >
                         <div
@@ -247,12 +276,14 @@ function LineChart({ width, height, data, layout }) {
                             width: 10,
                             height: 10,
                             marginRight: 5,
+                            borderRadius: 2,
                           }}
                         />
                         <div
                           style={{
                             color: theme === 'dark' ? '#f0f0f0' : '#000',
                             fontSize: 14,
+                            fontWeight: 600,
                           }}
                         >
                           {series.label}
@@ -260,23 +291,65 @@ function LineChart({ width, height, data, layout }) {
                       </div>
                     ))}
                   </div>
-                  <button
-                    onClick={zoom.reset}
-                    style={{
-                      backgroundColor: theme === 'dark' ? '#4f5b67' : '#fff',
-                      color: theme === 'dark' ? '#fff' : '#000',
-                      border: '1px solid #ddd',
-                      fontWeight: 'bold',
-                      borderRadius: 4,
-                      padding: '4px 8px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <LuExpand size={20} />
-                  </button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => zoom.scale({ scaleX: 1.15, scaleY: 1.15, point: { x: innerWidth / 2, y: innerHeight / 2 } })}
+                      style={{
+                        backgroundColor: theme === 'dark' ? '#4f5b67' : '#fff',
+                        color: theme === 'dark' ? '#fff' : '#000',
+                        border: '1px solid #ddd',
+                        fontWeight: 'bold',
+                        borderRadius: 4,
+                        padding: '4px 8px',
+                        cursor: 'pointer',
+                      }}
+                      aria-label="Zoom in"
+                      title="Zoom in"
+                    >
+                      <LuPlus size={18} />
+                    </button>
+                    <button
+                      onClick={() => zoom.scale({ scaleX: 1 / 1.15, scaleY: 1 / 1.15, point: { x: innerWidth / 2, y: innerHeight / 2 } })}
+                      style={{
+                        backgroundColor: theme === 'dark' ? '#4f5b67' : '#fff',
+                        color: theme === 'dark' ? '#fff' : '#000',
+                        border: '1px solid #ddd',
+                        fontWeight: 'bold',
+                        borderRadius: 4,
+                        padding: '4px 8px',
+                        cursor: 'pointer',
+                      }}
+                      aria-label="Zoom out"
+                      title="Zoom out"
+                    >
+                      <LuMinus size={18} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (onExpand) {
+                          onExpand();
+                        } else {
+                          zoom.reset();
+                        }
+                      }}
+                      style={{
+                        backgroundColor: theme === 'dark' ? '#4f5b67' : '#fff',
+                        color: theme === 'dark' ? '#fff' : '#000',
+                        border: '1px solid #ddd',
+                        fontWeight: 'bold',
+                        borderRadius: 4,
+                        padding: '4px 8px',
+                        cursor: 'pointer',
+                      }}
+                      aria-label={onExpand ? 'Expand chart' : 'Reset zoom'}
+                      title={onExpand ? 'Expand chart' : 'Reset zoom'}
+                    >
+                      <LuExpand size={20} />
+                    </button>
+                  </div>
                 </div>
 
-                <svg
+                 <svg
                   width={width}
                   height={height}
                   style={{
@@ -293,44 +366,57 @@ function LineChart({ width, height, data, layout }) {
                   />
 
                   <Group left={margin.left} top={margin.top}>
+                    {/* Plot background */}
+                    <rect
+                      x={0}
+                      y={0}
+                      width={innerWidth}
+                      height={innerHeight}
+                      fill={theme === 'dark' ? '#0f172a' : '#ffffff'}
+                      stroke={theme === 'dark' ? '#1f2937' : '#e5e7eb'}
+                      strokeWidth={1}
+                    />
+
                     <GridRows
                       scale={newYScale}
                       width={innerWidth}
                       height={innerHeight}
-                      stroke={theme === 'dark' ? '#7f8c8d' : '#e0e0e0'}
-                      strokeOpacity={0.1}
-                      strokeWidth={1}
+                      stroke={theme === 'dark' ? '#475569' : '#e5e7eb'}
+                      strokeOpacity={theme === 'dark' ? 0.2 : 0.4}
+                      strokeWidth={isSmall ? 0.5 : 0.75}
+                      lineStyle={{ shapeRendering: 'crispEdges' }}
                     />
                     <GridColumns
                       scale={newXScale}
                       width={innerWidth}
                       height={innerHeight}
-                      stroke={theme === 'dark' ? '#7f8c8d' : '#e0e0e0'}
-                      strokeOpacity={0.1}
-                      strokeWidth={1}
+                      stroke={theme === 'dark' ? '#475569' : '#e5e7eb'}
+                      strokeOpacity={theme === 'dark' ? 0.2 : 0.4}
+                      strokeWidth={isSmall ? 0.5 : 0.75}
+                      lineStyle={{ shapeRendering: 'crispEdges' }}
                     />
 
                     <AxisLeft
                       scale={newYScale}
-                      stroke={theme === 'dark' ? '#d1d5db' : '#000'}
-                      tickStroke={theme === 'dark' ? '#d1d5db' : '#000'}
+                      stroke={theme === 'dark' ? '#94a3b8' : '#111827'}
+                      tickStroke={theme === 'dark' ? '#94a3b8' : '#111827'}
                       tickLabelProps={() => ({
-                        fill: theme === 'dark' ? '#e0e0e0' : '#000',
-                        fontSize: 12,
-                        fontWeight: 'bold',
+                        fill: theme === 'dark' ? '#e5e7eb' : '#111827',
+                        fontSize: isSmall ? 10 : 12,
+                        fontWeight: 500,
                         textAnchor: 'end',
                       })}
                     />
                     <AxisBottom
                       scale={newXScale}
                       top={innerHeight}
-                      stroke={theme === 'dark' ? '#d1d5db' : '#000'}
+                      stroke={theme === 'dark' ? '#94a3b8' : '#111827'}
                       tickFormat={formatDate}
-                      tickStroke={theme === 'dark' ? '#d1d5db' : '#000'}
+                      tickStroke={theme === 'dark' ? '#94a3b8' : '#111827'}
                       tickLabelProps={() => ({
-                        fill: theme === 'dark' ? '#e0e0e0' : '#000',
-                        fontSize: 12,
-                        fontWeight: 'bold',
+                        fill: theme === 'dark' ? '#e5e7eb' : '#111827',
+                        fontSize: isSmall ? 10 : 12,
+                        fontWeight: 500,
                         textAnchor: 'middle',
                       })}
                     />
@@ -341,7 +427,11 @@ function LineChart({ width, height, data, layout }) {
                         <LinePath
                           key={`line-${index}`}
                           stroke={colors[index % colors.length]}
-                          strokeWidth={2}
+                          strokeWidth={isSmall ? 2 : 2.25}
+                          strokeOpacity={0.95}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          curve={curveMonotoneX}
                           data={series.data}
                           x={(d) => newXScale(getDate(d)) ?? 0}
                           y={(d) => newYScale(getYValue(d)) ?? 0}
@@ -360,8 +450,8 @@ function LineChart({ width, height, data, layout }) {
                               x: tooltipLeft - margin.left,
                               y: innerHeight,
                             }}
-                            stroke={theme === 'dark' ? '#d1d5db' : '#000'}
-                            strokeWidth={1.5}
+                            stroke={theme === 'dark' ? '#94a3b8' : '#111827'}
+                            strokeWidth={isSmall ? 0.75 : 1}
                             pointerEvents="none"
                             strokeDasharray="6,3"
                           />
@@ -370,7 +460,7 @@ function LineChart({ width, height, data, layout }) {
                               key={`glyph-${i}`}
                               left={newXScale(getDate(d.dataPoint)) ?? 0}
                               top={newYScale(getYValue(d.dataPoint)) ?? 0}
-                              size={110}
+                              size={isSmall ? 60 : 80}
                               fill={colors[d.seriesIndex % colors.length]}
                               stroke={theme === 'dark' ? 'white' : 'black'}
                               strokeWidth={2}
@@ -398,16 +488,10 @@ function LineChart({ width, height, data, layout }) {
                       onTouchStart={zoom.dragStart}
                       onTouchMove={zoom.dragMove}
                       onTouchEnd={zoom.dragEnd}
-                      onDoubleClick={(e) => {
-                        const point = localPoint(e) || { x: 0, y: 0 };
-                        zoom.scale({ scaleX: 1.5, scaleY: 1.5, point });
-                      }}
+                      onDoubleClick={undefined}
                       onWheel={(e) => {
-                        // e.preventDefault();
-                        const point = localPoint(e) || { x: 0, y: 0 };
-                        const delta = -e.deltaY / 500; // sensitivity
-                        const scale = 1 + delta;
-                        zoom.scale({ scaleX: scale, scaleY: scale, point });
+                        // Disable wheel zoom entirely
+                        e.preventDefault();
                       }}
                       style={{
                         cursor: zoom.isDragging ? 'grabbing' : 'grab',
@@ -436,7 +520,7 @@ function LineChart({ width, height, data, layout }) {
                         >
                           {d.seriesLabel}:{' '}
                         </strong>
-                        {getYValue(d.dataPoint)}
+                        {formatValue(getYValue(d.dataPoint))}
                       </div>
                     ))}
                   </TooltipWithBounds>

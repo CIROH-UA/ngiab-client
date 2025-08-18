@@ -79,15 +79,28 @@ createTheme(
 const TeehrMetricsTable = ({ data }) => {
     const theme = useTheme();
     const tableTheme = theme === 'dark' ? DARK_TABLE : LIGHT_TABLE;
-
+    const formatValue = (value) => {
+        if (typeof value === 'number') {
+            return value.toFixed(3);
+        }
+        return value;
+    };
+    const metricAliases = {
+        kling_gupta_efficiency: 'KGE',
+        nash_sutcliffe_efficiency: 'NSE',
+        relative_bias: 'Relative Bias',
+    };
+    const filteredData = data.filter(row =>
+        ['kling_gupta_efficiency', 'nash_sutcliffe_efficiency', 'relative_bias'].includes(row.metric)
+    );
     const columns = [
-        { name: 'Metric', selector: row => row.metric, sortable: true },
-        ...(data.length > 0
-            ? Object.keys(data[0])
+        { name: 'Metric', selector: row =>  metricAliases[row.metric] || row.metric, sortable: true },
+        ...(filteredData.length > 0
+            ? Object.keys(filteredData[0])
                   .filter(key => key !== 'metric')
                   .map(configName => ({
                       name: configName,
-                      selector: row => row[configName],
+                      selector: row => formatValue(row[configName]),
                       sortable: true,
                   }))
             : []),
@@ -96,7 +109,7 @@ const TeehrMetricsTable = ({ data }) => {
     return (
         <DataTable
             columns={columns}
-            data={data}
+            data={filteredData}
             defaultSortField="metric"
             pagination
             theme={tableTheme}

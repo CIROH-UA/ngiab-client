@@ -29,9 +29,7 @@ def _get_list_model_runs():
             ]
         }
     """
-    print("get_list_model_runs")
     conf_file = _get_conf_file()
-    
     with open(conf_file, "r") as f:
         data = json.load(f)
     return data
@@ -50,7 +48,6 @@ def get_model_runs_selectable():
 def _find_gpkg_file_path(model_path):
     config_path = os.path.join(model_path, "config")
     gpkg_files = []
-
     for root, dirs, files in os.walk(config_path):
         for file in files:
             if file.endswith(".gpkg"):
@@ -79,8 +76,11 @@ def find_gpkg_file_path(model_run_id):
 
 def append_ngen_usgs_column(gdf, model_id):
     # Load ngen_usgs_crosswalk.parquet into DuckDB
+    print("Appending ngen_usgs column to GeoDataFrame...")
     base_output_teehr_path = get_base_teehr_path(model_id)
     # Define the path to the ngen_usgs_crosswalk.parquet file
+    print("Base output teehr path:")
+    print(base_output_teehr_path)
     ngen_usgs_crosswalk_path = os.path.join(
         base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
     )
@@ -153,10 +153,9 @@ def _get_base_troute_output(model_id):
 def get_troute_df(model_id):
     """
     Load the first T-Route data file from the workspace as a DataFrame.
-    Supports both CSV and NetCDF (.nc) files, and replaces NaN values with -9999.
+    Supports both CSV and CDF (.nc) files, and replaces NaN values with -9999.
     """
     base_output_path = _get_base_troute_output(model_id)
-
     # Search for supported file types in priority order
     file_types = [("CSV", "*.csv"), ("NetCDF", "*.nc")]
 
@@ -165,7 +164,6 @@ def get_troute_df(model_id):
 
         if files:
             file_path = files[0]
-            print(f"Found {file_type} file: {file_path}")
 
             try:
                 if file_type == "CSV":
@@ -178,6 +176,7 @@ def get_troute_df(model_id):
 
                 # Replace NaN values with -9999
                 df.fillna(-9999, inplace=True)
+                print(f"Loaded {file_type} file successfully.")
                 return df
             except Exception as e:
                 print(f"Error reading {file_type} file '{file_path}': {e}")
@@ -312,7 +311,9 @@ def get_base_teehr_path(model_id):
     return base_output_teehr_path
 
 
+
 def get_usgs_from_ngen(app_workspace, ngen_id):
+    print(f"Getting USGS from NGEN ID: {ngen_id}")
     base_output_teehr_path = get_base_teehr_path(app_workspace)
     # Define the path to the ngen_usgs_crosswalk.parquet file
     crosswalk_file_path = os.path.join(
@@ -343,19 +344,23 @@ def get_configuration_variable_pairs(model_run_id):
     )
     configurations_variables = []
 
+    print("Getting Teehr configuration-variable pairs...")
     # Traverse the directory tree from the base path
     for root, dirs, files in os.walk(joined_timeseries_base_path):
         # Check if the directory matches the `configuration_name=` pattern
+
         if "configuration_name=" in root:
             # Extract the configuration name from the directory path
+            print(f"Checking root: {root}")
             config_name = [
                 d.split("=")[1]
-                for d in root.split("/")
+                for d in root.split(os.sep)
                 if d.startswith("configuration_name=")
             ][0]
-
+            print(f"dirs: {dirs}")
             # Look one level deeper for `variable_name=` directories
             for dir_name in dirs:
+                print(f"Checking directory: {dir_name}")
                 if dir_name.startswith("variable_name="):
                     variable_name = dir_name.split("=")[1]
 
@@ -365,11 +370,12 @@ def get_configuration_variable_pairs(model_run_id):
                         "label": f"{config_name} {variable_name.replace('_', ' ')}",
                     }
                     configurations_variables.append(config_var_pair)
-
+    print(f"Found {len(configurations_variables)} configuration-variable pairs.")
     return configurations_variables
 
 
 def get_teehr_joined_ts_path(model_run_id,configuration, variable):
+    print("Getting Teehr joined timeseries path...")
     base_output_teehr_path = get_base_teehr_path(model_run_id)
     joined_timeseries_path = os.path.join(
         base_output_teehr_path, "dataset", "joined_timeseries"
@@ -392,6 +398,7 @@ def get_teehr_joined_ts_path(model_run_id,configuration, variable):
 
 
 def get_usgs_from_ngen_id(model_run_id, nexgen_id):
+    print(f"Getting USGS from NGEN ID: {nexgen_id}")
     base_output_teehr_path = get_base_teehr_path(model_run_id)
     negen_usgs_path = os.path.join(
         base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
@@ -483,6 +490,7 @@ def get_teehr_metrics(model_run_id: str, primary_location_id: str):
     The function inspects whatever configurations/metrics are present in the
     CSV – nothing is hard-coded.
     """
+    print("Getting Teehr metrics...")
     base_output_teehr_path = get_base_teehr_path(model_run_id)
     metrics_path           = os.path.join(base_output_teehr_path, "metrics.csv")
 

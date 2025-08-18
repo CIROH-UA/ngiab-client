@@ -390,6 +390,7 @@ def check_if_datastream_data_exists(datastream_folder_name: str) -> bool:
     datastream_folder_path = os.path.join(conf_dir_path, datastream_folder_name)
     
     if not os.path.exists(datastream_folder_path):
+        print("Datastream folder does not exist:", datastream_folder_path)
         return False
     else:
         return True

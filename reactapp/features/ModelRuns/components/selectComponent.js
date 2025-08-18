@@ -8,10 +8,16 @@ class MenuList extends Component {
   render() {
     const { options, children, maxHeight, getValue } = this.props;
     const [value] = getValue();
-    const initialOffset = options.indexOf(value) * height;
 
-    // Dynamically adjust maxHeight
-    const adjustedHeight = Math.min(children.length * height, maxHeight);
+    const safeMaxHeight = typeof maxHeight === 'number' && !isNaN(maxHeight) ? maxHeight : 300;
+    const safeChildrenLength = Array.isArray(children) ? children.length : 0;
+
+    const valueIndex = options.indexOf(value);
+    const initialOffset = valueIndex >= 0 ? valueIndex * height : 0;
+    
+    // Calculate dynamic height based on number of options
+    const dynamicHeight = Math.min(safeChildrenLength * height, safeMaxHeight);
+    const adjustedHeight = Math.max(dynamicHeight, height); // Minimum height of one option
 
     return (
       <List
@@ -26,25 +32,70 @@ class MenuList extends Component {
   }
 }
 
-// Custom styles for react-select
+// Custom styles for react-select - matching hydrofabric styling
 const customStyles = {
-  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  menu: (provided) => ({
+  control: (provided, state) => ({
     ...provided,
-    maxHeight: '500px',
-    overflowY: 'auto',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    border: state.isFocused ? '1px solid #cafeff' : '1px solid rgba(255, 255, 255, 0.2)',
+    borderRadius: '8px',
+    boxShadow: state.isFocused ? '0 0 0 1px #cafeff' : 'none',
+    minHeight: '40px',
+    '&:hover': {
+      borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
   }),
-  option: (provided) => ({
+  menu: (provided, state) => ({
     ...provided,
-    color: 'black',
+    backgroundColor: '#4f5b67',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: '8px',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
+    // Dynamic height based on options
+    maxHeight: state.options ? Math.min(state.options.length * 35, 300) : 300,
+  }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  option: (provided, state) => ({
+    ...provided,
+    backgroundColor: state.isFocused 
+      ? 'rgba(255, 255, 255, 0.1)' 
+      : 'transparent',
+    color: '#ffffff',
+    padding: '10px 16px',
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
   }),
   singleValue: (provided) => ({
     ...provided,
-    color: 'black',
+    color: '#ffffff',
+    fontWeight: '400',
   }),
   input: (provided) => ({
     ...provided,
-    color: 'black',
+    color: '#ffffff',
+  }),
+  placeholder: (provided) => ({
+    ...provided,
+    color: 'rgba(255, 255, 255, 0.6)',
+  }),
+  indicatorSeparator: (provided) => ({
+    ...provided,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  }),
+  dropdownIndicator: (provided) => ({
+    ...provided,
+    color: '#ffffff',
+    '&:hover': {
+      color: '#cafeff',
+    },
+  }),
+  clearIndicator: (provided) => ({
+    ...provided,
+    color: '#ffffff',
+    '&:hover': {
+      color: '#cafeff',
+    },
   }),
 };
 

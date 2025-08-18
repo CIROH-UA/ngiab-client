@@ -26,23 +26,68 @@ class MenuList extends Component {
   }
 }
 
-
 // Custom styles for react-select
 const customStyles = {
-
-  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  option: (provided) => ({
+  control: (provided, state) => ({
     ...provided,
-    color: 'black',
-    overflowY: 'auto',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    border: state.isFocused ? '1px solid #cafeff' : '1px solid rgba(255, 255, 255, 0.2)',
+    borderRadius: '8px',
+    boxShadow: state.isFocused ? '0 0 0 1px #cafeff' : 'none',
+    minHeight: '40px',
+    '&:hover': {
+      borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+  }),
+  menu: (provided) => ({
+    ...provided,
+    backgroundColor: '#4f5b67',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    borderRadius: '8px',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
+  }),
+  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+  option: (provided, state) => ({
+    ...provided,
+    backgroundColor: state.isFocused 
+        ? 'rgba(255, 255, 255, 0.1)' 
+        : 'transparent',
+    color:  '#ffffff',
+    padding: '10px 16px',
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
   }),
   singleValue: (provided) => ({
     ...provided,
-    color: 'black',
+    color: '#ffffff',
+    fontWeight: '400',
   }),
   input: (provided) => ({
     ...provided,
-    color: 'black',
+    color: '#ffffff',
+  }),
+  placeholder: (provided) => ({
+    ...provided,
+    color: 'rgba(255, 255, 255, 0.6)',
+  }),
+  indicatorSeparator: (provided) => ({
+    ...provided,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  }),
+  dropdownIndicator: (provided) => ({
+    ...provided,
+    color: '#ffffff',
+    '&:hover': {
+      color: '#cafeff',
+    },
+  }),
+  clearIndicator: (provided) => ({
+    ...provided,
+    color: '#ffffff',
+    '&:hover': {
+      color: '#cafeff',
+    },
   }),
 };
   

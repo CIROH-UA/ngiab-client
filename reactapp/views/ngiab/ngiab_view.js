@@ -67,7 +67,8 @@ const NGIABView = () => {
               </ToggleButton>
               <HydroFabricContainer 
                 $fullScreen={singleRowOn} 
-                isModelRunListOpen={isModelRunListOpen}  
+                isModelRunListOpen={isModelRunListOpen}
+                style={{ zIndex: 800, left: 0 }}
               >
                 <Suspense fallback={<LoadingAnimation />}>
                   <HydroFabricView 
