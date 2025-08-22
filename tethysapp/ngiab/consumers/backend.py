@@ -58,7 +58,7 @@ class BackendConsumer(AsyncConsumer):
 
                 # Look up the handler for the message type and call the appropriate method
                 handler_found = False
-                # breakpoint()
+                breakpoint()
                 for handler in self.handlers:
                     if message_type in handler.receiving_actions:
                         handler_found = True
