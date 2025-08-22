@@ -16,7 +16,7 @@ from tethysapp.ngiab.app import App
 log = logging.getLogger(__name__)
 
 
-@consumer(name="ngiab_run", url="ngiab-run")
+@consumer(name="workflows", url="workflows")
 class BackendConsumer(AsyncConsumer):
     channel_layer_alias = App.package
 
@@ -29,7 +29,7 @@ class BackendConsumer(AsyncConsumer):
             NgiabBackendHandler(self),
         )
         # Join channel group
-        self.group_name = "ngiab_run"
+        self.group_name = "workflows"
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         
         # Accept the connection

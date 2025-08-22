@@ -10,9 +10,9 @@ export default class Backend {
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'; // Determine protocol based on current page's protocol
 
     if (port) {
-      this.wsUrl = `${protocol}://${hostname}:${port}${window.location.pathname}ngiab-run/ws/`;
+      this.wsUrl = `${protocol}://${hostname}:${port}${window.location.pathname}ws/`;
     } else {
-      this.wsUrl = `${protocol}://${hostname}${window.location.pathname}ngiab-run/ws/`;
+      this.wsUrl = `${protocol}://${hostname}${window.location.pathname}ws/`;
     }
 
     this.rootUrl = rootUrl;
