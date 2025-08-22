@@ -9,6 +9,7 @@ function Toolbar() {
   const {
     addNode, removeSelected, autoLayout,
     requestLastRun, startPlayback, pausePlayback, resetPlayback,
+    runWorkflow,
     state,
   } = useWorkflows();
 
@@ -50,7 +51,7 @@ function Toolbar() {
 
       <button onClick={requestLastRun} className="btn">Load last run</button>
       <div style={{ display: 'flex', gap: 6 }}>
-        <button onClick={startPlayback} className="btn" style={{ flex: 1 }}>Play</button>
+         <button onClick={runWorkflow} className="btn" style={{ flex: 1 }}>Play</button>
         <button onClick={pausePlayback} className="btn" style={{ flex: 1 }}>Pause</button>
       </div>
       <button onClick={resetPlayback} className="btn btn-danger">Reset</button>
