@@ -1,11 +1,12 @@
+// features/workflows/providers/workflowsProvider.js
 import React, { useEffect, useMemo, useReducer, useRef, useContext } from 'react';
 import { WorkflowsContext } from '../contexts/workflowsContext';
 import { workflowsReducer, initialState } from '../store/reducers/workflowsReducer';
 import { types } from '../store/actions/actionsTypes';
-import dagre from 'dagre'; // dagre-driven layout. :contentReference[oaicite:4]{index=4}
-import { AppContext } from 'context/context'; // Import AppContext to access backend URL
+import dagre from 'dagre';
+import { AppContext } from 'context/context';
 
-
+// ---- unchanged helpers (layout + cycle detection) ----
 function computeExecutionLayers(nodes, edges) {
   const ids = nodes.map(n => n.id);
   const indeg = new Map(ids.map(id => [id, 0]));
@@ -39,17 +40,13 @@ function computeExecutionLayers(nodes, edges) {
   return layers;
 }
 
-// --- Cycle detection used by isValidConnection ---
-// returns true if adding source->target would create a cycle
 function createsCycle(source, target, edges) {
   if (source === target) return true;
-  // Build adjacency
   const adj = new Map();
   edges.forEach(e => {
     if (!adj.has(e.source)) adj.set(e.source, []);
     adj.get(e.source).push(e.target);
   });
-  // DFS from target to see if we can reach source
   const stack = [target];
   const seen = new Set();
   while (stack.length) {
@@ -62,34 +59,63 @@ function createsCycle(source, target, edges) {
   return false;
 }
 
-// --- Dagre auto-layout (LR by default) ---
 function layoutWithDagre(nodes, edges, { rankdir = 'LR', nodesep = 60, ranksep = 90 } = {}) {
   const g = new dagre.graphlib.Graph();
   g.setGraph({ rankdir, nodesep, ranksep });
   g.setDefaultEdgeLabel(() => ({}));
 
   nodes.forEach((n) => {
-    // estimate node box
     const width = Math.max(180, (n.data?.label?.length ?? 10) * 8);
     const height = 56;
     g.setNode(n.id, { width, height });
   });
   edges.forEach((e) => g.setEdge(e.source, e.target));
 
-  dagre.layout(g); // computes x,y
-  const positioned = nodes.map((n) => {
+  dagre.layout(g);
+  return nodes.map((n) => {
     const p = g.node(n.id);
-    return {
-      ...n,
-      position: { x: p.x - (p.width / 2), y: p.y - (p.height / 2) },
-    };
+    return { ...n, position: { x: p.x - (p.width / 2), y: p.y - (p.height / 2) } };
   });
-  return positioned;
 }
 
+// ---- Provider ----
 export function WorkflowsProvider({ children }) {
   const [state, dispatch] = useReducer(workflowsReducer, initialState);
   const { backend } = useContext(AppContext);
+
+  // Hook into the shared Backend socket
+  useEffect(() => {
+    if (!backend) return;
+
+    // set initial connected flag based on readyState (1 === OPEN)
+    if (backend.webSocket?.readyState === 1) {
+      dispatch({ type: types.WS_CONNECTED });
+    }
+
+    const onOpen = () => dispatch({ type: types.WS_CONNECTED });
+    const onClose = () => dispatch({ type: types.WS_DISCONNECTED });
+
+    const onNodeStatus = (payload) =>
+      dispatch({ type: types.WS_MESSAGE, payload: { type: 'NODE_STATUS', ...payload } });
+
+    const onLastRunLog = (payload) =>
+      dispatch({
+        type: types.WS_MESSAGE,
+        payload: { type: 'LAST_RUN_LOG', events: payload?.events ?? [] },
+      });
+
+    backend.on('WS_CONNECTED', onOpen);
+    backend.on('WS_DISCONNECTED', onClose);
+    backend.on('NODE_STATUS', onNodeStatus);
+    backend.on('LAST_RUN_LOG', onLastRunLog);
+
+    return () => {
+      backend.off('WS_CONNECTED');
+      backend.off('WS_DISCONNECTED');
+      backend.off('NODE_STATUS');
+      backend.off('LAST_RUN_LOG');
+    };
+  }, [backend]);
 
   // Public APIs exposed via context
   const addNode = (kind) => dispatch({ type: types.ADD_NODE, payload: { kind } });
@@ -105,7 +131,7 @@ export function WorkflowsProvider({ children }) {
       (e) => e.source === conn.source && e.target === conn.target
     );
     if (alreadyExists) return false;
-    return !createsCycle(conn.source, conn.target, state.edges); // per isValidConnection prop. :contentReference[oaicite:6]{index=6}
+    return !createsCycle(conn.source, conn.target, state.edges);
   };
 
   const runWorkflow = () => {
@@ -113,26 +139,24 @@ export function WorkflowsProvider({ children }) {
     const layers = computeExecutionLayers(nodes, edges);
     dispatch({ type: types.WORKFLOW_COMPILED, payload: layers });
 
-    const payload = {
-      type: 'RUN_WORKFLOW',
-      workflow: {
-        layers,
-        nodes: nodes.map(n => ({ id: n.id, label: n.data?.label })),
-        edges: edges.map(e => ({ source: e.source, target: e.target })),
-      },
+    const workflow = {
+      layers,
+      nodes: nodes.map(n => ({ id: n.id, label: n.data?.label })),
+      edges: edges.map(e => ({ source: e.source, target: e.target })),
     };
+
     try {
-      wsRef.current?.send(JSON.stringify(payload));
+      backend?.do(backend?.actions?.RUN_WORKFLOW ?? 'RUN_WORKFLOW', { workflow });
       dispatch({ type: types.WORKFLOW_SENT });
     } catch {
       dispatch({ type: types.WS_ERROR, payload: 'Failed to send workflow' });
     }
   };
 
-  // --- Playback controls ---
+  // Playback controls using shared socket
   const requestLastRun = () => {
     try {
-      wsRef.current?.send(JSON.stringify({ type: 'REQUEST_LAST_RUN' }));
+      backend?.do(backend?.actions?.REQUEST_LAST_RUN ?? 'REQUEST_LAST_RUN', {});
     } catch {
       dispatch({ type: types.WS_ERROR, payload: 'Failed to request last run' });
     }
@@ -148,7 +172,7 @@ export function WorkflowsProvider({ children }) {
     if (state.playback.playing && !timerRef.current) {
       timerRef.current = setInterval(() => {
         dispatch({ type: types.PLAYBACK_TICK });
-      }, 700); // fixed cadence; server timestamps optional
+      }, 700);
     }
     if (!state.playback.playing && timerRef.current) {
       clearInterval(timerRef.current);
