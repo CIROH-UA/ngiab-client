@@ -1,5 +1,7 @@
 from tethys_sdk.base import TethysAppBase
-
+from tethys_sdk.app_settings import (
+    PersistentStoreDatabaseSetting,
+)
 
 class App(TethysAppBase):
     """
@@ -16,3 +18,15 @@ class App(TethysAppBase):
     tags = ""
     enable_feedback = False
     feedback_emails = []
+
+    def persistent_store_settings(self):
+        return (
+            # A concrete database this app will create/use
+            PersistentStoreDatabaseSetting(
+                name="workflows",
+                description="Stores workflow and node state",
+                initializer="ngiab.model.init_db.create_tables",
+                spatial=False,   # set True if you need PostGIS
+                required=True,
+            ),
+        )
