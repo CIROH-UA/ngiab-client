@@ -1,4 +1,3 @@
-// features/workflows/store/actions/actionsTypes.js
 export const types = {
   SET_NODES: 'SET_NODES',
   SET_EDGES: 'SET_EDGES',
@@ -8,11 +7,8 @@ export const types = {
   ADD_NODE: 'ADD_NODE',
   REMOVE_SELECTED: 'REMOVE_SELECTED',
 
-  // Selection & popup
   TOGGLE_NODE_SELECTED: 'TOGGLE_NODE_SELECTED',
   CLEAR_SELECTION: 'CLEAR_SELECTION',
-  OPEN_NODE_POPUP: 'OPEN_NODE_POPUP',
-  CLOSE_NODE_POPUP: 'CLOSE_NODE_POPUP',
   UPDATE_NODE_CONFIG: 'UPDATE_NODE_CONFIG',
 
   // Execution + WS

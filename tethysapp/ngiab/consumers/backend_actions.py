@@ -1,4 +1,4 @@
-from enum import StrEnum, auto, unique  # Python 3.11+
+from enum import StrEnum, auto, unique
 
 @unique
 class BackendActions(StrEnum):
@@ -14,5 +14,6 @@ class BackendActions(StrEnum):
     # outgoing (to frontend)
     NODE_STATUS         = auto()
     LAST_RUN_LOG        = auto()
+    WORKFLOW_SUBMITTED  = auto()
     MESSAGE_ACKNOWLEDGE = auto()
     MESSAGE_ERROR       = auto()

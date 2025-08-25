@@ -1,22 +1,10 @@
-# id   -> uuid
-# name -> str
-# user -> str
-# graph -> json (nodes/edges as sent by frontend)
-# layers -> json
-# status -> str
-# message -> str
-# created_at / updated_at / last_run_at
-
 import uuid
 from datetime import datetime, timezone
-
-from sqlalchemy import Column, String, DateTime, Text
+from sqlalchemy import Column, String, DateTime, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship
-
 from .__base import Base
-
 
 class Workflow(Base):
     __tablename__ = "workflow"
@@ -25,10 +13,13 @@ class Workflow(Base):
     name = Column(String(255), nullable=False)
     user = Column(String(255), nullable=False)
 
-    graph = Column(JSON, nullable=True)     # raw nodes/edges payload
+    # foreign to template, if any
+    template_id = Column(UUID(as_uuid=True), ForeignKey("workflow_template.id", ondelete="SET NULL"), nullable=True)
+
+    graph = Column(JSON, nullable=True)      # raw nodes/edges payload from UI
     layers = Column(JSON, nullable=True)
 
-    status = Column(String(32), nullable=False, default="idle")
+    status = Column(String(32), nullable=False, default="idle")   # idle|queued|running|success|error
     message = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
@@ -40,5 +31,6 @@ class Workflow(Base):
     )
     last_run_at = Column(DateTime(timezone=True), nullable=True)
 
-    # relationship to nodes
+    # relationships
+    template = relationship("WorkflowTemplate")
     nodes = relationship("Node", back_populates="workflow", cascade="all, delete-orphan")

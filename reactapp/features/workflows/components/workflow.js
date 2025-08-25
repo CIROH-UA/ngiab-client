@@ -41,20 +41,35 @@ const Icons = {
 
 const NODE_FORMS = {
   'pre-process': [
-    { name: 'input', label: 'Input path', type: 'text' },
-    { name: 'method', label: 'Method', type: 'select', options: ['clean', 'normalize'] },
+    { name: 'selector_type', label: 'Selector Type', type: 'select', options: ['gage','latlon','catchment'] },
+    { name: 'selector_value', label: 'Value (e.g. 01359139 or \"lat,lon\")', type: 'text' },
+    { name: 'start_date', label: 'Start (YYYY-MM-DD)', type: 'text' },
+    { name: 'end_date', label: 'End (YYYY-MM-DD)', type: 'text' },
+    { name: 'output_name', label: 'Output name', type: 'text' },
+    { name: 'extra_args', label: 'Extra CLI args', type: 'text' },
   ],
   'calibration': [
     { name: 'strategy', label: 'Strategy', type: 'select', options: ['grid', 'random', 'bayes'] },
     { name: 'iterations', label: 'Iterations', type: 'number' },
   ],
   'run ngiab': [
-    { name: 'vpu', label: 'VPU', type: 'text' },
-    { name: 'forecast', label: 'Forecast Type', type: 'select', options: ['short_range', 'medium_range', 'analysis_assim_extend'] },
+    { name: 'input_url', label: 'Input URL (tar.gz)', type: 'text' },
+    { name: 'output_bucket', label: 'S3 Bucket', type: 'text' },
+    { name: 'output_prefix', label: 'S3 Prefix', type: 'text' },
+    { name: 'ngen_np', label: 'NGEN Parallelism', type: 'number' },
+    { name: 'image_ngen', label: 'Image (ngen)', type: 'text' },
+    { name: 'run_teehr', label: 'Run TEEHR?', type: 'select', options: ['true','false'] },
+    { name: 'teehr_inputs_subdir', label: 'TEEHR inputs subdir', type: 'text' },
+    { name: 'teehr_results_subdir', label: 'TEEHR results subdir', type: 'text' },
+    { name: 'teehr_args', label: 'TEEHR extra args', type: 'text' },
+    { name: 'image_teehr', label: 'Image (teehr)', type: 'text' },
   ],
   'teehr': [
-    { name: 'metrics', label: 'Metrics (comma-separated)', type: 'text' },
-    { name: 'gage', label: 'USGS Gage', type: 'text' },
+    { name: 'run_teehr', label: 'Run TEEHR?', type: 'select', options: ['true','false'] },
+    { name: 'teehr_inputs_subdir', label: 'Inputs subdir', type: 'text' },
+    { name: 'teehr_results_subdir', label: 'Results subdir', type: 'text' },
+    { name: 'teehr_args', label: 'Extra args', type: 'text' },
+    { name: 'image_teehr', label: 'Image', type: 'text' },
   ],
 };
 
