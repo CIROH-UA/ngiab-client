@@ -21,6 +21,62 @@ import { lightTheme, darkTheme } from '@visx/xychart';
 import useTheme from 'hooks/useTheme'; // ← adjust the path if needed
 
 function LineChart({ width, height, data, layout }) {
+  const getAxisLabelStyles = (theme) => ({
+  fill: theme === 'dark' ? '#e0e0e0' : '#000',
+  fontSize: 18,
+  fontWeight: 500,
+});
+
+  // Function to get units for common variables
+  const getVariableUnits = (variableName) => {
+    if (!variableName) return '';
+    
+    const variable = variableName.toLowerCase();
+    
+    if (variable.includes('streamflow') || variable.includes('discharge') || variable.includes('flow')) {
+      return ' (m³/s)';
+    }
+    
+    if (variable.includes('precipitation') || variable.includes('rainfall') || variable.includes('rain')) {
+      return ' (mm/hr)';
+    }
+    
+    if (variable.includes('temperature') || variable.includes('temp')) {
+      return ' (°C)';
+    }
+    
+    // Soil moisture related
+    if (variable.includes('soil') && variable.includes('moisture')) {
+      return ' (m³/m³)';
+    }
+    
+    // Evapotranspiration related
+    if (variable.includes('evapotranspiration') || variable.includes('evaporation')) {
+      return ' (mm/hr)';
+    }
+    
+    // Water level related
+    if (variable.includes('depth') || variable.includes('level')) {
+      return ' (m)';
+    }
+    
+    // Velocity related
+    if (variable.includes('velocity') || variable.includes('speed')) {
+      return ' (m/s)';
+    }
+    
+    // Default for unknown variables
+    return '';
+  };
+
+  // Generate dynamic y-axis label
+  const getYAxisLabel = () => {
+    const yaxisValue = layout?.yaxis || '';
+    const units = getVariableUnits(yaxisValue);
+    return yaxisValue + units;
+  };
+
+  console.log("This is the data\n", data);
   /* ─────────────────────────────────────
      Hooks – always execute, no early-return
      ───────────────────────────────────── */
@@ -38,7 +94,7 @@ function LineChart({ width, height, data, layout }) {
   /* ─────────────────────────────────────
      Layout helpers
      ───────────────────────────────────── */
-  const margin = { top: 40, right: 40, bottom: 40, left: 60 };
+  const margin = { top: 20, right: 40, bottom: 45, left: 110 };
   const innerWidth  = Math.max(1, width  - margin.left - margin.right);
   const innerHeight = Math.max(1, height - margin.top  - margin.bottom);
 
@@ -63,7 +119,6 @@ function LineChart({ width, height, data, layout }) {
   const xScale = scaleTime({
     range: [0, innerWidth],
     domain: safeExtent(allData, getDate, [new Date(), new Date()]),
-    nice: true,
   });
 
   const yScale = scaleLinear({
@@ -312,25 +367,30 @@ function LineChart({ width, height, data, layout }) {
 
                     <AxisLeft
                       scale={newYScale}
+                      label={getYAxisLabel()}
+                      labelProps={{ style: getAxisLabelStyles(theme) }}
+                      labelOffset={80}
                       stroke={theme === 'dark' ? '#d1d5db' : '#000'}
                       tickStroke={theme === 'dark' ? '#d1d5db' : '#000'}
                       tickLabelProps={() => ({
                         fill: theme === 'dark' ? '#e0e0e0' : '#000',
-                        fontSize: 12,
-                        fontWeight: 'bold',
+                        fontSize: 14,
+                        fontWeight: 500,
                         textAnchor: 'end',
                       })}
                     />
                     <AxisBottom
                       scale={newXScale}
                       top={innerHeight}
+                      label="Simulation Time Period (YYYY-MM-DD)"
+                      labelProps={{ style: getAxisLabelStyles(theme) }}
                       stroke={theme === 'dark' ? '#d1d5db' : '#000'}
                       tickFormat={formatDate}
                       tickStroke={theme === 'dark' ? '#d1d5db' : '#000'}
                       tickLabelProps={() => ({
                         fill: theme === 'dark' ? '#e0e0e0' : '#000',
-                        fontSize: 12,
-                        fontWeight: 'bold',
+                        fontSize: 14,
+                        fontWeight: 500,
                         textAnchor: 'middle',
                       })}
                     />
