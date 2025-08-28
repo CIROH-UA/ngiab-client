@@ -27,6 +27,7 @@ class BackendConsumer(AsyncConsumer):
     file_q = queue.Queue()
 
     async def websocket_connect(self, event):
+        # register handlers
         self.handlers = (NgiabBackendHandler(self),)
 
         # Join a broadcast group (optional; useful for server->all pushes)
@@ -66,16 +67,34 @@ class BackendConsumer(AsyncConsumer):
                 await self.send_error(msg, message_action, message_data)
                 return
 
+            # Canonicalize incoming type to uppercase string
+            in_type = str(message_type).upper()
+
             # Route to a handler
+            dispatched = False
             for handler in self.handlers:
-                if message_type in handler.receiving_actions:
-                    await handler.receiving_actions[message_type](
-                        event=event,
-                        action=message_action,
-                        data=message_data,
-                    )
+                # Normalize handler keys to strings so we accept enums or strings
+                ra_raw = getattr(handler, "receiving_actions", {}) or {}
+                ra = {}
+
+                for k, v in ra_raw.items():
+                    # accept Enum, its name, and its string form
+                    try:
+                        if isinstance(k, BackendActions):
+                            ra[k.name] = v
+                            ra[str(k).upper()] = v  # e.g., "BackendActions.RUN_WORKFLOW"
+                        else:
+                            ra[str(k).upper()] = v
+                    except Exception:
+                        # best-effort normalization
+                        ra[str(k)] = v
+
+                if in_type in ra:
+                    await ra[in_type](event=event, action=message_action, data=message_data)
+                    dispatched = True
                     break
-            else:
+
+            if not dispatched:
                 msg = f'Unhandled message type received: "{message_type}"'
                 log.warning(msg)
                 await self.send_error(msg, message_action, message_data)
@@ -88,11 +107,17 @@ class BackendConsumer(AsyncConsumer):
 
     async def send_action(self, action: BackendActions | str, payload):
         """Send an action to the frontend as a JSON text frame."""
+        # Normalize action type to a simple string for the client
+        if isinstance(action, BackendActions):
+            action_type = action.name
+        else:
+            action_type = str(action)
+
         message = {
             "type": "websocket.send",
             "text": json.dumps(
                 {
-                    "action": {"id": str(uuid.uuid4()), "type": str(action)},
+                    "action": {"id": str(uuid.uuid4()), "type": action_type},
                     "payload": payload,
                 },
                 default=self._json_serializer,
