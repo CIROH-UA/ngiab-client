@@ -7,13 +7,13 @@ import {
   MiniMap,
   Handle,
   Position,
-  NodeToolbar,          // ← NEW
+  NodeToolbar,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useWorkflows } from '../hooks/useWorkflowsContext';
 import { types } from '../store/actions/actionsTypes';
 import NodeConfigPopup from './NodeConfigPopup';
-import { AppContext } from 'context/context';  // to send RUN_NODE via Backend
+import { AppContext } from 'context/context';
 
 // Small inline SVG helpers
 const Icons = {
@@ -39,48 +39,48 @@ const Icons = {
   ),
 };
 
+// === UPDATED FORMS to match backend template inputs ===
 const NODE_FORMS = {
   'pre-process': [
     { name: 'selector_type', label: 'Selector Type', type: 'select', options: ['gage','latlon','catchment'] },
-    { name: 'selector_value', label: 'Value (e.g. 01359139 or \"lat,lon\")', type: 'text' },
+    { name: 'selector_value', label: 'Value (e.g. 01359139 or "lat,lon")', type: 'text' },
     { name: 'start_date', label: 'Start (YYYY-MM-DD)', type: 'text' },
     { name: 'end_date', label: 'End (YYYY-MM-DD)', type: 'text' },
     { name: 'output_name', label: 'Output name', type: 'text' },
-    { name: 'extra_args', label: 'Extra CLI args', type: 'text' },
+    { name: 'source', label: 'Source', type: 'select', options: ['nwm','aorc'] },
+    { name: 'debug', label: 'Debug?', type: 'select', options: ['false','true'] },
   ],
   'calibration': [
-    { name: 'strategy', label: 'Strategy', type: 'select', options: ['grid', 'random', 'bayes'] },
+    { name: 'gage', label: 'USGS Gage ID', type: 'text' },
     { name: 'iterations', label: 'Iterations', type: 'number' },
+    { name: 'warmup', label: 'Warmup (days)', type: 'number' },
+    { name: 'calibration_ratio', label: 'Calibration ratio (0..1)', type: 'text' },
+    { name: 'force', label: 'Force overwrite?', type: 'select', options: ['false','true'] },
+    { name: 'run', label: 'Run calibration?', type: 'select', options: ['false','true'] },
+    { name: 'debug', label: 'Debug?', type: 'select', options: ['false','true'] },
+    // If not chained: allow manual S3 input
+    { name: 'input_s3_key', label: 'Input S3 key (optional)', type: 'text' },
   ],
   'run ngiab': [
-    { name: 'input_url', label: 'Input URL (tar.gz)', type: 'text' },
-    { name: 'output_bucket', label: 'S3 Bucket', type: 'text' },
-    { name: 'output_prefix', label: 'S3 Prefix', type: 'text' },
+    // When not chained, user can point to an S3 key that has config/ + forcings/
+    { name: 'input_s3_key', label: 'Input S3 key (optional)', type: 'text' },
     { name: 'ngen_np', label: 'NGEN Parallelism', type: 'number' },
-    { name: 'image_ngen', label: 'Image (ngen)', type: 'text' },
-    { name: 'run_teehr', label: 'Run TEEHR?', type: 'select', options: ['true','false'] },
-    { name: 'teehr_inputs_subdir', label: 'TEEHR inputs subdir', type: 'text' },
-    { name: 'teehr_results_subdir', label: 'TEEHR results subdir', type: 'text' },
-    { name: 'teehr_args', label: 'TEEHR extra args', type: 'text' },
-    { name: 'image_teehr', label: 'Image (teehr)', type: 'text' },
   ],
   'teehr': [
-    { name: 'run_teehr', label: 'Run TEEHR?', type: 'select', options: ['true','false'] },
+    { name: 'input_s3_key', label: 'Input S3 key (optional)', type: 'text' },
     { name: 'teehr_inputs_subdir', label: 'Inputs subdir', type: 'text' },
     { name: 'teehr_results_subdir', label: 'Results subdir', type: 'text' },
     { name: 'teehr_args', label: 'Extra args', type: 'text' },
-    { name: 'image_teehr', label: 'Image', type: 'text' },
   ],
 };
 
-// --- replace only the ProcessNode(...) definition with this version ---
+// Node component
 function ProcessNode({ id, data, selected }) {
   const { dispatch, state } = useWorkflows();
   const { backend } = useContext(AppContext);
 
-  // leave extra top padding so the TL cluster never overlaps the title
   const base = {
-    padding: '28px 12px 12px 12px',       // <-- key change: bigger top padding
+    padding: '28px 12px 12px 12px',
     borderRadius: 12,
     border: selected ? '2px solid #60a5fa' : '1px solid #374151',
     background: '#111827',
@@ -102,16 +102,13 @@ function ProcessNode({ id, data, selected }) {
   };
 
   const onSaveConfig = (values) => {
-    console.log('save config', { nodeId: id, values });
     dispatch({ type: types.UPDATE_NODE_CONFIG, payload: { nodeId: id, config: values } });
     dispatch({ type: types.CLOSE_NODE_POPUP });
   };
 
-  // ▶ PLAY actually sends RUN_NODE now (will only show when idle)
   const onRunNode = (e) => {
     e.stopPropagation();
     const payload = { nodeId: id, label: data?.label, config: data?.config || {} };
-    console.log('RUN_NODE send', payload);
     try {
       backend?.do(backend?.actions?.RUN_NODE ?? 'RUN_NODE', payload);
     } catch (err) {
@@ -119,19 +116,19 @@ function ProcessNode({ id, data, selected }) {
     }
   };
 
-  const status = data?.status; // 'running' | 'success' | 'error' | 'idle'
+  const status = data?.status ?? 'idle';
   const statusIcon = (
     status === 'running' ? <Icons.spinner /> :
     status === 'success' ? <Icons.check /> :
     status === 'error'   ? <Icons.x /> :
-    null                  // idle no longer shows top-left status (play sits by title)
+    null
   );
 
   const fields = NODE_FORMS[data?.label] || [];
 
   return (
     <div style={base} onMouseDown={(e)=>e.stopPropagation()}>
-      {/* TOP-LEFT cluster: selection circle + status (spinner/check/x when not idle) */}
+      {/* TOP-LEFT: selection + status */}
       <div style={{ position: 'absolute', top: 6, left: 6, display: 'flex', gap: 6, alignItems: 'center' }}>
         <button
           onClick={toggleSelected}
@@ -144,12 +141,7 @@ function ProcessNode({ id, data, selected }) {
           }}
         />
         {statusIcon && (
-          <span
-            style={{
-              color: status === 'error' ? '#ef4444' :
-                     status === 'success' ? '#22c55e' : '#e5e7eb'
-            }}
-          >
+          <span style={{ color: status === 'error' ? '#ef4444' : status === 'success' ? '#22c55e' : '#e5e7eb' }}>
             {statusIcon}
           </span>
         )}
@@ -161,21 +153,16 @@ function ProcessNode({ id, data, selected }) {
         title="Configure node"
         style={{
           position: 'absolute', top: 6, right: 6,
-          width: 22, height: 22,
-          display: 'grid', placeItems: 'center',
+          width: 22, height: 22, display: 'grid', placeItems: 'center',
           borderRadius: 8, border: '1px solid #374151',
           background: '#959eaaff', color: '#ffffffff', cursor: 'pointer',
-          
         }}
       >
         <Icons.kebab />
       </button>
 
-      {/* Title row with PLAY (shown only when idle) */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        fontWeight: 600, lineHeight: 1.2
-      }}>
+      {/* Title + inline play (only when idle) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, lineHeight: 1.2 }}>
         <span>{data?.label ?? 'Process'}</span>
         {status === 'idle' && (
           <button
@@ -198,11 +185,8 @@ function ProcessNode({ id, data, selected }) {
         <div style={{ marginTop: 6, fontSize: 12, opacity: 0.9 }}>{data.message}</div>
       ) : null}
 
-      {/* Unscaled toolbar-based popup (per docs) */}
-      <NodeToolbar
-        isVisible={state.ui.popupNodeId === id}
-        position={Position.Top}
-      >
+      {/* Unscaled popup */}
+      <NodeToolbar isVisible={state.ui.popupNodeId === id} position={Position.Top}>
         <NodeConfigPopup
           nodeId={id}
           visible={true}

@@ -2,10 +2,10 @@ import { applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react';
 import { types } from '../actions/actionsTypes';
 
 const baseNodes = [
-  { id: 'pre-process', position: { x: 0,   y: 0 },  type: 'process', data: { label: 'pre-process' } },
-  { id: 'calibration', position: { x: 250, y: 0 },  type: 'process', data: { label: 'calibration' } },
-  { id: 'run-ngiab',   position: { x: 500, y: 0 },  type: 'process', data: { label: 'run ngiab' } },
-  { id: 'teehr',       position: { x: 750, y: 0 },  type: 'process', data: { label: 'teehr' } },
+  { id: 'pre-process', position: { x: 0,   y: 0 },  type: 'process', data: { label: 'pre-process', status: 'idle', config: {} } },
+  { id: 'calibration', position: { x: 250, y: 0 },  type: 'process', data: { label: 'calibration', status: 'idle', config: {} } },
+  { id: 'run-ngiab',   position: { x: 500, y: 0 },  type: 'process', data: { label: 'run ngiab',  status: 'idle', config: {} } },
+  { id: 'teehr',       position: { x: 750, y: 0 },  type: 'process', data: { label: 'teehr',      status: 'idle', config: {} } },
 ];
 
 function labelFor(kind) {
@@ -71,6 +71,10 @@ export function workflowsReducer(state, action) {
       const nodes = state.nodes.map(n => (n.id === nodeId ? { ...n, data: { ...n.data, config } } : n));
       return { ...state, nodes };
     }
+    case types.OPEN_NODE_POPUP:
+      return { ...state, ui: { ...state.ui, popupNodeId: action.payload.nodeId } };
+    case types.CLOSE_NODE_POPUP:
+      return { ...state, ui: { ...state.ui, popupNodeId: null } };
 
     case types.REMOVE_SELECTED: {
       const selectedIds = new Set(state.nodes.filter(n => n.selected).map(n => n.id));
@@ -94,6 +98,16 @@ export function workflowsReducer(state, action) {
 
     case types.WS_MESSAGE: {
       const msg = action.payload;
+// Backend confirms a submission & which nodes are part of it → show spinners immediately
+      if (msg?.type === 'WORKFLOW_SUBMITTED' && Array.isArray(msg.nodeIds)) {
+        const ids = new Set(msg.nodeIds);
+        const nodes = state.nodes.map(n =>
+          ids.has(n.id) ? { ...n, data: { ...n.data, status: 'running', message: 'submitted' } } : n
+        );
+        return { ...state, nodes, lastMessage: msg };
+      }
+
+
       if (msg?.type === 'NODE_STATUS' && msg.nodeId) {
         const nodes = state.nodes.map(n =>
           n.id === msg.nodeId

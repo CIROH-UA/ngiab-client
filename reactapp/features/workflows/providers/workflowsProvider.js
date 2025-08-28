@@ -66,14 +66,19 @@ export function WorkflowsProvider({ children }) {
     const onNodeStatus = (payload) => dispatch({ type: types.WS_MESSAGE, payload: { type: 'NODE_STATUS', ...payload } });
     const onLastRunLog = (payload) => dispatch({ type: types.WS_MESSAGE, payload: { type: 'LAST_RUN_LOG', events: payload?.events ?? [] } });
 
+    const onWorkflowSubmitted = (payload) =>
+        dispatch({ type: types.WS_MESSAGE, payload: { type: 'WORKFLOW_SUBMITTED', ...payload } });
+
     backend.on('WS_CONNECTED', onOpen);
     backend.on('WS_DISCONNECTED', onClose);
     backend.on('NODE_STATUS', onNodeStatus);
     backend.on('LAST_RUN_LOG', onLastRunLog);
+    backend.on('WORKFLOW_SUBMITTED', onWorkflowSubmitted);
 
     return () => {
       backend.off('WS_CONNECTED'); backend.off('WS_DISCONNECTED');
       backend.off('NODE_STATUS');  backend.off('LAST_RUN_LOG');
+      backend.off('NODE_STATUS');  backend.off('LAST_RUN_LOG'); backend.off('WORKFLOW_SUBMITTED');
     };
   }, [backend]);
 
@@ -111,6 +116,15 @@ export function WorkflowsProvider({ children }) {
     try {
       backend?.do(backend?.actions?.RUN_WORKFLOW ?? 'RUN_WORKFLOW', payload);
       dispatch({ type: types.WORKFLOW_SENT });
+
+      // optimistic: mark the targeted nodes as running right away
+      const runIds = new Set(selectedIds.length ? selectedIds : state.nodes.map(n => n.id));
+      state.nodes.forEach(n => {
+        if (runIds.has(n.id)) {
+          dispatch({ type: types.UPDATE_NODE_STATUS, payload: { nodeId: n.id, status: 'running', message: 'submitting...' } });
+        }
+      });
+
     } catch {
       dispatch({ type: types.WS_ERROR, payload: 'Failed to send workflow' });
     }
