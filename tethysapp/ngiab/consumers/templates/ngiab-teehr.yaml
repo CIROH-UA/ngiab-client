@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ngiab-teehr
+  namespace: argo
+spec:
+  templates:
+  - name: main
+    inputs:
+      parameters:
+        - { name: output_bucket, default: "test-ngen" }
+        - { name: output_prefix, default: "demo/default" }
+        - { name: final_prefix, default: "" }
+        - { name: input_s3_key, default: "" }
+        - { name: teehr_inputs_subdir, default: "outputs" }
+        - { name: teehr_results_subdir, default: "teehr" }
+        - { name: teehr_args, default: "" }
+        - { name: image_teehr, default: "awiciroh/ngiab-teehr:x86" }
+      artifacts:
+        - name: input
+          path: /tmp/input.tgz
+          s3:
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+            insecure: false
+            bucket: "{{inputs.parameters.output_bucket}}"
+            key: "{{inputs.parameters.input_s3_key}}"
+            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+    script:
+      image: "{{inputs.parameters.image_teehr}}"
+      command: [bash, -lc]
+      source: |
+        set -e
+        mkdir -p /app/data "/app/data/{{inputs.parameters.teehr_inputs_subdir}}" "/app/data/{{inputs.parameters.teehr_results_subdir}}"
+        if [ -s /tmp/input.tgz ]; then tar -xzf /tmp/input.tgz -C /app/data; fi
+
+        # If the image provides a CLI or entrypoint, run additional args if provided
+        set +e
+        if [ -n "{{inputs.parameters.teehr_args}}" ]; then
+          /bin/bash -lc "{{inputs.parameters.teehr_args}}"
+        fi
+        set -e
+
+        # Guarantee results exist so artifact upload works
+        mkdir -p "/app/data/{{inputs.parameters.teehr_results_subdir}}"
+        # Touch a stamp file if nothing was produced
+        : > "/app/data/{{inputs.parameters.teehr_results_subdir}}/_empty.txt"
+
+        tar -C "/app/data/{{inputs.parameters.teehr_results_subdir}}" -czf /tmp/teehr_results.tgz .
+        exit 0
+    outputs:
+      artifacts:
+      - name: teehr-results
+        path: /tmp/teehr_results.tgz
+        s3:
+          endpoint: s3.amazonaws.com
+          region: us-east-1
+          insecure: false
+          bucket: "{{inputs.parameters.output_bucket}}"
+          key: "{{inputs.parameters.output_prefix}}/teehr_results.tgz"
+          accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+          secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }

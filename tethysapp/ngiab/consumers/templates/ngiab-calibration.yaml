@@ -1,0 +1,68 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ngiab-calibration
+  namespace: argo
+spec:
+  templates:
+  - name: main
+    inputs:
+      parameters:
+        - { name: output_bucket, default: "test-ngen" }
+        - { name: output_prefix, default: "demo/default" }
+        - { name: final_prefix, default: "" }
+        - { name: input_s3_key, default: "" }
+        - { name: gage, default: "01359139" }
+        - { name: iterations, default: "100" }
+        - { name: warmup, default: "365" }
+        - { name: calibration_ratio, default: "0.5" }
+        - { name: force, default: "false" }
+        - { name: run, default: "false" }
+        - { name: debug, default: "false" }
+      artifacts:
+        - name: input
+          path: /work/in.tgz
+          s3:
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+            insecure: false
+            bucket: "{{inputs.parameters.output_bucket}}"
+            key: "{{inputs.parameters.input_s3_key}}"
+            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+    script:
+      image: python:3.11-slim
+      command: [bash, -lc]
+      source: |
+        set -e
+        apt-get update -y && apt-get install -y --no-install-recommends git ca-certificates tar gzip && rm -rf /var/lib/apt/lists/*
+        python -m pip install --no-cache-dir --upgrade pip
+        python -m pip install --no-cache-dir "git+https://github.com/CIROH-UA/ngiab-cal.git"
+
+        mkdir -p /work/in /work/out
+        if [ -s /work/in.tgz ]; then tar -xzf /work/in.tgz -C /work/in; fi
+        ROOT="/work/in"
+
+        set +e
+        if command -v ngiab-cal >/dev/null 2>&1; then
+          ARGS=""
+          if [ "{{inputs.parameters.force}}" = "true" ]; then ARGS="$ARGS -f"; fi
+          if [ "{{inputs.parameters.run}}" = "true" ]; then ARGS="$ARGS --run"; fi
+          ngiab-cal "$ROOT" -g "{{inputs.parameters.gage}}" -i "{{inputs.parameters.iterations}}" --warmup "{{inputs.parameters.warmup}}" --cr "{{inputs.parameters.calibration_ratio}}" $ARGS
+        fi
+        set -e
+
+        tar -C "$ROOT" -czf /tmp/calibrated.tgz .
+        exit 0
+    outputs:
+      artifacts:
+      - name: calibrated
+        path: /tmp/calibrated.tgz
+        s3:
+          endpoint: s3.amazonaws.com
+          region: us-east-1
+          insecure: false
+          bucket: "{{inputs.parameters.output_bucket}}"
+          key: "{{inputs.parameters.output_prefix}}/calibrated.tgz"
+          accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+          secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }

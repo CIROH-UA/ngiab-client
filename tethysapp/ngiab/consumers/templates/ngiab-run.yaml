@@ -1,0 +1,61 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ngiab-run
+  namespace: argo
+spec:
+  templates:
+  - name: main
+    inputs:
+      parameters:
+        - { name: output_bucket, default: "test-ngen" }
+        - { name: output_prefix, default: "demo/default" }
+        - { name: final_prefix, default: "" }
+        - { name: input_s3_key, default: "" }
+        - { name: ngen_np, default: "8" }
+        - { name: image_ngen, default: "awiciroh/ciroh-ngen-image:latest" }
+      artifacts:
+        - name: dataset
+          path: /workspace/data
+          s3:
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+            insecure: false
+            bucket: "{{inputs.parameters.output_bucket}}"
+            key: "{{inputs.parameters.input_s3_key}}"
+            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+    container:
+      image: "{{inputs.parameters.image_ngen}}"
+      command: [bash, -lc]
+      args:
+        - |
+          set -e
+          cd /workspace
+          # Try to run; tolerate failure but always create output dirs so artifact upload succeeds
+          set +e
+          /ngen/HelloNGEN.sh /workspace/data auto {{inputs.parameters.ngen_np}} local
+          set -e
+          mkdir -p /workspace/data/outputs /workspace/data/restarts
+    outputs:
+      artifacts:
+        - name: outputs-dir
+          path: /workspace/data/outputs
+          s3:
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+            insecure: false
+            bucket: "{{inputs.parameters.output_bucket}}"
+            key: "{{inputs.parameters.output_prefix}}/outputs.tgz"
+            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+        - name: restarts-dir
+          path: /workspace/data/restarts
+          s3:
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+            insecure: false
+            bucket: "{{inputs.parameters.output_bucket}}"
+            key: "{{inputs.parameters.output_prefix}}/restarts.tgz"
+            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }

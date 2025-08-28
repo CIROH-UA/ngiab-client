@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ngiab-data-preprocess
+  namespace: argo
+spec:
+  templates:
+  - name: main
+    inputs:
+      parameters:
+        - { name: output_bucket, default: "test-ngen" }
+        - { name: output_prefix, default: "demo/default" }
+        - { name: selector_type, default: "gage" }
+        - { name: selector_value, default: "01359139" }
+        - { name: start_date, default: "2020-01-01" }
+        - { name: end_date, default: "2020-01-15" }
+        - { name: output_name, default: "ngiab" }
+        - { name: source, default: "nwm" }
+        - { name: debug, default: "false" }
+    script:
+      image: python:3.11-slim
+      command: [bash, -lc]
+      source: |
+        set -e
+        apt-get update -y && apt-get install -y --no-install-recommends git curl ca-certificates tar gzip && rm -rf /var/lib/apt/lists/*
+        python -m pip install --no-cache-dir --upgrade pip
+        # install the CLI from GitHub
+        python -m pip install --no-cache-dir "git+https://github.com/CIROH-UA/NGIAB_data_preprocess.git"
+
+        mkdir -p /work/out
+        SEL="{{inputs.parameters.selector_type}}"
+        VAL="{{inputs.parameters.selector_value}}"
+        START="{{inputs.parameters.start_date}}"
+        END="{{inputs.parameters.end_date}}"
+        OUT="{{inputs.parameters.output_name}}"
+        SRC="{{inputs.parameters.source}}"
+
+        EXTRA=""
+        if [ "$SEL" = "gage" ]; then EXTRA="-g"; fi
+        if [ "$SEL" = "latlon" ]; then EXTRA="-l"; fi
+
+        # Try to run end-to-end; do not fail the pod if CLI fails, but still package what's available
+        set +e
+        python -m ngiab_data_cli -i "$VAL" $EXTRA -s -f -r --start "$START" --end "$END" -o "$OUT" --source "$SRC"
+        STATUS=$?
+        set -e
+
+        mkdir -p "/work/out/${OUT}"
+        if [ -d "$OUT" ]; then
+          cp -r "$OUT"/. "/work/out/${OUT}/"
+        elif [ -d "config" ] || [ -d "forcings" ] || [ -d "outputs" ]; then
+          cp -r config "/work/out/${OUT}/" 2>/dev/null || true
+          cp -r forcings "/work/out/${OUT}/" 2>/dev/null || true
+          cp -r outputs "/work/out/${OUT}/" 2>/dev/null || true
+        fi
+
+        tar -C /work/out -czf /tmp/preprocess.tgz "${OUT}" || tar -C /work/out -czf /tmp/preprocess.tgz .
+        exit 0
+    outputs:
+      artifacts:
+      - name: preprocess
+        path: /tmp/preprocess.tgz
+        s3:
+          endpoint: s3.amazonaws.com
+          region: us-east-1
+          insecure: false
+          bucket: "{{inputs.parameters.output_bucket}}"
+          key: "{{inputs.parameters.output_prefix}}/preprocess.tgz"
+          accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+          secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
