@@ -4,6 +4,7 @@ metadata:
   name: ngiab-teehr
   namespace: argo
 spec:
+  entrypoint: main 
   templates:
   - name: main
     inputs:

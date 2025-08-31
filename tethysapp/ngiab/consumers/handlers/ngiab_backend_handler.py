@@ -1,9 +1,10 @@
+# tethysapp/ngiab/consumers/ngiab_backend_handler.py
 import asyncio
 import logging
 import os
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from importlib import resources
 
@@ -25,6 +26,7 @@ ARGO_HOST = os.getenv("ARGO_HOST", "https://localhost:2746")
 ARGO_TOKEN = os.getenv("ARGO_TOKEN", "")
 ARGO_NAMESPACE = os.getenv("ARGO_NAMESPACE", "argo")
 ARGO_VERIFY_SSL = os.getenv("ARGO_VERIFY_SSL", "false").lower() in ("1", "true", "yes")
+
 ARGO_FORCE_TEMPLATE_UPDATE = os.getenv("ARGO_FORCE_TEMPLATE_UPDATE", "false").lower() in ("1", "true", "yes")
 
 POLL_SEC = float(os.getenv("ARGO_POLL_SEC", "3.0"))
@@ -39,7 +41,6 @@ _TEMPLATE_FILES = {
 
 _TERMINAL = {"Succeeded", "Failed", "Error", "Terminated"}
 
-
 def _phase_to_ui(phase: str | None) -> str:
     p = (phase or "").strip() or "Pending"
     if p == "Succeeded":
@@ -47,7 +48,6 @@ def _phase_to_ui(phase: str | None) -> str:
     if p in {"Failed", "Error", "Terminated"}:
         return "error"
     return "running"
-
 
 def make_ws() -> WorkflowsService:
     global_config.host = ARGO_HOST
@@ -61,7 +61,6 @@ def make_ws() -> WorkflowsService:
         verify_ssl=ARGO_VERIFY_SSL,
     )
 
-
 # ---------- template upsert helpers ----------
 def _load_template_yaml_text(name: str) -> str:
     pkg = "tethysapp.ngiab.consumers.templates"
@@ -70,7 +69,6 @@ def _load_template_yaml_text(name: str) -> str:
         raise ValueError(f"No YAML file mapped for template '{name}'")
     with resources.files(pkg).joinpath(filename).open("r", encoding="utf-8") as f:
         return f.read()
-
 
 def _ensure_template_exists_or_create(name: str) -> None:
     ws = make_ws()
@@ -105,29 +103,9 @@ def _ensure_template_exists_or_create(name: str) -> None:
             f"'{name}' in namespace '{ARGO_NAMESPACE}': {e}"
         ) from e
 
-
 # ---------- small graph helpers ----------
-def _weakly_connected(nodes: List[dict], edges: List[dict]) -> bool:
-    if not nodes:
-        return False
-    ids = [n["id"] for n in nodes]
-    idx = {i: k for k, i in enumerate(ids)}
-    adj = [[] for _ in ids]
-    for e in edges or []:
-        if e["source"] in idx and e["target"] in idx:
-            a, b = idx[e["source"]], idx[e["target"]]
-            adj[a].append(b)
-            adj[b].append(a)
-    seen = {0}
-    stack = [0]
-    while stack:
-        u = stack.pop()
-        for v in adj[u]:
-            if v not in seen:
-                seen.add(v)
-                stack.append(v)
-    return len(seen) == len(ids)
-
+def _has_edge(edges: List[dict], src: str, dst: str) -> bool:
+    return any(e.get("source") == src and e.get("target") == dst for e in (edges or []))
 
 def _topo_layers(nodes: List[dict], edges: List[dict]) -> List[List[str]]:
     ids = [n["id"] for n in nodes]
@@ -153,20 +131,28 @@ def _topo_layers(nodes: List[dict], edges: List[dict]) -> List[List[str]]:
         layers.append([i for i in ids if i not in seen])
     return layers
 
+# ---------- S3 helpers ----------
+def _parse_s3_url(u: str) -> Tuple[str, str]:
+    """Return (bucket, key) for s3://bucket/key...; raises ValueError if malformed."""
+    u = (u or "").strip()
+    if not u.startswith("s3://"):
+        raise ValueError("not an s3:// URL")
+    rest = u[5:]
+    i = rest.find("/")
+    if i <= 0:
+        raise ValueError("missing key")
+    return rest[:i], rest[i + 1 :].lstrip("/")
 
 # ---------- parameter builders ----------
 def _user_id(handler: MBH) -> str:
     u = handler.backend_consumer.scope.get("user")
     return getattr(u, "username", "anonymous")
 
-
 def _run_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 
-
 def _bucket() -> str:
     return os.getenv("NGIAB_S3_BUCKET", "test-ngen")
-
 
 def _kind_to_template(kind: str) -> str:
     k = (kind or "").lower()
@@ -180,18 +166,17 @@ def _kind_to_template(kind: str) -> str:
         return "ngiab-teehr"
     return "ngiab-run"
 
-
 def _intermediate_prefix(user: str, run_id: str, kind: str) -> str:
     safe = kind.replace(" ", "-").lower()
     return f"{user}/Run/intermediate/{safe}/{run_id}"
-
 
 def _final_prefix(user: str, run_id: str, kind: str) -> str:
     safe = kind.replace(" ", "-").lower()
     return f"{user}/Run/Final/{safe}/{run_id}"
 
-
-def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str, last_in_chain: bool, upstream_key: str | None) -> Dict[str, str]:
+def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str,
+               last_in_chain: bool, upstream_key: Optional[str]) -> Dict[str, str]:
+    """Translate UI config into template parameters. Also normalizes S3 URL/key inputs."""
     bucket = _bucket()
     out_prefix = _intermediate_prefix(user, run_id, kind)
     final_prefix = _final_prefix(user, run_id, kind) if last_in_chain else ""
@@ -199,23 +184,45 @@ def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str, last_in_
     k = (kind or "").lower()
     if "pre-process" in k or "preprocess" in k:
         return {
-            "output_bucket": bucket,
-            "output_prefix": out_prefix,
+            "output_bucket": str(cfg.get("output_bucket") or bucket),
+            "output_prefix": str(cfg.get("output_prefix") or out_prefix),
             "selector_type": str(cfg.get("selector_type") or "gage"),
             "selector_value": str(cfg.get("selector_value") or "01359139"),
+            "vpu": str(cfg.get("vpu") or ""),
             "start_date": str(cfg.get("start_date") or "2020-01-01"),
             "end_date": str(cfg.get("end_date") or "2020-01-15"),
             "output_name": str(cfg.get("output_name") or "ngiab"),
             "source": str(cfg.get("source") or "nwm"),
             "debug": str(cfg.get("debug") or "false"),
+            # step controls
+            "all": str(cfg.get("all") or "false"),
+            "subset": str(cfg.get("subset") or "true"),
+            "forcings": str(cfg.get("forcings") or "true"),
+            "realization": str(cfg.get("realization") or "true"),
+            "run": str(cfg.get("run") or "false"),
+            "validate": str(cfg.get("validate") or "false"),
         }
 
     if "calibration" in k:
+        # derive input bucket/key
+        ibucket = str(cfg.get("input_bucket") or bucket)
+        ikey = upstream_key or str(cfg.get("input_key") or cfg.get("input_s3_key") or "")
+        if not ikey and cfg.get("input_s3_url"):
+            try:
+                ibucket, _ikey = _parse_s3_url(str(cfg["input_s3_url"]))
+                ikey = _ikey
+            except Exception:
+                pass
+        ikey = ikey.lstrip("/")
+
         return {
-            "output_bucket": bucket,
-            "output_prefix": out_prefix,
+            "output_bucket": str(cfg.get("output_bucket") or bucket),
+            "output_prefix": str(cfg.get("output_prefix") or out_prefix),
             "final_prefix": final_prefix,
-            "input_s3_key": upstream_key or str(cfg.get("input_s3_key") or ""),
+            "input_bucket": ibucket,
+            "input_key": ikey,           # preferred by YAML (artifact.s3.key)
+            "input_s3_key": ikey,        # backward-compat if template still uses this param
+            "input_subdir": str(cfg.get("input_subdir") or "ngiab"),
             "gage": str(cfg.get("gage") or cfg.get("selector_value") or "01359139"),
             "iterations": str(cfg.get("iterations") or "100"),
             "warmup": str(cfg.get("warmup") or "365"),
@@ -223,12 +230,13 @@ def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str, last_in_
             "force": str(cfg.get("force") or "false"),
             "run": str(cfg.get("run") or "false"),
             "debug": str(cfg.get("debug") or "false"),
+            "vpu": str(cfg.get("vpu") or ""),
         }
 
     if "run" in k and "ngiab" in k:
         return {
-            "output_bucket": bucket,
-            "output_prefix": out_prefix,
+            "output_bucket": str(cfg.get("output_bucket") or bucket),
+            "output_prefix": str(cfg.get("output_prefix") or out_prefix),
             "final_prefix": final_prefix,
             "input_s3_key": upstream_key or str(cfg.get("input_s3_key") or ""),
             "ngen_np": str(cfg.get("ngen_np") or "8"),
@@ -237,8 +245,8 @@ def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str, last_in_
 
     if "teehr" in k:
         return {
-            "output_bucket": bucket,
-            "output_prefix": out_prefix,
+            "output_bucket": str(cfg.get("output_bucket") or bucket),
+            "output_prefix": str(cfg.get("output_prefix") or out_prefix),
             "final_prefix": final_prefix,
             "input_s3_key": upstream_key or str(cfg.get("input_s3_key") or ""),
             "teehr_inputs_subdir": str(cfg.get("teehr_inputs_subdir") or "outputs"),
@@ -249,11 +257,9 @@ def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str, last_in_
 
     return {"output_bucket": bucket, "output_prefix": out_prefix, "final_prefix": final_prefix}
 
-
 # ---------- status helpers ----------
 async def _emit_status(handler: MBH, node_id: str, status: str, message: str = ""):
     await handler.send_action(BackendActions.NODE_STATUS, {"nodeId": node_id, "status": status, "message": message})
-
 
 async def _update_node_db(session: AsyncSession, wf_id, node_name: str, status: str, message: str = ""):
     node = (
@@ -267,21 +273,26 @@ async def _update_node_db(session: AsyncSession, wf_id, node_name: str, status: 
         node.updated_at = datetime.now(timezone.utc)
         await session.commit()
 
-
 class NgiabBackendHandler(MBH):
     @property
     def receiving_actions(self) -> dict[str, callable]:
-        return {
+        actions = {
             "RUN_WORKFLOW": self.receive_run_workflow,
             "RUN_NODE": self.receive_run_node,
             "REQUEST_LAST_RUN": self.receive_request_last_run,
-
-            # if you still keep these stubs, expose them as strings too
-            "RUN_PREPROCESS": self.receive_run_preprocess,
-            "RUN_CALIBRATION": self.receive_run_calibration,
-            "RUN_NGIAB": self.receive_run_ngiab,
-            "RUN_TEEHR": self.receive_run_teehr,
         }
+        # Optional legacy shims
+        optional = {
+            "RUN_PREPROCESS": "receive_run_preprocess",
+            "RUN_CALIBRATION": "receive_run_calibration",
+            "RUN_NGIAB": "receive_run_ngiab",
+            "RUN_TEEHR": "receive_run_teehr",
+        }
+        for key, meth in optional.items():
+            fn = getattr(self, meth, None)
+            if callable(fn):
+                actions[key] = fn
+        return actions
 
     # ---------------- polling ----------------
     async def _poll_argo_to_terminal(self, argo_wf_name: str, ui_node_id: str, wf_id) -> None:
@@ -297,6 +308,9 @@ class NgiabBackendHandler(MBH):
                 await _emit_status(self, ui_node_id, "running", f"poll error: {e}")
                 if time.monotonic() - start > POLL_TIMEOUT_SEC:
                     await _emit_status(self, ui_node_id, "error", "poll timeout")
+                    SessionFactory = await self.get_sessionmaker()
+                    async with SessionFactory() as session:
+                        await _update_node_db(session, wf_id, ui_node_id, "error", "poll timeout")
                     return
                 await asyncio.sleep(POLL_SEC)
                 continue
@@ -313,6 +327,9 @@ class NgiabBackendHandler(MBH):
 
             if time.monotonic() - start > POLL_TIMEOUT_SEC:
                 await _emit_status(self, ui_node_id, "error", "poll timeout")
+                SessionFactory = await self.get_sessionmaker()
+                async with SessionFactory() as session:
+                    await _update_node_db(session, wf_id, ui_node_id, "error", "poll timeout")
                 return
 
             await asyncio.sleep(POLL_SEC)
@@ -323,64 +340,61 @@ class NgiabBackendHandler(MBH):
         for tpl in needed:
             _ensure_template_exists_or_create(tpl)
 
-def _build_chain_workflow(self, chain: List[dict], user: str, run_id: str) -> Workflow:
-    """
-    Build a DAG workflow with templateRef tasks for the ordered nodes in `chain`.
-    NOTE: dependencies must be names (strings), and task names must NOT start with a digit.
-    """
-    ws = make_ws()
-    with Workflow(
-        generate_name="ngiab-chain-",
-        entrypoint="main",
-        workflows_service=ws,
-    ) as w:
-        # harmless defaults; our templates take params from Arguments we pass per-task
-        w.arguments = [
-            Parameter(name="output_bucket", value=_bucket()),
-            Parameter(name="output_prefix", value=f"{user}/Run/{run_id}"),
-        ]
+    def _build_chain_workflow(self, chain: List[dict], user: str, run_id: str) -> Workflow:
+        """
+        Build a simple linear DAG chaining the provided nodes in order.
+        Each task calls a WorkflowTemplate via templateRef and receives parameters;
+        we carry forward the produced S3 key to the next task.
+        """
+        ws = make_ws()
+        with Workflow(
+            generate_name="ngiab-chain-",
+            entrypoint="main",
+            workflows_service=ws,
+        ) as w:
+            with DAG(name="main"):
+                upstream_key = None
+                prev_name: str | None = None
 
-        with DAG(name="main"):
-            upstream_key = None
-            prev_name: str | None = None
+                for i, n in enumerate(chain):
+                    kind = n.get("label") or n.get("id")
+                    tpl_name = _kind_to_template(kind)
+                    last = (i == len(chain) - 1)
 
-            for i, n in enumerate(chain):
-                kind = n.get("label") or n.get("id")
-                tpl_name = _kind_to_template(kind)
-                last = (i == len(chain) - 1)
+                    _ensure_template_exists_or_create(tpl_name)
 
-                _ensure_template_exists_or_create(tpl_name)
+                    params = _params_for(kind, n.get("config") or {}, user, run_id, last, upstream_key)
 
-                params = _params_for(kind, n.get("config") or {}, user, run_id, last, upstream_key)
+                    # determine default downstream artifact key
+                    lk = (kind or "").lower()
+                    if "pre-process" in lk or "preprocess" in lk:
+                        upstream_key = f"{params['output_prefix'].rstrip('/')}/preprocess.tgz"
+                    elif "calibration" in lk:
+                        upstream_key = f"{params['output_prefix'].rstrip('/')}/calibrated.tgz"
+                    elif "run" in lk and "ngiab" in lk:
+                        upstream_key = f"{params['output_prefix'].rstrip('/')}/outputs.tgz"
+                    elif "teehr" in lk:
+                        upstream_key = f"{params['output_prefix'].rstrip('/')}/teehr_results.tgz"
+                    else:
+                        upstream_key = None
 
-                # Compute default downstream key mapping
-                lk = (kind or "").lower()
-                if "pre-process" in lk or "preprocess" in lk:
-                    upstream_key = f"{params['output_prefix']}/preprocess.tgz"
-                elif "calibration" in lk:
-                    upstream_key = f"{params['output_prefix']}/calibrated.tgz"
-                elif "run" in lk and "ngiab" in lk:
-                    upstream_key = f"{params['output_prefix']}/outputs.tgz"
-                elif "teehr" in lk:
-                    upstream_key = f"{params['output_prefix']}/teehr_results.tgz"
-                else:
-                    upstream_key = None
+                    # make sure calibration/run receive input_s3 key if not explicitly set
+                    if upstream_key and "input_s3_key" not in params and ("calibration" in lk or "ngiab" in lk or "teehr" in lk):
+                        params["input_s3_key"] = upstream_key
+                        params["input_key"] = upstream_key
+                        params["input_bucket"] = params.get("input_bucket") or params.get("output_bucket") or _bucket()
 
-                if upstream_key and "input_s3_key" not in params:
-                    params["input_s3_key"] = upstream_key
+                    task_name = f"step-{i:02d}-{tpl_name}"
 
-                # ✅ Argo requires task names not to start with a digit when dependencies are used
-                task_name = f"step-{i:02d}-{tpl_name}"
+                    Task(
+                        name=task_name,
+                        template_ref=TemplateRef(name=tpl_name, template="main"),
+                        arguments=Arguments(parameters=[Parameter(name=k, value=v) for k, v in params.items()]),
+                        dependencies=[prev_name] if prev_name else None,
+                    )
+                    prev_name = task_name
 
-                Task(
-                    name=task_name,
-                    template_ref=TemplateRef(name=tpl_name, template="main"),
-                    arguments=Arguments(parameters=[Parameter(name=k, value=v) for k, v in params.items()]),
-                    dependencies=[prev_name] if prev_name else None,
-                )
-                prev_name = task_name
-
-    return w
+        return w
 
     # ---------------- RUN WORKFLOW ----------------
     @MBH.action_handler
@@ -392,65 +406,87 @@ def _build_chain_workflow(self, chain: List[dict], user: str, run_id: str) -> Wo
         user = _user_id(self)
         run_id = _run_id()
 
-        if not selected_ids and not _weakly_connected(nodes, edges):
-            raise ValueError("Cannot run: not all nodes are connected. Connect all nodes first.")
-
-        order = [nid for layer in _topo_layers(nodes, edges) for nid in layer]
-        id_to_node = {n["id"]: n for n in nodes}
-        chain = [id_to_node[i] for i in order if (not selected_ids or i in selected_ids)]
-
-        if not chain:
-            # nothing to do; surface a friendly message
+        # pick target nodes: selected or all
+        targets = [n for n in nodes if not selected_ids or n["id"] in selected_ids]
+        if not targets:
             await self.send_action(BackendActions.NODE_STATUS, {"nodeId": "", "status": "error", "message": "Nothing selected to run."})
             return
 
-        self._ensure_templates_for_nodes(chain)
+        # Detect the special chain: pre-process -> calibration
+        pre = next((n for n in targets if (n.get("label") or n["id"]) in ("pre-process", "preprocess", "pre process")), None)
+        cal = next((n for n in targets if (n.get("label") or n["id"]).lower().startswith("calibration")), None)
+        do_chain = pre is not None and cal is not None and _has_edge(edges, "pre-process", "calibration")
 
-        wt_row = await self._get_or_create_template_row(session, "ngiab-chain", user, {"source": "yaml"})
-        wf_row = WFModel(
-            name=wf_data.get("name") or f"wf-{run_id}",
-            user=user,
-            template_id=wt_row.id,
-            status="queued",
-            graph=wf_data,
-            layers=_topo_layers(nodes, edges),
-        )
-        session.add(wf_row)
-        await session.flush()
+        # Ensure templates exist for all nodes we might run
+        self._ensure_templates_for_nodes(targets)
 
-        for idx, n in enumerate(chain):
-            session.add(
-                NodeModel(
-                    workflow_id=wf_row.id,
-                    name=n["id"],
-                    kind=n.get("label") or "process",
-                    user=user,
-                    config=n.get("config") or {},
-                    status="idle",
-                    order_index=idx,
-                )
+        if do_chain:
+            # record a single workflow with two nodes chained
+            wt_row = await self._get_or_create_template_row(session, "ngiab-chain", user, {"source": "yaml"})
+            wf_row = WFModel(
+                name=wf_data.get("name") or f"wf-{run_id}",
+                user=user,
+                template_id=wt_row.id,
+                status="queued",
+                graph=wf_data,
+                layers=[["pre-process"], ["calibration"]],
             )
-        await session.commit()
+            session.add(wf_row)
+            await session.flush()
 
-        for n in chain:
-            await _emit_status(self, n["id"], "running", "submitting")
+            for idx, n in [("pre-process", 0), ("calibration", 1)]:
+                cfg = (pre if idx == "pre-process" else cal).get("config") or {}
+                session.add(
+                    NodeModel(
+                        workflow_id=wf_row.id,
+                        name=idx,
+                        kind=(pre if idx == "pre-process" else cal).get("label") or idx,
+                        user=user,
+                        config=cfg,
+                        status="idle",
+                        order_index=int(idx == "calibration"),
+                    )
+                )
+            await session.commit()
 
-        w = self._build_chain_workflow(chain, user, run_id)
-        try:
-            log.info("Submitting chain workflow...")
-            w.create()
-            log.info("Submitted workflow: %s", w.name)
-            # tell UI immediately
-            for n in chain:
-                await _emit_status(self, n["id"], "running", f"argo: {w.name}")
-        except Exception as e:
-            for n in chain:
-                await _emit_status(self, n["id"], "error", f"submit failed: {e}")
+            # notify UI
+            await _emit_status(self, "pre-process", "running", "submitting")
+            await _emit_status(self, "calibration", "running", "submitting")
+
+            # build and submit the chain
+            try:
+                w = self._build_chain_workflow([pre, cal], user, run_id)
+                w.create()
+                argo_name = w.name
+                await _emit_status(self, "pre-process", "running", f"argo: {argo_name}")
+                await _emit_status(self, "calibration", "running", f"argo: {argo_name}")
+                asyncio.create_task(self._poll_argo_to_terminal(argo_name, "pre-process", wf_row.id))
+                asyncio.create_task(self._poll_argo_to_terminal(argo_name, "calibration", wf_row.id))
+            except Exception as e:
+                await _emit_status(self, "pre-process", "error", f"submit failed: {e}")
+                await _emit_status(self, "calibration", "error", f"submit failed: {e}")
+                # update database statuses for chain nodes
+                await _update_node_db(session, wf_row.id, "pre-process", "error", f"submit failed: {e}")
+                await _update_node_db(session, wf_row.id, "calibration", "error", f"submit failed: {e}")
+                return
+
+            # Any other nodes in the canvas should run independently
+            others = [n for n in targets if n["id"] not in ("pre-process", "calibration")]
+            for n in others:
+                await self.receive_run_node(
+                    event,
+                    action,
+                    {"nodeId": n["id"], "label": n.get("label"), "config": n.get("config") or {}},
+                )
             return
 
-        argo_name = w.name
-        for n in chain:
-            asyncio.create_task(self._poll_argo_to_terminal(argo_name, n["id"], wf_row.id))
+        # No chain: run each selected node independently
+        for n in targets:
+            await self.receive_run_node(
+                event,
+                action,
+                {"nodeId": n["id"], "label": n.get("label"), "config": n.get("config") or {}},
+            )
 
     async def _get_or_create_template_row(self, session: AsyncSession, name: str, user: str, spec: dict | None):
         existing = (await session.execute(select(WTModel).where(WTModel.name == name).limit(1))).scalar_one_or_none()
@@ -473,6 +509,17 @@ def _build_chain_workflow(self, chain: List[dict], user: str, run_id: str) -> Wo
         user = _user_id(self)
         run = _run_id()
 
+        # normalize S3 URL for single-node calibration runs
+        if "input_s3_url" in cfg and (("input_bucket" not in cfg) or ("input_key" not in cfg)):
+            try:
+                b, k = _parse_s3_url(str(cfg["input_s3_url"]))
+                cfg.setdefault("input_bucket", b)
+                cfg.setdefault("input_key", k.lstrip("/"))
+            except Exception:
+                pass
+        if "input_key" in cfg and isinstance(cfg["input_key"], str):
+            cfg["input_key"] = cfg["input_key"].lstrip("/")
+
         wf = WFModel(
             name=f"ad-hoc-{run}",
             user=user,
@@ -492,14 +539,17 @@ def _build_chain_workflow(self, chain: List[dict], user: str, run_id: str) -> Wo
             _ensure_template_exists_or_create(tpl)
         except Exception as e:
             await _emit_status(self, node_id, "error", f"template error: {e}")
+            # update database status for this node
+            await _update_node_db(session, wf.id, node_id, "error", f"template error: {e}")
             return
 
-        params = _params_for(kind, cfg, user, run, last_in_chain=True, upstream_key=cfg.get("input_s3_key"))
+        params = _params_for(kind, cfg, user, run, last_in_chain=True, upstream_key=cfg.get("input_s3_key") or cfg.get("input_key"))
 
         ws = make_ws()
         try:
             with Workflow(
                 generate_name=f"{tpl}-",
+                entrypoint="main",
                 workflow_template_ref=WorkflowTemplateRef(name=tpl),
                 workflows_service=ws,
             ) as w:
@@ -509,8 +559,41 @@ def _build_chain_workflow(self, chain: List[dict], user: str, run_id: str) -> Wo
             asyncio.create_task(self._poll_argo_to_terminal(w.name, node_id, wf.id))
         except Exception as e:
             await _emit_status(self, node_id, "error", f"submit failed: {e}")
+            # update database status for this node
+            await _update_node_db(session, wf.id, node_id, "error", f"submit failed: {e}")
+            return
 
     # ---------------- Playback stub ----------------
     @MBH.action_handler
     async def receive_request_last_run(self, event, action, data, session: AsyncSession):
         await self.send_action(BackendActions.LAST_RUN_LOG, {"events": []})
+
+    # -------- Legacy shims (optional) --------
+    async def receive_run_preprocess(self, event, action, data):
+        cfg = (data or {}).get("config") or data or {}
+        return await self.receive_run_node(
+            event, action,
+            {"nodeId": "pre-process", "label": "pre-process", "config": cfg}
+        )
+
+    async def receive_run_calibration(self, event, action, data):
+        cfg = (data or {}).get("config") or data or {}
+        return await self.receive_run_node(
+            event, action,
+            {"nodeId": "calibration", "label": "calibration", "config": cfg}
+        )
+
+    async def receive_run_ngiab(self, event, action, data):
+        cfg = (data or {}).get("config") or data or {}
+        return await self.receive_run_node(
+            event, action,
+            {"nodeId": "ngiab-run", "label": "ngiab run", "config": cfg}
+        )
+
+    async def receive_run_teehr(self, event, action, data):
+        cfg = (data or {}).get("config") or data or {}
+        return await self.receive_run_node(
+            event, action,
+            {"nodeId": "teehr", "label": "teehr", "config": cfg}
+        )
+

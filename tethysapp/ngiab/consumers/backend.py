@@ -13,7 +13,6 @@ from tethysapp.ngiab.app import App
 
 log = logging.getLogger(__name__)
 
-
 @consumer(name="workflows", url="workflows")
 class BackendConsumer(AsyncConsumer):
     """
@@ -104,7 +103,6 @@ class BackendConsumer(AsyncConsumer):
             log.exception(f"Unexpected error while handling message: {event_summary}")
 
     # ---- Utilities for handlers ------------------------------------------------
-
     async def send_action(self, action: BackendActions | str, payload):
         """Send an action to the frontend as a JSON text frame."""
         # Normalize action type to a simple string for the client

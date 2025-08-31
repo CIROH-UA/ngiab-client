@@ -4,67 +4,131 @@ metadata:
   name: ngiab-data-preprocess
   namespace: argo
 spec:
+  entrypoint: main
   templates:
   - name: main
     inputs:
       parameters:
-        - { name: output_bucket, default: "test-ngen" }
-        - { name: output_prefix, default: "demo/default" }
-        - { name: selector_type, default: "gage" }
-        - { name: selector_value, default: "01359139" }
-        - { name: start_date, default: "2020-01-01" }
-        - { name: end_date, default: "2020-01-15" }
-        - { name: output_name, default: "ngiab" }
-        - { name: source, default: "nwm" }
-        - { name: debug, default: "false" }
+        - { name: output_bucket,  default: "test-ngen" }
+        - { name: output_prefix,  default: "demo/default" }
+        - { name: selector_type,  default: "gage" }         # gage | latlon | catchment
+        - { name: selector_value, default: "01359139" }     # e.g. "01359139" or "33.22,-87.54" or "5173"
+        - { name: vpu,            default: "" }             # optional (e.g., "01")
+        - { name: start_date,     default: "2020-01-01" }
+        - { name: end_date,       default: "2020-01-15" }
+        - { name: output_name,    default: "ngiab" }
+        - { name: source,         default: "nwm" }          # nwm | aorc
+        - { name: debug,          default: "false" }
+        # step toggles
+        - { name: all,        default: "false" }            # --all (equivalent to -sfr + --run)
+        - { name: subset,     default: "true" }             # -s
+        - { name: forcings,   default: "true" }             # -f
+        - { name: realization,default: "true" }             # -r
+        - { name: run,        default: "false" }            # --run
+        - { name: validate,   default: "false" }            # --validate
     script:
       image: python:3.11-slim
       command: [bash, -lc]
       source: |
-        set -e
-        apt-get update -y && apt-get install -y --no-install-recommends git curl ca-certificates tar gzip && rm -rf /var/lib/apt/lists/*
-        python -m pip install --no-cache-dir --upgrade pip
-        # install the CLI from GitHub
-        python -m pip install --no-cache-dir "git+https://github.com/CIROH-UA/NGIAB_data_preprocess.git"
+        set -euo pipefail
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -y && apt-get install -y --no-install-recommends \
+          curl ca-certificates findutils coreutils gzip tar && \
+          rm -rf /var/lib/apt/lists/*
 
-        mkdir -p /work/out
+        # Install Astral UV + add to PATH
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="${HOME}/.local/bin:${PATH}"
+
+        # Params
         SEL="{{inputs.parameters.selector_type}}"
         VAL="{{inputs.parameters.selector_value}}"
+        VPU="{{inputs.parameters.vpu}}"
         START="{{inputs.parameters.start_date}}"
         END="{{inputs.parameters.end_date}}"
         OUT="{{inputs.parameters.output_name}}"
         SRC="{{inputs.parameters.source}}"
+        DBG="{{inputs.parameters.debug}}"
 
-        EXTRA=""
-        if [ "$SEL" = "gage" ]; then EXTRA="-g"; fi
-        if [ "$SEL" = "latlon" ]; then EXTRA="-l"; fi
+        DO_ALL="{{inputs.parameters.all}}"
+        DO_SUB="{{inputs.parameters.subset}}"
+        DO_FOR="{{inputs.parameters.forcings}}"
+        DO_REAL="{{inputs.parameters.realization}}"
+        DO_RUN="{{inputs.parameters.run}}"
+        DO_VALID="{{inputs.parameters.validate}}"
 
-        # Try to run end-to-end; do not fail the pod if CLI fails, but still package what's available
-        set +e
-        python -m ngiab_data_cli -i "$VAL" $EXTRA -s -f -r --start "$START" --end "$END" -o "$OUT" --source "$SRC"
-        STATUS=$?
-        set -e
+        # ---- Build selector flags/values ----
+        IDFLAG="-i"
+        IDVAL="$VAL"
+        case "$SEL" in
+          gage)
+            case "$IDVAL" in gage-*) ;; *) IDVAL="gage-$IDVAL" ;; esac
+            ;;
+          catchment)
+            case "$IDVAL" in cat-*) ;; *) IDVAL="cat-$IDVAL" ;; esac
+            ;;
+          latlon)
+            IDFLAG="-l"     # pass raw "lat,lon"
+            ;;
+          *) : ;;
+        esac
 
-        mkdir -p "/work/out/${OUT}"
-        if [ -d "$OUT" ]; then
-          cp -r "$OUT"/. "/work/out/${OUT}/"
-        elif [ -d "config" ] || [ -d "forcings" ] || [ -d "outputs" ]; then
-          cp -r config "/work/out/${OUT}/" 2>/dev/null || true
-          cp -r forcings "/work/out/${OUT}/" 2>/dev/null || true
-          cp -r outputs "/work/out/${OUT}/" 2>/dev/null || true
+        # ---- Build step flags (one shot) ----
+        STEPS=""
+        if [ "$DO_ALL" = "true" ]; then
+          STEPS="-sfr"
+          DO_RUN="true"
+        else
+          [ "$DO_SUB"  = "true" ] && STEPS="${STEPS}s"
+          [ "$DO_FOR"  = "true" ] && STEPS="${STEPS}f"
+          [ "$DO_REAL" = "true" ] && STEPS="${STEPS}r"
+          [ -n "$STEPS" ] && STEPS="-$STEPS" || STEPS=""
         fi
 
-        tar -C /work/out -czf /tmp/preprocess.tgz "${OUT}" || tar -C /work/out -czf /tmp/preprocess.tgz .
-        exit 0
+        [ -n "$VPU" ] && VPUFLAG="--vpu $VPU" || VPUFLAG=""
+        [ "$DBG"      = "true" ] && DBGFLAG="-D" || DBGFLAG=""
+        [ "$DO_RUN"   = "true" ] && RUNFLAG="--run" || RUNFLAG=""
+        [ "$DO_VALID" = "true" ] && VALIDFLAG="--validate" || VALIDFLAG=""
+
+        # ---- Run ngiab-prep once; avoid pipefail from 'yes' SIGPIPE ----
+        set +o pipefail
+        yes "" | uvx ngiab-prep \
+          $IDFLAG "$IDVAL" $STEPS $RUNFLAG $VALIDFLAG $DBGFLAG $VPUFLAG \
+          --start "$START" --end "$END" \
+          -o "$OUT" \
+          --source "$SRC"
+        set -o pipefail
+
+        # ---- Normalize output location & package ----
+        OUTROOT="${HOME}/ngiab_preprocess_output"
+        TARGET="${OUTROOT}/${OUT}"
+
+        # Some versions write to a timestamped folder; if ours is missing, copy newest into the expected path
+        if [ ! -d "$TARGET" ]; then
+          mkdir -p "$TARGET"
+          NEWEST="$(find "$OUTROOT" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2- || true)"
+          [ -n "${NEWEST:-}" ] && cp -a "${NEWEST}/." "${TARGET}/" || true
+        fi
+
+        mkdir -p /work/out
+        # Create the archive ourselves so Argo doesn't spawn its own tar|gzip (avoids exit 141)
+        tar -C "$OUTROOT" -czf "/work/out/${OUT}.tgz" "$OUT"
+
+        echo "Final staged directory: ${TARGET}"
+        ls -lahR "${TARGET}" || true
+
     outputs:
       artifacts:
       - name: preprocess
-        path: /tmp/preprocess.tgz
+        # Upload the pre-created tarball as-is (no Argo archiving/compression)
+        path: /work/out/{{inputs.parameters.output_name}}.tgz
+        archive:
+          none: {}
         s3:
           endpoint: s3.amazonaws.com
           region: us-east-1
           insecure: false
           bucket: "{{inputs.parameters.output_bucket}}"
-          key: "{{inputs.parameters.output_prefix}}/preprocess.tgz"
+          key: "{{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz"
           accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
           secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }

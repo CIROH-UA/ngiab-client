@@ -4,65 +4,244 @@ metadata:
   name: ngiab-calibration
   namespace: argo
 spec:
+  entrypoint: main
   templates:
   - name: main
     inputs:
       parameters:
-        - { name: output_bucket, default: "test-ngen" }
-        - { name: output_prefix, default: "demo/default" }
-        - { name: final_prefix, default: "" }
-        - { name: input_s3_key, default: "" }
-        - { name: gage, default: "01359139" }
-        - { name: iterations, default: "100" }
-        - { name: warmup, default: "365" }
+        - { name: input_bucket,  default: "" }
+        - { name: input_key,     default: "" }   # users/<user>/Run/intermediate/pre-process/.../preprocess.tgz
+        - { name: input_s3_url,  default: "" }   # overrides bucket+key if set
+        - { name: input_subdir,  default: "" }   # inner folder (e.g., "ngiab")
+        - { name: gage,              default: "" }
+        - { name: iterations,        default: "100" }
+        - { name: warmup,            default: "365" }
         - { name: calibration_ratio, default: "0.5" }
-        - { name: force, default: "false" }
-        - { name: run, default: "false" }
-        - { name: debug, default: "false" }
+        - { name: force,             default: "false" }
+        - { name: run,               default: "true" }   # 'true' or 'false'
+        - { name: debug,             default: "false" }
+        - { name: output_bucket,     default: "test-ngen" }
+        - { name: output_prefix,     default: "demo/default" }
+    steps:
+    - - name: prepare
+        template: prepare
+        arguments:
+          parameters:
+            - { name: input_bucket,  value: "{{inputs.parameters.input_bucket}}" }
+            - { name: input_key,     value: "{{inputs.parameters.input_key}}" }
+            - { name: input_s3_url,  value: "{{inputs.parameters.input_s3_url}}" }
+            - { name: input_subdir,  value: "{{inputs.parameters.input_subdir}}" }
+            - { name: gage,              value: "{{inputs.parameters.gage}}" }
+            - { name: iterations,        value: "{{inputs.parameters.iterations}}" }
+            - { name: warmup,            value: "{{inputs.parameters.warmup}}" }
+            - { name: calibration_ratio, value: "{{inputs.parameters.calibration_ratio}}" }
+            - { name: force,             value: "{{inputs.parameters.force}}" }
+            - { name: debug,             value: "{{inputs.parameters.debug}}" }
+            - { name: output_bucket,     value: "{{inputs.parameters.output_bucket}}" }
+            - { name: output_prefix,     value: "{{inputs.parameters.output_prefix}}" }
+    - - name: run-cal
+        template: run-cal
+        when: "{{inputs.parameters.run}} == 'true'"
+        arguments:
+          parameters:
+            - { name: gage,              value: "{{inputs.parameters.gage}}" }
+            - { name: iterations,        value: "{{inputs.parameters.iterations}}" }
+            - { name: warmup,            value: "{{inputs.parameters.warmup}}" }
+            - { name: calibration_ratio, value: "{{inputs.parameters.calibration_ratio}}" }
+            - { name: force,             value: "{{inputs.parameters.force}}" }
+            - { name: debug,             value: "{{inputs.parameters.debug}}" }
+            - { name: output_bucket,     value: "{{inputs.parameters.output_bucket}}" }
+            - { name: output_prefix,     value: "{{inputs.parameters.output_prefix}}" }
+          artifacts:
+            - name: prepared
+              from: "{{steps.prepare.outputs.artifacts.prepared}}"
+    - - name: noop
+        template: pass
+        when: "{{inputs.parameters.run}} == 'false'"
+    - - name: done
+        template: echo
+
+  # Step 1: create configs (no --run), upload prepared.tgz
+  - name: prepare
+    inputs:
+      parameters:
+        - { name: input_bucket,  default: "" }
+        - { name: input_key,     default: "" }
+        - { name: input_s3_url,  default: "" }
+        - { name: input_subdir,  default: "" }
+        - { name: gage,              default: "" }
+        - { name: iterations,        default: "100" }
+        - { name: warmup,            default: "365" }
+        - { name: calibration_ratio, default: "0.5" }
+        - { name: force,             default: "false" }
+        - { name: debug,             default: "false" }
+        - { name: output_bucket,     default: "test-ngen" }
+        - { name: output_prefix,     default: "demo/default" }
       artifacts:
-        - name: input
-          path: /work/in.tgz
+        - name: preprocess
+          optional: true
+          path: /tmp/in/preprocess.tgz
           s3:
             endpoint: s3.amazonaws.com
             region: us-east-1
-            insecure: false
-            bucket: "{{inputs.parameters.output_bucket}}"
-            key: "{{inputs.parameters.input_s3_key}}"
+            bucket: "{{inputs.parameters.input_bucket}}"
+            key: "{{inputs.parameters.input_key}}"
             accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
             secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
     script:
-      image: python:3.11-slim
+      image: awiciroh/ngiab-cal:latest
       command: [bash, -lc]
+      env:
+      - name: AWS_ACCESS_KEY_ID
+        valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_ACCESS_KEY_ID } }
+      - name: AWS_SECRET_ACCESS_KEY
+        valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_SECRET_ACCESS_KEY } }
+      - name: AWS_DEFAULT_REGION
+        value: us-east-1
       source: |
-        set -e
-        apt-get update -y && apt-get install -y --no-install-recommends git ca-certificates tar gzip && rm -rf /var/lib/apt/lists/*
-        python -m pip install --no-cache-dir --upgrade pip
-        python -m pip install --no-cache-dir "git+https://github.com/CIROH-UA/ngiab-cal.git"
+        set -euo pipefail
+        mkdir -p /tmp/in /tmp/data /tmp/out
 
-        mkdir -p /work/in /work/out
-        if [ -s /work/in.tgz ]; then tar -xzf /work/in.tgz -C /work/in; fi
-        ROOT="/work/in"
-
-        set +e
-        if command -v ngiab-cal >/dev/null 2>&1; then
-          ARGS=""
-          if [ "{{inputs.parameters.force}}" = "true" ]; then ARGS="$ARGS -f"; fi
-          if [ "{{inputs.parameters.run}}" = "true" ]; then ARGS="$ARGS --run"; fi
-          ngiab-cal "$ROOT" -g "{{inputs.parameters.gage}}" -i "{{inputs.parameters.iterations}}" --warmup "{{inputs.parameters.warmup}}" --cr "{{inputs.parameters.calibration_ratio}}" $ARGS
+        # If preprocess artifact exists, unpack it
+        if [ -s /tmp/in/preprocess.tgz ]; then
+          tar -C /tmp/data -xzf /tmp/in/preprocess.tgz
         fi
-        set -e
 
-        tar -C "$ROOT" -czf /tmp/calibrated.tgz .
-        exit 0
+        # Or download from a single S3 URL if provided
+        IN_URL="{{inputs.parameters.input_s3_url}}"
+        if [ -n "$IN_URL" ] && [ ! -s /tmp/in/preprocess.tgz ]; then
+          echo "Downloading preprocess from $IN_URL"
+          if command -v aws >/dev/null 2>&1; then
+            aws s3 cp "$IN_URL" /tmp/in/preprocess.tgz --no-progress
+          else
+            curl -L "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+            apt-get update -y && apt-get install -y unzip && unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install
+            aws s3 cp "$IN_URL" /tmp/in/preprocess.tgz --no-progress
+          fi
+          tar -C /tmp/data -xzf /tmp/in/preprocess.tgz
+        fi
+
+        # Find NGIAB data folder (must contain config/)
+        IN_SUB="{{inputs.parameters.input_subdir}}"
+        DATA_DIR="/tmp/data"
+        if [ -n "$IN_SUB" ] && [ -d "/tmp/data/$IN_SUB/config" ]; then
+          DATA_DIR="/tmp/data/$IN_SUB"
+        elif [ -d "/tmp/data/config" ]; then
+          DATA_DIR="/tmp/data"
+        else
+          ONE_SUB="$(find /tmp/data -mindepth 1 -maxdepth 1 -type d | head -n 1 || true)"
+          if [ -n "$ONE_SUB" ] && [ -d "$ONE_SUB/config" ]; then
+            DATA_DIR="$ONE_SUB"
+          fi
+        fi
+        if [ ! -d "$DATA_DIR/config" ]; then
+          echo "ERROR: could not locate NGIAB data folder with config/ under /tmp/data"
+          ls -al /tmp/data; exit 2
+        fi
+
+        GAGE="{{inputs.parameters.gage}}"
+        ITERS="{{inputs.parameters.iterations}}"
+        WARMUP="{{inputs.parameters.warmup}}"
+        CR="{{inputs.parameters.calibration_ratio}}"
+        FORCE="{{inputs.parameters.force}}"
+        DEBUG="{{inputs.parameters.debug}}"
+
+        # Prepare only (no --run)
+        ngiab-cal "$DATA_DIR" -g "$GAGE" -i "$ITERS" -w "$WARMUP" --calibration_ratio "$CR" \
+          $( [ "$FORCE" = "true" ] && echo "-f" ) \
+          $( [ "$DEBUG" = "true" ] && echo "--debug" )
+
+        # Package working tree for next step or final output when run=false
+        tar -C "$(dirname "$DATA_DIR")" -czf /tmp/out/prepared.tgz "$(basename "$DATA_DIR")"
     outputs:
       artifacts:
-      - name: calibrated
-        path: /tmp/calibrated.tgz
+      - name: prepared
+        path: /tmp/out/prepared.tgz
         s3:
           endpoint: s3.amazonaws.com
           region: us-east-1
-          insecure: false
+          bucket: "{{inputs.parameters.output_bucket}}"
+          key: "{{inputs.parameters.output_prefix}}/prepared.tgz"
+          accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+          secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+
+  # Step 2: run calibration (with --run) then upload calibrated.tgz
+  - name: run-cal
+    inputs:
+      parameters:
+        - { name: gage }
+        - { name: iterations }
+        - { name: warmup }
+        - { name: calibration_ratio }
+        - { name: force }
+        - { name: debug }
+        - { name: output_bucket }
+        - { name: output_prefix }
+      artifacts:
+        - name: prepared
+          path: /tmp/in/prepared.tgz
+    script:
+      image: awiciroh/ngiab-cal:latest
+      command: [bash, -lc]
+      env:
+      - name: AWS_ACCESS_KEY_ID
+        valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_ACCESS_KEY_ID } }
+      - name: AWS_SECRET_ACCESS_KEY
+        valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_SECRET_ACCESS_KEY } }
+      - name: AWS_DEFAULT_REGION
+        value: us-east-1
+      source: |
+        set -euo pipefail
+        mkdir -p /tmp/in /tmp/data /tmp/out
+        tar -C /tmp/data -xzf /tmp/in/prepared.tgz
+
+        # Resolve data folder again
+        DATA_DIR="/tmp/data"
+        if [ -d "/tmp/data/config" ]; then
+          DATA_DIR="/tmp/data"
+        else
+          ONE_SUB="$(find /tmp/data -mindepth 1 -maxdepth 1 -type d | head -n 1 || true)"
+          if [ -n "$ONE_SUB" ] && [ -d "$ONE_SUB/config" ]; then
+            DATA_DIR="$ONE_SUB"
+          fi
+        fi
+        if [ ! -d "$DATA_DIR/config" ]; then
+          echo "ERROR: prepared artifact missing config/"; ls -al /tmp/data; exit 2
+        fi
+
+        GAGE="{{inputs.parameters.gage}}"
+        ITERS="{{inputs.parameters.iterations}}"
+        WARMUP="{{inputs.parameters.warmup}}"
+        CR="{{inputs.parameters.calibration_ratio}}"
+        FORCE="{{inputs.parameters.force}}"
+        DEBUG="{{inputs.parameters.debug}}"
+
+        # Run actual calibration
+        ngiab-cal "$DATA_DIR" -g "$GAGE" --run -i "$ITERS" -w "$WARMUP" --calibration_ratio "$CR" \
+          $( [ "$FORCE" = "true" ] && echo "-f" ) \
+          $( [ "$DEBUG" = "true" ] && echo "--debug" )
+
+        tar -C "$(dirname "$DATA_DIR")" -czf /tmp/out/calibrated.tgz "$(basename "$DATA_DIR")"
+    outputs:
+      artifacts:
+      - name: calibrated
+        path: /tmp/out/calibrated.tgz
+        s3:
+          endpoint: s3.amazonaws.com
+          region: us-east-1
           bucket: "{{inputs.parameters.output_bucket}}"
           key: "{{inputs.parameters.output_prefix}}/calibrated.tgz"
           accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
           secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+
+  - name: pass
+    container:
+      image: alpine:3.19
+      command: [sh, -c]
+      args: ["echo 'run=false: calibration setup created and uploaded'; sleep 1"]
+
+  - name: echo
+    container:
+      image: alpine:3.19
+      command: [sh, -c]
+      args: ["echo 'workflow complete'"]
