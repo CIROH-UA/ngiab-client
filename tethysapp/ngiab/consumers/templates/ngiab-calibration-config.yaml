@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
-  name: ngiab-calibration
+  name: ngiab-calibration-config
   namespace: argo
 spec:
   entrypoint: main
@@ -149,6 +149,8 @@ spec:
       artifacts:
       - name: calibration-prepared
         path: /tmp/out/calibration-prepared.tgz
+        archive:
+          none: {}        
         s3:
           endpoint: s3.amazonaws.com
           region: us-east-1

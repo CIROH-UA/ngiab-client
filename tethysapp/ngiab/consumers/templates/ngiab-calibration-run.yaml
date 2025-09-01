@@ -1,39 +1,29 @@
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
-  name: ngiab-calibration
+  name: ngiab-calibration-run
   namespace: argo
 spec:
   entrypoint: main
   templates:
-  - name: main
-    inputs:
-      parameters:
-        - { name: input_bucket,  default: "" }
-        - { name: input_key,     default: "" }   # users/<user>/Run/intermediate/pre-process/.../preprocess.tgz
-        - { name: input_s3_url,  default: "" }   # overrides bucket+key if set
-        - { name: input_subdir,  default: "" }   # inner folder (e.g., "ngiab")
-        - { name: output_bucket,     default: "test-ngen" }
-        - { name: output_prefix,     default: "demo/default" }
-    steps:
-    - - name: run-cal
-        template: run-cal
-        arguments:
-          parameters:
-            - { name: output_bucket,     value: "{{inputs.parameters.output_bucket}}" }
-            - { name: output_prefix,     value: "{{inputs.parameters.output_prefix}}" }
-          artifacts:
-            - name: calibration-prepared
-              from: "{{steps.prepare.outputs.artifacts.calibration-prepared}}"
-  # Step 1: run calibration
   - name: run-cal
     inputs:
       parameters:
-        - { name: output_bucket }
-        - { name: output_prefix }
+        - { name: input_bucket,  default: "" }
+        - { name: input_key,     default: "" }
+        - { name: input_subdir,  default: "" }
+        - { name: output_bucket, default: "test-ngen" }
+        - { name: output_prefix, default: "demo/default" }
       artifacts:
         - name: calibration-prepared
           path: /tmp/in/calibration-prepared.tgz
+          s3:
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+            bucket: "{{inputs.parameters.input_bucket}}"
+            key: "{{inputs.parameters.input_key}}"
+            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
     script:
       image: awiciroh/ngiab-cal:latest
       command: [bash, -lc]
@@ -47,22 +37,16 @@ spec:
       source: |
         set -euo pipefail
         DATA_DIR="/ngen/ngen/data"
-
-        # making directories
-        tar -C $DATA_DIR -xzf /tmp/in/calibration-prepared.tgz
-
-        # Run actual calibration
-
+        tar -C "$DATA_DIR" -xzf /tmp/in/calibration-prepared.tgz
         set +o pipefail
-        
         /calibration/run.sh
-        
         tar -C "$(dirname "$DATA_DIR")" -czf /tmp/out/calibrated.tgz "$(basename "$DATA_DIR")"
-        
     outputs:
       artifacts:
       - name: calibrated
         path: /tmp/out/calibrated.tgz
+        archive:
+            none: {}        
         s3:
           endpoint: s3.amazonaws.com
           region: us-east-1

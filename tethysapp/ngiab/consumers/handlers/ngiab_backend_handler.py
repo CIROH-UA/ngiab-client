@@ -443,8 +443,14 @@ class NgiabBackendHandler(MBH):
         pre = next((n for n in targets if (n.get("label") or n["id"]) in ("pre-process", "preprocess", "pre process")), None)
         cal_config = next((n for n in targets if (n.get("label") or n["id"]).lower().startswith("calibration-config")), None)
         cal_run = next((n for n in targets if (n.get("label") or n["id"]).lower().startswith("calibration-run")), None)
-        do_chain = pre is not None and cal_config is not None and cal_run is not None and _has_edge(edges, "pre-process", "calibration-config",  "calibration-run")
 
+        def _eid(x): return (x.get("id") or x.get("label"))
+        do_chain = (
+            pre is not None and cal_config is not None and cal_run is not None
+            and _has_edge(edges, _eid(pre), _eid(cal_config))
+            and _has_edge(edges, _eid(cal_config), _eid(cal_run))
+        )
+    
         # Ensure templates exist for all nodes we might run
         self._ensure_templates_for_nodes(targets)
 
@@ -462,27 +468,20 @@ class NgiabBackendHandler(MBH):
             session.add(wf_row)
             await session.flush()
 
-            for idx, n in [("pre-process", 0), ("calibration", 1)]:
-                if idx == "pre-process":
-                    cfg = pre.get("config") or {}
-                    kind = pre.get("label") or idx
-                elif idx == "calibration-config":
-                    cfg = cal_config.get("config") or {}
-                    kind = cal_config.get("label") or idx
-                else:  # calibration-run
-                    cfg = cal_run.get("config") or {}
-                    kind = cal_run.get("label") or idx
-                session.add(
-                    NodeModel(
-                        workflow_id=wf_row.id,
-                        name=idx,
-                        kind=kind,
-                        user=user,
-                        config=cfg,
-                        status="idle",
-                        order_index=int(idx == "calibration"),
-                    )
-                )
+            for order, (name, node) in enumerate([
+                ("pre-process", pre),
+                ("calibration-config", cal_config),
+                ("calibration-run", cal_run),
+            ]):
+                session.add(NodeModel(
+                    workflow_id=wf_row.id,
+                    name=name,
+                    kind=node.get("label") or name,
+                    user=user,
+                    config=node.get("config") or {},
+                    status="idle",
+                    order_index=order,
+                ))
             await session.commit()
 
             # notify UI
