@@ -34,7 +34,8 @@ POLL_TIMEOUT_SEC = float(os.getenv("ARGO_POLL_TIMEOUT_SEC", "21600"))  # 6h
 
 _TEMPLATE_FILES = {
     "ngiab-data-preprocess": "ngiab-data-preprocess.yaml",
-    "ngiab-calibration": "ngiab-calibration.yaml",
+    "ngiab-calibration-config": "ngiab-calibration-config.yaml",
+    "ngiab-calibration-run": "ngiab-calibration-run.yaml",
     "ngiab-run": "ngiab-run.yaml",
     "ngiab-teehr": "ngiab-teehr.yaml",
 }
@@ -158,8 +159,10 @@ def _kind_to_template(kind: str) -> str:
     k = (kind or "").lower()
     if "pre-process" in k or "preprocess" in k:
         return "ngiab-data-preprocess"
-    if "calibration" in k:
-        return "ngiab-calibration"
+    if "calibration-config" in k:
+        return "ngiab-calibration-config"    
+    if "calibration-run" in k:
+        return "ngiab-calibration-run"
     if "run" in k and "ngiab" in k:
         return "ngiab-run"
     if "teehr" in k:
@@ -203,7 +206,7 @@ def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str,
             "validate": str(cfg.get("validate") or "false"),
         }
 
-    if "calibration" in k:
+    if "calibration-config" in k:
         # derive input bucket/key
         ibucket = str(cfg.get("input_bucket") or bucket)
         ikey = upstream_key or str(cfg.get("input_key") or cfg.get("input_s3_key") or "")
@@ -228,9 +231,30 @@ def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str,
             "warmup": str(cfg.get("warmup") or "365"),
             "calibration_ratio": str(cfg.get("calibration_ratio") or "0.5"),
             "force": str(cfg.get("force") or "false"),
-            "run": str(cfg.get("run") or "false"),
             "debug": str(cfg.get("debug") or "false"),
             "vpu": str(cfg.get("vpu") or ""),
+        }
+
+    if "calibration-run" in k:
+        # derive input bucket/key
+        ibucket = str(cfg.get("input_bucket") or bucket)
+        ikey = upstream_key or str(cfg.get("input_key") or cfg.get("input_s3_key") or "")
+        if not ikey and cfg.get("input_s3_url"):
+            try:
+                ibucket, _ikey = _parse_s3_url(str(cfg["input_s3_url"]))
+                ikey = _ikey
+            except Exception:
+                pass
+        ikey = ikey.lstrip("/")
+
+        return {
+            "output_bucket": str(cfg.get("output_bucket") or bucket),
+            "output_prefix": str(cfg.get("output_prefix") or out_prefix),
+            "final_prefix": final_prefix,
+            "input_bucket": ibucket,
+            "input_key": ikey,           # preferred by YAML (artifact.s3.key)
+            "input_s3_key": ikey,        # backward-compat if template still uses this param
+            "input_subdir": str(cfg.get("input_subdir") or "ngiab"),
         }
 
     if "run" in k and "ngiab" in k:
@@ -284,7 +308,8 @@ class NgiabBackendHandler(MBH):
         # Optional legacy shims
         optional = {
             "RUN_PREPROCESS": "receive_run_preprocess",
-            "RUN_CALIBRATION": "receive_run_calibration",
+            "RUN_CALIBRATION_CONFIG": "receive_run_calibration_config",
+            "RUN_CALIBRATION_RUN": "receive_run_calibration_run",
             "RUN_NGIAB": "receive_run_ngiab",
             "RUN_TEEHR": "receive_run_teehr",
         }
@@ -369,7 +394,9 @@ class NgiabBackendHandler(MBH):
                     lk = (kind or "").lower()
                     if "pre-process" in lk or "preprocess" in lk:
                         upstream_key = f"{params['output_prefix'].rstrip('/')}/preprocess.tgz"
-                    elif "calibration" in lk:
+                    elif "calibration-config" in lk:
+                        upstream_key = f"{params['output_prefix'].rstrip('/')}/calibration-prepared.tgz"
+                    elif "calibration-run" in lk:
                         upstream_key = f"{params['output_prefix'].rstrip('/')}/calibrated.tgz"
                     elif "run" in lk and "ngiab" in lk:
                         upstream_key = f"{params['output_prefix'].rstrip('/')}/outputs.tgz"
@@ -379,7 +406,7 @@ class NgiabBackendHandler(MBH):
                         upstream_key = None
 
                     # make sure calibration/run receive input_s3 key if not explicitly set
-                    if upstream_key and "input_s3_key" not in params and ("calibration" in lk or "ngiab" in lk or "teehr" in lk):
+                    if upstream_key and "input_s3_key" not in params and ("ngiab" in lk or "teehr" in lk):
                         params["input_s3_key"] = upstream_key
                         params["input_key"] = upstream_key
                         params["input_bucket"] = params.get("input_bucket") or params.get("output_bucket") or _bucket()
@@ -414,8 +441,9 @@ class NgiabBackendHandler(MBH):
 
         # Detect the special chain: pre-process -> calibration
         pre = next((n for n in targets if (n.get("label") or n["id"]) in ("pre-process", "preprocess", "pre process")), None)
-        cal = next((n for n in targets if (n.get("label") or n["id"]).lower().startswith("calibration")), None)
-        do_chain = pre is not None and cal is not None and _has_edge(edges, "pre-process", "calibration")
+        cal_config = next((n for n in targets if (n.get("label") or n["id"]).lower().startswith("calibration-config")), None)
+        cal_run = next((n for n in targets if (n.get("label") or n["id"]).lower().startswith("calibration-run")), None)
+        do_chain = pre is not None and cal_config is not None and cal_run is not None and _has_edge(edges, "pre-process", "calibration-config",  "calibration-run")
 
         # Ensure templates exist for all nodes we might run
         self._ensure_templates_for_nodes(targets)
@@ -429,18 +457,26 @@ class NgiabBackendHandler(MBH):
                 template_id=wt_row.id,
                 status="queued",
                 graph=wf_data,
-                layers=[["pre-process"], ["calibration"]],
+                layers=[["pre-process"], ["calibration-config"], ["calibration-run"]],
             )
             session.add(wf_row)
             await session.flush()
 
             for idx, n in [("pre-process", 0), ("calibration", 1)]:
-                cfg = (pre if idx == "pre-process" else cal).get("config") or {}
+                if idx == "pre-process":
+                    cfg = pre.get("config") or {}
+                    kind = pre.get("label") or idx
+                elif idx == "calibration-config":
+                    cfg = cal_config.get("config") or {}
+                    kind = cal_config.get("label") or idx
+                else:  # calibration-run
+                    cfg = cal_run.get("config") or {}
+                    kind = cal_run.get("label") or idx
                 session.add(
                     NodeModel(
                         workflow_id=wf_row.id,
                         name=idx,
-                        kind=(pre if idx == "pre-process" else cal).get("label") or idx,
+                        kind=kind,
                         user=user,
                         config=cfg,
                         status="idle",
@@ -451,27 +487,32 @@ class NgiabBackendHandler(MBH):
 
             # notify UI
             await _emit_status(self, "pre-process", "running", "submitting")
-            await _emit_status(self, "calibration", "running", "submitting")
+            await _emit_status(self, "calibration-config", "running", "submitting")
+            await _emit_status(self, "calibration-run", "running", "submitting")
 
             # build and submit the chain
             try:
-                w = self._build_chain_workflow([pre, cal], user, run_id)
+                w = self._build_chain_workflow([pre, cal_config, cal_run], user, run_id)
                 w.create()
                 argo_name = w.name
                 await _emit_status(self, "pre-process", "running", f"argo: {argo_name}")
-                await _emit_status(self, "calibration", "running", f"argo: {argo_name}")
+                await _emit_status(self, "calibration-config", "running", f"argo: {argo_name}")
+                await _emit_status(self, "calibration-run", "running", f"argo: {argo_name}")
                 asyncio.create_task(self._poll_argo_to_terminal(argo_name, "pre-process", wf_row.id))
-                asyncio.create_task(self._poll_argo_to_terminal(argo_name, "calibration", wf_row.id))
+                asyncio.create_task(self._poll_argo_to_terminal(argo_name, "calibration-config", wf_row.id))
+                asyncio.create_task(self._poll_argo_to_terminal(argo_name, "calibration-run", wf_row.id))
             except Exception as e:
                 await _emit_status(self, "pre-process", "error", f"submit failed: {e}")
-                await _emit_status(self, "calibration", "error", f"submit failed: {e}")
+                await _emit_status(self, "calibration-config", "error", f"submit failed: {e}")
+                await _emit_status(self, "calibration-run", "error", f"submit failed: {e}")
                 # update database statuses for chain nodes
                 await _update_node_db(session, wf_row.id, "pre-process", "error", f"submit failed: {e}")
-                await _update_node_db(session, wf_row.id, "calibration", "error", f"submit failed: {e}")
+                await _update_node_db(session, wf_row.id, "calibration-config", "error", f"submit failed: {e}")
+                await _update_node_db(session, wf_row.id, "calibration-run", "error", f"submit failed: {e}")
                 return
 
             # Any other nodes in the canvas should run independently
-            others = [n for n in targets if n["id"] not in ("pre-process", "calibration")]
+            others = [n for n in targets if n["id"] not in ("pre-process", "calibration-config", "calibration-run")]
             for n in others:
                 await self.receive_run_node(
                     event,
@@ -576,11 +617,18 @@ class NgiabBackendHandler(MBH):
             {"nodeId": "pre-process", "label": "pre-process", "config": cfg}
         )
 
-    async def receive_run_calibration(self, event, action, data):
+    async def receive_run_calibration_config(self, event, action, data):
         cfg = (data or {}).get("config") or data or {}
         return await self.receive_run_node(
             event, action,
-            {"nodeId": "calibration", "label": "calibration", "config": cfg}
+            {"nodeId": "calibration-config", "label": "calibration-config", "config": cfg}
+        )
+
+    async def receive_run_calibration_run(self, event, action, data):
+        cfg = (data or {}).get("config") or data or {}
+        return await self.receive_run_node(
+            event, action,
+            {"nodeId": "calibration-run", "label": "calibration-run", "config": cfg}
         )
 
     async def receive_run_ngiab(self, event, action, data):

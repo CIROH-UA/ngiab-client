@@ -18,7 +18,6 @@ spec:
         - { name: warmup,            default: "365" }
         - { name: calibration_ratio, default: "0.5" }
         - { name: force,             default: "false" }
-        - { name: run,               default: "true" }   # 'true' or 'false'
         - { name: debug,             default: "false" }
         - { name: output_bucket,     default: "test-ngen" }
         - { name: output_prefix,     default: "demo/default" }
@@ -39,27 +38,6 @@ spec:
             - { name: debug,             value: "{{inputs.parameters.debug}}" }
             - { name: output_bucket,     value: "{{inputs.parameters.output_bucket}}" }
             - { name: output_prefix,     value: "{{inputs.parameters.output_prefix}}" }
-    - - name: run-cal
-        template: run-cal
-        when: "{{inputs.parameters.run}} == 'true'"
-        arguments:
-          parameters:
-            - { name: gage,              value: "{{inputs.parameters.gage}}" }
-            - { name: iterations,        value: "{{inputs.parameters.iterations}}" }
-            - { name: warmup,            value: "{{inputs.parameters.warmup}}" }
-            - { name: calibration_ratio, value: "{{inputs.parameters.calibration_ratio}}" }
-            - { name: force,             value: "{{inputs.parameters.force}}" }
-            - { name: debug,             value: "{{inputs.parameters.debug}}" }
-            - { name: output_bucket,     value: "{{inputs.parameters.output_bucket}}" }
-            - { name: output_prefix,     value: "{{inputs.parameters.output_prefix}}" }
-          artifacts:
-            - name: prepared
-              from: "{{steps.prepare.outputs.artifacts.prepared}}"
-    - - name: noop
-        template: pass
-        when: "{{inputs.parameters.run}} == 'false'"
-    - - name: done
-        template: echo
 
   # Step 1: create configs (no --run), upload prepared.tgz
   - name: prepare
@@ -89,7 +67,7 @@ spec:
             accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
             secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
     script:
-      image: awiciroh/ngiab-cal:latest
+      image: python:3.11-slim
       command: [bash, -lc]
       env:
       - name: AWS_ACCESS_KEY_ID
@@ -100,6 +78,18 @@ spec:
         value: us-east-1
       source: |
         set -euo pipefail
+
+        # install dependencies
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update -y && apt-get install -y --no-install-recommends \
+          curl ca-certificates findutils coreutils gzip tar && \
+          rm -rf /var/lib/apt/lists/*
+
+        # Install Astral UV + add to PATH
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        export PATH="${HOME}/.local/bin:${PATH}"
+
+
         mkdir -p /tmp/in /tmp/data /tmp/out
 
         # If preprocess artifact exists, unpack it
@@ -145,103 +135,24 @@ spec:
         CR="{{inputs.parameters.calibration_ratio}}"
         FORCE="{{inputs.parameters.force}}"
         DEBUG="{{inputs.parameters.debug}}"
-
+        
+        set +o pipefail
+        
         # Prepare only (no --run)
-        ngiab-cal "$DATA_DIR" -g "$GAGE" -i "$ITERS" -w "$WARMUP" --calibration_ratio "$CR" \
+        uvx  ngiab-cal "$DATA_DIR" -g "$GAGE" -i "$ITERS" -w "$WARMUP" --calibration_ratio "$CR" \
           $( [ "$FORCE" = "true" ] && echo "-f" ) \
           $( [ "$DEBUG" = "true" ] && echo "--debug" )
 
         # Package working tree for next step or final output when run=false
-        tar -C "$(dirname "$DATA_DIR")" -czf /tmp/out/prepared.tgz "$(basename "$DATA_DIR")"
+        tar -C "$(dirname "$DATA_DIR")" -czf /tmp/out/calibration-prepared.tgz "$(basename "$DATA_DIR")"
     outputs:
       artifacts:
-      - name: prepared
-        path: /tmp/out/prepared.tgz
+      - name: calibration-prepared
+        path: /tmp/out/calibration-prepared.tgz
         s3:
           endpoint: s3.amazonaws.com
           region: us-east-1
           bucket: "{{inputs.parameters.output_bucket}}"
-          key: "{{inputs.parameters.output_prefix}}/prepared.tgz"
+          key: "{{inputs.parameters.output_prefix}}/calibration-prepared.tgz"
           accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
           secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
-
-  # Step 2: run calibration (with --run) then upload calibrated.tgz
-  - name: run-cal
-    inputs:
-      parameters:
-        - { name: gage }
-        - { name: iterations }
-        - { name: warmup }
-        - { name: calibration_ratio }
-        - { name: force }
-        - { name: debug }
-        - { name: output_bucket }
-        - { name: output_prefix }
-      artifacts:
-        - name: prepared
-          path: /tmp/in/prepared.tgz
-    script:
-      image: awiciroh/ngiab-cal:latest
-      command: [bash, -lc]
-      env:
-      - name: AWS_ACCESS_KEY_ID
-        valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_ACCESS_KEY_ID } }
-      - name: AWS_SECRET_ACCESS_KEY
-        valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_SECRET_ACCESS_KEY } }
-      - name: AWS_DEFAULT_REGION
-        value: us-east-1
-      source: |
-        set -euo pipefail
-        mkdir -p /tmp/in /tmp/data /tmp/out
-        tar -C /tmp/data -xzf /tmp/in/prepared.tgz
-
-        # Resolve data folder again
-        DATA_DIR="/tmp/data"
-        if [ -d "/tmp/data/config" ]; then
-          DATA_DIR="/tmp/data"
-        else
-          ONE_SUB="$(find /tmp/data -mindepth 1 -maxdepth 1 -type d | head -n 1 || true)"
-          if [ -n "$ONE_SUB" ] && [ -d "$ONE_SUB/config" ]; then
-            DATA_DIR="$ONE_SUB"
-          fi
-        fi
-        if [ ! -d "$DATA_DIR/config" ]; then
-          echo "ERROR: prepared artifact missing config/"; ls -al /tmp/data; exit 2
-        fi
-
-        GAGE="{{inputs.parameters.gage}}"
-        ITERS="{{inputs.parameters.iterations}}"
-        WARMUP="{{inputs.parameters.warmup}}"
-        CR="{{inputs.parameters.calibration_ratio}}"
-        FORCE="{{inputs.parameters.force}}"
-        DEBUG="{{inputs.parameters.debug}}"
-
-        # Run actual calibration
-        ngiab-cal "$DATA_DIR" -g "$GAGE" --run -i "$ITERS" -w "$WARMUP" --calibration_ratio "$CR" \
-          $( [ "$FORCE" = "true" ] && echo "-f" ) \
-          $( [ "$DEBUG" = "true" ] && echo "--debug" )
-
-        tar -C "$(dirname "$DATA_DIR")" -czf /tmp/out/calibrated.tgz "$(basename "$DATA_DIR")"
-    outputs:
-      artifacts:
-      - name: calibrated
-        path: /tmp/out/calibrated.tgz
-        s3:
-          endpoint: s3.amazonaws.com
-          region: us-east-1
-          bucket: "{{inputs.parameters.output_bucket}}"
-          key: "{{inputs.parameters.output_prefix}}/calibrated.tgz"
-          accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
-          secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
-
-  - name: pass
-    container:
-      image: alpine:3.19
-      command: [sh, -c]
-      args: ["echo 'run=false: calibration setup created and uploaded'; sleep 1"]
-
-  - name: echo
-    container:
-      image: alpine:3.19
-      command: [sh, -c]
-      args: ["echo 'workflow complete'"]

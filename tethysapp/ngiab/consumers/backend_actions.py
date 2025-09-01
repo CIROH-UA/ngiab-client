@@ -4,7 +4,8 @@ from enum import StrEnum, auto, unique
 class BackendActions(StrEnum):
     # incoming (from frontend)
     RUN_PREPROCESS      = auto()
-    RUN_CALIBRATION     = auto()
+    RUN_CALIBRATION_CONFIG     = auto()
+    RUN_CALIBRATION_RUN     = auto()
     RUN_NGIAB           = auto()
     RUN_TEERH           = auto()
     RUN_WORKFLOW        = auto()

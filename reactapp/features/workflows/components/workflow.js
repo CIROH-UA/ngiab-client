@@ -70,7 +70,7 @@ const NODE_FORMS = {
     { name: 'output_bucket', label: 'S3 bucket (artifact)', type: 'text' },
     { name: 'output_prefix', label: 'S3 prefix (artifact)', type: 'text' },
   ],
-  'calibration': [
+  'calibration-config': [
     // Calibration-only path: user can paste ONE S3 URL; we’ll parse it.
     { name: 'input_s3_url', label: 'Preprocess artifact S3 URL (e.g. s3://bucket/path/preprocess.tgz)', type: 'text' },
     // Advanced overrides (optional)
@@ -87,8 +87,17 @@ const NODE_FORMS = {
     { name: 'warmup', label: 'Warmup days (-w)', type: 'number' },
     { name: 'calibration_ratio', label: 'Calibration ratio (--calibration_ratio)', type: 'text' },
     { name: 'force', label: 'Force overwrite? (-f)', type: 'select', options: ['false', 'true'] },
-    { name: 'run', label: 'Run calibration? (--run)', type: 'select', options: ['false', 'true'] },
     { name: 'debug', label: 'Debug? (--debug)', type: 'select', options: ['false', 'true'] },
+  ],
+  'calibration-run': [
+    // Calibration-only path: user can paste ONE S3 URL; we’ll parse it.
+    { name: 'input_s3_url', label: 'Preprocess artifact S3 URL (e.g. s3://bucket/path/preprocess.tgz)', type: 'text' },
+    // Advanced overrides (optional)
+    { name: 'input_bucket', label: 'Input S3 bucket (optional)', type: 'text' },
+    { name: 'input_key', label: 'Input S3 key (optional)', type: 'text' },
+    // Output destination
+    { name: 'output_bucket', label: 'Output S3 bucket', type: 'text' },
+    { name: 'output_prefix', label: 'Output S3 prefix', type: 'text' },
   ],
   'run ngiab': [
     { name: 'input_s3_key', label: 'Input S3 key (optional)', type: 'text' },
