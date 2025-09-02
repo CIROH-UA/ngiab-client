@@ -11,23 +11,22 @@ spec:
       parameters:
         - { name: output_bucket,  default: "test-ngen" }
         - { name: output_prefix,  default: "demo/default" }
-        - { name: selector_type,  default: "gage" }         # gage | latlon | catchment
-        - { name: selector_value, default: "01359139" }     # e.g. "01359139" or "33.22,-87.54" or "5173"
-        - { name: vpu,            default: "" }             # optional (e.g., "01")
+        - { name: selector_type,  default: "gage" }
+        - { name: selector_value, default: "01359139" }
+        - { name: vpu,            default: "" }
         - { name: start_date,     default: "2020-01-01" }
         - { name: end_date,       default: "2020-01-15" }
         - { name: output_name,    default: "ngiab" }
-        - { name: source,         default: "nwm" }          # nwm | aorc
+        - { name: source,         default: "nwm" }
         - { name: debug,          default: "false" }
-        # step toggles
-        - { name: all,        default: "false" }            # --all (equivalent to -sfr + --run)
-        - { name: subset,     default: "true" }             # -s
-        - { name: forcings,   default: "true" }             # -f
-        - { name: realization,default: "true" }             # -r
-        - { name: run,        default: "false" }            # --run
-        - { name: validate,   default: "false" }            # --validate
+        - { name: all,        default: "false" }
+        - { name: subset,     default: "true" }
+        - { name: forcings,   default: "true" }
+        - { name: realization,default: "true" }
+        - { name: run,        default: "false" }
+        - { name: validate,   default: "false" }
     script:
-      image: python:3.11-slim
+      image: ghcr.io/astral-sh/uv:python3.11-bookworm-slim
       command: [bash, -lc]
       source: |
         set -euo pipefail
@@ -36,11 +35,6 @@ spec:
           curl ca-certificates findutils coreutils gzip tar && \
           rm -rf /var/lib/apt/lists/*
 
-        # Install Astral UV + add to PATH
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="${HOME}/.local/bin:${PATH}"
-
-        # Params
         SEL="{{inputs.parameters.selector_type}}"
         VAL="{{inputs.parameters.selector_value}}"
         VPU="{{inputs.parameters.vpu}}"
@@ -57,27 +51,17 @@ spec:
         DO_RUN="{{inputs.parameters.run}}"
         DO_VALID="{{inputs.parameters.validate}}"
 
-        # ---- Build selector flags/values ----
         IDFLAG="-i"
         IDVAL="$VAL"
         case "$SEL" in
-          gage)
-            case "$IDVAL" in gage-*) ;; *) IDVAL="gage-$IDVAL" ;; esac
-            ;;
-          catchment)
-            case "$IDVAL" in cat-*) ;; *) IDVAL="cat-$IDVAL" ;; esac
-            ;;
-          latlon)
-            IDFLAG="-l"     # pass raw "lat,lon"
-            ;;
-          *) : ;;
+          gage)      case "$IDVAL" in gage-*) ;; *) IDVAL="gage-$IDVAL" ;; esac ;;
+          catchment) case "$IDVAL" in cat-*)  ;; *) IDVAL="cat-$IDVAL"  ;; esac ;;
+          latlon)    IDFLAG="-l" ;;
         esac
 
-        # ---- Build step flags (one shot) ----
         STEPS=""
         if [ "$DO_ALL" = "true" ]; then
-          STEPS="-sfr"
-          DO_RUN="true"
+          STEPS="-sfr"; DO_RUN="true"
         else
           [ "$DO_SUB"  = "true" ] && STEPS="${STEPS}s"
           [ "$DO_FOR"  = "true" ] && STEPS="${STEPS}f"
@@ -90,7 +74,6 @@ spec:
         [ "$DO_RUN"   = "true" ] && RUNFLAG="--run" || RUNFLAG=""
         [ "$DO_VALID" = "true" ] && VALIDFLAG="--validate" || VALIDFLAG=""
 
-        # ---- Run ngiab-prep once; avoid pipefail from 'yes' SIGPIPE ----
         set +o pipefail
         yes "" | uvx ngiab-prep \
           $IDFLAG "$IDVAL" $STEPS $RUNFLAG $VALIDFLAG $DBGFLAG $VPUFLAG \
@@ -99,36 +82,38 @@ spec:
           --source "$SRC"
         set -o pipefail
 
-        # ---- Normalize output location & package ----
         OUTROOT="${HOME}/ngiab_preprocess_output"
         TARGET="${OUTROOT}/${OUT}"
 
-        # Some versions write to a timestamped folder; if ours is missing, copy newest into the expected path
         if [ ! -d "$TARGET" ]; then
           mkdir -p "$TARGET"
           NEWEST="$(find "$OUTROOT" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2- || true)"
           [ -n "${NEWEST:-}" ] && cp -a "${NEWEST}/." "${TARGET}/" || true
         fi
 
-        mkdir -p /work/out
-        # Create the archive ourselves so Argo doesn't spawn its own tar|gzip (avoids exit 141)
-        tar -C "$OUTROOT" -czf "/work/out/${OUT}.tgz" "$OUT"
+        mkdir -p /tmp/out
+        printf "%s\n" "{{inputs.parameters.output_bucket}}" > /tmp/out/.s3_bucket
+        printf "%s\n" "{{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz" > /tmp/out/.s3_key
+        printf "s3://%s/%s\n" "{{inputs.parameters.output_bucket}}" "{{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz" > /tmp/out/.s3_url
 
         echo "Final staged directory: ${TARGET}"
-        ls -lahR "${TARGET}" || true
+        ls -lah "$TARGET" || true
 
-    outputs:
+    outputs:   # <— SIBLING of 'script', not nested inside it
+      parameters:
+        - name: preprocess_bucket
+          valueFrom: { path: /tmp/out/.s3_bucket }
+        - name: preprocess_s3_key
+          valueFrom: { path: /tmp/out/.s3_key }
+        - name: preprocess_s3_url
+          valueFrom: { path: /tmp/out/.s3_url }
       artifacts:
-      - name: preprocess
-        # Upload the pre-created tarball as-is (no Argo archiving/compression)
-        path: /work/out/{{inputs.parameters.output_name}}.tgz
-        archive:
-          none: {}
-        s3:
-          endpoint: s3.amazonaws.com
-          region: us-east-1
-          insecure: false
-          bucket: "{{inputs.parameters.output_bucket}}"
-          key: "{{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz"
-          accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
-          secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+        - name: preprocess
+          path: /root/ngiab_preprocess_output/{{inputs.parameters.output_name}}  # directory
+          s3:
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+            bucket: "{{inputs.parameters.output_bucket}}"
+            key: "{{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz"
+            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }

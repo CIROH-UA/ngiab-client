@@ -6,12 +6,13 @@ metadata:
 spec:
   entrypoint: main
   templates:
+
   - name: main
     inputs:
       parameters:
         - { name: input_bucket,  default: "" }
-        - { name: input_key,     default: "" }   # users/<user>/Run/intermediate/pre-process/.../preprocess.tgz
-        - { name: input_s3_url,  default: "" }   # overrides bucket+key if set
+        - { name: input_key,     default: "" }   # e.g., .../ngiab.tgz (from preprocess)
+        - { name: input_s3_url,  default: "" }   # if set, takes precedence
         - { name: input_subdir,  default: "" }   # inner folder (e.g., "ngiab")
         - { name: gage,              default: "" }
         - { name: iterations,        default: "100" }
@@ -39,7 +40,17 @@ spec:
             - { name: output_bucket,     value: "{{inputs.parameters.output_bucket}}" }
             - { name: output_prefix,     value: "{{inputs.parameters.output_prefix}}" }
 
-  # Step 1: create configs (no --run), upload prepared.tgz
+    # ⬇⬇⬇ Promote to parent so DAG can see them via tasks.<task>.outputs...
+    outputs:
+      parameters:
+        - name: prepared_bucket
+          valueFrom: { parameter: "{{steps.prepare.outputs.parameters.prepared_bucket}}" }
+        - name: prepared_s3_key
+          valueFrom: { parameter: "{{steps.prepare.outputs.parameters.prepared_s3_key}}" }
+      artifacts:
+        - name: calibration-prepared
+          from: "{{steps.prepare.outputs.artifacts.calibration-prepared}}"
+
   - name: prepare
     inputs:
       parameters:
@@ -58,7 +69,8 @@ spec:
       artifacts:
         - name: preprocess
           optional: true
-          path: /tmp/in/preprocess.tgz
+          # IMPORTANT: point to a directory, not a filename
+          path: /tmp/ngiab
           s3:
             endpoint: s3.amazonaws.com
             region: us-east-1
@@ -67,7 +79,7 @@ spec:
             accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
             secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
     script:
-      image: python:3.11-slim
+      image: ghcr.io/astral-sh/uv:python3.11-bookworm-slim
       command: [bash, -lc]
       env:
       - name: AWS_ACCESS_KEY_ID
@@ -79,54 +91,50 @@ spec:
       source: |
         set -euo pipefail
 
-        # install dependencies
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -y && apt-get install -y --no-install-recommends \
-          curl ca-certificates findutils coreutils gzip tar && \
+          curl ca-certificates findutils coreutils gzip tar unzip && \
           rm -rf /var/lib/apt/lists/*
 
-        # Install Astral UV + add to PATH
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        export PATH="${HOME}/.local/bin:${PATH}"
+        mkdir -p /tmp/ngiab /tmp/data /tmp/out
 
-
-        mkdir -p /tmp/in /tmp/data /tmp/out
-
-        # If preprocess artifact exists, unpack it
-        if [ -s /tmp/in/preprocess.tgz ]; then
-          tar -C /tmp/data -xzf /tmp/in/preprocess.tgz
-        fi
-
-        # Or download from a single S3 URL if provided
         IN_URL="{{inputs.parameters.input_s3_url}}"
-        if [ -n "$IN_URL" ] && [ ! -s /tmp/in/preprocess.tgz ]; then
-          echo "Downloading preprocess from $IN_URL"
-          if command -v aws >/dev/null 2>&1; then
-            aws s3 cp "$IN_URL" /tmp/in/preprocess.tgz --no-progress
-          else
+        echo "Input S3 URL: ${IN_URL}"
+
+        SRC_DIR="/tmp/ngiab"
+        TAR=""
+        if [ -n "${IN_URL}" ]; then
+          # URL takes precedence — download to our own filename
+          if ! command -v aws >/dev/null 2>&1; then
             curl -L "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
-            apt-get update -y && apt-get install -y unzip && unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install
-            aws s3 cp "$IN_URL" /tmp/in/preprocess.tgz --no-progress
+            unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install
           fi
-          tar -C /tmp/data -xzf /tmp/in/preprocess.tgz
+          TAR="/tmp/ngiab/from_url.tgz"
+          aws s3 cp "${IN_URL}" "${TAR}" --no-progress
+
+          # Extract (gz if possible, fall back to plain tar)
+          if ! tar -C /tmp/data -xzf "${TAR}" 2>/dev/null; then
+            tar -C /tmp/data -xf "${TAR}"
+          fi
+          SRC_DIR="/tmp/data"
         fi
 
-        # Find NGIAB data folder (must contain config/)
         IN_SUB="{{inputs.parameters.input_subdir}}"
-        DATA_DIR="/tmp/data"
-        if [ -n "$IN_SUB" ] && [ -d "/tmp/data/$IN_SUB/config" ]; then
-          DATA_DIR="/tmp/data/$IN_SUB"
-        elif [ -d "/tmp/data/config" ]; then
-          DATA_DIR="/tmp/data"
+        DATA_DIR=""
+        # Prefer an explicit subdir if provided
+        if [ -n "${IN_SUB}" ] && [ -d "${SRC_DIR}/${IN_SUB}/config" ]; then
+          DATA_DIR="${SRC_DIR}/${IN_SUB}"
+        elif [ -d "${SRC_DIR}/config" ]; then
+          DATA_DIR="${SRC_DIR}"
         else
-          ONE_SUB="$(find /tmp/data -mindepth 1 -maxdepth 1 -type d | head -n 1 || true)"
-          if [ -n "$ONE_SUB" ] && [ -d "$ONE_SUB/config" ]; then
-            DATA_DIR="$ONE_SUB"
-          fi
+          # fall back: first subdir that contains config/
+          DATA_DIR="$(find "${SRC_DIR}" -mindepth 1 -maxdepth 1 -type d -exec test -d '{}/config' ';' -print -quit || true)"
         fi
-        if [ ! -d "$DATA_DIR/config" ]; then
-          echo "ERROR: could not locate NGIAB data folder with config/ under /tmp/data"
-          ls -al /tmp/data; exit 2
+
+        if [ ! -d "${DATA_DIR}/config" ]; then
+          echo "ERROR: could not locate NGIAB data folder with config/ under ${SRC_DIR}"
+          find "${SRC_DIR}" -maxdepth 2 -type d -print || true
+          exit 2
         fi
 
         GAGE="{{inputs.parameters.gage}}"
@@ -135,26 +143,32 @@ spec:
         CR="{{inputs.parameters.calibration_ratio}}"
         FORCE="{{inputs.parameters.force}}"
         DEBUG="{{inputs.parameters.debug}}"
-        
+
         set +o pipefail
-        
-        # Prepare only (no --run)
-        uvx  ngiab-cal "$DATA_DIR" -g "$GAGE" -i "$ITERS" -w "$WARMUP" --calibration_ratio "$CR" \
+        uvx ngiab-cal "$DATA_DIR" -g "$GAGE" -i "$ITERS" -w "$WARMUP" --calibration_ratio "$CR" \
           $( [ "$FORCE" = "true" ] && echo "-f" ) \
           $( [ "$DEBUG" = "true" ] && echo "--debug" )
+        set -o pipefail
 
-        # Package working tree for next step or final output when run=false
         tar -C "$(dirname "$DATA_DIR")" -czf /tmp/out/calibration-prepared.tgz "$(basename "$DATA_DIR")"
+
+        printf "%s\n" "{{inputs.parameters.output_bucket}}" > /tmp/out/.prepared_bucket
+        printf "%s\n" "{{inputs.parameters.output_prefix}}/calibration-prepared.tgz" > /tmp/out/.prepared_key
+
     outputs:
+      parameters:
+        - name: prepared_bucket
+          valueFrom: { path: /tmp/out/.prepared_bucket }
+        - name: prepared_s3_key
+          valueFrom: { path: /tmp/out/.prepared_key }
       artifacts:
-      - name: calibration-prepared
-        path: /tmp/out/calibration-prepared.tgz
-        archive:
-          none: {}        
-        s3:
-          endpoint: s3.amazonaws.com
-          region: us-east-1
-          bucket: "{{inputs.parameters.output_bucket}}"
-          key: "{{inputs.parameters.output_prefix}}/calibration-prepared.tgz"
-          accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
-          secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+        - name: calibration-prepared
+          path: /tmp/out/calibration-prepared.tgz
+          archive: { none: {} }
+          s3:
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+            bucket: "{{inputs.parameters.output_bucket}}"
+            key: "{{inputs.parameters.output_prefix}}/calibration-prepared.tgz"
+            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }

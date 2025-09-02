@@ -225,6 +225,7 @@ def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str,
             "input_bucket": ibucket,
             "input_key": ikey,           # preferred by YAML (artifact.s3.key)
             "input_s3_key": ikey,        # backward-compat if template still uses this param
+            "input_s3_url": str(cfg.get("input_s3_url") or ""),   # <-- ADD THIS
             "input_subdir": str(cfg.get("input_subdir") or "ngiab"),
             "gage": str(cfg.get("gage") or cfg.get("selector_value") or "01359139"),
             "iterations": str(cfg.get("iterations") or "100"),
@@ -254,6 +255,7 @@ def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str,
             "input_bucket": ibucket,
             "input_key": ikey,           # preferred by YAML (artifact.s3.key)
             "input_s3_key": ikey,        # backward-compat if template still uses this param
+            "input_s3_url": str(cfg.get("input_s3_url") or ""),
             "input_subdir": str(cfg.get("input_subdir") or "ngiab"),
         }
 
@@ -365,54 +367,38 @@ class NgiabBackendHandler(MBH):
         for tpl in needed:
             _ensure_template_exists_or_create(tpl)
 
-    def _build_chain_workflow(self, chain: List[dict], user: str, run_id: str) -> Workflow:
-        """
-        Build a simple linear DAG chaining the provided nodes in order.
-        Each task calls a WorkflowTemplate via templateRef and receives parameters;
-        we carry forward the produced S3 key to the next task.
-        """
+    def _build_chain_workflow(self, chain: list[dict], user: str, run_id: str) -> Workflow:
         ws = make_ws()
-        with Workflow(
-            generate_name="ngiab-chain-",
-            entrypoint="main",
-            workflows_service=ws,
-        ) as w:
+        with Workflow(generate_name="ngiab-chain-", entrypoint="main", workflows_service=ws) as w:
             with DAG(name="main"):
-                upstream_key = None
-                prev_name: str | None = None
+                prev_name = None
+
+                # literals we compute from the params we pass to each step
+                last_bucket_lit: str | None = None
+                last_key_lit: str | None = None
+                last_url_lit: str | None = None
 
                 for i, n in enumerate(chain):
                     kind = n.get("label") or n.get("id")
+                    lk = (kind or "").lower()
                     tpl_name = _kind_to_template(kind)
                     last = (i == len(chain) - 1)
 
                     _ensure_template_exists_or_create(tpl_name)
+                    params = _params_for(kind, n.get("config") or {}, user, run_id, last, upstream_key=None)
 
-                    params = _params_for(kind, n.get("config") or {}, user, run_id, last, upstream_key)
-
-                    # determine default downstream artifact key
-                    lk = (kind or "").lower()
-                    if "pre-process" in lk or "preprocess" in lk:
-                        upstream_key = f"{params['output_prefix'].rstrip('/')}/preprocess.tgz"
-                    elif "calibration-config" in lk:
-                        upstream_key = f"{params['output_prefix'].rstrip('/')}/calibration-prepared.tgz"
-                    elif "calibration-run" in lk:
-                        upstream_key = f"{params['output_prefix'].rstrip('/')}/calibrated.tgz"
-                    elif "run" in lk and "ngiab" in lk:
-                        upstream_key = f"{params['output_prefix'].rstrip('/')}/outputs.tgz"
-                    elif "teehr" in lk:
-                        upstream_key = f"{params['output_prefix'].rstrip('/')}/teehr_results.tgz"
-                    else:
-                        upstream_key = None
-
-                    # make sure calibration/run receive input_s3 key if not explicitly set
-                    if upstream_key and "input_s3_key" not in params and ("ngiab" in lk or "teehr" in lk):
-                        params["input_s3_key"] = upstream_key
-                        params["input_key"] = upstream_key
-                        params["input_bucket"] = params.get("input_bucket") or params.get("output_bucket") or _bucket()
+                    # If this step needs upstream data, inject the literals we computed
+                    wants_input = ("calibration-config" in lk) or ("calibration-run" in lk)
+                    if wants_input and not str(params.get("input_s3_url", "")).strip():
+                        if last_bucket_lit and last_key_lit:
+                            params["input_bucket"] = last_bucket_lit
+                            params["input_key"]    = last_key_lit
+                            params["input_s3_key"] = last_key_lit
+                        # if last_url_lit:
+                        #     # URL takes precedence in your templates (and avoids artifact staging entirely)
+                        #     params["input_s3_url"] = last_url_lit
 
                     task_name = f"step-{i:02d}-{tpl_name}"
-
                     Task(
                         name=task_name,
                         template_ref=TemplateRef(name=tpl_name, template="main"),
@@ -421,6 +407,21 @@ class NgiabBackendHandler(MBH):
                     )
                     prev_name = task_name
 
+                    # Compute where THIS step will upload for the NEXT step:
+                    if ("preprocess" in lk) or ("pre-process" in lk):
+                        # s3://<bucket>/<prefix>/<output_name>.tgz
+                        last_bucket_lit = params["output_bucket"]
+                        last_key_lit    = f"{params['output_prefix'].rstrip('/')}/{params['output_name']}.tgz"
+                        last_url_lit    = f"s3://{last_bucket_lit}/{last_key_lit}"
+                    elif "calibration-config" in lk:
+                        # s3://<bucket>/<prefix>/calibration-prepared.tgz
+                        last_bucket_lit = params["output_bucket"]
+                        last_key_lit    = f"{params['output_prefix'].rstrip('/')}/calibration-prepared.tgz"
+                        last_url_lit    = f"s3://{last_bucket_lit}/{last_key_lit}"
+                    elif "calibration-run" in lk:
+                        last_bucket_lit = params["output_bucket"]
+                        last_key_lit    = f"{params['output_prefix'].rstrip('/')}/calibration-run.tgz"
+                        last_url_lit    = f"s3://{last_bucket_lit}/{last_key_lit}"
         return w
 
     # ---------------- RUN WORKFLOW ----------------
@@ -445,17 +446,25 @@ class NgiabBackendHandler(MBH):
         cal_run = next((n for n in targets if (n.get("label") or n["id"]).lower().startswith("calibration-run")), None)
 
         def _eid(x): return (x.get("id") or x.get("label"))
-        do_chain = (
-            pre is not None and cal_config is not None and cal_run is not None
-            and _has_edge(edges, _eid(pre), _eid(cal_config))
-            and _has_edge(edges, _eid(cal_config), _eid(cal_run))
-        )
-    
+
+        chain_nodes = []
+        # Full 3-step
+        if pre and cal_config and cal_run \
+           and _has_edge(edges, _eid(pre), _eid(cal_config)) \
+           and _has_edge(edges, _eid(cal_config), _eid(cal_run)):
+            chain_nodes = [pre, cal_config, cal_run]
+        # 2-step config -> run
+        elif cal_config and cal_run and _has_edge(edges, _eid(cal_config), _eid(cal_run)):
+            chain_nodes = [cal_config, cal_run]
+        # 2-step pre -> config (no run)
+        elif pre and cal_config and _has_edge(edges, _eid(pre), _eid(cal_config)):
+            chain_nodes = [pre, cal_config]
+
         # Ensure templates exist for all nodes we might run
         self._ensure_templates_for_nodes(targets)
 
-        if do_chain:
-            # record a single workflow with two nodes chained
+        if chain_nodes:
+            # record workflow rows dynamically based on the chain we actually have
             wt_row = await self._get_or_create_template_row(session, "ngiab-chain", user, {"source": "yaml"})
             wf_row = WFModel(
                 name=wf_data.get("name") or f"wf-{run_id}",
@@ -463,20 +472,17 @@ class NgiabBackendHandler(MBH):
                 template_id=wt_row.id,
                 status="queued",
                 graph=wf_data,
-                layers=[["pre-process"], ["calibration-config"], ["calibration-run"]],
+                layers=[[ (n.get("label") or n.get("id")) ] for n in chain_nodes],
             )
             session.add(wf_row)
             await session.flush()
 
-            for order, (name, node) in enumerate([
-                ("pre-process", pre),
-                ("calibration-config", cal_config),
-                ("calibration-run", cal_run),
-            ]):
+            for order, node in enumerate(chain_nodes):
+                label = node.get("label") or node.get("id")
                 session.add(NodeModel(
                     workflow_id=wf_row.id,
-                    name=name,
-                    kind=node.get("label") or name,
+                    name=label,
+                    kind=label,
                     user=user,
                     config=node.get("config") or {},
                     status="idle",
@@ -485,48 +491,34 @@ class NgiabBackendHandler(MBH):
             await session.commit()
 
             # notify UI
-            await _emit_status(self, "pre-process", "running", "submitting")
-            await _emit_status(self, "calibration-config", "running", "submitting")
-            await _emit_status(self, "calibration-run", "running", "submitting")
+            for node in chain_nodes:
+                label = node.get("label") or node.get("id")
+                await _emit_status(self, label, "running", "submitting")
 
             # build and submit the chain
             try:
-                w = self._build_chain_workflow([pre, cal_config, cal_run], user, run_id)
+                w = self._build_chain_workflow(chain_nodes, user, run_id)
                 w.create()
-                argo_name = w.name
-                await _emit_status(self, "pre-process", "running", f"argo: {argo_name}")
-                await _emit_status(self, "calibration-config", "running", f"argo: {argo_name}")
-                await _emit_status(self, "calibration-run", "running", f"argo: {argo_name}")
-                asyncio.create_task(self._poll_argo_to_terminal(argo_name, "pre-process", wf_row.id))
-                asyncio.create_task(self._poll_argo_to_terminal(argo_name, "calibration-config", wf_row.id))
-                asyncio.create_task(self._poll_argo_to_terminal(argo_name, "calibration-run", wf_row.id))
+                for node in chain_nodes:
+                    label = node.get("label") or node.get("id")
+                    await _emit_status(self, label, "running", f"argo: {w.name}")
+                    asyncio.create_task(self._poll_argo_to_terminal(w.name, label, wf_row.id))
             except Exception as e:
-                await _emit_status(self, "pre-process", "error", f"submit failed: {e}")
-                await _emit_status(self, "calibration-config", "error", f"submit failed: {e}")
-                await _emit_status(self, "calibration-run", "error", f"submit failed: {e}")
-                # update database statuses for chain nodes
-                await _update_node_db(session, wf_row.id, "pre-process", "error", f"submit failed: {e}")
-                await _update_node_db(session, wf_row.id, "calibration-config", "error", f"submit failed: {e}")
-                await _update_node_db(session, wf_row.id, "calibration-run", "error", f"submit failed: {e}")
-                return
+                for node in chain_nodes:
+                    label = node.get("label") or node.get("id")
+                    await _emit_status(self, label, "error", f"submit failed: {e}")
+                    await _update_node_db(session, wf_row.id, label, "error", f"submit failed: {e}")
 
-            # Any other nodes in the canvas should run independently
-            others = [n for n in targets if n["id"] not in ("pre-process", "calibration-config", "calibration-run")]
+            # Any other nodes run independently
+            others = [n for n in targets if n not in chain_nodes]
             for n in others:
-                await self.receive_run_node(
-                    event,
-                    action,
-                    {"nodeId": n["id"], "label": n.get("label"), "config": n.get("config") or {}},
-                )
+                await self.receive_run_node(event, action, {"nodeId": n["id"], "label": n.get("label"), "config": n.get("config") or {}})
             return
 
-        # No chain: run each selected node independently
+        # (unchanged) fall back: run each selected node independently
         for n in targets:
-            await self.receive_run_node(
-                event,
-                action,
-                {"nodeId": n["id"], "label": n.get("label"), "config": n.get("config") or {}},
-            )
+            await self.receive_run_node(event, action, {"nodeId": n["id"], "label": n.get("label"), "config": n.get("config") or {}})
+
 
     async def _get_or_create_template_row(self, session: AsyncSession, name: str, user: str, spec: dict | None):
         existing = (await session.execute(select(WTModel).where(WTModel.name == name).limit(1))).scalar_one_or_none()

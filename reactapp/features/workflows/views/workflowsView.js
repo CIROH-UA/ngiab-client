@@ -34,7 +34,8 @@ function Toolbar() {
       <strong style={{ marginBottom: 4 }}>Tools</strong>
 
       <button onClick={() => addNode('pre-process')} className="btn">+ pre-process</button>
-      <button onClick={() => addNode('calibration')} className="btn">+ calibration</button>
+      <button onClick={() => addNode('calibration-config')} className="btn">+ calibration config</button>
+      <button onClick={() => addNode('calibration-run')} className="btn">+ calibration run</button>
       <button onClick={() => addNode('run-ngiab')} className="btn">+ run ngiab</button>
       <button onClick={() => addNode('teehr')} className="btn">+ teehr</button>
 

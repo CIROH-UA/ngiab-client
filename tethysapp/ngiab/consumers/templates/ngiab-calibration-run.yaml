@@ -6,51 +6,125 @@ metadata:
 spec:
   entrypoint: main
   templates:
-  - name: run-cal
-    inputs:
-      parameters:
-        - { name: input_bucket,  default: "" }
-        - { name: input_key,     default: "" }
-        - { name: input_subdir,  default: "" }
-        - { name: output_bucket, default: "test-ngen" }
-        - { name: output_prefix, default: "demo/default" }
-      artifacts:
-        - name: calibration-prepared
-          path: /tmp/in/calibration-prepared.tgz
-          s3:
-            endpoint: s3.amazonaws.com
-            region: us-east-1
-            bucket: "{{inputs.parameters.input_bucket}}"
-            key: "{{inputs.parameters.input_key}}"
-            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
-            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
-    script:
-      image: awiciroh/ngiab-cal:latest
-      command: [bash, -lc]
-      env:
-      - name: AWS_ACCESS_KEY_ID
-        valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_ACCESS_KEY_ID } }
-      - name: AWS_SECRET_ACCESS_KEY
-        valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_SECRET_ACCESS_KEY } }
-      - name: AWS_DEFAULT_REGION
-        value: us-east-1
-      source: |
-        set -euo pipefail
-        DATA_DIR="/ngen/ngen/data"
-        tar -C "$DATA_DIR" -xzf /tmp/in/calibration-prepared.tgz
-        set +o pipefail
-        /calibration/run.sh
-        tar -C "$(dirname "$DATA_DIR")" -czf /tmp/out/calibrated.tgz "$(basename "$DATA_DIR")"
-    outputs:
-      artifacts:
-      - name: calibrated
-        path: /tmp/out/calibrated.tgz
-        archive:
-            none: {}        
-        s3:
-          endpoint: s3.amazonaws.com
-          region: us-east-1
-          bucket: "{{inputs.parameters.output_bucket}}"
-          key: "{{inputs.parameters.output_prefix}}/calibrated.tgz"
-          accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
-          secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+    - name: main
+      inputs:
+        parameters:
+          - { name: input_bucket,  default: "" }     # chained: bucket of calibration-prepared.tgz
+          - { name: input_key,     default: "" }     # chained: key of calibration-prepared.tgz
+          - { name: input_s3_url,  default: "" }     # standalone: s3://... or https://...
+          - { name: input_subdir,  default: "" }     # optional inner folder (e.g., "ngiab")
+          - { name: output_bucket, default: "test-ngen" }
+          - { name: output_prefix, default: "demo/default" }
+        artifacts:
+          - name: prepared
+            optional: true
+            path: /tmp/in                 # chained: Argo auto-unpacks the input artifact here
+            s3:
+              endpoint: s3.amazonaws.com
+              region: us-east-1
+              bucket: "{{inputs.parameters.input_bucket}}"
+              key: "{{inputs.parameters.input_key}}"
+              accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+              secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+
+      script:
+        image: awiciroh/ngiab-cal:latest
+        securityContext:
+          runAsUser: 0
+          runAsGroup: 0
+        command: [bash, -lc]
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_ACCESS_KEY_ID } }
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_SECRET_ACCESS_KEY } }
+          - name: AWS_DEFAULT_REGION
+            value: us-east-1
+        source: |
+          set -euo pipefail
+
+          mkdir -p /tmp/in /tmp/data /tmp/out /ngen/ngen/data
+
+          IN_URL="{{inputs.parameters.input_s3_url}}"
+          SRC_DIR="/tmp/in"   # CHAINED: Argo auto-unpacks input artifact here
+
+          # --- Standalone: fetch tar with AWS CLI v2 (s3) or curl (http/https) ---
+          pkg_install() {
+            if command -v dnf >/dev/null 2>&1; then
+              dnf install -y "$@" || dnf install -y --setopt=install_weak_deps=False "$@"
+            elif command -v microdnf >/dev/null 2>&1; then
+              microdnf install -y "$@"
+            elif command -v yum >/dev/null 2>&1; then
+              yum install -y "$@"
+            else
+              echo "ERROR: no dnf/microdnf/yum available"; exit 2
+            fi
+          }
+
+          if [ -n "${IN_URL}" ]; then
+            if echo "${IN_URL}" | grep -q '^s3://'; then
+              command -v unzip >/dev/null 2>&1 || pkg_install unzip
+              command -v curl  >/dev/null 2>&1 || pkg_install curl ca-certificates
+              if ! command -v aws >/dev/null 2>&1; then
+                curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+                unzip -q /tmp/awscliv2.zip -d /tmp
+                /tmp/aws/install -i /usr/local/aws-cli -b /usr/local/bin
+              fi
+              aws --version
+              aws s3 cp "${IN_URL}" /tmp/data/input.tgz --no-progress
+            else
+              command -v curl >/dev/null 2>&1 || pkg_install curl ca-certificates
+              curl -fL "${IN_URL}" -o /tmp/data/input.tgz
+            fi
+
+            [ -s /tmp/data/input.tgz ] || { echo "Missing /tmp/data/input.tgz"; exit 2; }
+            tar -C /tmp/data -xzf /tmp/data/input.tgz 2>/dev/null || tar -C /tmp/data -xf /tmp/data/input.tgz
+            SRC_DIR="/tmp/data"
+          fi
+
+          # --- Pick the root data directory (must contain config/) ---
+          IN_SUB="{{inputs.parameters.input_subdir}}"
+          DATA_DIR=""
+          if [ -n "${IN_SUB}" ] && [ -d "${SRC_DIR}/${IN_SUB}/config" ]; then
+            DATA_DIR="${SRC_DIR}/${IN_SUB}"
+          elif [ -d "${SRC_DIR}/config" ]; then
+            DATA_DIR="${SRC_DIR}"
+          else
+            DATA_DIR="$(find "${SRC_DIR}" -mindepth 1 -maxdepth 2 -type d -exec test -d '{}/config' ';' -print -quit || true)"
+          fi
+          [ -n "${DATA_DIR}" ] && [ -d "${DATA_DIR}/config" ] || { echo "Could not find data dir with config/ under ${SRC_DIR}"; exit 2; }
+
+          # --- Mirror local docker run: stage the ENTIRE decompressed folder ---
+          # (equivalent to: docker run -v <data_dir>:/ngen/ngen/data ... /calibration/run.sh)
+          cp -a "${DATA_DIR}/." "/ngen/ngen/data/"
+
+          # Sanity checks (fail fast & clear)
+          test -f "/ngen/ngen/data/calibration/ngen_cal_conf.yaml" || { echo "Missing calibration/ngen_cal_conf.yaml"; exit 3; }
+          test -d "/ngen/ngen/data/config" || { echo "Missing config/ directory"; exit 3; }
+
+          echo "=== Running calibration & validation ==="
+          /calibration/run.sh
+
+          # Package results
+          tar -C "/ngen/ngen/data" -czf /tmp/out/calibration-run.tgz "calibration"
+          printf "%s\n" "{{inputs.parameters.output_bucket}}" > /tmp/out/.run_bucket
+          printf "%s\n" "{{inputs.parameters.output_prefix}}/calibration-run.tgz" > /tmp/out/.run_key
+
+
+      outputs:
+        parameters:
+          - name: run_bucket
+            valueFrom: { path: /tmp/out/.run_bucket }
+          - name: run_s3_key
+            valueFrom: { path: /tmp/out/.run_key }
+        artifacts:
+          - name: calibration-run
+            path: /tmp/out/calibration-run.tgz
+            archive: { none: {} }
+            s3:
+              endpoint: s3.amazonaws.com
+              region: us-east-1
+              bucket: "{{inputs.parameters.output_bucket}}"
+              key: "{{inputs.parameters.output_prefix}}/calibration-run.tgz"
+              accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+              secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
