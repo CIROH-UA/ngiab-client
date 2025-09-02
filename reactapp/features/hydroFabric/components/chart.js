@@ -21,62 +21,55 @@ import { lightTheme, darkTheme } from '@visx/xychart';
 import useTheme from 'hooks/useTheme'; // ← adjust the path if needed
 
 function LineChart({ width, height, data, layout }) {
+  const screenWidth = window.innerWidth;
+  const fontSize = screenWidth <= 1300 ? 13 : 18;
+  const fontWeight = screenWidth <= 1300 ? 600 : 500;
   const getAxisLabelStyles = (theme) => ({
   fill: theme === 'dark' ? '#e0e0e0' : '#000',
-  fontSize: 18,
-  fontWeight: 500,
+  fontSize: fontSize,
+  fontWeight: fontWeight,
 });
 
   // Function to get units for common variables
   const getVariableUnits = (variableName) => {
     if (!variableName) return '';
+    console.log(variableName);
     
+    const variableUnits = {
+    'rain_rate': 'mm/h',
+    'giuh_runoff': 'mm',
+    'infiltration_excess': '',
+    'direct_runoff': '',
+    'nash_lateral_runoff': '',
+    'deep_gw_to_channel_flux': '',
+    'soil_to_gw_flux': '',
+    'q_out': '',
+    'potential_et': '',
+    'actual_et': '',
+    'gw_storage': 'm/m',
+    'soil_storage': 'm/m',
+    'soil_storage_change': '',
+    'surf_runoff_scheme': '',
+    'nwm_ponded_depth': '',
+    'type': '',
+    'flow': 'm³/s',
+    'velocity': 'm/s',
+    'depth': 'm',
+    'nudge': 'm³/s',
+    'streamflow': 'm³/s',
+  };
     const variable = variableName.toLowerCase();
-    
-    if (variable.includes('streamflow') || variable.includes('discharge') || variable.includes('flow')) {
-      return ' (m³/s)';
-    }
-    
-    if (variable.includes('precipitation') || variable.includes('rainfall') || variable.includes('rain')) {
-      return ' (mm/hr)';
-    }
-    
-    if (variable.includes('temperature') || variable.includes('temp')) {
-      return ' (°C)';
-    }
-    
-    // Soil moisture related
-    if (variable.includes('soil') && variable.includes('moisture')) {
-      return ' (m³/m³)';
-    }
-    
-    // Evapotranspiration related
-    if (variable.includes('evapotranspiration') || variable.includes('evaporation')) {
-      return ' (mm/hr)';
-    }
-    
-    // Water level related
-    if (variable.includes('depth') || variable.includes('level')) {
-      return ' (m)';
-    }
-    
-    // Velocity related
-    if (variable.includes('velocity') || variable.includes('speed')) {
-      return ' (m/s)';
-    }
-    
-    // Default for unknown variables
-    return '';
+    return variableUnits[variable] ?? '';
   };
 
   // Generate dynamic y-axis label
   const getYAxisLabel = () => {
     const yaxisValue = layout?.yaxis || '';
     const units = getVariableUnits(yaxisValue);
-    return yaxisValue + units;
+    if (!units) return yaxisValue;
+    return yaxisValue + " (" + units + ")";
   };
 
-  console.log("This is the data\n", data);
   /* ─────────────────────────────────────
      Hooks – always execute, no early-return
      ───────────────────────────────────── */
