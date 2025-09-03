@@ -13,6 +13,7 @@ from tethysapp.ngiab.app import App
 
 log = logging.getLogger(__name__)
 
+
 @consumer(name="workflows", url="workflows")
 class BackendConsumer(AsyncConsumer):
     """
