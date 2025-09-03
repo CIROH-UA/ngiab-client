@@ -20,17 +20,7 @@ import { RectClipPath } from '@visx/clip-path';
 import { lightTheme, darkTheme } from '@visx/xychart';
 import useTheme from 'hooks/useTheme'; // ← adjust the path if needed
 
-function LineChart({ width, height, data, layout }) {
-  const screenWidth = window.innerWidth;
-  const fontSize = screenWidth <= 1300 ? 13 : 18;
-  const fontWeight = screenWidth <= 1300 ? 600 : 500;
-  const getAxisLabelStyles = (theme) => ({
-  fill: theme === 'dark' ? '#e0e0e0' : '#000',
-  fontSize: fontSize,
-  fontWeight: fontWeight,
-});
-
-  // Function to get units for common variables
+// Function to get units for common variables
   const getVariableUnits = (variableName) => {
     if (!variableName) return '';
     console.log(variableName);
@@ -62,6 +52,17 @@ function LineChart({ width, height, data, layout }) {
     return variableUnits[variable] ?? '';
   };
 
+
+function LineChart({ width, height, data, layout }) {
+  const screenWidth = window.innerWidth;
+  const fontSize = screenWidth <= 1300 ? 13 : 18;
+  const fontWeight = screenWidth <= 1300 ? 600 : 500;
+  const getAxisLabelStyles = (theme) => ({
+  fill: theme === 'dark' ? '#e0e0e0' : '#000',
+  fontSize: fontSize,
+  fontWeight: fontWeight,
+});
+
   // Generate dynamic y-axis label
   const getYAxisLabel = () => {
     const yaxisValue = layout?.yaxis || '';
@@ -90,6 +91,8 @@ function LineChart({ width, height, data, layout }) {
   const margin = { top: 20, right: 40, bottom: 45, left: 110 };
   const innerWidth  = Math.max(1, width  - margin.left - margin.right);
   const innerHeight = Math.max(1, height - margin.top  - margin.bottom);
+  const EST_LABEL_PX = 100;
+  const xNumTicks = Math.max(2, Math.floor(innerWidth / EST_LABEL_PX));
 
   /* ─────────────────────────────────────
      Data preparation
@@ -262,6 +265,8 @@ function LineChart({ width, height, data, layout }) {
           {(zoom) => {
             const newXScale = rescaleXAxis(xScale, zoom.transformMatrix);
             const newYScale = rescaleYAxis(yScale, zoom.transformMatrix);
+            const xTickValues = newXScale.ticks(xNumTicks);
+            const safeXTicks = xTickValues.length > 1 ? xTickValues.slice(0, -1) : xTickValues;
 
             return (
               <>
@@ -370,7 +375,9 @@ function LineChart({ width, height, data, layout }) {
                         fontSize: 14,
                         fontWeight: 500,
                         textAnchor: 'end',
+                        
                       })}
+                      tickValues={safeXTicks}
                     />
                     <AxisBottom
                       scale={newXScale}
