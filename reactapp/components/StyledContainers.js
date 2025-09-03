@@ -5,11 +5,10 @@ import useTheme from 'hooks/useTheme';
 // HydroFabricContainer
 const StyledHydroFabricContainer = styled.div`
   // flex: ${(props) => (props.$fullScreen ? '1 1 0%' : '1 1 40%')};
-  height: ${(props) => (props.$fullScreen ? '0%' : '40%;')};
+  height: ${(props) => (props.$fullScreen ? '0%' : '55%')};
   // order: 2;
   width: ${(props) => (props.isModelRunListOpen ? '80%' : '100%')};
   margin-left: ${(props) => (props.isModelRunListOpen ? '20%' : '0%')};
-  padding: ${(props) => (props.$fullScreen ? '0px' : '5px;')}; 
   background-color: ${(props) => props.theme === 'dark' ? '#4f5b67' : '#ffffff'};
   position: absolute;
   bottom: 0;
@@ -20,11 +19,13 @@ const StyledHydroFabricContainer = styled.div`
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   
   /* For even smoother animation, include width in the transition */
-  @media (min-width: 768px) {
+  @media (min-width: 1300px) {
     transition: margin-left 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
                 width 0.5s cubic-bezier(0.4, 0, 0.2, 1),
                 transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    height: ${(props) => props.$fullScreen ? '0%' : '48%'};
   }
+ 
 `;
 
 export const HydroFabricContainer = (props) => {
@@ -36,7 +37,7 @@ export const HydroFabricContainer = (props) => {
 const StyledHydroFabricPlotContainer = styled.div`
   width: 100%;
   padding: 5px;
-  height: 300px;
+  height: calc(40vh - 10px);
   order: 1;
   flex: 1 1 80%;
   background-color: ${(props) => props.theme === 'dark' ? '#4f5b67' : '#f9f9f9'};
