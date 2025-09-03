@@ -20,7 +20,57 @@ import { RectClipPath } from '@visx/clip-path';
 import { lightTheme, darkTheme } from '@visx/xychart';
 import useTheme from 'hooks/useTheme'; // ← adjust the path if needed
 
+// Function to get units for common variables
+  const getVariableUnits = (variableName) => {
+    if (!variableName) return '';
+    console.log(variableName);
+    
+    const variableUnits = {
+    'rain_rate': 'mm/h',
+    'giuh_runoff': 'mm',
+    'infiltration_excess': '',
+    'direct_runoff': '',
+    'nash_lateral_runoff': '',
+    'deep_gw_to_channel_flux': '',
+    'soil_to_gw_flux': '',
+    'q_out': '',
+    'potential_et': '',
+    'actual_et': '',
+    'gw_storage': 'm/m',
+    'soil_storage': 'm/m',
+    'soil_storage_change': '',
+    'surf_runoff_scheme': '',
+    'nwm_ponded_depth': '',
+    'type': '',
+    'flow': 'm³/s',
+    'velocity': 'm/s',
+    'depth': 'm',
+    'nudge': 'm³/s',
+    'streamflow': 'm³/s',
+  };
+    const variable = variableName.toLowerCase();
+    return variableUnits[variable] ?? '';
+  };
+
+
 function LineChart({ width, height, data, layout }) {
+  const screenWidth = window.innerWidth;
+  const fontSize = screenWidth <= 1300 ? 13 : 18;
+  const fontWeight = screenWidth <= 1300 ? 600 : 500;
+  const getAxisLabelStyles = (theme) => ({
+  fill: theme === 'dark' ? '#e0e0e0' : '#000',
+  fontSize: fontSize,
+  fontWeight: fontWeight,
+});
+
+  // Generate dynamic y-axis label
+  const getYAxisLabel = () => {
+    const yaxisValue = layout?.yaxis || '';
+    const units = getVariableUnits(yaxisValue);
+    if (!units) return yaxisValue;
+    return yaxisValue + " (" + units + ")";
+  };
+
   /* ─────────────────────────────────────
      Hooks – always execute, no early-return
      ───────────────────────────────────── */
@@ -38,9 +88,11 @@ function LineChart({ width, height, data, layout }) {
   /* ─────────────────────────────────────
      Layout helpers
      ───────────────────────────────────── */
-  const margin = { top: 40, right: 40, bottom: 40, left: 60 };
+  const margin = { top: 20, right: 40, bottom: 45, left: 110 };
   const innerWidth  = Math.max(1, width  - margin.left - margin.right);
   const innerHeight = Math.max(1, height - margin.top  - margin.bottom);
+  const EST_LABEL_PX = 100;
+  const xNumTicks = Math.max(2, Math.floor(innerWidth / EST_LABEL_PX));
 
   /* ─────────────────────────────────────
      Data preparation
@@ -63,7 +115,6 @@ function LineChart({ width, height, data, layout }) {
   const xScale = scaleTime({
     range: [0, innerWidth],
     domain: safeExtent(allData, getDate, [new Date(), new Date()]),
-    nice: true,
   });
 
   const yScale = scaleLinear({
@@ -214,6 +265,8 @@ function LineChart({ width, height, data, layout }) {
           {(zoom) => {
             const newXScale = rescaleXAxis(xScale, zoom.transformMatrix);
             const newYScale = rescaleYAxis(yScale, zoom.transformMatrix);
+            const xTickValues = newXScale.ticks(xNumTicks);
+            const safeXTicks = xTickValues.length > 1 ? xTickValues.slice(0, -1) : xTickValues;
 
             return (
               <>
@@ -312,25 +365,32 @@ function LineChart({ width, height, data, layout }) {
 
                     <AxisLeft
                       scale={newYScale}
+                      label={getYAxisLabel()}
+                      labelProps={{ style: getAxisLabelStyles(theme) }}
+                      labelOffset={80}
                       stroke={theme === 'dark' ? '#d1d5db' : '#000'}
                       tickStroke={theme === 'dark' ? '#d1d5db' : '#000'}
                       tickLabelProps={() => ({
                         fill: theme === 'dark' ? '#e0e0e0' : '#000',
-                        fontSize: 12,
-                        fontWeight: 'bold',
+                        fontSize: 14,
+                        fontWeight: 500,
                         textAnchor: 'end',
+                        
                       })}
+                      tickValues={safeXTicks}
                     />
                     <AxisBottom
                       scale={newXScale}
                       top={innerHeight}
+                      label="Simulation Time Period (YYYY-MM-DD)"
+                      labelProps={{ style: getAxisLabelStyles(theme) }}
                       stroke={theme === 'dark' ? '#d1d5db' : '#000'}
                       tickFormat={formatDate}
                       tickStroke={theme === 'dark' ? '#d1d5db' : '#000'}
                       tickLabelProps={() => ({
                         fill: theme === 'dark' ? '#e0e0e0' : '#000',
-                        fontSize: 12,
-                        fontWeight: 'bold',
+                        fontSize: 14,
+                        fontWeight: 500,
                         textAnchor: 'middle',
                       })}
                     />
