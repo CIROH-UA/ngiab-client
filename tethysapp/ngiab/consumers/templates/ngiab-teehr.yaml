@@ -4,61 +4,157 @@ metadata:
   name: ngiab-teehr
   namespace: argo
 spec:
-  entrypoint: main 
+  entrypoint: main
   templates:
   - name: main
     inputs:
       parameters:
-        - { name: output_bucket, default: "test-ngen" }
-        - { name: output_prefix, default: "demo/default" }
-        - { name: final_prefix, default: "" }
-        - { name: input_s3_key, default: "" }
-        - { name: teehr_inputs_subdir, default: "outputs" }
-        - { name: teehr_results_subdir, default: "teehr" }
-        - { name: teehr_args, default: "" }
-        - { name: image_teehr, default: "awiciroh/ngiab-teehr:x86" }
+        - { name: output_bucket,         default: "test-ngen" }
+        - { name: output_prefix,         default: "demo/default" }
+        - { name: final_prefix,          default: "" }
+        # input selectors (either chained or standalone)
+        - { name: input_bucket,          default: "test-ngen" }
+        - { name: input_s3_key,          default: "" }                 # <-- chained / manual
+        - { name: input_s3_url,          default: "" }                 # <-- NEW: standalone s3://... OR https://...
+        # teehr specific
+        - { name: teehr_inputs_subdir,   default: "outputs" }
+        - { name: teehr_results_subdir,  default: "teehr" }
+        - { name: teehr_args,            default: "" }
+        - { name: image_teehr,           default: "awiciroh/ngiab-teehr:x86" }
       artifacts:
         - name: input
+          optional: true
           path: /tmp/input.tgz
           s3:
             endpoint: s3.amazonaws.com
             region: us-east-1
-            insecure: false
-            bucket: "{{inputs.parameters.output_bucket}}"
+            bucket: "{{inputs.parameters.input_bucket}}"
             key: "{{inputs.parameters.input_s3_key}}"
             accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
             secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+
     script:
       image: "{{inputs.parameters.image_teehr}}"
       command: [bash, -lc]
+      env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_ACCESS_KEY_ID } }
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_SECRET_ACCESS_KEY } }
+        - name: AWS_DEFAULT_REGION
+          value: us-east-1
       source: |
-        set -e
+        set -euo pipefail
+
+        ensure_tools() {
+          if command -v dnf >/dev/null 2>&1; then dnf install -y unzip curl ca-certificates || true
+          elif command -v microdnf >/dev/null 2>&1; then microdnf install -y unzip curl ca-certificates || true
+          elif command -v yum >/dev/null 2>&1; then yum install -y unzip curl ca-certificates || true
+          elif command -v apt-get >/dev/null 2>&1; then apt-get update -y && apt-get install -y --no-install-recommends unzip curl ca-certificates || true
+          fi
+          if ! command -v aws >/dev/null 2>&1; then
+            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+            unzip -q /tmp/awscliv2.zip -d /tmp
+            /tmp/aws/install -i /usr/local/aws-cli -b /usr/local/bin
+          fi
+        }
+
         mkdir -p /app/data "/app/data/{{inputs.parameters.teehr_inputs_subdir}}" "/app/data/{{inputs.parameters.teehr_results_subdir}}"
-        if [ -s /tmp/input.tgz ]; then tar -xzf /tmp/input.tgz -C /app/data; fi
 
-        # If the image provides a CLI or entrypoint, run additional args if provided
-        set +e
-        if [ -n "{{inputs.parameters.teehr_args}}" ]; then
-          /bin/bash -lc "{{inputs.parameters.teehr_args}}"
+        # 1) If an Argo artifact was provided, extract it
+        if [ -s /tmp/input.tgz ]; then
+          tar -xzf /tmp/input.tgz -C /app/data || tar -xf /tmp/input.tgz -C /app/data
         fi
-        set -e
 
-        # Guarantee results exist so artifact upload works
-        mkdir -p "/app/data/{{inputs.parameters.teehr_results_subdir}}"
-        # Touch a stamp file if nothing was produced
-        : > "/app/data/{{inputs.parameters.teehr_results_subdir}}/_empty.txt"
+        # 2) Otherwise, pull from URL (s3:// or https://) and extract
+        IN_URL="{{inputs.parameters.input_s3_url}}"
+        if [ ! -s /tmp/input.tgz ] && [ -n "${IN_URL}" ]; then
+          ensure_tools
+          if echo "${IN_URL}" | grep -q '^s3://'; then
+            echo "aws s3 cp ${IN_URL} /tmp/input.tgz"
+            aws s3 cp "${IN_URL}" /tmp/input.tgz --no-progress
+          else
+            echo "curl -fL ${IN_URL} -o /tmp/input.tgz"
+            curl -fL "${IN_URL}" -o /tmp/input.tgz
+          fi
+          [ -s /tmp/input.tgz ] || { echo "Failed to fetch input from URL"; exit 2; }
+          tar -xzf /tmp/input.tgz -C /app/data || tar -xf /tmp/input.tgz -C /app/data
+        fi
 
-        tar -C "/app/data/{{inputs.parameters.teehr_results_subdir}}" -czf /tmp/teehr_results.tgz .
-        exit 0
+        # 3) Some packages contain an inner *.tgz. If so, unpack it too.
+        inner="$(find /app/data -maxdepth 1 -type f -name '*.tgz' | head -n1 || true)"
+        if [ -n "${inner}" ]; then
+          echo "Found inner archive ${inner}; unpacking…"
+          tar -xzf "${inner}" -C /app/data || tar -xf "${inner}" -C /app/data
+          rm -f "${inner}"
+        fi
+
+        # 4) Normalize layout so /app/data/config/realization.json exists
+        if [ ! -d /app/data/config ] && [ -d /app/data/ngiab/config ]; then
+          echo "Flattening /app/data/ngiab -> /app/data"
+          shopt -s dotglob
+          mv /app/data/ngiab/* /app/data/ || true
+          rmdir /app/data/ngiab || true
+        fi
+
+        # As a fallback, make a symlink if config is still nested
+        if [ ! -d /app/data/config ] && [ -d /app/data/ngiab/config ]; then
+          ln -s /app/data/ngiab/config /app/data/config
+        fi
+
+        # Sanity check
+        if [ ! -f /app/data/config/realization.json ]; then
+          echo "ERROR: Missing /app/data/config/realization.json"
+          find /app/data -maxdepth 3 -type f -name realization.json -printf 'found: %p\n' || true
+          exit 2
+        fi
+
+        # Resolve inputs dir: prefer provided subdir, then common fallbacks
+        INPUT_DIR_CANDIDATES=(
+          "/app/data/{{inputs.parameters.teehr_inputs_subdir}}"
+          "/app/data/outputs"
+          "/app/data/ngiab/outputs"
+        )
+        INPUT_DIR=""
+        for d in "${INPUT_DIR_CANDIDATES[@]}"; do
+          if [ -d "$d" ]; then INPUT_DIR="$d"; break; fi
+        done
+        [ -n "${INPUT_DIR}" ] || { echo "ERROR: Could not locate outputs directory"; exit 2; }
+
+        RESULTS_DIR="/app/data/{{inputs.parameters.teehr_results_subdir}}"
+        mkdir -p "${RESULTS_DIR}"
+
+        echo "TEEHR INPUT_DIR=${INPUT_DIR}"
+        echo "TEEHR RESULTS_DIR=${RESULTS_DIR}"
+
+        # Run evaluator (script template overrides ENTRYPOINT, so call it explicitly)
+        cd /app
+        export TEEHR_INPUTS_DIR="${INPUT_DIR}"
+        export TEEHR_RESULTS_DIR="${RESULTS_DIR}"
+
+        if [ -n "{{inputs.parameters.teehr_args}}" ]; then
+          echo "python -u teehr_ngen.py {{inputs.parameters.teehr_args}}"
+          python -u teehr_ngen.py {{inputs.parameters.teehr_args}}
+        else
+          echo "python -u teehr_ngen.py"
+          python -u teehr_ngen.py
+        fi
+
+        echo "Packaging TEEHR results…"
+        # Ensure there's something to upload even if tool produced nothing
+        find "${RESULTS_DIR}" -mindepth 1 -print -quit >/dev/null 2>&1 || : > "${RESULTS_DIR}/_empty.txt"
+        tar -C "${RESULTS_DIR}" -czf /tmp/teehr_results.tgz .
+
+
+
     outputs:
       artifacts:
-      - name: teehr-results
-        path: /tmp/teehr_results.tgz
-        s3:
-          endpoint: s3.amazonaws.com
-          region: us-east-1
-          insecure: false
-          bucket: "{{inputs.parameters.output_bucket}}"
-          key: "{{inputs.parameters.output_prefix}}/teehr_results.tgz"
-          accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
-          secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+        - name: teehr-results
+          path: /tmp/teehr_results.tgz
+          s3:
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+            bucket: "{{inputs.parameters.output_bucket}}"
+            key: "{{inputs.parameters.output_prefix}}/teehr_results.tgz"
+            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }

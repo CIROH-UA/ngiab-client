@@ -189,6 +189,7 @@ def _params_for(
     wf_uuid: str,                 # <-- CHANGED: pass workflow UUID instead of run_id for paths
     last_in_chain: bool,
     upstream_key: Optional[str],
+    upstream_bucket: Optional[str] = None,
 ) -> Dict[str, str]:
     bucket = _bucket()
 
@@ -282,8 +283,37 @@ def _params_for(
             "input_key": ikey,
             "input_s3_url": str(cfg.get("input_s3_url") or ""),
             "input_subdir": str(cfg.get("input_subdir") or "ngiab"),
+            "output_name": str(cfg.get("output_name") or "ngiab"),
             "ngen_np": str(cfg.get("ngen_np") or "8"),
             "image_ngen": str(cfg.get("image_ngen") or "awiciroh/ciroh-ngen-image:latest"),
+        }
+    if "teehr" in k:
+        # derive input bucket/key (from upstream pointer or provided fields)
+        ibucket = str(cfg.get("input_bucket") or bucket)
+        ikey = upstream_key or str(cfg.get("input_s3_key") or cfg.get("input_key") or "")
+        if (not ikey) and cfg.get("input_s3_url"):
+            try:
+                ibucket, _ikey = _parse_s3_url(str(cfg["input_s3_url"]))
+                ikey = _ikey
+            except Exception:
+                pass
+        ikey = ikey.lstrip("/")
+
+        subdir_default = "outputs"
+        if upstream_key and not str(upstream_key).endswith("outputs.tgz"):
+            subdir_default = f"{cfg.get('input_subdir') or 'ngiab'}/outputs"
+
+        return {
+            "output_bucket": str(cfg.get("output_bucket") or upstream_bucket or bucket),
+            "output_prefix": str(cfg.get("output_prefix") or out_prefix),
+            "final_prefix": final_prefix,
+            "input_bucket": ibucket,
+            "input_s3_key": ikey,
+            "input_s3_url": str(cfg.get("input_s3_url") or ""),
+            "teehr_inputs_subdir": str(cfg.get("teehr_inputs_subdir") or subdir_default),  # <— updated default
+            "teehr_results_subdir": str(cfg.get("teehr_results_subdir") or "teehr"),
+            "teehr_args": str(cfg.get("teehr_args") or ""),
+            "image_teehr": str(cfg.get("image_teehr") or "awiciroh/ngiab-teehr:x86"),
         }
 
     # teehr, default, etc.
@@ -425,25 +455,39 @@ class NgiabBackendHandler(MBH):
 
         def _is_dataset_consumer(kind: str) -> bool:
             lk = (kind or "").lower()
-            return ("calibration-config" in lk) or ("calibration-run" in lk) or (("ngiab" in lk) and ("run" in lk))
+            return (
+                ("calibration-config" in lk)
+                or ("calibration-run" in lk)
+                or (("ngiab" in lk) and ("run" in lk))
+                or ("teehr" in lk)
+            )
 
         def _dataset_pointer_from_params(kind: str, params: dict, inherit: dict | None = None) -> dict:
             lk = (kind or "").lower()
+            inherit = dict(inherit or {})
+
             if ("preprocess" in lk) or ("pre-process" in lk):
-                return {
+                inherit.update({
                     "dataset_bucket": params.get("output_bucket", ""),
                     "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/{params.get('output_name','ngiab')}.tgz",
-                }
+                })
+                return inherit
+
             if "calibration-config" in lk:
-                return {
+                inherit.update({
                     "dataset_bucket": params.get("output_bucket", ""),
                     "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/calibration-prepared.tgz",
-                }
-            if "calibration-run" in lk:
-                # does not create a new dataset tar; propagate prior pointer
-                return dict(inherit or {})
-            # ngiab-run & others: propagate whatever we had
-            return dict(inherit or {})
+                })
+                return inherit
+
+            if (("ngiab" in lk) and ("run" in lk)):
+                inherit.update({
+                    "dataset_bucket": params.get("output_bucket", ""),
+                    "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/{params.get('output_name','ngiab')}.tgz",
+
+                })
+                return inherit
+            return inherit
 
         def _make_params(node: dict, last_flag: bool, incoming: dict | None, branch: str) -> dict:
             """Build params and *append the branch suffix* to output/final prefixes."""
@@ -453,8 +497,11 @@ class NgiabBackendHandler(MBH):
             if incoming and incoming.get("dataset_bucket") and incoming.get("dataset_key"):
                 upstream_key = incoming["dataset_key"]
 
-            params = _params_for(kind, cfg, user, wf_uuid, last_flag, upstream_key=upstream_key)
-
+            upstream_bucket = incoming.get("dataset_bucket") if incoming else None
+            params = _params_for(
+                kind, cfg, user, wf_uuid, last_in_chain=last_flag,
+                upstream_key=upstream_key, upstream_bucket=upstream_bucket
+            )
             # If we know the producing bucket/key, set explicit inputs for artifact binding
             if incoming and incoming.get("dataset_bucket") and incoming.get("dataset_key"):
                 params.setdefault("input_bucket", incoming["dataset_bucket"])
@@ -551,7 +598,12 @@ class NgiabBackendHandler(MBH):
 
         def _is_dataset_consumer(n: dict) -> bool:
             k = _kind(n)
-            return ("calibration-config" in k) or ("calibration-run" in k) or ("ngiab" in k and "run" in k)
+            return (
+                ("calibration-config" in k)
+                or ("calibration-run" in k)
+                or ("ngiab" in k and "run" in k)
+                or ("teehr" in k)                # <-- add this
+            )
 
         # Build parent adjacency on the induced subgraph
         parents: dict[str, list[str]] = {nid: [] for nid in nodes_by_id}
@@ -627,8 +679,9 @@ class NgiabBackendHandler(MBH):
 
         except Exception as e:
             for node in chain_nodes:
+                node_id = node.get("id") or (node.get("label") or "")
                 await _emit_status(self, node_id, "error", f"submit failed: {e}")
-                await _update_node_db(session, wf_row.id,node_id, "error", f"submit failed: {e}")
+                await _update_node_db(session, wf_row.id, node_id, "error", f"submit failed: {e}")
 
         # Optionally run *other* selected nodes that are totally disconnected from the kept subgraph
         other_ids = selected_set - keep
@@ -665,10 +718,14 @@ class NgiabBackendHandler(MBH):
                 b, k = _parse_s3_url(str(cfg["input_s3_url"]))
                 cfg.setdefault("input_bucket", b)
                 cfg.setdefault("input_key", k.lstrip("/"))
+                cfg.setdefault("input_s3_key", k.lstrip("/"))
             except Exception:
                 pass
         if "input_key" in cfg and isinstance(cfg["input_key"], str):
             cfg["input_key"] = cfg["input_key"].lstrip("/")
+
+        if "input_s3_key" in cfg and isinstance(cfg["input_s3_key"], str):
+            cfg["input_s3_key"] = cfg["input_s3_key"].lstrip("/")
 
         wf = WFModel(
             name=f"ad-hoc-{run}",

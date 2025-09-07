@@ -12,6 +12,7 @@ spec:
         - { name: output_bucket, default: "test-ngen" }
         - { name: output_prefix, default: "demo/default" }
         - { name: final_prefix,  default: "" }
+        - { name: output_name,   default: "ngiab" }
         # dataset selectors
         - { name: input_bucket,  default: "" }      # chained
         - { name: input_key,     default: "" }      # chained (may be sanitized below)
@@ -49,7 +50,6 @@ spec:
         # Make these early so artifact archiving and parameter saves always work
         mkdir -p /workspace/data/outputs /workspace/data/restarts
         printf "%s\n" "{{inputs.parameters.output_bucket}}" > /tmp/out/.bucket
-        printf "%s\n" "{{inputs.parameters.output_prefix}}/outputs.tgz"  > /tmp/out/.outputs_key
         printf "%s\n" "{{inputs.parameters.output_prefix}}/restarts.tgz" > /tmp/out/.restarts_key
 
         IN_URL="{{inputs.parameters.input_s3_url}}"
@@ -155,24 +155,24 @@ spec:
         set -e
         echo "HelloNGEN exit code: ${rc}"
 
+        # --- Package full dataset as a single tar with a top-level "<output_name>/" dir
+        OUT_NAME="{{inputs.parameters.output_name}}"
+        OUT_TGZ="/tmp/${OUT_NAME}.tgz"
+
+        mkdir -p "/tmp/pkg/${OUT_NAME}"
+        cp -a /workspace/data/. "/tmp/pkg/${OUT_NAME}/"
+        tar -C /tmp/pkg -czf "${OUT_TGZ}" "${OUT_NAME}"
+
+        # record the dataset key for downstream steps
+        printf "%s\n" "{{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz" > /tmp/out/.dataset_key
+
     outputs:
       parameters:
-        - name: outputs_bucket
-          valueFrom: { path: /tmp/out/.bucket }
-        - name: outputs_s3_key
-          valueFrom: { path: /tmp/out/.outputs_key }
         - name: restarts_s3_key
           valueFrom: { path: /tmp/out/.restarts_key }
-      artifacts:
-        - name: outputs-dir
-          path: /workspace/data/outputs
-          s3:
-            endpoint: s3.amazonaws.com
-            region: us-east-1
-            bucket: "{{inputs.parameters.output_bucket}}"
-            key: "{{inputs.parameters.output_prefix}}/outputs.tgz"
-            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
-            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+        - name: dataset_s3_key
+          valueFrom: { path: /tmp/out/.dataset_key }
+      artifacts:                # <-- this block must be nested under outputs
         - name: restarts-dir
           path: /workspace/data/restarts
           s3:
@@ -180,5 +180,14 @@ spec:
             region: us-east-1
             bucket: "{{inputs.parameters.output_bucket}}"
             key: "{{inputs.parameters.output_prefix}}/restarts.tgz"
+            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+        - name: dataset-full
+          path: "/tmp/{{inputs.parameters.output_name}}.tgz"
+          s3:
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+            bucket: "{{inputs.parameters.output_bucket}}"
+            key: "{{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz"
             accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
             secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
