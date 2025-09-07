@@ -184,6 +184,7 @@ spec:
             secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
         - name: dataset-full
           path: "/tmp/{{inputs.parameters.output_name}}.tgz"
+          archive: { none: {} }
           s3:
             endpoint: s3.amazonaws.com
             region: us-east-1

@@ -59,16 +59,38 @@ spec:
           fi
         }
 
+        # Recursively unpack and remove any nested archives under /app/data
+        unpack_nested() {
+          local found=1
+          while [ $found -eq 1 ]; do
+            found=0
+            while IFS= read -r -d '' f; do
+              echo "Unpacking nested archive: $f"
+              local d; d="$(dirname "$f")"
+              tar -xzf "$f" -C "$d" 2>/dev/null || tar -xf "$f" -C "$d"
+              rm -f "$f"
+              found=1
+            done < <(find /app/data -type f \( -name '*.tgz' -o -name '*.tar.gz' -o -name '*.tar' \) -print0)
+          done
+        }
+
         mkdir -p /app/data "/app/data/{{inputs.parameters.teehr_inputs_subdir}}" "/app/data/{{inputs.parameters.teehr_results_subdir}}"
 
-        # 1) If an Argo artifact was provided, extract it
-        if [ -s /tmp/input.tgz ]; then
-          tar -xzf /tmp/input.tgz -C /app/data || tar -xf /tmp/input.tgz -C /app/data
+        # --- 1) Accept Argo-passed artifact (could be a FILE or a DIRECTORY)
+        if [ -e /tmp/input.tgz ]; then
+          if [ -d /tmp/input.tgz ]; then
+            echo "/tmp/input.tgz is a directory; copying contents into /app/data"
+            shopt -s dotglob
+            cp -a /tmp/input.tgz/* /app/data/ || true
+          elif [ -s /tmp/input.tgz ]; then
+            echo "/tmp/input.tgz is a file; extracting into /app/data"
+            tar -xzf /tmp/input.tgz -C /app/data || tar -xf /tmp/input.tgz -C /app/data
+          fi
         fi
 
-        # 2) Otherwise, pull from URL (s3:// or https://) and extract
+        # --- 2) If no artifact, pull from URL (s3 or https) and extract
         IN_URL="{{inputs.parameters.input_s3_url}}"
-        if [ ! -s /tmp/input.tgz ] && [ -n "${IN_URL}" ]; then
+        if [ ! -e /tmp/input.tgz ] && [ -n "${IN_URL}" ]; then
           ensure_tools
           if echo "${IN_URL}" | grep -q '^s3://'; then
             echo "aws s3 cp ${IN_URL} /tmp/input.tgz"
@@ -81,42 +103,28 @@ spec:
           tar -xzf /tmp/input.tgz -C /app/data || tar -xf /tmp/input.tgz -C /app/data
         fi
 
-        # 3) Some packages contain an inner *.tgz. If so, unpack it too.
-        inner="$(find /app/data -maxdepth 1 -type f -name '*.tgz' | head -n1 || true)"
-        if [ -n "${inner}" ]; then
-          echo "Found inner archive ${inner}; unpacking…"
-          tar -xzf "${inner}" -C /app/data || tar -xf "${inner}" -C /app/data
-          rm -f "${inner}"
-        fi
+        # --- 3) Remove any inner archives so we don't ship tgz-inside-tgz
+        unpack_nested
 
-        # 4) Normalize layout so /app/data/config/realization.json exists
+        # --- 4) Normalize to ensure /app/data/config/realization.json
         if [ ! -d /app/data/config ] && [ -d /app/data/ngiab/config ]; then
           echo "Flattening /app/data/ngiab -> /app/data"
           shopt -s dotglob
           mv /app/data/ngiab/* /app/data/ || true
           rmdir /app/data/ngiab || true
         fi
-
-        # As a fallback, make a symlink if config is still nested
         if [ ! -d /app/data/config ] && [ -d /app/data/ngiab/config ]; then
           ln -s /app/data/ngiab/config /app/data/config
         fi
-
-        # Sanity check
         if [ ! -f /app/data/config/realization.json ]; then
           echo "ERROR: Missing /app/data/config/realization.json"
           find /app/data -maxdepth 3 -type f -name realization.json -printf 'found: %p\n' || true
           exit 2
         fi
 
-        # Resolve inputs dir: prefer provided subdir, then common fallbacks
-        INPUT_DIR_CANDIDATES=(
-          "/app/data/{{inputs.parameters.teehr_inputs_subdir}}"
-          "/app/data/outputs"
-          "/app/data/ngiab/outputs"
-        )
+        # --- 5) Locate inputs directory for TEEHR
         INPUT_DIR=""
-        for d in "${INPUT_DIR_CANDIDATES[@]}"; do
+        for d in "/app/data/{{inputs.parameters.teehr_inputs_subdir}}" "/app/data/outputs" "/app/data/ngiab/outputs"; do
           if [ -d "$d" ]; then INPUT_DIR="$d"; break; fi
         done
         [ -n "${INPUT_DIR}" ] || { echo "ERROR: Could not locate outputs directory"; exit 2; }
@@ -127,11 +135,10 @@ spec:
         echo "TEEHR INPUT_DIR=${INPUT_DIR}"
         echo "TEEHR RESULTS_DIR=${RESULTS_DIR}"
 
-        # Run evaluator (script template overrides ENTRYPOINT, so call it explicitly)
+        # --- 6) Run evaluator
         cd /app
         export TEEHR_INPUTS_DIR="${INPUT_DIR}"
         export TEEHR_RESULTS_DIR="${RESULTS_DIR}"
-
         if [ -n "{{inputs.parameters.teehr_args}}" ]; then
           echo "python -u teehr_ngen.py {{inputs.parameters.teehr_args}}"
           python -u teehr_ngen.py {{inputs.parameters.teehr_args}}
@@ -140,17 +147,27 @@ spec:
           python -u teehr_ngen.py
         fi
 
-        echo "Packaging TEEHR results…"
-        # Ensure there's something to upload even if tool produced nothing
+        # --- 7) Remove any archives created by evaluator so we don't nest them
+        unpack_nested
+
+        # --- 8) Ensure non-empty results
         find "${RESULTS_DIR}" -mindepth 1 -print -quit >/dev/null 2>&1 || : > "${RESULTS_DIR}/_empty.txt"
-        tar -C "${RESULTS_DIR}" -czf /tmp/teehr_results.tgz .
 
+        # --- 9) Package FULL DATASET (inputs + teehr/) under a single top folder
+        TOP="ngiab"
+        PKG="/tmp/pkg"
+        mkdir -p "${PKG}/${TOP}"
+        shopt -s dotglob
+        cp -a /app/data/* "${PKG}/${TOP}/"
 
+        # Final archive we upload (we create the tgz; Argo uploads it verbatim)
+        tar -C "${PKG}" -czf /tmp/teehr_results.tgz "${TOP}"
 
     outputs:
       artifacts:
         - name: teehr-results
           path: /tmp/teehr_results.tgz
+          archive: { none: {} }          # <- prevents Argo from re-wrapping our tgz
           s3:
             endpoint: s3.amazonaws.com
             region: us-east-1
