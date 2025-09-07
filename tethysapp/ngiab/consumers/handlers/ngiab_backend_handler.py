@@ -169,22 +169,35 @@ def _kind_to_template(kind: str) -> str:
         return "ngiab-teehr"
     return "ngiab-run"
 
-def _intermediate_prefix(user: str, run_id: str, kind: str) -> str:
-    safe = kind.replace(" ", "-").lower()
-    return f"{user}/Run/intermediate/{safe}/{run_id}"
+def _job_root_prefix(user: str, wf_uuid: str) -> str:
+    # user/<workflow-uuid>/<argo-job-name>
+    # NOTE: {{workflow.name}} is resolved by Argo at runtime.
+    return f"{user}/{wf_uuid}/{{{{workflow.name}}}}"
 
-def _final_prefix(user: str, run_id: str, kind: str) -> str:
-    safe = kind.replace(" ", "-").lower()
-    return f"{user}/Run/Final/{safe}/{run_id}"
 
-def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str,
-               last_in_chain: bool, upstream_key: Optional[str]) -> Dict[str, str]:
-    """Translate UI config into template parameters. Also normalizes S3 URL/key inputs."""
+def _intermediate_prefix(user: str, wf_uuid: str, _kind: str) -> str:
+    return _job_root_prefix(user, wf_uuid)
+
+def _final_prefix(_user: str, _wf_uuid: str, _kind: str) -> str:
+    # no longer used
+    return ""
+
+def _params_for(
+    kind: str,
+    cfg: Dict[str, Any],
+    user: str,
+    wf_uuid: str,                 # <-- CHANGED: pass workflow UUID instead of run_id for paths
+    last_in_chain: bool,
+    upstream_key: Optional[str],
+) -> Dict[str, str]:
     bucket = _bucket()
-    out_prefix = _intermediate_prefix(user, run_id, kind)
-    final_prefix = _final_prefix(user, run_id, kind) if last_in_chain else ""
+
+    # Base output path = user/<wf-uuid>/<argo-job-name>
+    out_prefix = _job_root_prefix(user, wf_uuid)
+    final_prefix = ""             # <- requirement #3: no more /Run/Final/
 
     k = (kind or "").lower()
+
     if "pre-process" in k or "preprocess" in k:
         return {
             "output_bucket": str(cfg.get("output_bucket") or bucket),
@@ -197,7 +210,6 @@ def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str,
             "output_name": str(cfg.get("output_name") or "ngiab"),
             "source": str(cfg.get("source") or "nwm"),
             "debug": str(cfg.get("debug") or "false"),
-            # step controls
             "all": str(cfg.get("all") or "false"),
             "subset": str(cfg.get("subset") or "true"),
             "forcings": str(cfg.get("forcings") or "true"),
@@ -207,25 +219,22 @@ def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str,
         }
 
     if "calibration-config" in k:
-        # derive input bucket/key
         ibucket = str(cfg.get("input_bucket") or bucket)
         ikey = upstream_key or str(cfg.get("input_key") or cfg.get("input_s3_key") or "")
         if not ikey and cfg.get("input_s3_url"):
             try:
-                ibucket, _ikey = _parse_s3_url(str(cfg["input_s3_url"]))
-                ikey = _ikey
+                ibucket, _ikey = _parse_s3_url(str(cfg["input_s3_url"])); ikey = _ikey
             except Exception:
                 pass
         ikey = ikey.lstrip("/")
-
         return {
             "output_bucket": str(cfg.get("output_bucket") or bucket),
             "output_prefix": str(cfg.get("output_prefix") or out_prefix),
             "final_prefix": final_prefix,
             "input_bucket": ibucket,
-            "input_key": ikey,           # preferred by YAML (artifact.s3.key)
-            "input_s3_key": ikey,        # backward-compat if template still uses this param
-            "input_s3_url": str(cfg.get("input_s3_url") or ""),   # <-- ADD THIS
+            "input_key": ikey,
+            "input_s3_key": ikey,
+            "input_s3_url": str(cfg.get("input_s3_url") or ""),
             "input_subdir": str(cfg.get("input_subdir") or "ngiab"),
             "gage": str(cfg.get("gage") or cfg.get("selector_value") or "01359139"),
             "iterations": str(cfg.get("iterations") or "100"),
@@ -237,44 +246,38 @@ def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str,
         }
 
     if "calibration-run" in k:
-        # derive input bucket/key
         ibucket = str(cfg.get("input_bucket") or bucket)
         ikey = upstream_key or str(cfg.get("input_key") or cfg.get("input_s3_key") or "")
         if not ikey and cfg.get("input_s3_url"):
             try:
-                ibucket, _ikey = _parse_s3_url(str(cfg["input_s3_url"]))
-                ikey = _ikey
+                ibucket, _ikey = _parse_s3_url(str(cfg["input_s3_url"])); ikey = _ikey
             except Exception:
                 pass
         ikey = ikey.lstrip("/")
-
         return {
             "output_bucket": str(cfg.get("output_bucket") or bucket),
             "output_prefix": str(cfg.get("output_prefix") or out_prefix),
             "final_prefix": final_prefix,
             "input_bucket": ibucket,
-            "input_key": ikey,           # preferred by YAML (artifact.s3.key)
-            "input_s3_key": ikey,        # backward-compat if template still uses this param
+            "input_key": ikey,
+            "input_s3_key": ikey,
             "input_s3_url": str(cfg.get("input_s3_url") or ""),
             "input_subdir": str(cfg.get("input_subdir") or "ngiab"),
         }
 
     if "run" in k and "ngiab" in k:
-        # derive input bucket/key (dataset tar), allow standalone URL as well
         ibucket = str(cfg.get("input_bucket") or bucket)
         ikey = upstream_key or str(cfg.get("input_key") or cfg.get("input_s3_key") or "")
         if not ikey and cfg.get("input_s3_url"):
             try:
-                ibucket, _ikey = _parse_s3_url(str(cfg["input_s3_url"]))
-                ikey = _ikey
+                ibucket, _ikey = _parse_s3_url(str(cfg["input_s3_url"])); ikey = _ikey
             except Exception:
                 pass
         ikey = ikey.lstrip("/")
-        
         return {
             "output_bucket": str(cfg.get("output_bucket") or bucket),
-            "output_prefix": str(cfg.get("output_prefix") or _intermediate_prefix(user, run_id, kind)),
-            "final_prefix": _final_prefix(user, run_id, kind) if last_in_chain else "",
+            "output_prefix": str(cfg.get("output_prefix") or out_prefix),
+            "final_prefix": final_prefix,
             "input_bucket": ibucket,
             "input_key": ikey,
             "input_s3_url": str(cfg.get("input_s3_url") or ""),
@@ -283,19 +286,9 @@ def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str,
             "image_ngen": str(cfg.get("image_ngen") or "awiciroh/ciroh-ngen-image:latest"),
         }
 
-    if "teehr" in k:
-        return {
-            "output_bucket": str(cfg.get("output_bucket") or bucket),
-            "output_prefix": str(cfg.get("output_prefix") or out_prefix),
-            "final_prefix": final_prefix,
-            "input_s3_key": upstream_key or str(cfg.get("input_s3_key") or ""),
-            "teehr_inputs_subdir": str(cfg.get("teehr_inputs_subdir") or "outputs"),
-            "teehr_results_subdir": str(cfg.get("teehr_results_subdir") or "teehr"),
-            "teehr_args": str(cfg.get("teehr_args") or ""),
-            "image_teehr": str(cfg.get("image_teehr") or "awiciroh/ngiab-teehr:x86"),
-        }
-
+    # teehr, default, etc.
     return {"output_bucket": bucket, "output_prefix": out_prefix, "final_prefix": final_prefix}
+
 
 # ---------- status helpers ----------
 async def _emit_status(handler: MBH, node_id: str, status: str, message: str = ""):
@@ -386,35 +379,26 @@ class NgiabBackendHandler(MBH):
         self,
         chain: list[dict],
         user: str,
-        run_id: str,
-        edges: list[dict] | None = None,   # <-- optional: pass full UI edges if you have them
+        wf_uuid: str,
+        edges: list[dict] | None = None,  # pass UI edges for correct fan-in/out
     ) -> Workflow:
         """
-        Build a DAG for the selected nodes with *per-parent fan-out* semantics.
-
-        - If a node is a dataset consumer (prepped dataset -> calibration-config/run -> ngiab-run),
-        and it has K incoming edges, we create K task *instances*, each depending on its
-        corresponding upstream task instance and inheriting that upstream's dataset pointer
-        (bucket/key). This yields parallel "mini-chains" into the shared node.
-        - If a node has no parents or is not a dataset consumer, we create a single task
-        that depends on *all* parent instances (classic fan-in).
-
-        'edges' is the UI edge list (items with 'source' and 'target' IDs). If not provided,
-        we fall back to a linear chain in the order of 'chain'.
+        Build a DAG with per-parent fan-out and per-instance unique output prefixes.
+        Every task instance gets a stable branch suffix (its task name), which is
+        appended to output_prefix (and final_prefix when set) to avoid S3 key collisions.
         """
         import re
 
         def _slug(x: str) -> str:
-            return re.sub(r"[^a-zA-Z0-9\-]+", "-", str(x)).strip("-").lower() or "n"
+            return re.sub(r"[^a-zA-Z0-9\\-]+", "-", str(x)).strip("-").lower() or "n"
 
         def _node_id(n: dict) -> str:
             return str(n.get("id") or n.get("label"))
 
-        # Normalize nodes and (optional) edges to the selected subgraph
+        # Restrict graph to selected nodes/edges
         nodes_by_id = {_node_id(n): n for n in chain}
         node_ids = list(nodes_by_id.keys())
 
-        # Filter edges to only those that connect nodes within 'chain'
         edges_in: list[dict] = []
         if edges:
             for e in edges:
@@ -422,14 +406,12 @@ class NgiabBackendHandler(MBH):
                 if s in nodes_by_id and t in nodes_by_id:
                     edges_in.append({"source": s, "target": t})
 
-        # Fallback: linear chain if no edges supplied/retained
+        # Fallback linear edges if none were provided/retained
         if not edges_in and len(chain) > 1:
             for i in range(len(chain) - 1):
-                s = _node_id(chain[i])
-                t = _node_id(chain[i + 1])
-                edges_in.append({"source": s, "target": t})
+                edges_in.append({"source": _node_id(chain[i]), "target": _node_id(chain[i + 1])})
 
-        # Compute parents/children maps and topological layers
+        # Parents/children maps
         parents = {nid: [] for nid in node_ids}
         children = {nid: [] for nid in node_ids}
         for e in edges_in:
@@ -441,16 +423,11 @@ class NgiabBackendHandler(MBH):
         topo_layers = _topo_layers([{"id": nid} for nid in node_ids], edges_in)
         sinks = {nid for nid in node_ids if not children[nid]}
 
-        def _is_dataset_producer(kind: str) -> bool:
-            lk = (kind or "").lower()
-            return ("preprocess" in lk) or ("pre-process" in lk) or ("calibration-config" in lk)
-
         def _is_dataset_consumer(kind: str) -> bool:
             lk = (kind or "").lower()
             return ("calibration-config" in lk) or ("calibration-run" in lk) or (("ngiab" in lk) and ("run" in lk))
 
         def _dataset_pointer_from_params(kind: str, params: dict, inherit: dict | None = None) -> dict:
-            """Return {'dataset_bucket': ..., 'dataset_key': ...} for downstream threading."""
             lk = (kind or "").lower()
             if ("preprocess" in lk) or ("pre-process" in lk):
                 return {
@@ -463,34 +440,39 @@ class NgiabBackendHandler(MBH):
                     "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/calibration-prepared.tgz",
                 }
             if "calibration-run" in lk:
-                # Does not change the dataset pointer; propagate input
+                # does not create a new dataset tar; propagate prior pointer
                 return dict(inherit or {})
-            # ngiab-run and others: no new dataset for downstream; propagate if any
+            # ngiab-run & others: propagate whatever we had
             return dict(inherit or {})
 
-        def _make_params(node: dict, last_flag: bool, incoming: dict | None) -> dict:
-            """Build template params, injecting upstream dataset bucket/key when present."""
+        def _make_params(node: dict, last_flag: bool, incoming: dict | None, branch: str) -> dict:
+            """Build params and *append the branch suffix* to output/final prefixes."""
             kind = node.get("label") or node.get("id")
             cfg = (node.get("config") or {})
             upstream_key = None
-            # If incoming has a dataset pointer, pass its key through to _params_for
             if incoming and incoming.get("dataset_bucket") and incoming.get("dataset_key"):
                 upstream_key = incoming["dataset_key"]
 
-            params = _params_for(kind, cfg, user, run_id, last_flag, upstream_key=upstream_key)
+            params = _params_for(kind, cfg, user, wf_uuid, last_flag, upstream_key=upstream_key)
 
-            # Ensure explicit bucket/key are set when we have them so artifact S3 inputs bind
+            # If we know the producing bucket/key, set explicit inputs for artifact binding
             if incoming and incoming.get("dataset_bucket") and incoming.get("dataset_key"):
                 params.setdefault("input_bucket", incoming["dataset_bucket"])
                 params.setdefault("input_key", incoming["dataset_key"])
                 params.setdefault("input_s3_key", incoming["dataset_key"])
+
+            # <<< crucial: uniqueize output paths per task instance >>>
+            base = params.get("output_prefix")
+            if base:
+                params["output_prefix"] = f"{base.rstrip('/')}/{branch}"  # branch = task name (e.g., t-pre-process-00)
+            if params.get("final_prefix"):
+                params["final_prefix"] = f"{params['final_prefix'].rstrip('/')}/{branch}"
             return params
 
         ws = make_ws()
         with Workflow(generate_name="ngiab-chain-", entrypoint="main", workflows_service=ws) as w:
             with DAG(name="main"):
-                # For each UI node id, keep a list of created task instances:
-                #   {"task": <argo_task_name>, "dataset_bucket": "...", "dataset_key": "..."}
+                # For each UI node, keep list of created task instances with their dataset pointers
                 instances_by_node: dict[str, list[dict]] = {}
 
                 for layer in topo_layers:
@@ -500,9 +482,7 @@ class NgiabBackendHandler(MBH):
                         tpl_name = _kind_to_template(kind)
                         _ensure_template_exists_or_create(tpl_name)
 
-                        # Determine if this node is terminal in the selected subgraph
                         is_last = nid in sinks
-                        # Gather *all* parent instances (could be 0..N)
                         parent_ids = parents.get(nid, [])
                         parent_instances: list[dict] = []
                         for pid in parent_ids:
@@ -510,33 +490,28 @@ class NgiabBackendHandler(MBH):
 
                         created: list[dict] = []
                         if parent_instances and _is_dataset_consumer(kind):
-                            # Fan-out: one instance per incoming parent instance
+                            # fan-out: one child instance per parent instance
                             for idx, pinst in enumerate(parent_instances):
                                 tname = f"t-{_slug(nid)}-{idx:02d}"
-                                params = _make_params(node, is_last, incoming=pinst)
+                                params = _make_params(node, is_last, incoming=pinst, branch=tname)
                                 Task(
                                     name=tname,
                                     template_ref=TemplateRef(name=tpl_name, template="main"),
-                                    arguments=Arguments(
-                                        parameters=[Parameter(name=k, value=v) for k, v in params.items()]
-                                    ),
-                                    dependencies=[pinst["task"]],  # only that specific upstream instance
+                                    arguments=Arguments(parameters=[Parameter(name=k, value=v) for k, v in params.items()]),
+                                    dependencies=[pinst["task"]],
                                 )
                                 pointer = _dataset_pointer_from_params(kind, params, inherit=pinst)
                                 created.append({"task": tname, **pointer})
                         else:
-                            # Single instance: depend on *all* upstream instances (if any)
+                            # single instance: depend on all upstreams (if any)
                             dep_names = [pi["task"] for pi in parent_instances]
                             tname = f"t-{_slug(nid)}-00"
-                            # If there is exactly one upstream instance, forward its pointer; else None
                             incoming = parent_instances[0] if len(parent_instances) == 1 else None
-                            params = _make_params(node, is_last, incoming=incoming)
+                            params = _make_params(node, is_last, incoming=incoming, branch=tname)
                             Task(
                                 name=tname,
                                 template_ref=TemplateRef(name=tpl_name, template="main"),
-                                arguments=Arguments(
-                                    parameters=[Parameter(name=k, value=v) for k, v in params.items()]
-                                ),
+                                arguments=Arguments(parameters=[Parameter(name=k, value=v) for k, v in params.items()]),
                                 dependencies=dep_names or None,
                             )
                             pointer = _dataset_pointer_from_params(kind, params, inherit=incoming or {})
@@ -545,6 +520,7 @@ class NgiabBackendHandler(MBH):
                         instances_by_node[nid] = created
 
         return w
+
 
 
     # ---------------- RUN WORKFLOW ----------------
@@ -640,7 +616,7 @@ class NgiabBackendHandler(MBH):
 
         # Build the DAG with fan-out semantics (per-parent instances) and submit
         try:
-            w = self._build_chain_workflow(chain_nodes, user, run_id, edges=edges_kept)
+            w = self._build_chain_workflow(chain_nodes, user, wf_uuid=str(wf_row.id), edges=edges_kept)
             w.create()
 
             # Notify/poll all nodes in this DAG
@@ -717,8 +693,11 @@ class NgiabBackendHandler(MBH):
             await _update_node_db(session, wf.id, node_id, "error", f"template error: {e}")
             return
 
-        params = _params_for(kind, cfg, user, run, last_in_chain=True, upstream_key=cfg.get("input_s3_key") or cfg.get("input_key"))
-
+        params = _params_for(
+            kind, cfg, user, str(wf.id),      # <-- wf_uuid
+            last_in_chain=True,
+            upstream_key=cfg.get("input_s3_key") or cfg.get("input_key"),
+        )
         ws = make_ws()
         try:
             with Workflow(
