@@ -63,7 +63,13 @@ export function WorkflowsProvider({ children }) {
 
     const onOpen = () => dispatch({ type: types.WS_CONNECTED });
     const onClose = () => dispatch({ type: types.WS_DISCONNECTED });
-    const onNodeStatus = (payload) => dispatch({ type: types.WS_MESSAGE, payload: { type: 'NODE_STATUS', ...payload } });
+    const onNodeStatus = (payload) => {
+      const { nodeId, status, message = '' } = payload ?? {};
+      if (nodeId && status) {
+        dispatch({ type: types.UPDATE_NODE_STATUS, payload: { nodeId, status, message } });
+      }
+      dispatch({ type: types.WS_MESSAGE, payload: { type: 'NODE_STATUS', ...payload } });
+    };
     const onLastRunLog = (payload) => dispatch({ type: types.WS_MESSAGE, payload: { type: 'LAST_RUN_LOG', events: payload?.events ?? [] } });
 
     const onWorkflowSubmitted = (payload) =>

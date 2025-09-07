@@ -260,11 +260,25 @@ def _params_for(kind: str, cfg: Dict[str, Any], user: str, run_id: str,
         }
 
     if "run" in k and "ngiab" in k:
+        # derive input bucket/key (dataset tar), allow standalone URL as well
+        ibucket = str(cfg.get("input_bucket") or bucket)
+        ikey = upstream_key or str(cfg.get("input_key") or cfg.get("input_s3_key") or "")
+        if not ikey and cfg.get("input_s3_url"):
+            try:
+                ibucket, _ikey = _parse_s3_url(str(cfg["input_s3_url"]))
+                ikey = _ikey
+            except Exception:
+                pass
+        ikey = ikey.lstrip("/")
+        
         return {
             "output_bucket": str(cfg.get("output_bucket") or bucket),
-            "output_prefix": str(cfg.get("output_prefix") or out_prefix),
-            "final_prefix": final_prefix,
-            "input_s3_key": upstream_key or str(cfg.get("input_s3_key") or ""),
+            "output_prefix": str(cfg.get("output_prefix") or _intermediate_prefix(user, run_id, kind)),
+            "final_prefix": _final_prefix(user, run_id, kind) if last_in_chain else "",
+            "input_bucket": ibucket,
+            "input_key": ikey,
+            "input_s3_url": str(cfg.get("input_s3_url") or ""),
+            "input_subdir": str(cfg.get("input_subdir") or "ngiab"),
             "ngen_np": str(cfg.get("ngen_np") or "8"),
             "image_ngen": str(cfg.get("image_ngen") or "awiciroh/ciroh-ngen-image:latest"),
         }
@@ -367,62 +381,171 @@ class NgiabBackendHandler(MBH):
         for tpl in needed:
             _ensure_template_exists_or_create(tpl)
 
-    def _build_chain_workflow(self, chain: list[dict], user: str, run_id: str) -> Workflow:
+
+    def _build_chain_workflow(
+        self,
+        chain: list[dict],
+        user: str,
+        run_id: str,
+        edges: list[dict] | None = None,   # <-- optional: pass full UI edges if you have them
+    ) -> Workflow:
+        """
+        Build a DAG for the selected nodes with *per-parent fan-out* semantics.
+
+        - If a node is a dataset consumer (prepped dataset -> calibration-config/run -> ngiab-run),
+        and it has K incoming edges, we create K task *instances*, each depending on its
+        corresponding upstream task instance and inheriting that upstream's dataset pointer
+        (bucket/key). This yields parallel "mini-chains" into the shared node.
+        - If a node has no parents or is not a dataset consumer, we create a single task
+        that depends on *all* parent instances (classic fan-in).
+
+        'edges' is the UI edge list (items with 'source' and 'target' IDs). If not provided,
+        we fall back to a linear chain in the order of 'chain'.
+        """
+        import re
+
+        def _slug(x: str) -> str:
+            return re.sub(r"[^a-zA-Z0-9\-]+", "-", str(x)).strip("-").lower() or "n"
+
+        def _node_id(n: dict) -> str:
+            return str(n.get("id") or n.get("label"))
+
+        # Normalize nodes and (optional) edges to the selected subgraph
+        nodes_by_id = {_node_id(n): n for n in chain}
+        node_ids = list(nodes_by_id.keys())
+
+        # Filter edges to only those that connect nodes within 'chain'
+        edges_in: list[dict] = []
+        if edges:
+            for e in edges:
+                s, t = e.get("source"), e.get("target")
+                if s in nodes_by_id and t in nodes_by_id:
+                    edges_in.append({"source": s, "target": t})
+
+        # Fallback: linear chain if no edges supplied/retained
+        if not edges_in and len(chain) > 1:
+            for i in range(len(chain) - 1):
+                s = _node_id(chain[i])
+                t = _node_id(chain[i + 1])
+                edges_in.append({"source": s, "target": t})
+
+        # Compute parents/children maps and topological layers
+        parents = {nid: [] for nid in node_ids}
+        children = {nid: [] for nid in node_ids}
+        for e in edges_in:
+            s, t = e["source"], e["target"]
+            if s in nodes_by_id and t in nodes_by_id:
+                parents[t].append(s)
+                children[s].append(t)
+
+        topo_layers = _topo_layers([{"id": nid} for nid in node_ids], edges_in)
+        sinks = {nid for nid in node_ids if not children[nid]}
+
+        def _is_dataset_producer(kind: str) -> bool:
+            lk = (kind or "").lower()
+            return ("preprocess" in lk) or ("pre-process" in lk) or ("calibration-config" in lk)
+
+        def _is_dataset_consumer(kind: str) -> bool:
+            lk = (kind or "").lower()
+            return ("calibration-config" in lk) or ("calibration-run" in lk) or (("ngiab" in lk) and ("run" in lk))
+
+        def _dataset_pointer_from_params(kind: str, params: dict, inherit: dict | None = None) -> dict:
+            """Return {'dataset_bucket': ..., 'dataset_key': ...} for downstream threading."""
+            lk = (kind or "").lower()
+            if ("preprocess" in lk) or ("pre-process" in lk):
+                return {
+                    "dataset_bucket": params.get("output_bucket", ""),
+                    "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/{params.get('output_name','ngiab')}.tgz",
+                }
+            if "calibration-config" in lk:
+                return {
+                    "dataset_bucket": params.get("output_bucket", ""),
+                    "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/calibration-prepared.tgz",
+                }
+            if "calibration-run" in lk:
+                # Does not change the dataset pointer; propagate input
+                return dict(inherit or {})
+            # ngiab-run and others: no new dataset for downstream; propagate if any
+            return dict(inherit or {})
+
+        def _make_params(node: dict, last_flag: bool, incoming: dict | None) -> dict:
+            """Build template params, injecting upstream dataset bucket/key when present."""
+            kind = node.get("label") or node.get("id")
+            cfg = (node.get("config") or {})
+            upstream_key = None
+            # If incoming has a dataset pointer, pass its key through to _params_for
+            if incoming and incoming.get("dataset_bucket") and incoming.get("dataset_key"):
+                upstream_key = incoming["dataset_key"]
+
+            params = _params_for(kind, cfg, user, run_id, last_flag, upstream_key=upstream_key)
+
+            # Ensure explicit bucket/key are set when we have them so artifact S3 inputs bind
+            if incoming and incoming.get("dataset_bucket") and incoming.get("dataset_key"):
+                params.setdefault("input_bucket", incoming["dataset_bucket"])
+                params.setdefault("input_key", incoming["dataset_key"])
+                params.setdefault("input_s3_key", incoming["dataset_key"])
+            return params
+
         ws = make_ws()
         with Workflow(generate_name="ngiab-chain-", entrypoint="main", workflows_service=ws) as w:
             with DAG(name="main"):
-                prev_name = None
+                # For each UI node id, keep a list of created task instances:
+                #   {"task": <argo_task_name>, "dataset_bucket": "...", "dataset_key": "..."}
+                instances_by_node: dict[str, list[dict]] = {}
 
-                # literals we compute from the params we pass to each step
-                last_bucket_lit: str | None = None
-                last_key_lit: str | None = None
-                last_url_lit: str | None = None
+                for layer in topo_layers:
+                    for nid in layer:
+                        node = nodes_by_id[nid]
+                        kind = node.get("label") or node.get("id")
+                        tpl_name = _kind_to_template(kind)
+                        _ensure_template_exists_or_create(tpl_name)
 
-                for i, n in enumerate(chain):
-                    kind = n.get("label") or n.get("id")
-                    lk = (kind or "").lower()
-                    tpl_name = _kind_to_template(kind)
-                    last = (i == len(chain) - 1)
+                        # Determine if this node is terminal in the selected subgraph
+                        is_last = nid in sinks
+                        # Gather *all* parent instances (could be 0..N)
+                        parent_ids = parents.get(nid, [])
+                        parent_instances: list[dict] = []
+                        for pid in parent_ids:
+                            parent_instances.extend(instances_by_node.get(pid, []))
 
-                    _ensure_template_exists_or_create(tpl_name)
-                    params = _params_for(kind, n.get("config") or {}, user, run_id, last, upstream_key=None)
+                        created: list[dict] = []
+                        if parent_instances and _is_dataset_consumer(kind):
+                            # Fan-out: one instance per incoming parent instance
+                            for idx, pinst in enumerate(parent_instances):
+                                tname = f"t-{_slug(nid)}-{idx:02d}"
+                                params = _make_params(node, is_last, incoming=pinst)
+                                Task(
+                                    name=tname,
+                                    template_ref=TemplateRef(name=tpl_name, template="main"),
+                                    arguments=Arguments(
+                                        parameters=[Parameter(name=k, value=v) for k, v in params.items()]
+                                    ),
+                                    dependencies=[pinst["task"]],  # only that specific upstream instance
+                                )
+                                pointer = _dataset_pointer_from_params(kind, params, inherit=pinst)
+                                created.append({"task": tname, **pointer})
+                        else:
+                            # Single instance: depend on *all* upstream instances (if any)
+                            dep_names = [pi["task"] for pi in parent_instances]
+                            tname = f"t-{_slug(nid)}-00"
+                            # If there is exactly one upstream instance, forward its pointer; else None
+                            incoming = parent_instances[0] if len(parent_instances) == 1 else None
+                            params = _make_params(node, is_last, incoming=incoming)
+                            Task(
+                                name=tname,
+                                template_ref=TemplateRef(name=tpl_name, template="main"),
+                                arguments=Arguments(
+                                    parameters=[Parameter(name=k, value=v) for k, v in params.items()]
+                                ),
+                                dependencies=dep_names or None,
+                            )
+                            pointer = _dataset_pointer_from_params(kind, params, inherit=incoming or {})
+                            created.append({"task": tname, **pointer})
 
-                    # If this step needs upstream data, inject the literals we computed
-                    wants_input = ("calibration-config" in lk) or ("calibration-run" in lk)
-                    if wants_input and not str(params.get("input_s3_url", "")).strip():
-                        if last_bucket_lit and last_key_lit:
-                            params["input_bucket"] = last_bucket_lit
-                            params["input_key"]    = last_key_lit
-                            params["input_s3_key"] = last_key_lit
-                        # if last_url_lit:
-                        #     # URL takes precedence in your templates (and avoids artifact staging entirely)
-                        #     params["input_s3_url"] = last_url_lit
+                        instances_by_node[nid] = created
 
-                    task_name = f"step-{i:02d}-{tpl_name}"
-                    Task(
-                        name=task_name,
-                        template_ref=TemplateRef(name=tpl_name, template="main"),
-                        arguments=Arguments(parameters=[Parameter(name=k, value=v) for k, v in params.items()]),
-                        dependencies=[prev_name] if prev_name else None,
-                    )
-                    prev_name = task_name
-
-                    # Compute where THIS step will upload for the NEXT step:
-                    if ("preprocess" in lk) or ("pre-process" in lk):
-                        # s3://<bucket>/<prefix>/<output_name>.tgz
-                        last_bucket_lit = params["output_bucket"]
-                        last_key_lit    = f"{params['output_prefix'].rstrip('/')}/{params['output_name']}.tgz"
-                        last_url_lit    = f"s3://{last_bucket_lit}/{last_key_lit}"
-                    elif "calibration-config" in lk:
-                        # s3://<bucket>/<prefix>/calibration-prepared.tgz
-                        last_bucket_lit = params["output_bucket"]
-                        last_key_lit    = f"{params['output_prefix'].rstrip('/')}/calibration-prepared.tgz"
-                        last_url_lit    = f"s3://{last_bucket_lit}/{last_key_lit}"
-                    elif "calibration-run" in lk:
-                        last_bucket_lit = params["output_bucket"]
-                        last_key_lit    = f"{params['output_prefix'].rstrip('/')}/calibration-run.tgz"
-                        last_url_lit    = f"s3://{last_bucket_lit}/{last_key_lit}"
         return w
+
 
     # ---------------- RUN WORKFLOW ----------------
     @MBH.action_handler
@@ -434,90 +557,109 @@ class NgiabBackendHandler(MBH):
         user = _user_id(self)
         run_id = _run_id()
 
-        # pick target nodes: selected or all
-        targets = [n for n in nodes if not selected_ids or n["id"] in selected_ids]
-        if not targets:
+        # Working set = selected nodes or all nodes
+        selected_set = set(selected_ids) if selected_ids else set(n["id"] for n in nodes)
+        if not selected_set:
             await self.send_action(BackendActions.NODE_STATUS, {"nodeId": "", "status": "error", "message": "Nothing selected to run."})
             return
 
-        # Detect the special chain: pre-process -> calibration
-        pre = next((n for n in targets if (n.get("label") or n["id"]) in ("pre-process", "preprocess", "pre process")), None)
-        cal_config = next((n for n in targets if (n.get("label") or n["id"]).lower().startswith("calibration-config")), None)
-        cal_run = next((n for n in targets if (n.get("label") or n["id"]).lower().startswith("calibration-run")), None)
-
-        def _eid(x): return (x.get("id") or x.get("label"))
-
-        chain_nodes = []
-        # Full 3-step
-        if pre and cal_config and cal_run \
-           and _has_edge(edges, _eid(pre), _eid(cal_config)) \
-           and _has_edge(edges, _eid(cal_config), _eid(cal_run)):
-            chain_nodes = [pre, cal_config, cal_run]
-        # 2-step config -> run
-        elif cal_config and cal_run and _has_edge(edges, _eid(cal_config), _eid(cal_run)):
-            chain_nodes = [cal_config, cal_run]
-        # 2-step pre -> config (no run)
-        elif pre and cal_config and _has_edge(edges, _eid(pre), _eid(cal_config)):
-            chain_nodes = [pre, cal_config]
-
-        # Ensure templates exist for all nodes we might run
-        self._ensure_templates_for_nodes(targets)
-
-        if chain_nodes:
-            # record workflow rows dynamically based on the chain we actually have
-            wt_row = await self._get_or_create_template_row(session, "ngiab-chain", user, {"source": "yaml"})
-            wf_row = WFModel(
-                name=wf_data.get("name") or f"wf-{run_id}",
-                user=user,
-                template_id=wt_row.id,
-                status="queued",
-                graph=wf_data,
-                layers=[[ (n.get("label") or n.get("id")) ] for n in chain_nodes],
-            )
-            session.add(wf_row)
-            await session.flush()
-
-            for order, node in enumerate(chain_nodes):
-                label = node.get("label") or node.get("id")
-                session.add(NodeModel(
-                    workflow_id=wf_row.id,
-                    name=label,
-                    kind=label,
-                    user=user,
-                    config=node.get("config") or {},
-                    status="idle",
-                    order_index=order,
-                ))
-            await session.commit()
-
-            # notify UI
-            for node in chain_nodes:
-                label = node.get("label") or node.get("id")
-                await _emit_status(self, label, "running", "submitting")
-
-            # build and submit the chain
-            try:
-                w = self._build_chain_workflow(chain_nodes, user, run_id)
-                w.create()
-                for node in chain_nodes:
-                    label = node.get("label") or node.get("id")
-                    await _emit_status(self, label, "running", f"argo: {w.name}")
-                    asyncio.create_task(self._poll_argo_to_terminal(w.name, label, wf_row.id))
-            except Exception as e:
-                for node in chain_nodes:
-                    label = node.get("label") or node.get("id")
-                    await _emit_status(self, label, "error", f"submit failed: {e}")
-                    await _update_node_db(session, wf_row.id, label, "error", f"submit failed: {e}")
-
-            # Any other nodes run independently
-            others = [n for n in targets if n not in chain_nodes]
-            for n in others:
-                await self.receive_run_node(event, action, {"nodeId": n["id"], "label": n.get("label"), "config": n.get("config") or {}})
+        # Induced subgraph of selected nodes
+        nodes_by_id = {n["id"]: n for n in nodes if n["id"] in selected_set}
+        edges_sub = [e for e in edges if e.get("source") in nodes_by_id and e.get("target") in nodes_by_id]
+        if not nodes_by_id:
+            await self.send_action(BackendActions.NODE_STATUS, {"nodeId": "", "status": "error", "message": "No valid nodes in selection."})
             return
 
-        # (unchanged) fall back: run each selected node independently
-        for n in targets:
-            await self.receive_run_node(event, action, {"nodeId": n["id"], "label": n.get("label"), "config": n.get("config") or {}})
+        def _kind(n: dict) -> str:
+            return (n.get("label") or n.get("id") or "").lower()
+
+        def _is_dataset_consumer(n: dict) -> bool:
+            k = _kind(n)
+            return ("calibration-config" in k) or ("calibration-run" in k) or ("ngiab" in k and "run" in k)
+
+        # Build parent adjacency on the induced subgraph
+        parents: dict[str, list[str]] = {nid: [] for nid in nodes_by_id}
+        for e in edges_sub:
+            parents[e["target"]].append(e["source"])
+
+        # Collect all sinks that are dataset consumers
+        sink_ids = [nid for nid, n in nodes_by_id.items() if _is_dataset_consumer(n)]
+
+        # If there are no consumer sinks selected, fall back to all selected nodes (still runs parallel/independent)
+        keep: set[str] = set()
+        if sink_ids:
+            # For each sink, collect all ancestors (pre-process, etc.) + the sink itself
+            for sid in sink_ids:
+                stack = [sid]
+                while stack:
+                    cur = stack.pop()
+                    if cur in keep:
+                        continue
+                    keep.add(cur)
+                    stack.extend(parents.get(cur, []))
+        else:
+            keep = set(nodes_by_id.keys())
+
+        chain_nodes = [nodes_by_id[i] for i in keep]
+        edges_kept = [e for e in edges_sub if e["source"] in keep and e["target"] in keep]
+
+        # Ensure templates exist for everything we’re about to run
+        self._ensure_templates_for_nodes(chain_nodes)
+
+        # Record a single WF row that covers this connected subgraph
+        wt_row = await self._get_or_create_template_row(session, "ngiab-chain", user, {"source": "yaml"})
+        wf_row = WFModel(
+            name=wf_data.get("name") or f"wf-{run_id}",
+            user=user,
+            template_id=wt_row.id,
+            status="queued",
+            graph={"nodes": chain_nodes, "edges": edges_kept},
+            layers=[],  # optional: could compute topo layers for UI here
+        )
+        session.add(wf_row)
+        await session.flush()
+
+        for order, node in enumerate(chain_nodes):
+            label = node.get("label") or node.get("id")
+            node_id = node.get("id") or (node.get("label") or "")
+            session.add(NodeModel(
+                workflow_id=wf_row.id,
+                name=node_id,
+                kind=label,
+                user=user,
+                config=node.get("config") or {},
+                status="idle",
+                order_index=order,
+            ))
+        await session.commit()
+
+        # optimistic UI updates
+        for node in chain_nodes:
+            node_id = node.get("id") or (node.get("label") or "")
+            await _emit_status(self, node_id, "running", "submitting")
+
+        # Build the DAG with fan-out semantics (per-parent instances) and submit
+        try:
+            w = self._build_chain_workflow(chain_nodes, user, run_id, edges=edges_kept)
+            w.create()
+
+            # Notify/poll all nodes in this DAG
+            for node in chain_nodes:
+                node_id = node.get("id") or (node.get("label") or "")
+                await _emit_status(self, node_id, "running", f"argo: {w.name}")
+                asyncio.create_task(self._poll_argo_to_terminal(w.name, node_id, wf_row.id))
+
+        except Exception as e:
+            for node in chain_nodes:
+                await _emit_status(self, node_id, "error", f"submit failed: {e}")
+                await _update_node_db(session, wf_row.id,node_id, "error", f"submit failed: {e}")
+
+        # Optionally run *other* selected nodes that are totally disconnected from the kept subgraph
+        other_ids = selected_set - keep
+        for n in nodes:
+            if n["id"] in other_ids:
+                await self.receive_run_node(event, action, {"nodeId": n["id"], "label": n.get("label"), "config": n.get("config") or {}})
+
 
 
     async def _get_or_create_template_row(self, session: AsyncSession, name: str, user: str, spec: dict | None):

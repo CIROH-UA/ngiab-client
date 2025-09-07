@@ -11,41 +11,164 @@ spec:
       parameters:
         - { name: output_bucket, default: "test-ngen" }
         - { name: output_prefix, default: "demo/default" }
-        - { name: final_prefix, default: "" }
-        - { name: input_s3_key, default: "" }
-        - { name: ngen_np, default: "8" }
-        - { name: image_ngen, default: "awiciroh/ciroh-ngen-image:latest" }
+        - { name: final_prefix,  default: "" }
+        # dataset selectors
+        - { name: input_bucket,  default: "" }      # chained
+        - { name: input_key,     default: "" }      # chained (may be sanitized below)
+        - { name: input_s3_key,  default: "" }      # legacy/optional (may be a full s3:// URL)
+        - { name: input_s3_url,  default: "" }      # standalone: s3://… or https://…
+        - { name: input_subdir,  default: "ngiab" } # typical preprocess top-level dir
+        - { name: ngen_np,       default: "8" }
+        - { name: image_ngen,    default: "awiciroh/ciroh-ngen-image:latest" }
       artifacts:
         - name: dataset
-          path: /workspace/data
+          optional: true
+          path: /tmp/in
           s3:
             endpoint: s3.amazonaws.com
             region: us-east-1
-            insecure: false
-            bucket: "{{inputs.parameters.output_bucket}}"
-            key: "{{inputs.parameters.input_s3_key}}"
+            bucket: "{{inputs.parameters.input_bucket}}"
+            key: "{{inputs.parameters.input_key}}"
             accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
             secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
-    container:
+
+    script:
       image: "{{inputs.parameters.image_ngen}}"
       command: [bash, -lc]
-      args:
-        - |
-          set -e
-          cd /workspace
-          # Try to run; tolerate failure but always create output dirs so artifact upload succeeds
-          set +e
-          /ngen/HelloNGEN.sh /workspace/data auto {{inputs.parameters.ngen_np}} local
-          set -e
-          mkdir -p /workspace/data/outputs /workspace/data/restarts
+      env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_ACCESS_KEY_ID } }
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_SECRET_ACCESS_KEY } }
+        - name: AWS_DEFAULT_REGION
+          value: us-east-1
+      source: |
+        set -euo pipefail
+
+        mkdir -p /tmp/in /tmp/data /workspace/data /tmp/out
+        # Make these early so artifact archiving and parameter saves always work
+        mkdir -p /workspace/data/outputs /workspace/data/restarts
+        printf "%s\n" "{{inputs.parameters.output_bucket}}" > /tmp/out/.bucket
+        printf "%s\n" "{{inputs.parameters.output_prefix}}/outputs.tgz"  > /tmp/out/.outputs_key
+        printf "%s\n" "{{inputs.parameters.output_prefix}}/restarts.tgz" > /tmp/out/.restarts_key
+
+        IN_URL="{{inputs.parameters.input_s3_url}}"
+        SRC_DIR="/tmp/in"
+
+        pkg_install() {
+          if command -v dnf >/dev/null 2>&1; then
+            dnf install -y "$@" || dnf install -y --setopt=install_weak_deps=False "$@"
+          elif command -v microdnf >/dev/null 2>&1; then
+            microdnf install -y "$@"
+          elif command -v yum >/dev/null 2>&1; then
+            yum install -y "$@"
+          elif command -v apt-get >/dev/null 2>&1; then
+            apt-get update -y && apt-get install -y --no-install-recommends "$@"
+          fi
+        }
+
+        ensure_aws() {
+          command -v unzip >/dev/null 2>&1 || pkg_install unzip
+          command -v curl  >/dev/null 2>&1 || pkg_install curl ca-certificates
+          if ! command -v aws >/dev/null 2>&1; then
+            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+            unzip -q /tmp/awscliv2.zip -d /tmp
+            /tmp/aws/install -i /usr/local/aws-cli -b /usr/local/bin
+          fi
+        }
+
+        # ---------------- Standalone: fetch the URL ----------------
+        if [ -n "${IN_URL}" ]; then
+          if echo "${IN_URL}" | grep -q '^s3://'; then
+            ensure_aws
+            echo "aws s3 cp ${IN_URL} /tmp/data/input.tgz"
+            aws s3 cp "${IN_URL}" /tmp/data/input.tgz --no-progress
+          else
+            command -v curl >/dev/null 2>&1 || pkg_install curl ca-certificates
+            echo "curl -fL ${IN_URL} -o /tmp/data/input.tgz"
+            curl -fL "${IN_URL}" -o /tmp/data/input.tgz
+          fi
+          [ -s /tmp/data/input.tgz ] || { echo "Missing /tmp/data/input.tgz"; exit 2; }
+          tar -C /tmp/data -xzf /tmp/data/input.tgz 2>/dev/null || tar -C /tmp/data -xf /tmp/data/input.tgz
+          SRC_DIR="/tmp/data"
+        fi
+
+        # ---------------- Chained/Artifact path normalize ----------------
+        ib="{{inputs.parameters.input_bucket}}"
+        ik="$(printf "%s" "{{inputs.parameters.input_key}}")"
+        [ -z "$ik" ] && ik="$(printf "%s" "{{inputs.parameters.input_s3_key}}")"
+
+        # If the "key" is actually a full s3 URL, parse it and override bucket/key
+        if printf '%s' "$ik" | grep -q '^s3://'; then
+          u="${ik#s3://}"
+          ib="${u%%/*}"
+          ik="${u#*/}"
+        fi
+        # Strip any accidental leading slashes from key
+        ik="${ik#/}"
+
+        # If /tmp/in is still our source and it's empty, pull with aws s3 cp
+        if [ "${SRC_DIR}" = "/tmp/in" ]; then
+          if [ -f "${SRC_DIR}" ]; then
+            tar -C /tmp/data -xzf "${SRC_DIR}" 2>/dev/null || tar -C /tmp/data -xf "${SRC_DIR}"
+            SRC_DIR="/tmp/data"
+          elif [ -d "${SRC_DIR}" ]; then
+            tgz="$(find "${SRC_DIR}" -maxdepth 1 -type f \( -name '*.tgz' -o -name '*.tar.gz' -o -name '*.tar' \) | head -n1 || true)"
+            if [ -n "${tgz}" ]; then
+              tar -C /tmp/data -xzf "${tgz}" 2>/dev/null || tar -C /tmp/data -xf "${tgz}"
+              SRC_DIR="/tmp/data"
+            fi
+          fi
+
+          if [ "${SRC_DIR}" = "/tmp/in" ] && [ -n "$ib" ] && [ -n "$ik" ]; then
+            ensure_aws
+            echo "aws s3 cp s3://${ib}/${ik} /tmp/data/input.tgz"
+            aws s3 cp "s3://${ib}/${ik}" /tmp/data/input.tgz --no-progress
+            [ -s /tmp/data/input.tgz ] || { echo "No such S3 object: s3://${ib}/${ik}"; exit 254; }
+            tar -C /tmp/data -xzf /tmp/data/input.tgz 2>/dev/null || tar -C /tmp/data -xf /tmp/data/input.tgz
+            SRC_DIR="/tmp/data"
+          fi
+        fi
+
+        # ---------------- Find dataset root (contains config/) ----------------
+        IN_SUB="{{inputs.parameters.input_subdir}}"
+        DATA_DIR=""
+        if [ -n "${IN_SUB}" ] && [ -d "${SRC_DIR}/${IN_SUB}/config" ]; then
+          DATA_DIR="${SRC_DIR}/${IN_SUB}"
+        elif [ -d "${SRC_DIR}/config" ]; then
+          DATA_DIR="${SRC_DIR}"
+        else
+          DATA_DIR="$(find "${SRC_DIR}" -mindepth 1 -maxdepth 2 -type d -exec test -d '{}/config' ';' -print -quit || true)"
+        fi
+
+        if [ -z "${DATA_DIR}" ] || [ ! -d "${DATA_DIR}/config" ]; then
+          echo "ERROR: Could not find dataset root with config/ under ${SRC_DIR}"
+          find "${SRC_DIR}" -maxdepth 2 -type d -print || true
+          exit 2
+        fi
+
+        # ---------------- Stage and run ----------------
+        cp -a "${DATA_DIR}/." "/workspace/data/"
+        set +e
+        /ngen/HelloNGEN.sh /workspace/data auto "{{inputs.parameters.ngen_np}}" local
+        rc=$?
+        set -e
+        echo "HelloNGEN exit code: ${rc}"
+
     outputs:
+      parameters:
+        - name: outputs_bucket
+          valueFrom: { path: /tmp/out/.bucket }
+        - name: outputs_s3_key
+          valueFrom: { path: /tmp/out/.outputs_key }
+        - name: restarts_s3_key
+          valueFrom: { path: /tmp/out/.restarts_key }
       artifacts:
         - name: outputs-dir
           path: /workspace/data/outputs
           s3:
             endpoint: s3.amazonaws.com
             region: us-east-1
-            insecure: false
             bucket: "{{inputs.parameters.output_bucket}}"
             key: "{{inputs.parameters.output_prefix}}/outputs.tgz"
             accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
@@ -55,7 +178,6 @@ spec:
           s3:
             endpoint: s3.amazonaws.com
             region: us-east-1
-            insecure: false
             bucket: "{{inputs.parameters.output_bucket}}"
             key: "{{inputs.parameters.output_prefix}}/restarts.tgz"
             accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
