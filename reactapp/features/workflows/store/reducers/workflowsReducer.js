@@ -2,11 +2,11 @@ import { applyNodeChanges, applyEdgeChanges, addEdge } from '@xyflow/react';
 import { types } from '../actions/actionsTypes';
 
 const baseNodes = [
-  { id: 'pre-process', position: { x: 0,   y: 0 },  type: 'process', data: { label: 'pre-process', status: 'idle', config: {} } },
-  { id: 'calibration-config', position: { x: 250, y: 0 },  type: 'process', data: { label: 'calibration-config', status: 'idle', config: {} } },
-  { id: 'calibration-run', position: { x: 500, y: 0 },  type: 'process', data: { label: 'calibration-run', status: 'idle', config: {} } },
-  { id: 'run-ngiab',   position: { x: 750, y: 0 },  type: 'process', data: { label: 'run ngiab',  status: 'idle', config: {} } },
-  { id: 'teehr',       position: { x: 1000, y: 0 },  type: 'process', data: { label: 'teehr',      status: 'idle', config: {} } },
+  // { id: 'pre-process', position: { x: 0,   y: 0 },  type: 'process', data: { label: 'pre-process', status: 'idle', config: {} } },
+  // { id: 'calibration-config', position: { x: 250, y: 0 },  type: 'process', data: { label: 'calibration-config', status: 'idle', config: {} } },
+  // { id: 'calibration-run', position: { x: 500, y: 0 },  type: 'process', data: { label: 'calibration-run', status: 'idle', config: {} } },
+  // { id: 'run-ngiab',   position: { x: 750, y: 0 },  type: 'process', data: { label: 'run ngiab',  status: 'idle', config: {} } },
+  // { id: 'teehr',       position: { x: 1000, y: 0 },  type: 'process', data: { label: 'teehr',      status: 'idle', config: {} } },
 ];
 
 function labelFor(kind) {
