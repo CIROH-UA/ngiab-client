@@ -4,6 +4,7 @@ import { workflowsReducer, initialState } from '../store/reducers/workflowsReduc
 import { types } from '../store/actions/actionsTypes';
 import dagre from 'dagre';
 import { AppContext } from 'context/context';
+import { toast } from 'react-toastify';
 
 // ---- helpers (unchanged dagre + cycle) ----
 function createsCycle(source, target, edges) {
@@ -59,7 +60,12 @@ export function WorkflowsProvider({ children }) {
 
   useEffect(() => {
     if (!backend) return;
-    if (backend.webSocket?.readyState === 1) dispatch({ type: types.WS_CONNECTED });
+    const isOpenNow = backend.webSocket?.readyState === 1;
+    if (isOpenNow) {
+      dispatch({ type: types.WS_CONNECTED });
+      // request workflows immediately if already open
+      try { backend?.do(backend?.actions?.LIST_WORKFLOWS ?? 'LIST_WORKFLOWS', {}); } catch {}
+    }
 
     const onOpen = () => dispatch({ type: types.WS_CONNECTED });
     const onClose = () => dispatch({ type: types.WS_DISCONNECTED });
@@ -74,15 +80,53 @@ export function WorkflowsProvider({ children }) {
     const onWorkflowSubmitted = (payload) =>
         dispatch({ type: types.WS_MESSAGE, payload: { type: 'WORKFLOW_SUBMITTED', ...payload } });
 
+    const onWorkflowsList = (payload) => {
+      dispatch({ type: types.WS_MESSAGE, payload: { type: 'WORKFLOWS_LIST', ...payload } });
+      toast.success(`Loaded ${payload?.count ?? 0} workflows`);
+    };
+
+    const onWorkflowGraph = (payload) => {
+      const srcNodes = Array.isArray(payload?.nodes) ? payload.nodes : [];
+      const srcEdges = Array.isArray(payload?.edges) ? payload.edges : [];
+      // Normalize to React Flow shapes (id/type/position/data)
+      const rfNodes = srcNodes.map((n, i) => ({
+        id: String(n.id ?? `n-${i}`),
+        type: 'process',
+        position: { x: 0, y: 0 },
+        data: {
+          label: n.label ?? String(n.id ?? `n-${i}`),
+          status: n.status ?? 'idle',
+          config: n.config ?? {},
+        },
+      }));
+      const rfEdges = srcEdges.map((e, i) => ({
+        id: `e-${e.source}-${e.target}-${i}`,
+        source: String(e.source),
+        target: String(e.target),
+      }));
+      // Layout (LR by default); React Flow recommends mapping positions from dagre result. :contentReference[oaicite:1]{index=1}
+      const layouted = layoutWithDagre(rfNodes, rfEdges, { rankdir: 'LR', nodesep: 60, ranksep: 90 });
+      dispatch({ type: types.SET_EDGES, payload: rfEdges });
+      dispatch({ type: types.SET_NODES, payload: layouted });
+      const name = payload?.workflow?.name ?? 'workflow';
+      const n = rfNodes.length, m = rfEdges.length;
+      toast.info(`Opened "${name}" • ${n} node${n===1?'':'s'}, ${m} edge${m===1?'':'s'}`);
+    };
+
     backend.on('WS_CONNECTED', onOpen);
     backend.on('WS_DISCONNECTED', onClose);
     backend.on('NODE_STATUS', onNodeStatus);
+    backend.on('WORKFLOWS_LIST', onWorkflowsList);
+    backend.on('WORKFLOW_GRAPH', onWorkflowGraph);
     backend.on('WORKFLOW_SUBMITTED', onWorkflowSubmitted);
+
 
     return () => {
       backend.off('WS_CONNECTED'); 
       backend.off('WS_DISCONNECTED');
-      backend.off('NODE_STATUS');  
+      backend.off('NODE_STATUS');
+      backend.off('WORKFLOWS_LIST');
+       backend.off('WORKFLOW_GRAPH');
       backend.off('WORKFLOW_SUBMITTED');
     };
   }, [backend]);
@@ -139,7 +183,12 @@ export function WorkflowsProvider({ children }) {
 
   const startPlayback = () => dispatch({ type: types.PLAYBACK_START });
   const resetPlayback = () => dispatch({ type: types.PLAYBACK_RESET });
-
+  const setSelectedWorkflow = (id) =>
+    {
+      dispatch({ type: types.SET_SELECTED_WORKFLOW, payload: id });
+      // ask backend for the graph
+      try { backend?.do(backend?.actions?.GET_WORKFLOW ?? 'GET_WORKFLOW', { id }); } catch {}
+    }
   // timer for playback
   const timerRef = useRef(null);
   useEffect(() => {
@@ -155,6 +204,7 @@ export function WorkflowsProvider({ children }) {
     runWorkflow, autoLayout, isValidConnection,
     addNode, removeSelected,
     startPlayback, resetPlayback,
+    setSelectedWorkflow,
   }), [state]);
 
   return <WorkflowsContext.Provider value={value}>{children}</WorkflowsContext.Provider>;

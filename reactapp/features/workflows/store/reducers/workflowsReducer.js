@@ -30,7 +30,9 @@ export const initialState = {
   layers: [],
   lastMessage: null,
   playback: { events: [], idx: 0, playing: false },
-  ui: { popupNodeId: null },
+  workflows: [],
+  ui: { popupNodeId: null, selectedWorkflowId: null },
+
 };
 
 export function workflowsReducer(state, action) {
@@ -100,7 +102,11 @@ export function workflowsReducer(state, action) {
 
     case types.WS_MESSAGE: {
       const msg = action.payload;
-// Backend confirms a submission & which nodes are part of it → show spinners immediately
+      if (msg?.type === 'WORKFLOWS_LIST' && Array.isArray(msg.items)) {
+        return { ...state, workflows: msg.items, lastMessage: msg };
+      }
+
+      // Backend confirms a submission & which nodes are part of it → show spinners immediately
       if (msg?.type === 'WORKFLOW_SUBMITTED' && Array.isArray(msg.nodeIds)) {
         const ids = new Set(msg.nodeIds);
         const nodes = state.nodes.map(n =>
@@ -148,6 +154,9 @@ export function workflowsReducer(state, action) {
       return { ...state, nodes, playback: { ...playback, idx: playback.idx + 1 } };
     }
 
+    case types.SET_SELECTED_WORKFLOW:
+      return { ...state, ui: { ...state.ui, selectedWorkflowId: action.payload } };
+      
     default:
       return state;
   }

@@ -343,6 +343,8 @@ class NgiabBackendHandler(MBH):
             "RUN_WORKFLOW": self.receive_run_workflow,
             "RUN_NODE": self.receive_run_node,
             "REQUEST_LAST_RUN": self.receive_request_last_run,
+            "LIST_WORKFLOWS": self.receive_list_workflows,
+            "GET_WORKFLOW": self.receive_get_workflow,
         }
         # Optional legacy shims
         optional = {
@@ -568,6 +570,54 @@ class NgiabBackendHandler(MBH):
 
         return w
 
+
+    @MBH.action_handler
+    async def receive_get_workflow(self, event, action, data, session: AsyncSession):
+        """Return {nodes, edges} for a workflow id. Falls back to Node rows if graph is missing."""
+        from ..backend_actions import BackendActions
+        wf_id = (data or {}).get("id") or (data or {}).get("workflowId")
+        if not wf_id:
+            raise ValueError("Missing workflow 'id'")
+
+        wf = (await session.execute(select(WFModel).where(WFModel.id == wf_id).limit(1))).scalar_one_or_none()
+        if not wf:
+            raise ValueError("Workflow not found")
+
+        nodes, edges = [], []
+        if wf.graph and isinstance(wf.graph, dict):
+            nodes = list(wf.graph.get("nodes") or [])
+            edges = list(wf.graph.get("edges") or [])
+        else:
+            # Fallback: reconstruct nodes from Node table; edges unknown
+            nrows = (await session.execute(select(NodeModel).where(NodeModel.workflow_id == wf.id))).scalars().all()
+            nodes = [{"id": n.name, "label": n.kind, "config": n.config or {}, "status": n.status} for n in nrows]
+            edges = []
+
+        payload = {
+            "workflow": {"id": wf.id, "name": wf.name, "status": wf.status},
+            "nodes": nodes,
+            "edges": edges,
+            "count": {"nodes": len(nodes), "edges": len(edges)},
+        }
+        await self.send_action(BackendActions.WORKFLOW_GRAPH, payload)
+
+    @MBH.action_handler
+    async def receive_list_workflows(self, event, action, data, session: AsyncSession):
+        """Return the current user's workflows for the dropdown."""
+        try:
+            user = self.backend_consumer.scope.get("user")
+            username = getattr(user, "username", None)
+            q = select(WFModel).order_by(WFModel.created_at.desc()).limit(1000)
+            if username:
+                q = q.where(WFModel.user == username)
+            rows = (await session.execute(q)).scalars().all()
+            items = [{
+                "id": w.id, "name": w.name, "status": w.status,
+                "created_at": w.created_at, "updated_at": w.updated_at
+            } for w in rows]
+            await self.send_action(BackendActions.WORKFLOWS_LIST, {"items": items, "count": len(items)})
+        except Exception as e:
+            await self.send_error(f"Failed to list workflows: {e}", action, data)
 
 
     # ---------------- RUN WORKFLOW ----------------

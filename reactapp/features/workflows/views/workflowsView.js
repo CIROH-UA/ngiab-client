@@ -1,22 +1,49 @@
 // features/workflows/views/workflowsView.js
 import React from 'react';
+
+
 import Workflow from '../components/workflow';
+import { useWorkflows } from '../hooks/useWorkflowsContext';
+
 import { FaTrashAlt, FaPlay, FaPuzzlePiece, FaPlus } from "react-icons/fa";
 import { GoWorkflow } from "react-icons/go";
 import { WorkflowsProvider } from '../providers/workflowsProvider';
-import { useWorkflows } from '../hooks/useWorkflowsContext';
-import '@xyflow/react/dist/style.css';
 
+
+import Select, { components as RSComponents } from 'react-select';
+import { FixedSizeList as List } from 'react-window';
+
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import '@xyflow/react/dist/style.css';
 
 
 function Toolbar() {
   const {
     
     addNode, removeSelected, autoLayout,
-    startPlayback, resetPlayback,
+    startPlayback,              // ok to keep if you still use it
     runWorkflow,
+    setSelectedWorkflow,        // <-- new from provider
     state,
   } = useWorkflows();
+
+  // react-window powered MenuList for react-select
+  const MenuList = (props) => {
+    const { children, maxHeight } = props;
+    const itemCount = Array.isArray(children) ? children.length : 0;
+    const height = Math.min(maxHeight, itemCount * 36);
+    return (
+      <RSComponents.MenuList {...props}>
+        <List height={height} itemCount={itemCount} itemSize={36} width="100%">
+          {({ index, style }) => <div style={style}>{children[index]}</div>}
+        </List>
+      </RSComponents.MenuList>
+    );
+  };
+  const options = (state.workflows || []).map(w => ({ value: String(w.id), label: w.name }));
+  const selected = options.find(o => o.value === state.ui?.selectedWorkflowId) || null;
+
 
   return (
     <aside
@@ -25,7 +52,7 @@ function Toolbar() {
         flexDirection: 'column',        // vertical stack
         gap: 8,
         alignItems: 'stretch',
-        width: 220,
+        width: 275,
         padding: 10,
         border: '1px solid #374151',
         borderRadius: 10,
@@ -36,6 +63,28 @@ function Toolbar() {
         overflowY: 'auto',              // scroll if buttons wrap
       }}
     >
+
+      <strong style={{ marginBottom: 4 }}>My Workflows</strong>
+      <Select
+        options={options}
+        value={selected}
+        onChange={(opt) => {
+          const id = opt?.value ?? null;
+          setSelectedWorkflow(id);     // <-- direct, safe, inside provider
+        }}
+        placeholder="Pick a workflow…"
+        components={{ MenuList }}
+        isClearable
+        styles={{
+          control: (base) => ({ ...base, background: '#111827', borderColor: '#374151', color: '#e5e7eb' }),
+          singleValue: (base) => ({ ...base, color: '#e5e7eb' }),
+          menu: (base) => ({ ...base, background: '#0b1220', color: '#e5e7eb' }),
+          option: (base, s) => ({ ...base, background: s.isFocused ? '#111827' : '#0b1220', color: '#e5e7eb' }),
+        }}
+        theme={(t) => ({ ...t, colors: { ...t.colors, primary25: '#111827', primary: '#3b82f6' } })}
+      />
+
+
       <strong style={{ marginBottom: 4 }}>Tools <FaPuzzlePiece/> </strong>
 
       <button onClick={() => addNode('pre-process')} className="btn"> <FaPlus />pre-process</button>
@@ -45,23 +94,22 @@ function Toolbar() {
       <button onClick={() => addNode('teehr')} className="btn"> <FaPlus />  teehr</button>
 
       <hr style={{ border: 'none', borderTop: '1px solid #374151', margin: '6px 0' }} />
-
-      <button onClick={removeSelected} className="btn btn-danger" style={{ display:'flex', alignItems:'center', gap:6 }}>
-        <FaTrashAlt /> Remove selected
-      </button>
-
-      <hr style={{ border: 'none', borderTop: '1px solid #374151', margin: '6px 0' }} />
-
-      <button onClick={() => autoLayout('LR')} className="btn"> <GoWorkflow /> Vertical Layout</button>
-      <button onClick={() => autoLayout('TB')} className="btn"> <GoWorkflow /> Horizontal Layout</button>
+      {/* Row: Remove + Auto-layout LR/TB */}
+      <div style={{ display: 'flex', gap: 3 }}>
+        <button onClick={removeSelected} className="btn btn-danger" style={{ display:'flex', alignItems:'center', gap:6 }}>
+          <FaTrashAlt/> Remove
+        </button>
+        <button onClick={() => autoLayout('LR')} className="btn"><GoWorkflow/> LR</button>
+        <button onClick={() => autoLayout('TB')} className="btn"><GoWorkflow/> TB</button>
+        <button onClick={runWorkflow} className="btn"> <FaPlay />Run </button>
+      </div>
 
       <hr style={{ border: 'none', borderTop: '1px solid #374151', margin: '6px 0' }} />
 
       
       <div style={{ display: 'flex', gap: 6 }}>
-         <button onClick={runWorkflow} className="btn" style={{ flex: 1 }}> <FaPlay /> Run</button>
+         
       </div>
-      <button onClick={resetPlayback} className="btn btn-danger">Reset</button>
 
       {/* Push WS status to bottom */}
       <div style={{ marginTop: 'auto', fontSize: 12, opacity: 0.8 }}>
@@ -125,6 +173,7 @@ export default function WorkflowsView() {
           <LayersPreview />
         </div>
       </div>
+      <ToastContainer position="top-right" />
     </WorkflowsProvider>
   );
 }
