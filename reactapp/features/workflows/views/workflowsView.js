@@ -109,7 +109,7 @@ function Toolbar() {
         flexDirection: 'column',        // vertical stack
         gap: 8,
         alignItems: 'stretch',
-        width: 275,
+        width: 350,
         padding: 10,
         border: '1px solid #374151',
         borderRadius: 10,
@@ -159,16 +159,8 @@ function Toolbar() {
           />
 
       <strong style={{ marginBottom: 4 }}>Tools</strong>
-
-      <button onClick={() => addNode('pre-process')} className="btn"> <FaPlus />pre-process</button>
-      <button onClick={() => addNode('calibration-config')} className="btn"> <FaPlus /> calibration config</button>
-      <button onClick={() => addNode('calibration-run')} className="btn"> <FaPlus /> calibration run</button>
-      <button onClick={() => addNode('run-ngiab')} className="btn"> <FaPlus /> run ngiab</button>
-      <button onClick={() => addNode('teehr')} className="btn"> <FaPlus />  teehr</button>
-
-      <hr style={{ border: 'none', borderTop: '1px solid #374151', margin: '6px 0' }} />
         {/* Row: Remove + Auto-layout LR/TB */}
-        <div style={{ display: 'flex', gap: 3 }}>
+        <div style={{ display: 'flex', gap: 3, width: '100%', justifyContent: 'center' }}>
           <button onClick={removeSelected} className="btn btn-danger" style={{ display:'flex', alignItems:'center', gap:6 }}>
             <FaTrashAlt/>
           </button>
@@ -176,10 +168,15 @@ function Toolbar() {
           <button onClick={() => autoLayout('TB')} className="btn"><LuAlignStartVertical /></button>
           <button onClick={runWorkflow} className="btn"> <FaPlay /> </button>
         </div>
-
       <hr style={{ border: 'none', borderTop: '1px solid #374151', margin: '6px 0' }} />
 
-      
+      <button onClick={() => addNode('pre-process')} className="btn"> <FaPlus />pre-process</button>
+      <button onClick={() => addNode('calibration-config')} className="btn"> <FaPlus /> calibration config</button>
+      <button onClick={() => addNode('calibration-run')} className="btn"> <FaPlus /> calibration run</button>
+      <button onClick={() => addNode('run-ngiab')} className="btn"> <FaPlus /> run ngiab</button>
+      <button onClick={() => addNode('teehr')} className="btn"> <FaPlus />  teehr</button>
+
+      <hr style={{ border: 'none', borderTop: '1px solid #374151', margin: '6px 0' }} />      
       <div style={{ display: 'flex', gap: 6 }}>
          
       </div>
