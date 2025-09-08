@@ -5,9 +5,12 @@ import tarfile
 import uuid
 import shutil
 from pathlib import Path
+import tempfile
+from typing import Iterable
 from botocore import UNSIGNED
 from botocore.client import Config
 from botocore.exceptions import ClientError, BotoCoreError
+
 
 
 from .utils import _get_conf_file
@@ -236,56 +239,129 @@ def _download_tar_from_s3(bucket: str, tar_key: str, download_path: str) -> None
     except (ClientError, BotoCoreError):
         raise
 
+
 def _extract_keep_ngen_run(
     tar_path: str,
     work_dir: str,
     dst_name: str = "ngen-run",
 ) -> Path:
     """
-    Extract only the subtree  home/ec2-user/outputs/ngen-run/
-    from *tar_path* into *work_dir*, rename it to *dst_name*, delete the
-    tarball, and prune any *new* empty directories that were created.
+    Extract only the subtree ending in 'ngen-run/' from *tar_path* into *work_dir*,
+    rename it to *dst_name*, delete the tarball, and leave *work_dir* otherwise
+    untouched. Handles archives that contain either:
+      - 'home/ec2-user/outputs/ngen-run/...'
+      - 'ngen-run/...'
+    and similar variants (leading './', etc.).
 
-    Anything that already existed inside *work_dir* is left untouched.
+    Returns the pathlib.Path to work_dir/dst_name.
     """
+
+    def _norm(name: str) -> str:
+        # Normalize tar member name to a safe, comparable relative POSIX path.
+        # - strip leading './' and '/'
+        # - convert backslashes (just in case) to '/'
+        name = name.replace("\\", "/")
+        while name.startswith("./"):
+            name = name[2:]
+        while name.startswith("/"):
+            name = name[1:]
+        return name
+
+    def _is_within_directory(directory: str, target: str) -> bool:
+        # Path traversal guard for extraction
+        abs_directory = os.path.abspath(directory)
+        abs_target = os.path.abspath(target)
+        return os.path.commonprefix([abs_directory, abs_target]) == abs_directory
+
+    def _safe_extract(tar: tarfile.TarFile, members: Iterable[tarfile.TarInfo], path: str) -> None:
+        for m in members:
+            dest = os.path.join(path, _norm(m.name))
+            if not _is_within_directory(path, dest):
+                raise RuntimeError(f"Blocked suspicious path in tar: {m.name!r}")
+        tar.extractall(path=path, members=members)
+
     work_dir = Path(work_dir).resolve()
-    KEEP_PREFIX = "home/ec2-user/outputs/ngen-run/"
-
-    # ── record what was already in work_dir ──────────────────────────────
-    preexisting = {p for p in work_dir.rglob("*") if p.is_dir()}
-
-    # ── 1. selective extraction ──────────────────────────────────────────
-    with tarfile.open(tar_path, "r:*") as tar:
-        wanted = [m for m in tar.getmembers()
-                  if m.name.startswith(KEEP_PREFIX)]
-        if not wanted:
-            raise FileNotFoundError(
-                f"{KEEP_PREFIX!r} not found inside {tar_path}"
-            )
-        tar.extractall(path=work_dir, members=wanted)
-
-    # ── 2. remove the tarball itself ─────────────────────────────────────
-    os.remove(tar_path)
-
-    # ── 3. move/rename the kept subtree ─────────────────────────────────
-    kept_src = work_dir / KEEP_PREFIX.rstrip("/")
+    work_dir.mkdir(parents=True, exist_ok=True)
     kept_dst = work_dir / dst_name
-    kept_dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(kept_src), kept_dst)
 
-    # ── 4. prune *new* empty directories (bottom-up) ────────────────────
-    for path in sorted(work_dir.rglob("*"), reverse=True):
-        if (
-            path.is_dir()
-            and path not in preexisting
-            and path != kept_dst
-        ):
-            try:
-                path.rmdir()          # succeeds only if directory is empty
-            except OSError:
-                pass                  # not empty → keep it
+    with tarfile.open(tar_path, "r:*") as tar:
+        # Collect normalized names once
+        members = list(tar.getmembers())
+        names = [_norm(m.name) for m in members]
+
+        # Find all base prefixes that include a path component exactly 'ngen-run'
+        # Example: 'home/ec2-user/outputs/ngen-run/foo/bar' -> base 'home/ec2-user/outputs/ngen-run'
+        candidate_bases = set()
+        for nm in names:
+            if not nm:  # skip empty
+                continue
+            parts = nm.split("/")
+            if "ngen-run" in parts:
+                idx = parts.index("ngen-run")
+                base = "/".join(parts[: idx + 1])  # include 'ngen-run'
+                if base:  # shouldn't be empty
+                    candidate_bases.add(base)
+
+        if not candidate_bases:
+            # Helpful context for debugging: show a few top-level entries
+            tops = sorted({p.split("/")[0] for p in names if p})[:8]
+            raise FileNotFoundError(
+                f"Could not locate a subtree containing 'ngen-run/' in {tar_path}.\n"
+                f"Top-level entries seen: {tops}"
+            )
+
+        # If multiple distinct bases exist, prefer the shortest (most common case is only 1)
+        # This resolves benign duplicates like both a dir entry and file entries under the same base.
+        base_prefix = sorted(candidate_bases, key=len)[0]
+        base_prefix_with_slash = base_prefix.rstrip("/") + "/"
+
+        # Filter only the members under that base
+        kept_members = [
+            m for m in members
+            if _norm(m.name) == base_prefix or _norm(m.name).startswith(base_prefix_with_slash)
+        ]
+
+        if not kept_members:
+            raise FileNotFoundError(
+                f"Found base '{base_prefix}', but no members under it in {tar_path}"
+            )
+
+        # Extract into an isolated temp dir under work_dir
+        with tempfile.TemporaryDirectory(dir=str(work_dir)) as tmpdir:
+            _safe_extract(tar, kept_members, tmpdir)
+            src_dir = Path(tmpdir) / base_prefix  # this should now exist after extraction
+            if not src_dir.exists():
+                # Some tars might not include the explicit directory entry; create it if needed
+                # by finding the nearest existing parent that ends with 'ngen-run'
+                # (This usually won't trigger, but keeps things robust.)
+                # Search down from longest to shortest path
+                probe = None
+                parts = base_prefix.split("/")
+                for i in range(len(parts), 0, -1):
+                    cand = Path(tmpdir) / "/".join(parts[:i])
+                    if cand.exists():
+                        probe = cand
+                        break
+                src_dir = probe if probe is not None else Path(tmpdir)
+
+            # Replace/overwrite destination if it already exists
+            if kept_dst.exists():
+                if kept_dst.is_dir():
+                    shutil.rmtree(kept_dst)
+                else:
+                    kept_dst.unlink()
+
+            kept_dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src_dir), kept_dst)
+
+    # Remove the tarball itself (match your original behavior)
+    try:
+        os.remove(tar_path)
+    except OSError:
+        pass  # non-fatal if we can't remove it
 
     return kept_dst
+
 
 def download_and_extract_tar_from_s3(
     bucket: str = "ciroh-community-ngen-datastream",
