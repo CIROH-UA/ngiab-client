@@ -118,9 +118,7 @@ export function workflowsReducer(state, action) {
         );
         return { ...state, nodes, lastMessage: msg };
       }
-      if (msg?.type === 'LAST_RUN_LOG' && Array.isArray(msg.events)) {
-        return { ...state, playback: { events: msg.events, idx: 0, playing: false }, lastMessage: msg };
-      }
+
       return { ...state, lastMessage: msg };
     }
 
@@ -133,12 +131,8 @@ export function workflowsReducer(state, action) {
     }
 
     // ---- Playback ----
-    case types.PLAYBACK_LOAD:
-      return { ...state, playback: { events: action.payload.events ?? [], idx: 0, playing: false } };
     case types.PLAYBACK_START:
       return { ...state, playback: { ...state.playback, playing: true } };
-    case types.PLAYBACK_PAUSE:
-      return { ...state, playback: { ...state.playback, playing: false } };
     case types.PLAYBACK_RESET:
       return { ...state, playback: { events: [], idx: 0, playing: false } };
 

@@ -244,8 +244,13 @@ function ProcessNode({ id, data, selected }) {
         />
       </NodeToolbar>
 
+
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Right} />
+      <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Top} />
+      <Handle type="target" position={Position.Bottom} />
+      <Handle type="source" position={Position.Bottom} />
     </div>
   );
 }
@@ -289,7 +294,7 @@ export default function Workflow() {
   };
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '70vh' }}>
+    <div style={{ position: 'relative', width: '100%', height: '90vh' }}>
       <ReactFlow
         colorMode="dark"
         nodes={nodes}

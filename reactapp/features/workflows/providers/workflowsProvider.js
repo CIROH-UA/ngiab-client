@@ -70,7 +70,6 @@ export function WorkflowsProvider({ children }) {
       }
       dispatch({ type: types.WS_MESSAGE, payload: { type: 'NODE_STATUS', ...payload } });
     };
-    const onLastRunLog = (payload) => dispatch({ type: types.WS_MESSAGE, payload: { type: 'LAST_RUN_LOG', events: payload?.events ?? [] } });
 
     const onWorkflowSubmitted = (payload) =>
         dispatch({ type: types.WS_MESSAGE, payload: { type: 'WORKFLOW_SUBMITTED', ...payload } });
@@ -78,13 +77,13 @@ export function WorkflowsProvider({ children }) {
     backend.on('WS_CONNECTED', onOpen);
     backend.on('WS_DISCONNECTED', onClose);
     backend.on('NODE_STATUS', onNodeStatus);
-    backend.on('LAST_RUN_LOG', onLastRunLog);
     backend.on('WORKFLOW_SUBMITTED', onWorkflowSubmitted);
 
     return () => {
-      backend.off('WS_CONNECTED'); backend.off('WS_DISCONNECTED');
-      backend.off('NODE_STATUS');  backend.off('LAST_RUN_LOG');
-      backend.off('NODE_STATUS');  backend.off('LAST_RUN_LOG'); backend.off('WORKFLOW_SUBMITTED');
+      backend.off('WS_CONNECTED'); 
+      backend.off('WS_DISCONNECTED');
+      backend.off('NODE_STATUS');  
+      backend.off('WORKFLOW_SUBMITTED');
     };
   }, [backend]);
 
@@ -137,12 +136,8 @@ export function WorkflowsProvider({ children }) {
   };
 
   // playback & misc unchanged
-  const requestLastRun = () => {
-    try { backend?.do(backend?.actions?.REQUEST_LAST_RUN ?? 'REQUEST_LAST_RUN', {}); }
-    catch { dispatch({ type: types.WS_ERROR, payload: 'Failed to request last run' }); }
-  };
+
   const startPlayback = () => dispatch({ type: types.PLAYBACK_START });
-  const pausePlayback = () => dispatch({ type: types.PLAYBACK_PAUSE });
   const resetPlayback = () => dispatch({ type: types.PLAYBACK_RESET });
 
   // timer for playback
@@ -159,7 +154,7 @@ export function WorkflowsProvider({ children }) {
     state, dispatch,
     runWorkflow, autoLayout, isValidConnection,
     addNode, removeSelected,
-    requestLastRun, startPlayback, pausePlayback, resetPlayback,
+    startPlayback, resetPlayback,
   }), [state]);
 
   return <WorkflowsContext.Provider value={value}>{children}</WorkflowsContext.Provider>;
