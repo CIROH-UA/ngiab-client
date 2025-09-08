@@ -5,7 +5,7 @@ import React from 'react';
 import Workflow from '../components/workflow';
 import { useWorkflows } from '../hooks/useWorkflowsContext';
 
-import { FaTrashAlt, FaPlay, FaPuzzlePiece, FaPlus } from "react-icons/fa";
+import { FaTrashAlt, FaPlay, FaPuzzlePiece, FaPlus, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaRegCircle } from "react-icons/fa";
 import { GoWorkflow } from "react-icons/go";
 import { WorkflowsProvider } from '../providers/workflowsProvider';
 
@@ -41,9 +41,49 @@ function Toolbar() {
       </RSComponents.MenuList>
     );
   };
-  const options = (state.workflows || []).map(w => ({ value: String(w.id), label: w.name }));
+  
+  const list = [...(state.workflows || [])].sort((a, b) => {
+    const da = a.last_run_at ? new Date(a.last_run_at).getTime() : -Infinity;
+    const db = b.last_run_at ? new Date(b.last_run_at).getTime() : -Infinity;
+    return db - da; // desc, NULLS LAST
+  });
+  const iconFor = (s) => {
+    if (s === 'success') return <FaCheckCircle style={{ opacity: 0.9 }} />;
+    if (s === 'error')   return <FaTimesCircle style={{ opacity: 0.9 }} />;
+    if (s === 'running' || s === 'queued') return <FaHourglassHalf style={{ opacity: 0.9 }} />;
+    return <FaRegCircle style={{ opacity: 0.6 }} />;
+  };
+  const options = list.map(w => ({
+    value: String(w.id),
+    label: w.name,
+    status: w.status,
+    lastRunAt: w.last_run_at || null,
+  }));
+
   const selected = options.find(o => o.value === state.ui?.selectedWorkflowId) || null;
 
+  const StatusOption = (props) => {
+    const { data } = props;
+    return (
+      <RSComponents.Option {...props}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {iconFor(data.status)}
+          <span>{data.label}</span>
+        </div>
+      </RSComponents.Option>
+    );
+  };
+  const StatusSingleValue = (props) => {
+    const { data } = props;
+    return (
+      <RSComponents.SingleValue {...props}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {iconFor(data.status)}
+          <span>{data.label}</span>
+        </div>
+      </RSComponents.SingleValue>
+    );
+  };
 
   return (
     <aside
@@ -73,7 +113,7 @@ function Toolbar() {
           setSelectedWorkflow(id);     // <-- direct, safe, inside provider
         }}
         placeholder="Pick a workflow…"
-        components={{ MenuList }}
+        components={{ MenuList, Option: StatusOption, SingleValue: StatusSingleValue }}
         isClearable
         styles={{
           control: (base) => ({ ...base, background: '#111827', borderColor: '#374151', color: '#e5e7eb' }),

@@ -161,7 +161,12 @@ export function WorkflowsProvider({ children }) {
       }
     }
 
-    const payload = { workflow: { nodes, edges }, selected: selectedIds };
+    const payload = {
+      workflow: { nodes, edges },
+      selected: selectedIds,
+      workflowId: state.ui?.selectedWorkflowId || null,
+    };
+    
     try {
       backend?.do(backend?.actions?.RUN_WORKFLOW ?? 'RUN_WORKFLOW', payload);
       dispatch({ type: types.WORKFLOW_SENT });

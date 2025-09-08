@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from importlib import resources
 
-from sqlalchemy import select
+from sqlalchemy import select, func
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hera.workflows import Workflow, WorkflowTemplate, DAG, Task, Parameter, WorkflowsService
@@ -41,6 +42,28 @@ _TEMPLATE_FILES = {
 }
 
 _TERMINAL = {"Succeeded", "Failed", "Error", "Terminated"}
+
+
+
+async def _set_workflow_status(session: AsyncSession, wf_id, status: str, touch_last_run: bool = False):
+    wf = (await session.execute(select(WFModel).where(WFModel.id == wf_id))).scalar_one_or_none()
+    if wf:
+        wf.status = status
+        if touch_last_run:
+            wf.last_run_at = datetime.now(timezone.utc)
+        await session.commit()
+
+async def _recompute_workflow_status(session: AsyncSession, wf_id):
+    rows = (await session.execute(select(NodeModel.status).where(NodeModel.workflow_id == wf_id))).all()
+    statuses = {r[0] for r in rows}
+    if not statuses:
+        return
+    if "error" in statuses:
+        await _set_workflow_status(session, wf_id, "error", touch_last_run=True)
+    elif statuses.issubset({"success"}):
+        await _set_workflow_status(session, wf_id, "success", touch_last_run=True)
+    else:
+        await _set_workflow_status(session, wf_id, "running")
 
 def _phase_to_ui(phase: str | None) -> str:
     p = (phase or "").strip() or "Pending"
@@ -387,7 +410,8 @@ class NgiabBackendHandler(MBH):
             SessionFactory = await self.get_sessionmaker()
             async with SessionFactory() as session:
                 await _update_node_db(session, wf_id, ui_node_id, ui, f"argo: {argo_wf_name} • {phase or 'Pending'}")
-
+                # reflect overall WF status as nodes move
+                await _recompute_workflow_status(session, wf_id)
             if (phase or "Pending") in _TERMINAL:
                 return
 
@@ -607,14 +631,32 @@ class NgiabBackendHandler(MBH):
         try:
             user = self.backend_consumer.scope.get("user")
             username = getattr(user, "username", None)
-            q = select(WFModel).order_by(WFModel.created_at.desc()).limit(1000)
+            
+            from sqlalchemy import desc
+            from sqlalchemy.sql import nulls_last
+            q = (
+                select(WFModel)
+                .order_by(
+                    nulls_last(desc(WFModel.last_run_at)),
+                    desc(WFModel.created_at),
+                )
+                .limit(1000)
+            )            
             if username:
                 q = q.where(WFModel.user == username)
             rows = (await session.execute(q)).scalars().all()
+
+
             items = [{
-                "id": w.id, "name": w.name, "status": w.status,
-                "created_at": w.created_at, "updated_at": w.updated_at
+                "id": w.id,
+                "name": w.name,
+                "status": w.status,
+                "created_at": w.created_at.isoformat() if w.created_at else None,
+                "updated_at": w.updated_at.isoformat() if w.updated_at else None,
+                "last_run_at": w.last_run_at.isoformat() if w.last_run_at else None,
             } for w in rows]
+
+
             await self.send_action(BackendActions.WORKFLOWS_LIST, {"items": items, "count": len(items)})
         except Exception as e:
             await self.send_error(f"Failed to list workflows: {e}", action, data)
@@ -624,6 +666,7 @@ class NgiabBackendHandler(MBH):
     @MBH.action_handler
     async def receive_run_workflow(self, event, action, data, session: AsyncSession):
         wf_data = data.get("workflow") or {}
+        selected_wf_id = data.get("workflowId")
         nodes = wf_data.get("nodes", [])
         edges = wf_data.get("edges", [])
         selected_ids: List[str] = data.get("selected") or []
@@ -684,18 +727,37 @@ class NgiabBackendHandler(MBH):
         # Ensure templates exist for everything we’re about to run
         self._ensure_templates_for_nodes(chain_nodes)
 
-        # Record a single WF row that covers this connected subgraph
+
+        # Reuse selected workflow row if provided; else create a new one
         wt_row = await self._get_or_create_template_row(session, "ngiab-chain", user, {"source": "yaml"})
-        wf_row = WFModel(
-            name=wf_data.get("name") or f"wf-{run_id}",
-            user=user,
-            template_id=wt_row.id,
-            status="queued",
-            graph={"nodes": chain_nodes, "edges": edges_kept},
-            layers=[],  # optional: could compute topo layers for UI here
-        )
-        session.add(wf_row)
-        await session.flush()
+        wf_row = None
+        if selected_wf_id:
+            try:
+                wf_row = (await session.execute(
+                    select(WFModel).where(WFModel.id == UUID(str(selected_wf_id)))
+                )).scalar_one_or_none()
+            except Exception:
+                wf_row = None
+        if wf_row:
+            wf_row.graph = {"nodes": chain_nodes, "edges": edges_kept}
+            wf_row.template_id = wt_row.id
+            wf_row.status = "queued"
+            await session.commit()
+            # clear old node rows and re-seed in the stored order
+            await session.execute(NodeModel.__table__.delete().where(NodeModel.workflow_id == wf_row.id))
+            await session.commit()
+        else:
+            wf_row = WFModel(
+                name=wf_data.get("name") or f"wf-{run_id}",
+                user=user,
+                template_id=wt_row.id,
+                status="queued",
+                graph={"nodes": chain_nodes, "edges": edges_kept},
+                layers=[],
+            )
+            session.add(wf_row)
+            await session.flush()
+
 
         for order, node in enumerate(chain_nodes):
             label = node.get("label") or node.get("id")
@@ -720,6 +782,8 @@ class NgiabBackendHandler(MBH):
         try:
             w = self._build_chain_workflow(chain_nodes, user, wf_uuid=str(wf_row.id), edges=edges_kept)
             w.create()
+            # mark the workflow row as running and set last_run_at
+            await _set_workflow_status(session, wf_row.id, "running", touch_last_run=True)
 
             # Notify/poll all nodes in this DAG
             for node in chain_nodes:
@@ -815,6 +879,7 @@ class NgiabBackendHandler(MBH):
             ) as w:
                 w.arguments = [Parameter(name=k, value=v) for k, v in params.items()]
             w.create()
+            await _set_workflow_status(session, wf.id, "running", touch_last_run=True)
             await _emit_status(self, node_id, "running", f"argo: {w.name}")
             asyncio.create_task(self._poll_argo_to_terminal(w.name, node_id, wf.id))
         except Exception as e:
