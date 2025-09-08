@@ -58,6 +58,64 @@ export function WorkflowsProvider({ children }) {
   const [state, dispatch] = useReducer(workflowsReducer, initialState);
   const { backend } = useContext(AppContext);
 
+  // local helpers to mirror reducer behavior
+  const labelFor = (kind) => {
+    if (kind === 'pre-process') return 'pre-process';
+    if (kind === 'calibration-config') return 'calibration-config';
+    if (kind === 'calibration-run') return 'calibration-run';
+    if (kind === 'run-ngiab') return 'run ngiab';
+    if (kind === 'teehr') return 'teehr';
+    return kind;
+  };
+  const normalizeKind = (k) => {
+    if (k === 'ngiab-run') return 'run-ngiab';     // align with the rest of the app
+    if (k === 'ngiab-teehr') return 'teehr';
+    return k;
+  };
+
+  const templateChains = {
+    'pre->cfg'                     : ['pre-process','calibration-config'],
+    'pre->cfg->cal'                : ['pre-process','calibration-config','calibration-run'],
+    'pre->run'                     : ['pre-process','ngiab-run'],
+    'pre->run->teehr'              : ['pre-process','ngiab-run','ngiab-teehr'],
+    'pre->cfg->cal->run->teehr'    : ['pre-process','calibration-config','calibration-run','ngiab-run','ngiab-teehr'],
+    'cfg->cal'                     : ['calibration-config','calibration-run'],
+    'cfg->cal->run'                : ['calibration-config','calibration-run','ngiab-run'],
+    'cfg->cal->run->teehr'         : ['calibration-config','calibration-run','ngiab-run','ngiab-teehr'],
+    'cal->run'                     : ['calibration-run','ngiab-run'],
+    'cal->run->teehr'              : ['calibration-run','ngiab-run','ngiab-teehr'],
+    'run->teehr'                   : ['ngiab-run','ngiab-teehr'],
+  };
+
+ const makeGraphFromChain = (chain) => {
+   const uniq = Array.from(new Set(chain)).map(normalizeKind);
+   const nodes = uniq.map((id, i) => ({
+     id,
+     type: 'process',                   // <- make it your custom node
+     position: { x: 0, y: 0 },          // will be laid out after
+     data: { label: labelFor(id), status: 'idle', config: {} },
+     selected: false,
+   }));
+   const edges = uniq.slice(1).map((to, i) => {
+     const from = uniq[i];
+     return { id: `e-${from}-${to}`, source: from, target: to };
+   });
+   return { nodes, edges };
+ };
+
+
+  const applyTemplate = (key) => {
+    const chain = templateChains[key];
+    if (!chain) return;
+    const { nodes, edges } = makeGraphFromChain(chain);
+    dispatch({ type: types.SET_GRAPH, payload: { nodes, edges } });
+   // keep shape consistent with onWorkflowGraph normalization
+    const layouted = layoutWithDagre(nodes, edges, { rankdir: 'LR', nodesep: 60, ranksep: 90 });
+    dispatch({ type: types.SET_EDGES, payload: edges });
+    dispatch({ type: types.SET_NODES, payload: layouted });
+
+  };
+
   useEffect(() => {
     if (!backend) return;
     const isOpenNow = backend.webSocket?.readyState === 1;
@@ -217,7 +275,7 @@ export function WorkflowsProvider({ children }) {
   const value = useMemo(() => ({
     state, dispatch,
     runWorkflow, autoLayout, isValidConnection,
-    addNode, removeSelected,
+    addNode, removeSelected, applyTemplate,
     startPlayback, resetPlayback,
     setSelectedWorkflow,
   }), [state]);

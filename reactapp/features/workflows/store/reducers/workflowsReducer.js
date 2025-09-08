@@ -44,6 +44,29 @@ export function workflowsReducer(state, action) {
     case types.ADD_EDGE:
       return { ...state, edges: addEdge(action.payload, state.edges) };
 
+    case types.SET_GRAPH: {
+      const { nodes = [], edges = [] } = action.payload || {};
+      const mapNode = (n, i) => ({
+        id: String(n.id ?? n.label ?? `n-${i}`),
+        type: n.type || 'process',
+        position: n.position || { x: 0, y: 0 },
+        data: {
+          ...(n.data || {}),
+          label: (n.data?.label ?? n.label ?? String(n.id ?? `n-${i}`)),
+          status: n.data?.status ?? 'idle',
+          config: n.data?.config ?? n.config ?? {},
+        },
+        selected: !!n.selected,
+      });
+      const mapEdge = (e, i) => ({
+        id: String(e.id ?? `e-${e.source}-${e.target}-${i}`),
+        source: String(e.source),
+        target: String(e.target),
+      });
+      return { ...state, nodes: nodes.map(mapNode), edges: edges.map(mapEdge) };
+    }
+
+
     case types.SET_NODES:
       return { ...state, nodes: action.payload };
     case types.SET_EDGES:

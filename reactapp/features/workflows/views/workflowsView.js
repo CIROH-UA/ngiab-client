@@ -27,7 +27,23 @@ function Toolbar() {
     runWorkflow,
     setSelectedWorkflow,        // <-- new from provider
     state,
+    applyTemplate
   } = useWorkflows();
+
+
+  const TEMPLATE_OPTIONS = [
+    { value: 'pre->cfg',                  label: 'pre-process → calibration-config' },
+    { value: 'pre->cfg->cal',             label: 'pre-process → calibration-config → calibration-run' },
+    { value: 'pre->run',                   label: 'pre-process → ngiab-run' },
+    { value: 'pre->run->teehr',           label: 'pre-process → ngiab-run → ngiab-teehr' },
+    { value: 'pre->cfg->cal->run->teehr', label: 'pre-process → calibration-config → calibration-run → ngiab-run → ngiab-teehr' },
+    { value: 'cfg->cal',                  label: 'calibration-config → calibration-run' },
+    { value: 'cfg->cal->run',             label: 'calibration-config → calibration-run → ngiab-run' },
+    { value: 'cfg->cal->run->teehr',      label: 'calibration-config → calibration-run → ngiab-run → ngiab-teehr' },
+    { value: 'cal->run',                  label: 'calibration-run → ngiab-run' },
+    { value: 'cal->run->teehr',           label: 'calibration-run → ngiab-run → ngiab-teehr' },
+    { value: 'run->teehr',                label: 'ngiab-run → ngiab-teehr' },
+  ];
 
   // react-window powered MenuList for react-select
   const MenuList = (props) => {
@@ -125,7 +141,23 @@ function Toolbar() {
         theme={(t) => ({ ...t, colors: { ...t.colors, primary25: '#111827', primary: '#3b82f6' } })}
       />
 
+      <strong style={{ marginBottom: 4 }}>Useful Workflows</strong>
       
+          <Select
+            instanceId="template-workflow"
+            placeholder="Choose a template…"
+            options={TEMPLATE_OPTIONS}
+            components={{ MenuList }}
+            onChange={(opt) => opt && applyTemplate(opt.value)}
+            isClearable
+            styles={{
+              control: (base) => ({ ...base, background: '#111827', borderColor: '#374151', color: '#e5e7eb' }),
+              singleValue: (base) => ({ ...base, color: '#e5e7eb' }),
+              menu: (base) => ({ ...base, background: '#0b1220', color: '#e5e7eb' }),
+              option: (base, s) => ({ ...base, background: s.isFocused ? '#111827' : '#0b1220', color: '#e5e7eb' }),
+            }}
+          />
+
       <strong style={{ marginBottom: 4 }}>Tools</strong>
 
       <button onClick={() => addNode('pre-process')} className="btn"> <FaPlus />pre-process</button>
