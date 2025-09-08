@@ -5,7 +5,7 @@ import React from 'react';
 import Workflow from '../components/workflow';
 import { useWorkflows } from '../hooks/useWorkflowsContext';
 
-import { FaTrashAlt, FaPlay, FaPuzzlePiece, FaPlus, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaRegCircle } from "react-icons/fa";
+import { FaTrashAlt, FaPlay, FaPlus, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaRegCircle } from "react-icons/fa";
 import { LuAlignVerticalJustifyStart, LuAlignStartVertical  } from "react-icons/lu";
 
 import { WorkflowsProvider } from '../providers/workflowsProvider';
@@ -126,7 +126,7 @@ function Toolbar() {
       />
 
       
-      <strong style={{ marginBottom: 4 }}>Tools <FaPuzzlePiece/> </strong>
+      <strong style={{ marginBottom: 4 }}>Tools</strong>
 
       <button onClick={() => addNode('pre-process')} className="btn"> <FaPlus />pre-process</button>
       <button onClick={() => addNode('calibration-config')} className="btn"> <FaPlus /> calibration config</button>

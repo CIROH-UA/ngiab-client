@@ -44,6 +44,126 @@ _TEMPLATE_FILES = {
 _TERMINAL = {"Succeeded", "Failed", "Error", "Terminated"}
 
 
+async def _watch_workflow_nodes(
+    self,
+    argo_wf_name: str,
+    tasks_by_node: dict[str, list[str]],  # {ui_node_id: [tname, ...]}
+    wf_id,
+) -> None:
+    """
+    Watch ONE Argo Workflow and fan-out granular node status to the UI:
+      - For each UI node, we consider ONLY its own expected task names.
+      - success => ALL expected tasks present AND Succeeded.
+      - error   => ANY expected task Failed/Error/Terminated.
+      - running => otherwise (including when downstream tasks haven't appeared yet).
+    If ANY node errors, mark all non-terminal siblings "error" (upstream failure).
+    Emit the S3 URL once the aggregate becomes success.
+    """
+    ws = make_ws()
+    loop = asyncio.get_running_loop()
+    start = time.monotonic()
+
+    # Canonicalize expected names and provide a resolver for "<dag>.<task>"
+    expected_by_node: dict[str, set[str]] = {k: set(v or []) for k, v in tasks_by_node.items()}
+
+    def match_task(node_name: str, expected: set[str]) -> str | None:
+        if node_name in expected:
+            return node_name
+        # DAG tasks typically show as "main.<task>" in NodeStatus.name
+        # Only accept exact "<dag>.<task>" matches to avoid cross-node leaks.
+        dot = node_name.find(".")
+        if dot > 0:
+            tail = node_name[dot + 1 :]
+            if tail in expected:
+                return tail
+        return None
+
+    last_sent: dict[str, str] = {}  # ui_node_id -> last ui status
+    all_nodes = set(expected_by_node.keys())
+
+    while True:
+        try:
+            wf = await loop.run_in_executor(None, ws.get_workflow, argo_wf_name, ARGO_NAMESPACE)
+            status = getattr(wf, "status", None)
+            nodes_map = getattr(status, "nodes", None) or {}
+            nodes_iter = nodes_map.values() if isinstance(nodes_map, dict) else (nodes_map or [])
+
+            # Build a quick index of phases keyed by expected task-name per UI node
+            phases_by_ui: dict[str, dict[str, str]] = {k: {} for k in expected_by_node}
+            for n in nodes_iter:
+                nm = getattr(n, "name", None) or (isinstance(n, dict) and n.get("name"))
+                ph = getattr(n, "phase", None) or (isinstance(n, dict) and n.get("phase"))
+                if not nm or not ph:
+                    continue
+                nm = str(nm); ph = str(ph)
+                for ui_node_id, expected in expected_by_node.items():
+                    t = match_task(nm, expected)
+                    if t:
+                        phases_by_ui[ui_node_id][t] = ph
+
+            # Compute & emit statuses per UI node
+            someone_failed = False
+            for ui_node_id, expected in expected_by_node.items():
+                collected = list(phases_by_ui[ui_node_id].values())
+                if any(p in {"Failed", "Error", "Terminated"} for p in collected):
+                    ui = "error"
+                    someone_failed = True
+                elif expected and (len(phases_by_ui[ui_node_id]) == len(expected)) and all(p == "Succeeded" for p in collected):
+                    ui = "success"
+                else:
+                    ui = "running"
+
+                if last_sent.get(ui_node_id) != ui:
+                    last_sent[ui_node_id] = ui
+                    await _emit_status(self, ui_node_id, ui, ui)
+                    SessionFactory = await self.get_sessionmaker()
+                    async with SessionFactory() as session:
+                        await _update_node_db(session, wf_id, ui_node_id, ui, ui)
+
+            # If a node failed, fail all non-terminal siblings once and stop.
+            if someone_failed:
+                SessionFactory = await self.get_sessionmaker()
+                async with SessionFactory() as session:
+                    rows = (await session.execute(
+                        select(NodeModel).where(NodeModel.workflow_id == wf_id)
+                    )).scalars().all()
+                    for row in rows:
+                        if last_sent.get(row.name) not in {"success", "error"}:
+                            await _emit_status(self, row.name, "error", "upstream failure")
+                            await _update_node_db(session, wf_id, row.name, "error", "upstream failure")
+                    await _recompute_workflow_status(session, wf_id)
+                return
+
+            # Recompute aggregate; if all succeeded, announce S3 & stop.
+            SessionFactory = await self.get_sessionmaker()
+            async with SessionFactory() as session:
+                agg = await _recompute_workflow_status(session, wf_id)
+                if agg == "success":
+                    user = _user_id(self)
+                    bucket = _bucket()
+                    s3url = f"s3://{bucket}/{user}/{wf_id}/"
+                    await self.send_action(BackendActions.WORKFLOW_RESULT, {
+                        "workflowId": str(wf_id), "s3url": s3url
+                    })
+                    return
+
+        except Exception as e:
+            # Keep polling unless we time out; do NOT flip others to success.
+            # We can still emit "running" to the node that last changed if desired,
+            # but silence is fine here to avoid noise.
+            if time.monotonic() - start > POLL_TIMEOUT_SEC:
+                # timeout every non-terminal node
+                SessionFactory = await self.get_sessionmaker()
+                async with SessionFactory() as session:
+                    for ui_node_id in all_nodes:
+                        if last_sent.get(ui_node_id) not in {"success", "error"}:
+                            await _emit_status(self, ui_node_id, "error", "poll timeout")
+                            await _update_node_db(session, wf_id, ui_node_id, "error", "poll timeout")
+                return
+
+        await asyncio.sleep(POLL_SEC)
+
+
 
 async def _set_workflow_status(session: AsyncSession, wf_id, status: str, touch_last_run: bool = False):
     wf = (await session.execute(select(WFModel).where(WFModel.id == wf_id))).scalar_one_or_none()
@@ -430,20 +550,32 @@ class NgiabBackendHandler(MBH):
 
     async def _poll_tasks_to_terminal(self, argo_wf_name: str, task_names: list[str], ui_node_id: str, wf_id) -> None:
         """
-        Poll the Argo workflow and map *this UI node's* tasks' phases -> a single UI status.
-        error if ANY task failed; success if ALL are Succeeded; running otherwise.
+        Poll just THIS UI node's Argo tasks and emit its status:
+        - error   -> if ANY task failed/errored/terminated
+        - success -> if ALL expected tasks are present AND succeeded
+        - running -> otherwise
+        On error: fail all non-terminal siblings (upstream failure).
         """
         ws = make_ws()
         loop = asyncio.get_running_loop()
         start = time.monotonic()
         last_sent = None
+        failed_broadcast_done = False
 
-        def _agg_status(phases: list[str]) -> str:
-            if any(p in {"Failed", "Error", "Terminated"} for p in phases):
-                return "error"
-            if phases and all(p == "Succeeded" for p in phases):
-                return "success"
-            return "running"
+        # The exact task names we created in Hera for this UI node (e.g., t-my-node-00, t-my-node-01, …)
+        expected = set(task_names or [])
+        if not expected:
+            # Nothing to track for this node; keep it running until timeout, then error.
+            await _emit_status(self, ui_node_id, "running", "no tasks to poll")
+        def _canonical_match(nm: str) -> Optional[str]:
+            """Return the expected task name t if 'nm' belongs to it (exact or '<dag>.<t>')."""
+            if nm in expected:
+                return nm
+            # DAG nodes typically show as 'main.<task-name>' in NodeStatus.name
+            for t in expected:
+                if nm.endswith("." + t):
+                    return t
+            return None
 
         while True:
             try:
@@ -451,14 +583,28 @@ class NgiabBackendHandler(MBH):
                 status = getattr(wf, "status", None)
                 nodes_map = getattr(status, "nodes", None) or {}
                 nodes_iter = nodes_map.values() if isinstance(nodes_map, dict) else (nodes_map or [])
-                phases = []
+
+                # Collect latest phase per expected task (by canonical task-name key)
+                phases_by_task: dict[str, str] = {}
                 for n in nodes_iter:
-                    # Argo node JSON carries "displayName" and "phase" for each node. :contentReference[oaicite:2]{index=2}
-                    dn = getattr(n, "displayName", None) or getattr(n, "display_name", None) or (isinstance(n, dict) and n.get("displayName"))
+                    nm = getattr(n, "name", None) or (isinstance(n, dict) and n.get("name"))
                     ph = getattr(n, "phase", None) or (isinstance(n, dict) and n.get("phase"))
-                    if dn in task_names and ph:
-                        phases.append(str(ph))
-                ui = _agg_status(phases) if phases else "running"
+                    if not nm or not ph:
+                        continue
+                    t = _canonical_match(str(nm))
+                    if not t:
+                        continue
+                    phases_by_task[t] = str(ph)
+
+                # Decide this UI node's status
+                collected = list(phases_by_task.values())
+                if any(p in {"Failed", "Error", "Terminated"} for p in collected):
+                    ui = "error"
+                elif expected and (len(phases_by_task) == len(expected)) and all(p == "Succeeded" for p in collected):
+                    ui = "success"
+                else:
+                    ui = "running"
+
             except Exception as e:
                 ui = "running"
                 await _emit_status(self, ui_node_id, "running", f"poll error: {e}")
@@ -471,28 +617,53 @@ class NgiabBackendHandler(MBH):
                 await asyncio.sleep(POLL_SEC)
                 continue
 
+            # Only emit when the state actually changes
             if ui != last_sent:
                 last_sent = ui
-                await _emit_status(self, ui_node_id, ui, f"{ui}")
+                await _emit_status(self, ui_node_id, ui, ui)
                 SessionFactory = await self.get_sessionmaker()
                 async with SessionFactory() as session:
-                    await _update_node_db(session, wf_id, ui_node_id, ui, f"{ui}")
-                    # If all nodes have succeeded, announce S3 prefix once
+                    await _update_node_db(session, wf_id, ui_node_id, ui, ui)
+
+                    # If THIS node failed, mark non-terminal siblings as failed (once).
+                    if ui == "error" and not failed_broadcast_done:
+                        failed_broadcast_done = True
+                        try:
+                            rows = (await session.execute(
+                                select(NodeModel).where(NodeModel.workflow_id == wf_id)
+                            )).scalars().all()
+                            for row in rows:
+                                if row.name == ui_node_id:
+                                    continue
+                                if row.status not in {"success", "error"}:
+                                    await _emit_status(self, row.name, "error", "upstream failure")
+                                    await _update_node_db(session, wf_id, row.name, "error", "upstream failure")
+                        except Exception:
+                            pass
+
+                    # Update aggregate WF status & emit S3 URL when all are success
                     agg = await _recompute_workflow_status(session, wf_id)
                     if agg == "success":
                         user = _user_id(self)
                         bucket = _bucket()
                         s3url = f"s3://{bucket}/{user}/{wf_id}/"
-                        await self.send_action(BackendActions.WORKFLOW_RESULT, {"workflowId": str(wf_id), "s3url": s3url})
+                        await self.send_action(BackendActions.WORKFLOW_RESULT, {
+                            "workflowId": str(wf_id), "s3url": s3url
+                        })
+
+            # Stop polling this node when terminal
             if ui in {"error", "success"}:
                 return
+
             if time.monotonic() - start > POLL_TIMEOUT_SEC:
                 await _emit_status(self, ui_node_id, "error", "poll timeout")
                 SessionFactory = await self.get_sessionmaker()
                 async with SessionFactory() as session:
                     await _update_node_db(session, wf_id, ui_node_id, "error", "poll timeout")
                 return
+
             await asyncio.sleep(POLL_SEC)
+
 
     # ---------------- helpers ----------------
     def _ensure_templates_for_nodes(self, nodes: List[dict]) -> None:
@@ -855,13 +1026,14 @@ class NgiabBackendHandler(MBH):
             w.create()
             # mark the workflow row as running and set last_run_at
             await _set_workflow_status(session, wf_row.id, "running", touch_last_run=True)
-
-            # Notify/poll all nodes in this DAG
+            
+            # Notify the UI that this Argo Workflow name backs all nodes...
             for node in chain_nodes:
                 node_id = node.get("id") or (node.get("label") or "")
                 await _emit_status(self, node_id, "running", f"argo: {w.name}")
-                # poll ONLY this node's task(s)
-                asyncio.create_task(self._poll_tasks_to_terminal(w.name, tasks_by_node.get(node_id, []), node_id, wf_row.id))
+            # ...then start ONE watcher that attributes phases to the right UI node
+            asyncio.create_task(_watch_workflow_nodes(self, w.name, tasks_by_node, wf_row.id))
+
 
         except Exception as e:
             for node in chain_nodes:
