@@ -6,7 +6,8 @@ import Workflow from '../components/workflow';
 import { useWorkflows } from '../hooks/useWorkflowsContext';
 
 import { FaTrashAlt, FaPlay, FaPuzzlePiece, FaPlus, FaCheckCircle, FaTimesCircle, FaHourglassHalf, FaRegCircle } from "react-icons/fa";
-import { GoWorkflow } from "react-icons/go";
+import { LuAlignVerticalJustifyStart, LuAlignStartVertical  } from "react-icons/lu";
+
 import { WorkflowsProvider } from '../providers/workflowsProvider';
 
 
@@ -124,7 +125,7 @@ function Toolbar() {
         theme={(t) => ({ ...t, colors: { ...t.colors, primary25: '#111827', primary: '#3b82f6' } })}
       />
 
-
+      
       <strong style={{ marginBottom: 4 }}>Tools <FaPuzzlePiece/> </strong>
 
       <button onClick={() => addNode('pre-process')} className="btn"> <FaPlus />pre-process</button>
@@ -134,15 +135,15 @@ function Toolbar() {
       <button onClick={() => addNode('teehr')} className="btn"> <FaPlus />  teehr</button>
 
       <hr style={{ border: 'none', borderTop: '1px solid #374151', margin: '6px 0' }} />
-      {/* Row: Remove + Auto-layout LR/TB */}
-      <div style={{ display: 'flex', gap: 3 }}>
-        <button onClick={removeSelected} className="btn btn-danger" style={{ display:'flex', alignItems:'center', gap:6 }}>
-          <FaTrashAlt/> Remove
-        </button>
-        <button onClick={() => autoLayout('LR')} className="btn"><GoWorkflow/> LR</button>
-        <button onClick={() => autoLayout('TB')} className="btn"><GoWorkflow/> TB</button>
-        <button onClick={runWorkflow} className="btn"> <FaPlay />Run </button>
-      </div>
+        {/* Row: Remove + Auto-layout LR/TB */}
+        <div style={{ display: 'flex', gap: 3 }}>
+          <button onClick={removeSelected} className="btn btn-danger" style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <FaTrashAlt/>
+          </button>
+          <button onClick={() => autoLayout('LR')} className="btn"><LuAlignVerticalJustifyStart /></button>
+          <button onClick={() => autoLayout('TB')} className="btn"><LuAlignStartVertical /></button>
+          <button onClick={runWorkflow} className="btn"> <FaPlay /> </button>
+        </div>
 
       <hr style={{ border: 'none', borderTop: '1px solid #374151', margin: '6px 0' }} />
 
