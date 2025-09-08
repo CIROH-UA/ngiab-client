@@ -16,6 +16,7 @@ class BackendActions(StrEnum):
 
     # outgoing (to frontend)
     WORKFLOWS_LIST     = auto()
+    WORKFLOW_RESULT     = auto()
     WORKFLOW_GRAPH     = auto()
     NODE_STATUS         = auto()
     LAST_RUN_LOG        = auto()

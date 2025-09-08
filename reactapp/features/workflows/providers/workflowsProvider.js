@@ -119,15 +119,25 @@ export function WorkflowsProvider({ children }) {
     backend.on('WORKFLOWS_LIST', onWorkflowsList);
     backend.on('WORKFLOW_GRAPH', onWorkflowGraph);
     backend.on('WORKFLOW_SUBMITTED', onWorkflowSubmitted);
-
+    backend.on('WORKFLOW_RESULT', (p) => {
+      const url = p?.s3url;
+      if (url) {
+        // React-Toastify can render JSX (links/components) inside a toast. :contentReference[oaicite:4]{index=4}
+        toast.success(
+          <span>Workflow finished. Results at <code>{url}</code></span>,
+          { autoClose: 7000 }
+        );
+      }
+    });
 
     return () => {
       backend.off('WS_CONNECTED'); 
       backend.off('WS_DISCONNECTED');
       backend.off('NODE_STATUS');
       backend.off('WORKFLOWS_LIST');
-       backend.off('WORKFLOW_GRAPH');
+      backend.off('WORKFLOW_GRAPH');
       backend.off('WORKFLOW_SUBMITTED');
+      backend.off('WORKFLOW_RESULT');
     };
   }, [backend]);
 
@@ -166,7 +176,7 @@ export function WorkflowsProvider({ children }) {
       selected: selectedIds,
       workflowId: state.ui?.selectedWorkflowId || null,
     };
-    
+
     try {
       backend?.do(backend?.actions?.RUN_WORKFLOW ?? 'RUN_WORKFLOW', payload);
       dispatch({ type: types.WORKFLOW_SENT });
