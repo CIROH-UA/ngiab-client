@@ -143,7 +143,7 @@ export default function NodeConfigPopup({
         padding: 10,
       }}
     >
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>Node settings</div>
+      <div style={{ fontWeight: 600, marginBottom: 8 }}>Settings</div>
 
       <div style={{ display: 'grid', gap: 8 }}>
         {fields.map((f) => {
