@@ -119,11 +119,15 @@ const NODE_FORMS = {
     { name: 'output_prefix', label: 'Output S3 prefix', type: 'text' },
   ],
   'run ngiab': [
-    { name: 'input_s3_key', label: 'Input S3 key (optional)', type: 'text' },
+    // NEW: toggle to switch input mode
+    { name: 'import_data', label: 'Import data by URL', type: 'toggle' },   // default OFF
+
+    { name: 'input_s3_url', label: 'Input S3 key (optional)', type: 'text' },
     { name: 'ngen_np', label: 'NGEN Parallelism', type: 'number' },
   ],
   'teehr': [
-    { name: 'input_s3_key', label: 'Input S3 key (optional)', type: 'text' },
+    { name: 'import_data', label: 'Import data by URL', type: 'toggle' },   // default OFF
+    { name: 'input_s3_url', label: 'Input S3 key (optional)', type: 'text' },
     { name: 'teehr_inputs_subdir', label: 'Inputs subdir', type: 'text' },
     { name: 'teehr_results_subdir', label: 'Results subdir', type: 'text' },
     { name: 'teehr_args', label: 'Extra args', type: 'text' },

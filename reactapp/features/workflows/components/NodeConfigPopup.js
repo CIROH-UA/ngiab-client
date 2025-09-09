@@ -88,7 +88,6 @@ export default function NodeConfigPopup({
         className="nodrag nowheel"
         onPointerDown={stopAll}
         onWheel={(e) => { e.preventDefault(); e.stopPropagation(); }}
-        style={{ display: 'grid', gridTemplateColumns: '1fr 20px', gap: 6 }}
       >
         <input
           id={id}
@@ -104,44 +103,6 @@ export default function NodeConfigPopup({
           }}
           style={baseInputStyle}
         />
-        <div style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: 4 }}>
-          <button
-            type="button"
-            onClick={inc}
-            onMouseDown={(e) => e.preventDefault()}
-            className="nodrag nowheel"
-            style={{
-              borderRadius: 6,
-              fontSize: '10px',
-              width: 'fit-content',
-              height: 'fit-content',
-              border: '1px solid #374151',
-              background: '#1f2937',
-              color: '#e5e7eb',
-              cursor: 'pointer'
-            }}
-            aria-label="Increment"
-            title="Increment"
-          >▲</button>
-          <button
-            type="button"
-            onClick={dec}
-            onMouseDown={(e) => e.preventDefault()}
-            className="nodrag nowheel"
-            style={{
-              borderRadius: 6,
-              fontSize: '10px',
-              width: 'fit-content',
-              height: 'fit-content',
-              border: '1px solid #374151',
-              background: '#1f2937',
-              color: '#e5e7eb',
-              cursor: 'pointer'
-            }}
-            aria-label="Decrement"
-            title="Decrement"
-          >▼</button>
-        </div>
       </div>
     );
   };
