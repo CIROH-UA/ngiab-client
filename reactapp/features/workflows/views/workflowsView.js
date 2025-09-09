@@ -46,16 +46,21 @@ function Toolbar() {
   ];
 
   // react-window powered MenuList for react-select
-  const MenuList = (props) => {
-    const { children, maxHeight } = props;
+  const MenuListVirtualized = (props) => {
+    const { children, maxHeight, getStyles, innerProps } = props;
     const itemCount = Array.isArray(children) ? children.length : 0;
     const height = Math.min(maxHeight, itemCount * 36);
+
+    // Disable outer menu scroll; List provides the only scroll.
     return (
-      <RSComponents.MenuList {...props}>
+      <div
+        {...innerProps}
+        style={{ ...getStyles('menuList', props), padding: 0, overflowY: 'hidden' }}
+      >
         <List height={height} itemCount={itemCount} itemSize={36} width="100%">
           {({ index, style }) => <div style={style}>{children[index]}</div>}
         </List>
-      </RSComponents.MenuList>
+      </div>
     );
   };
   
@@ -125,38 +130,45 @@ function Toolbar() {
       <Select
         options={options}
         value={selected}
-        onChange={(opt) => {
-          const id = opt?.value ?? null;
-          setSelectedWorkflow(id);     // <-- direct, safe, inside provider
-        }}
+        onChange={(opt) => setSelectedWorkflow(opt?.value ?? null)}
         placeholder="Pick a workflow…"
-        components={{ MenuList, Option: StatusOption, SingleValue: StatusSingleValue }}
+        components={{ MenuList: MenuListVirtualized, Option: StatusOption, SingleValue: StatusSingleValue }}
         isClearable
+        menuPortalTarget={document.body}
+        menuPosition="fixed"
         styles={{
           control: (base) => ({ ...base, background: '#111827', borderColor: '#374151', color: '#e5e7eb' }),
           singleValue: (base) => ({ ...base, color: '#e5e7eb' }),
           menu: (base) => ({ ...base, background: '#0b1220', color: '#e5e7eb' }),
           option: (base, s) => ({ ...base, background: s.isFocused ? '#111827' : '#0b1220', color: '#e5e7eb' }),
+          // IMPORTANT: prevent double scroll in the menu container
+          menuList: (base) => ({ ...base, padding: 0, overflowY: 'hidden' }),
+          // make sure the portal is above everything
+          menuPortal: (base) => ({ ...base, zIndex: 9999 }),
         }}
         theme={(t) => ({ ...t, colors: { ...t.colors, primary25: '#111827', primary: '#3b82f6' } })}
       />
 
       <strong style={{ marginBottom: 4 }}>Useful Workflows</strong>
       
-          <Select
-            instanceId="template-workflow"
-            placeholder="Choose a template…"
-            options={TEMPLATE_OPTIONS}
-            components={{ MenuList }}
-            onChange={(opt) => opt && applyTemplate(opt.value)}
-            isClearable
-            styles={{
-              control: (base) => ({ ...base, background: '#111827', borderColor: '#374151', color: '#e5e7eb' }),
-              singleValue: (base) => ({ ...base, color: '#e5e7eb' }),
-              menu: (base) => ({ ...base, background: '#0b1220', color: '#e5e7eb' }),
-              option: (base, s) => ({ ...base, background: s.isFocused ? '#111827' : '#0b1220', color: '#e5e7eb' }),
-            }}
-          />
+      <Select
+        instanceId="template-workflow"
+        placeholder="Choose a template…"
+        options={TEMPLATE_OPTIONS}
+        components={{ MenuList: MenuListVirtualized }}
+        onChange={(opt) => opt && applyTemplate(opt.value)}
+        isClearable
+        menuPortalTarget={document.body}
+        menuPosition="fixed"
+        styles={{
+          control: (base) => ({ ...base, background: '#111827', borderColor: '#374151', color: '#e5e7eb' }),
+          singleValue: (base) => ({ ...base, color: '#e5e7eb' }),
+          menu: (base) => ({ ...base, background: '#0b1220', color: '#e5e7eb' }),
+          option: (base, s) => ({ ...base, background: s.isFocused ? '#111827' : '#0b1220', color: '#e5e7eb' }),
+          menuList: (base) => ({ ...base, padding: 0, overflowY: 'hidden' }),
+          menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+        }}
+      />
 
       <strong style={{ marginBottom: 4 }}>Tools</strong>
         {/* Row: Remove + Auto-layout LR/TB */}
