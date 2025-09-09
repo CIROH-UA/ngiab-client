@@ -751,8 +751,7 @@ class NgiabBackendHandler(MBH):
                 inherit.update({
                     "dataset_bucket": params.get("output_bucket", ""),
                     "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/{params.get('output_name','ngiab')}.tgz",
-
-                })
+                })             
                 return inherit
             return inherit
 
