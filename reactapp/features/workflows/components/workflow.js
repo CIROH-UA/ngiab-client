@@ -71,16 +71,26 @@ const NODE_FORMS = {
     { name: 'output_prefix', label: 'S3 prefix (artifact)', type: 'text' },
   ],
   'calibration-config': [
-    // Calibration-only path: user can paste ONE S3 URL; we’ll parse it.
-    { name: 'input_s3_url', label: 'Preprocess artifact S3 URL (e.g. s3://bucket/path/preprocess.tgz)', type: 'text' },
-    // Advanced overrides (optional)
-    { name: 'input_bucket', label: 'Input S3 bucket (optional)', type: 'text' },
-    { name: 'input_key', label: 'Input S3 key (optional)', type: 'text' },
-    // Output destination
+    // NEW: toggle to switch input mode
+    { name: 'import_data', label: 'Import data by URL', type: 'toggle' },   // default OFF
+
+    // URL input (shown when import_data = ON)
+    { name: 'input_s3_url', label: 'Preprocess artifact S3/HTTPS URL', type: 'text' },
+
+    // Bucket/Key inputs (shown when import_data = OFF)
+    { name: 'input_bucket', label: 'Input S3 bucket', type: 'text' },
+    { name: 'input_key',    label: 'Input S3 key',    type: 'text' },
+
+    // NEW: toggle to optionally customize output path
+    { name: 'customize_output_path', label: 'Customize output path', type: 'toggle' }, // default OFF
+
+    // Output destination (shown when customize_output_path = ON)
     { name: 'output_bucket', label: 'Output S3 bucket', type: 'text' },
     { name: 'output_prefix', label: 'Output S3 prefix', type: 'text' },
+
     // HydroFabric helper (if needed later)
     { name: 'vpu', label: 'VPU (only if gpkg missing)', type: 'text', placeholder: 'e.g., 10L' },
+
     // ngiab-cal CLI flags
     { name: 'gage', label: 'USGS Gage ID', type: 'text' },
     { name: 'iterations', label: 'Iterations (-i)', type: 'number' },
@@ -89,13 +99,22 @@ const NODE_FORMS = {
     { name: 'force', label: 'Force overwrite? (-f)', type: 'select', options: ['false', 'true'] },
     { name: 'debug', label: 'Debug? (--debug)', type: 'select', options: ['false', 'true'] },
   ],
+
   'calibration-run': [
-    // Calibration-only path: user can paste ONE S3 URL; we’ll parse it.
-    { name: 'input_s3_url', label: 'Preprocess artifact S3 URL (e.g. s3://bucket/path/preprocess.tgz)', type: 'text' },
-    // Advanced overrides (optional)
-    { name: 'input_bucket', label: 'Input S3 bucket (optional)', type: 'text' },
-    { name: 'input_key', label: 'Input S3 key (optional)', type: 'text' },
-    // Output destination
+    // NEW: toggle to switch input mode
+    { name: 'import_data', label: 'Import data by URL', type: 'toggle' },   // default OFF
+
+    // URL input (shown when import_data = ON)
+    { name: 'input_s3_url', label: 'Preprocess artifact S3/HTTPS URL', type: 'text' },
+
+    // Bucket/Key inputs (shown when import_data = OFF)
+    { name: 'input_bucket', label: 'Input S3 bucket', type: 'text' },
+    { name: 'input_key',    label: 'Input S3 key',    type: 'text' },
+
+    // NEW: toggle to optionally customize output path
+    { name: 'customize_output_path', label: 'Customize output path', type: 'toggle' }, // default OFF
+
+    // Output destination (shown when customize_output_path = ON)
     { name: 'output_bucket', label: 'Output S3 bucket', type: 'text' },
     { name: 'output_prefix', label: 'Output S3 prefix', type: 'text' },
   ],
