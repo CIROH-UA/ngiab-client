@@ -8,8 +8,10 @@ import {
   Handle,
   Position,
   NodeToolbar,
+  SelectionMode
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { FaPlay } from "react-icons/fa";
 import { useWorkflows } from '../hooks/useWorkflowsContext';
 import { types } from '../store/actions/actionsTypes';
 import NodeConfigPopup from './NodeConfigPopup';
@@ -41,131 +43,9 @@ const Icons = {
       <path fill="currentColor" d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.41 4.29 19.71 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29l6.3 6.3 6.29-6.3z" />
     </svg>
   ),
-  play: (props) => (
-    <svg viewBox="0 0 24 24" width="16" height="16" {...props}>
-      <path fill="currentColor" d="M8 5v14l11-7z" />
-    </svg>
-  ),
+  
+
 };
-
-// === forms aligned with preprocess & calibration ===
-// const NODE_FORMS = {
-//   'pre-process': [
-//     { name: 'selector_type', label: 'Selector Type', type: 'select', options: ['gage', 'latlon', 'catchment'] },
-//     { name: 'selector_value', label: 'Value (e.g. 01359139 | 33.22,-87.54 | 5173)', type: 'text' },
-//     { name: 'vpu', label: 'VPU (optional, e.g. 01)', type: 'text' },
-//     { name: 'start_date', label: 'Start (YYYY-MM-DD)', type: 'text' },
-//     { name: 'end_date', label: 'End (YYYY-MM-DD)', type: 'text' },
-//     { name: 'output_name', label: 'Output folder name (-o)', type: 'text' },
-//     { name: 'source', label: 'Source', type: 'select', options: ['nwm', 'aorc'] },
-//     { name: 'debug', label: 'Debug (-D)?', type: 'select', options: ['false', 'true'] },
-//     // step / flow controls
-//     { name: 'all', label: 'Run ALL (-sfr + --run)', type: 'select', options: ['false', 'true'] },
-//     { name: 'subset', label: 'Subset (-s)', type: 'select', options: ['true', 'false'] },
-//     { name: 'forcings', label: 'Forcings (-f)', type: 'select', options: ['true', 'false'] },
-//     { name: 'realization', label: 'Realization (-r)', type: 'select', options: ['true', 'false'] },
-//     { name: 'run', label: 'Run NGIAB (--run)', type: 'select', options: ['false', 'true'] },
-//     { name: 'validate', label: 'Validate (--validate)', type: 'select', options: ['false', 'true'] },
-//     // optional S3 target for artifact placement
-//     { name: 'output_bucket', label: 'S3 bucket (artifact)', type: 'text' },
-//     { name: 'output_prefix', label: 'S3 prefix (artifact)', type: 'text' },
-//   ],
-//   'calibration-config': [
-//     // NEW: toggle to switch input mode
-//     { name: 'import_data', label: 'Import data by URL', type: 'toggle' },   // default OFF
-
-//     // URL input (shown when import_data = ON)
-//     { name: 'input_s3_url', label: 'Preprocess artifact S3/HTTPS URL', type: 'text' },
-
-//     // Bucket/Key inputs (shown when import_data = OFF)
-//     { name: 'input_bucket', label: 'Input S3 bucket', type: 'text' },
-//     { name: 'input_key',    label: 'Input S3 key',    type: 'text' },
-
-//     // NEW: toggle to optionally customize output path
-//     { name: 'customize_output_path', label: 'Customize output path', type: 'toggle' }, // default OFF
-
-//     // Output destination (shown when customize_output_path = ON)
-//     { name: 'output_bucket', label: 'Output S3 bucket', type: 'text' },
-//     { name: 'output_prefix', label: 'Output S3 prefix', type: 'text' },
-
-//     // HydroFabric helper (if needed later)
-//     { name: 'vpu', label: 'VPU (only if gpkg missing)', type: 'text', placeholder: 'e.g., 10L' },
-
-//     // ngiab-cal CLI flags
-//     { name: 'gage', label: 'USGS Gage ID', type: 'text' },
-//     { name: 'iterations', label: 'Iterations (-i)', type: 'number' },
-//     { name: 'warmup', label: 'Warmup days (-w)', type: 'number' },
-//     { name: 'calibration_ratio', label: 'Calibration ratio (--calibration_ratio)', type: 'text' },
-//     { name: 'force', label: 'Force overwrite? (-f)', type: 'select', options: ['false', 'true'] },
-//     { name: 'debug', label: 'Debug? (--debug)', type: 'select', options: ['false', 'true'] },
-//   ],
-
-//   'calibration-run': [
-//     // NEW: toggle to switch input mode
-//     { name: 'import_data', label: 'Import data by URL', type: 'toggle' },   // default OFF
-
-//     // URL input (shown when import_data = ON)
-//     { name: 'input_s3_url', label: 'Preprocess artifact S3/HTTPS URL', type: 'text' },
-
-//     // Bucket/Key inputs (shown when import_data = OFF)
-//     { name: 'input_bucket', label: 'Input S3 bucket', type: 'text' },
-//     { name: 'input_key',    label: 'Input S3 key',    type: 'text' },
-
-//     // NEW: toggle to optionally customize output path
-//     { name: 'customize_output_path', label: 'Customize output path', type: 'toggle' }, // default OFF
-
-//     // Output destination (shown when customize_output_path = ON)
-//     { name: 'output_bucket', label: 'Output S3 bucket', type: 'text' },
-//     { name: 'output_prefix', label: 'Output S3 prefix', type: 'text' },
-//   ],
-//   'run ngiab': [
-//     // NEW: toggle to switch input mode
-//     { name: 'import_data', label: 'Import data by URL', type: 'toggle' },   // default OFF
-
-//     { name: 'input_s3_url', label: 'Input S3 key (optional)', type: 'text' },
-//     { name: 'ngen_np', label: 'NGEN Parallelism', type: 'number' },
-//   ],
-//   'teehr': [
-//     { name: 'import_data', label: 'Import data by URL', type: 'toggle' },   // default OFF
-//     { name: 'input_s3_url', label: 'Input S3 key (optional)', type: 'text' },
-//     { name: 'teehr_inputs_subdir', label: 'Inputs subdir', type: 'text' },
-//     { name: 'teehr_results_subdir', label: 'Results subdir', type: 'text' },
-//     { name: 'teehr_args', label: 'Extra args', type: 'text' },
-//   ],
-// };
-
-// // === dummy-friendly minimal forms for fast iteration ===
-// const NODE_FORMS = {
-//   'pre-process': [
-//     { name: 'sleep_sec', label: 'Sleep (sec)', type: 'number' },
-//     { name: 'output_bucket', label: 'Output bucket', type: 'text' },
-//     { name: 'output_prefix', label: 'Output prefix', type: 'text' },
-//     { name: 'output_name', label: 'Dataset name', type: 'text' },
-//   ],
-//   'calibration-config': [
-//     { name: 'sleep_sec', label: 'Sleep (sec)', type: 'number' },
-//     // accepts either chained dataset_s3_key or standalone inputs, but for dummy allow empty
-//     { name: 'output_bucket', label: 'Output bucket', type: 'text' },
-//     { name: 'output_prefix', label: 'Output prefix', type: 'text' },
-//   ],
-//   'calibration-run': [
-//     { name: 'sleep_sec', label: 'Sleep (sec)', type: 'number' },
-//     { name: 'output_bucket', label: 'Output bucket', type: 'text' },
-//     { name: 'output_prefix', label: 'Output prefix', type: 'text' },
-//   ],
-//   'run ngiab': [
-//     { name: 'sleep_sec', label: 'Sleep (sec)', type: 'number' },
-//     { name: 'output_bucket', label: 'Output bucket', type: 'text' },
-//     { name: 'output_prefix', label: 'Output prefix', type: 'text' },
-//     { name: 'output_name', label: 'Dataset name', type: 'text' },
-//   ],
-//   'teehr': [
-//     { name: 'sleep_sec', label: 'Sleep (sec)', type: 'number' },
-//     { name: 'output_bucket', label: 'Output bucket', type: 'text' },
-//     { name: 'output_prefix', label: 'Output prefix', type: 'text' },
-//   ],
-// };
-
 const NODE_FORMS = {
   'pre-process': [
     { name: 'selector_type',  label: 'Selector Type', type: 'select', options: ['gage', 'latlon', 'catchment'] },
@@ -188,6 +68,7 @@ const NODE_FORMS = {
     { name: 'output_prefix',  label: 'S3 prefix', type: 'text' },
   ],
   'calibration-config': [
+    { name: 'import_data', label: 'Import data by URL', type: 'toggle' },   // default OFF
     { name: 'input_s3_url',   label: 'Input URL (s3:// or https://)', type: 'text' },
     { name: 'input_bucket',   label: 'Input S3 bucket', type: 'text' },
     { name: 'input_key',      label: 'Input S3 key', type: 'text' },
@@ -198,18 +79,22 @@ const NODE_FORMS = {
     { name: 'calibration_ratio', label: 'Calibration ratio', type: 'text' },
     { name: 'force',          label: 'Force (-f)', type: 'select', options: ['false','true'] },
     { name: 'debug',          label: 'Debug', type: 'select', options: ['false','true'] },
+    { name: 'customize_output_path', label: 'Customize output path', type: 'toggle' },
     { name: 'output_bucket',  label: 'Output S3 bucket', type: 'text' },
     { name: 'output_prefix',  label: 'Output S3 prefix', type: 'text' },
   ],
   'calibration-run': [
+    { name: 'import_data', label: 'Import data by URL', type: 'toggle' },   // default OFF
     { name: 'input_s3_url',   label: 'Input URL (s3:// or https://)', type: 'text' },
     { name: 'input_bucket',   label: 'Input S3 bucket', type: 'text' },
     { name: 'input_key',      label: 'Input S3 key', type: 'text' },
     { name: 'input_subdir',   label: 'Inner folder (optional)', type: 'text' },
+    { name: 'customize_output_path', label: 'Customize output path', type: 'toggle' }, // default OFF
     { name: 'output_bucket',  label: 'Output S3 bucket', type: 'text' },
     { name: 'output_prefix',  label: 'Output S3 prefix', type: 'text' },
   ],
   'run ngiab': [
+    { name: 'import_data', label: 'Import data by URL', type: 'toggle' },   // default OFF
     { name: 'input_s3_url',   label: 'Input URL (s3:// or https://)', type: 'text' },
     { name: 'input_bucket',   label: 'Input S3 bucket', type: 'text' },
     { name: 'input_key',      label: 'Input S3 key', type: 'text' },
@@ -217,16 +102,19 @@ const NODE_FORMS = {
     { name: 'output_name',    label: 'Output name', type: 'text' },
     { name: 'ngen_np',        label: 'ngen NP', type: 'number' },
     { name: 'image_ngen',     label: 'Image', type: 'text' },
+    { name: 'customize_output_path', label: 'Customize output path', type: 'toggle' }, // default OFF
     { name: 'output_bucket',  label: 'Output S3 bucket', type: 'text' },
     { name: 'output_prefix',  label: 'Output S3 prefix', type: 'text' },
   ],
   'teehr': [
+    { name: 'import_data', label: 'Import data by URL', type: 'toggle' },   // default OFF
     { name: 'input_s3_url',   label: 'Input URL (s3:// or https://)', type: 'text' },
     { name: 'input_bucket',   label: 'Input S3 bucket', type: 'text' },
     { name: 'input_s3_key',   label: 'Input S3 key (file)', type: 'text' },
     { name: 'teehr_inputs_subdir',  label: 'Inputs subdir (default: outputs)', type: 'text' },
     { name: 'teehr_results_subdir', label: 'Results subdir (default: teehr)', type: 'text' },
     { name: 'teehr_args',     label: 'Extra args', type: 'text' },
+    { name: 'customize_output_path', label: 'Customize output path', type: 'toggle' }, // default OFF
     { name: 'output_bucket',  label: 'Output S3 bucket', type: 'text' },
     { name: 'output_prefix',  label: 'Output S3 prefix', type: 'text' },
     { name: 'image_teehr',    label: 'Image', type: 'text' },
@@ -347,7 +235,7 @@ function ProcessNode({ id, data, selected }) {
               background: '#1f2937', color: '#e5e7eb', cursor: 'pointer',
             }}
           >
-            <Icons.play />
+            <FaPlay size={8}/>
           </button>
         )}
       </div>
@@ -420,6 +308,8 @@ export default function Workflow() {
     <div style={{ position: 'relative', width: '100%', height: '90vh' }}>
       <ReactFlow
         colorMode="dark"
+        selectionKeyCode="Shift"
+        selectionMode={SelectionMode.Partial}
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -434,26 +324,6 @@ export default function Workflow() {
         <Controls />
         <Background />
       </ReactFlow>
-      <button
-        onClick={onRunWorkflow}
-        title="Run workflow"
-        style={{
-          position: 'absolute',
-          top: 8,
-          left: 8,
-          width: 32,
-          height: 32,
-          borderRadius: 999,
-          border: '2px solid #374151',
-          background: '#1f2937',
-          color: '#e5e7eb',
-          display: 'grid',
-          placeItems: 'center',
-          cursor: 'pointer',
-        }}
-      >
-        <Icons.play />
-      </button>
     </div>
   );
 }
