@@ -24,7 +24,7 @@ function App() {
               navLinks={[
                 {title: '📦 NextGen In A Box Outputs Visualization', to: PATH_HOME, eventKey: 'link-home'},
                 {title: '🪣 Datastream S3 Bucket Visualization', to: PATH_DATASTREAM, eventKey: 'link-datastream'},
-                {title: 'Workflows', to: PATH_WORKFLOWS, eventKey: 'link-workflows'},
+                {title: '🦙 Workflows', to: PATH_WORKFLOWS, eventKey: 'link-workflows'},
 
                 {title: 'ℹ️ About NextGen In A Box', to: PATH_NGIAB_SITE,  external: true},
                 {title: '📖 Visualizer Documentation', to: PATH_VISUALIZATION_DOCUMENTATION,  external: true},

@@ -4,7 +4,7 @@ import ModelRunsSelect from 'features/ModelRuns/components/modelRunsSelect';
 import TimeSeriesSelection from 'features/ModelRuns/components/timeSeriesSelect';
 import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
 import { useModelRunsContext } from '../hooks/useModelRunsContext';
-import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight,FaPlus } from "react-icons/fa";
 import Button from 'react-bootstrap/Button';
 
 const Container = styled.div`
@@ -86,6 +86,7 @@ const ModelRunsView = ({
     
       <Container isOpen={isOpen}>
         <Content>
+          <Button><FaPlus size={20} /> Import </Button>
           {
             isModelRunListVisible &&(
               <Fragment>
