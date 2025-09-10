@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: dummy-calibration-config
+  namespace: argo
+spec:
+  entrypoint: main
+  templates:
+  - name: main
+    metadata:
+      labels:
+        app: ngiab
+        stage: calibration-config
+    inputs:
+      parameters:
+        - { name: output_bucket, default: "test-ngen" }
+        - { name: output_prefix, default: "demo/default" }
+        - { name: sleep_sec,     default: "1" }
+        # allow chained input:
+        - { name: dataset_s3_key, default: "" }
+        - { name: input_bucket,    default: "" }
+        - { name: input_key,       default: "" }
+        - { name: input_s3_url,    default: "" }
+    script:
+      image: alpine:3.19
+      command: [sh, -lc]
+      source: |
+        set -e
+        echo "[CFG] starting dummy calibration-config …"
+        echo "[CFG] incoming dataset={{inputs.parameters.input_bucket}}/{{inputs.parameters.input_key}} url={{inputs.parameters.input_s3_url}} direct={{inputs.parameters.dataset_s3_key}}"
+        sleep {{inputs.parameters.sleep_sec}}
+        echo "cfg" > /tmp/.marker
+        printf "%s\n" "{{inputs.parameters.output_prefix}}/cfg-outputs.tgz" > /tmp/.dataset_key
+        tar -czf /tmp/cfg-outputs.tgz -C /tmp .marker
+    outputs:
+      parameters:
+        - name: dataset_s3_key
+          valueFrom: { path: /tmp/.dataset_key }
+      artifacts:
+        - name: dataset-full
+          path: /tmp/cfg-outputs.tgz
+          archive: { none: {} }
+          s3:
+            endpoint: s3.amazonaws.com
+            bucket: "{{inputs.parameters.output_bucket}}"
+            key: "{{inputs.parameters.output_prefix}}/cfg-outputs.tgz"
+            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }

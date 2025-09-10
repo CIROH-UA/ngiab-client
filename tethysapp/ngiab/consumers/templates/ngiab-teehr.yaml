@@ -84,22 +84,31 @@ spec:
         # explode any inner archives
         unpack_nested
 
-        # normalize config path and inputs dir
-        if [ ! -d /app/data/config ] && [ -d /app/data/ngiab/config ]; then
-          shopt -s dotglob; mv /app/data/ngiab/* /app/data/ || true; rmdir /app/data/ngiab || true
+        # ---- Locate dataset root (directory that contains config/) ----
+        DATA_DIR=""
+        if [ -d /app/data/config ]; then
+          DATA_DIR="/app/data"
+        else
+          DATA_DIR="$(find /app/data -mindepth 1 -maxdepth 2 -type d -exec test -d '{}/config' ';' -print -quit || true)"
         fi
-        [ -f /app/data/config/realization.json ] || { echo "Missing /app/data/config/realization.json"; exit 2; }
+        if [ -z "$DATA_DIR" ] || [ ! -f "$DATA_DIR/config/realization.json" ]; then
+          echo "Missing dataset config under /app/data (after extract)."
+          echo "Searched for */config with realization.json"
+          find /app/data -maxdepth 2 -type d -print || true
+          exit 2
+        fi
 
+        # ---- Resolve inputs (usually <DATA_DIR>/outputs) ----
         INPUT_DIR_CANDIDATES=(
-          "/app/data/{{inputs.parameters.teehr_inputs_subdir}}"
-          "/app/data/outputs"
-          "/app/data/ngiab/outputs"
+          "$DATA_DIR/{{inputs.parameters.teehr_inputs_subdir}}"
+          "$DATA_DIR/outputs"
         )
         INPUT_DIR=""
         for d in "${INPUT_DIR_CANDIDATES[@]}"; do [ -d "$d" ] && INPUT_DIR="$d" && break; done
-        [ -n "$INPUT_DIR" ] || { echo "No outputs/ found"; exit 2; }
+        [ -n "$INPUT_DIR" ] || { echo "No outputs/ found under $DATA_DIR"; exit 2; }
 
-        RESULTS_DIR="/app/data/{{inputs.parameters.teehr_results_subdir}}"
+        # ---- Results live under dataset root, not hard-coded /app/data ----
+        RESULTS_DIR="$DATA_DIR/{{inputs.parameters.teehr_results_subdir}}"
         mkdir -p "$RESULTS_DIR"
 
         echo "TEEHR INPUT_DIR=$INPUT_DIR"
@@ -138,3 +147,4 @@ spec:
             key: "{{inputs.parameters.output_prefix}}/teehr_results.tgz"
             accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
             secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+

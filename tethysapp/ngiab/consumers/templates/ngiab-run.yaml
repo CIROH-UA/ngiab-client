@@ -192,3 +192,4 @@ spec:
             key: "{{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz"
             accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
             secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+

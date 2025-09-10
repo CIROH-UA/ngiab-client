@@ -1,0 +1,1221 @@
+Name:         ngiab-chain-ckmlz
+Namespace:    argo
+Labels:       workflows.argoproj.io/completed=false
+              workflows.argoproj.io/creator=system-serviceaccount-argo-argo-server
+              workflows.argoproj.io/phase=Running
+Annotations:  workflows.argoproj.io/pod-name-format: v2
+API Version:  argoproj.io/v1alpha1
+Kind:         Workflow
+Metadata:
+  Creation Timestamp:  2025-09-09T21:19:25Z
+  Generate Name:       ngiab-chain-
+  Generation:          5
+  Resource Version:    799017
+  UID:                 1406f1ec-74d4-446f-96cf-6c14fd524a72
+Spec:
+  Arguments:
+  Entrypoint:  main
+  Templates:
+    Dag:
+      Tasks:
+        Arguments:
+          Parameters:
+            Name:   output_bucket
+            Value:  test-ngen
+            Name:   output_prefix
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-pre-process-2-00
+            Name:   selector_type
+            Value:  gage
+            Name:   selector_value
+            Value:  02464000
+            Name:   vpu
+            Value:  
+            Name:   start_date
+            Value:  2017-01-01
+            Name:   end_date
+            Value:  2017-02-01
+            Name:   output_name
+            Value:  ngiab
+            Name:   source
+            Value:  nwm
+            Name:   debug
+            Value:  false
+            Name:   all
+            Value:  false
+            Name:   subset
+            Value:  true
+            Name:   forcings
+            Value:  true
+            Name:   realization
+            Value:  true
+            Name:   run
+            Value:  false
+            Name:   validate
+            Value:  false
+        Name:       t-pre-process-2-00
+        Template Ref:
+          Name:      ngiab-data-preprocess
+          Template:  main
+        Arguments:
+          Parameters:
+            Name:   output_bucket
+            Value:  test-ngen
+            Name:   output_prefix
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-pre-process-00
+            Name:   selector_type
+            Value:  gage
+            Name:   selector_value
+            Value:  02464000
+            Name:   vpu
+            Value:  
+            Name:   start_date
+            Value:  2010-01-01
+            Name:   end_date
+            Value:  2010-02-02
+            Name:   output_name
+            Value:  ngiab
+            Name:   source
+            Value:  nwm
+            Name:   debug
+            Value:  false
+            Name:   all
+            Value:  false
+            Name:   subset
+            Value:  true
+            Name:   forcings
+            Value:  true
+            Name:   realization
+            Value:  true
+            Name:   run
+            Value:  false
+            Name:   validate
+            Value:  true
+        Name:       t-pre-process-00
+        Template Ref:
+          Name:      ngiab-data-preprocess
+          Template:  main
+        Arguments:
+          Parameters:
+            Name:   output_bucket
+            Value:  test-ngen
+            Name:   output_prefix
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-calibration-config-00
+            Name:   final_prefix
+            Value:  
+            Name:   input_bucket
+            Value:  test-ngen
+            Name:   input_key
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-pre-process-00/ngiab.tgz
+            Name:   input_s3_key
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-pre-process-00/ngiab.tgz
+            Name:   input_s3_url
+            Value:  
+            Name:   input_subdir
+            Value:  ngiab
+            Name:   gage
+            Value:  02464000
+            Name:   iterations
+            Value:  100
+            Name:   warmup
+            Value:  365
+            Name:   calibration_ratio
+            Value:  0.5
+            Name:   force
+            Value:  false
+            Name:   debug
+            Value:  true
+            Name:   vpu
+            Value:  
+        Dependencies:
+          t-pre-process-00
+        Name:  t-calibration-config-00
+        Template Ref:
+          Name:      ngiab-calibration-config
+          Template:  main
+        Arguments:
+          Parameters:
+            Name:   output_bucket
+            Value:  test-ngen
+            Name:   output_prefix
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-calibration-config-01
+            Name:   final_prefix
+            Value:  
+            Name:   input_bucket
+            Value:  test-ngen
+            Name:   input_key
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-pre-process-2-00/ngiab.tgz
+            Name:   input_s3_key
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-pre-process-2-00/ngiab.tgz
+            Name:   input_s3_url
+            Value:  
+            Name:   input_subdir
+            Value:  ngiab
+            Name:   gage
+            Value:  02464000
+            Name:   iterations
+            Value:  100
+            Name:   warmup
+            Value:  365
+            Name:   calibration_ratio
+            Value:  0.5
+            Name:   force
+            Value:  false
+            Name:   debug
+            Value:  true
+            Name:   vpu
+            Value:  
+        Dependencies:
+          t-pre-process-2-00
+        Name:  t-calibration-config-01
+        Template Ref:
+          Name:      ngiab-calibration-config
+          Template:  main
+        Arguments:
+          Parameters:
+            Name:   output_bucket
+            Value:  test-ngen
+            Name:   output_prefix
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-run-ngiab-00
+            Name:   final_prefix
+            Value:  
+            Name:   input_bucket
+            Value:  test-ngen
+            Name:   input_key
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-calibration-config-00/calibration-prepared.tgz
+            Name:   input_s3_url
+            Value:  
+            Name:   input_subdir
+            Value:  ngiab
+            Name:   output_name
+            Value:  ngiab
+            Name:   ngen_np
+            Value:  8
+            Name:   image_ngen
+            Value:  awiciroh/ciroh-ngen-image:latest
+            Name:   input_s3_key
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-calibration-config-00/calibration-prepared.tgz
+        Dependencies:
+          t-pre-process-00
+        Name:  t-run-ngiab-00
+        Template Ref:
+          Name:      ngiab-run
+          Template:  main
+        Arguments:
+          Parameters:
+            Name:   output_bucket
+            Value:  test-ngen
+            Name:   output_prefix
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-run-ngiab-01
+            Name:   final_prefix
+            Value:  
+            Name:   input_bucket
+            Value:  test-ngen
+            Name:   input_key
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-calibration-config-01/calibration-prepared.tgz
+            Name:   input_s3_url
+            Value:  
+            Name:   input_subdir
+            Value:  ngiab
+            Name:   output_name
+            Value:  ngiab
+            Name:   ngen_np
+            Value:  8
+            Name:   image_ngen
+            Value:  awiciroh/ciroh-ngen-image:latest
+            Name:   input_s3_key
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-calibration-config-01/calibration-prepared.tgz
+        Dependencies:
+          t-pre-process-2-00
+        Name:  t-run-ngiab-01
+        Template Ref:
+          Name:      ngiab-run
+          Template:  main
+        Arguments:
+          Parameters:
+            Name:   output_bucket
+            Value:  test-ngen
+            Name:   output_prefix
+            Value:  admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/{{workflow.name}}/t-teehr-00
+            Name:   final_prefix
+            Value:  
+            Name:   input_bucket
+            Value:  test-ngen
+            Name:   input_s3_key
+            Value:  
+            Name:   input_s3_url
+            Value:  
+            Name:   teehr_inputs_subdir
+            Value:  outputs
+            Name:   teehr_results_subdir
+            Value:  teehr
+            Name:   teehr_args
+            Value:  
+            Name:   image_teehr
+            Value:  awiciroh/ngiab-teehr:x86
+        Name:       t-teehr-00
+        Template Ref:
+          Name:      ngiab-teehr
+          Template:  main
+    Inputs:
+    Metadata:
+    Name:  main
+    Outputs:
+Status:
+  Artifact GC Status:
+    Not Specified:  true
+  Artifact Repository Ref:
+    Artifact Repository:
+      Archive Logs:  true
+      s3:
+        Access Key Secret:
+          Key:     accesskey
+          Name:    my-minio-cred
+        Bucket:    my-bucket
+        Endpoint:  minio:9000
+        Insecure:  true
+        Secret Key Secret:
+          Key:   secretkey
+          Name:  my-minio-cred
+    Config Map:  artifact-repositories
+    Key:         default-v1
+    Namespace:   argo
+  Conditions:
+    Status:     False
+    Type:       PodRunning
+  Finished At:  <nil>
+  Nodes:
+    Ngiab - Chain - Ckmlz:
+      Children:
+        ngiab-chain-ckmlz-1654572585
+        ngiab-chain-ckmlz-2698108716
+        ngiab-chain-ckmlz-560062654
+      Display Name:    ngiab-chain-ckmlz
+      Finished At:     <nil>
+      Id:              ngiab-chain-ckmlz
+      Name:            ngiab-chain-ckmlz
+      Phase:           Running
+      Progress:        0/3
+      Started At:      2025-09-09T21:19:25Z
+      Template Name:   main
+      Template Scope:  local/ngiab-chain-ckmlz
+      Type:            DAG
+    ngiab-chain-ckmlz-1654572585:
+      Boundary ID:     ngiab-chain-ckmlz
+      Display Name:    t-pre-process-00
+      Finished At:     <nil>
+      Host Node Name:  minikube
+      Id:              ngiab-chain-ckmlz-1654572585
+      Inputs:
+        Parameters:
+          Default:         test-ngen
+          Name:            output_bucket
+          Value:           test-ngen
+          Default:         demo/default
+          Name:            output_prefix
+          Value:           admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/ngiab-chain-ckmlz/t-pre-process-00
+          Default:         gage
+          Name:            selector_type
+          Value:           gage
+          Default:         01359139
+          Name:            selector_value
+          Value:           02464000
+          Default:         
+          Name:            vpu
+          Value:           
+          Default:         2020-01-01
+          Name:            start_date
+          Value:           2010-01-01
+          Default:         2020-01-15
+          Name:            end_date
+          Value:           2010-02-02
+          Default:         ngiab
+          Name:            output_name
+          Value:           ngiab
+          Default:         nwm
+          Name:            source
+          Value:           nwm
+          Default:         false
+          Name:            debug
+          Value:           false
+          Default:         false
+          Name:            all
+          Value:           false
+          Default:         true
+          Name:            subset
+          Value:           true
+          Default:         true
+          Name:            forcings
+          Value:           true
+          Default:         true
+          Name:            realization
+          Value:           true
+          Default:         false
+          Name:            run
+          Value:           false
+          Default:         false
+          Name:            validate
+          Value:           true
+      Name:                ngiab-chain-ckmlz.t-pre-process-00
+      Phase:               Running
+      Progress:            0/1
+      Started At:          2025-09-09T21:19:25Z
+      Task Result Synced:  false
+      Template Ref:
+        Name:          ngiab-data-preprocess
+        Template:      main
+      Template Scope:  local/ngiab-chain-ckmlz
+      Type:            Pod
+    ngiab-chain-ckmlz-2698108716:
+      Boundary ID:     ngiab-chain-ckmlz
+      Display Name:    t-pre-process-2-00
+      Finished At:     <nil>
+      Host Node Name:  minikube
+      Id:              ngiab-chain-ckmlz-2698108716
+      Inputs:
+        Parameters:
+          Default:         test-ngen
+          Name:            output_bucket
+          Value:           test-ngen
+          Default:         demo/default
+          Name:            output_prefix
+          Value:           admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/ngiab-chain-ckmlz/t-pre-process-2-00
+          Default:         gage
+          Name:            selector_type
+          Value:           gage
+          Default:         01359139
+          Name:            selector_value
+          Value:           02464000
+          Default:         
+          Name:            vpu
+          Value:           
+          Default:         2020-01-01
+          Name:            start_date
+          Value:           2017-01-01
+          Default:         2020-01-15
+          Name:            end_date
+          Value:           2017-02-01
+          Default:         ngiab
+          Name:            output_name
+          Value:           ngiab
+          Default:         nwm
+          Name:            source
+          Value:           nwm
+          Default:         false
+          Name:            debug
+          Value:           false
+          Default:         false
+          Name:            all
+          Value:           false
+          Default:         true
+          Name:            subset
+          Value:           true
+          Default:         true
+          Name:            forcings
+          Value:           true
+          Default:         true
+          Name:            realization
+          Value:           true
+          Default:         false
+          Name:            run
+          Value:           false
+          Default:         false
+          Name:            validate
+          Value:           false
+      Name:                ngiab-chain-ckmlz.t-pre-process-2-00
+      Phase:               Running
+      Progress:            0/1
+      Started At:          2025-09-09T21:19:25Z
+      Task Result Synced:  false
+      Template Ref:
+        Name:          ngiab-data-preprocess
+        Template:      main
+      Template Scope:  local/ngiab-chain-ckmlz
+      Type:            Pod
+    ngiab-chain-ckmlz-560062654:
+      Boundary ID:     ngiab-chain-ckmlz
+      Display Name:    t-teehr-00
+      Finished At:     2025-09-09T21:19:51Z
+      Host Node Name:  minikube
+      Id:              ngiab-chain-ckmlz-560062654
+      Inputs:
+        Parameters:
+          Default:  test-ngen
+          Name:     output_bucket
+          Value:    test-ngen
+          Default:  demo/default
+          Name:     output_prefix
+          Value:    admin/9be72de2-7c0a-4f30-b6d2-cdd230279764/ngiab-chain-ckmlz/t-teehr-00
+          Default:  
+          Name:     final_prefix
+          Value:    
+          Default:  test-ngen
+          Name:     input_bucket
+          Value:    test-ngen
+          Default:  
+          Name:     input_s3_key
+          Value:    
+          Default:  
+          Name:     input_s3_url
+          Value:    
+          Default:  outputs
+          Name:     teehr_inputs_subdir
+          Value:    outputs
+          Default:  teehr
+          Name:     teehr_results_subdir
+          Value:    teehr
+          Default:  
+          Name:     teehr_args
+          Value:    
+          Default:  awiciroh/ngiab-teehr:x86
+          Name:     image_teehr
+          Value:    awiciroh/ngiab-teehr:x86
+      Message:      main: Error (exit code 2)
+      Name:         ngiab-chain-ckmlz.t-teehr-00
+      Outputs:
+        Artifacts:
+          Name:  main-logs
+          s3:
+            Key:    ngiab-chain-ckmlz/ngiab-chain-ckmlz-main-560062654/main.log
+        Exit Code:  2
+      Phase:        Failed
+      Progress:     0/1
+      Resources Duration:
+        Cpu:               2
+        Memory:            36
+      Started At:          2025-09-09T21:19:25Z
+      Task Result Synced:  true
+      Template Ref:
+        Name:          ngiab-teehr
+        Template:      main
+      Template Scope:  local/ngiab-chain-ckmlz
+      Type:            Pod
+  Phase:               Running
+  Progress:            0/3
+  Resources Duration:
+    Cpu:       2
+    Memory:    36
+  Started At:  2025-09-09T21:19:25Z
+  Stored Templates:
+    namespaced/ngiab-calibration-config/main:
+      Inputs:
+        Parameters:
+          Default:  
+          Name:     input_bucket
+          Default:  
+          Name:     input_key
+          Default:  
+          Name:     input_s3_url
+          Default:  
+          Name:     input_subdir
+          Default:  
+          Name:     gage
+          Default:  100
+          Name:     iterations
+          Default:  365
+          Name:     warmup
+          Default:  0.5
+          Name:     calibration_ratio
+          Default:  false
+          Name:     force
+          Default:  false
+          Name:     debug
+          Default:  test-ngen
+          Name:     output_bucket
+          Default:  demo/default
+          Name:     output_prefix
+      Metadata:
+      Name:  main
+      Outputs:
+        Artifacts:
+          From:  {{steps.prepare.outputs.artifacts.calibration-prepared}}
+          Name:  calibration-prepared
+        Parameters:
+          Name:  prepared_bucket
+          Value From:
+            Parameter:  {{steps.prepare.outputs.parameters.prepared_bucket}}
+          Name:         prepared_s3_key
+          Value From:
+            Parameter:  {{steps.prepare.outputs.parameters.prepared_s3_key}}
+      Steps:
+        [map[arguments:map[parameters:[map[name:input_bucket value:{{inputs.parameters.input_bucket}}] map[name:input_key value:{{inputs.parameters.input_key}}] map[name:input_s3_url value:{{inputs.parameters.input_s3_url}}] map[name:input_subdir value:{{inputs.parameters.input_subdir}}] map[name:gage value:{{inputs.parameters.gage}}] map[name:iterations value:{{inputs.parameters.iterations}}] map[name:warmup value:{{inputs.parameters.warmup}}] map[name:calibration_ratio value:{{inputs.parameters.calibration_ratio}}] map[name:force value:{{inputs.parameters.force}}] map[name:debug value:{{inputs.parameters.debug}}] map[name:output_bucket value:{{inputs.parameters.output_bucket}}] map[name:output_prefix value:{{inputs.parameters.output_prefix}}]]] name:prepare template:prepare]]
+    namespaced/ngiab-calibration-config/prepare:
+      Inputs:
+        Artifacts:
+          Name:      preprocess
+          Optional:  true
+          Path:      /tmp/ngiab
+          s3:
+            Access Key Secret:
+              Key:     AWS_ACCESS_KEY_ID
+              Name:    aws-creds
+            Bucket:    {{inputs.parameters.input_bucket}}
+            Endpoint:  s3.amazonaws.com
+            Key:       {{inputs.parameters.input_key}}
+            Region:    us-east-1
+            Secret Key Secret:
+              Key:   AWS_SECRET_ACCESS_KEY
+              Name:  aws-creds
+        Parameters:
+          Default:  
+          Name:     input_bucket
+          Default:  
+          Name:     input_key
+          Default:  
+          Name:     input_s3_url
+          Default:  
+          Name:     input_subdir
+          Default:  
+          Name:     gage
+          Default:  100
+          Name:     iterations
+          Default:  365
+          Name:     warmup
+          Default:  0.5
+          Name:     calibration_ratio
+          Default:  false
+          Name:     force
+          Default:  false
+          Name:     debug
+          Default:  test-ngen
+          Name:     output_bucket
+          Default:  demo/default
+          Name:     output_prefix
+      Metadata:
+      Name:  prepare
+      Outputs:
+        Artifacts:
+          Archive:
+            None:
+          Name:  calibration-prepared
+          Path:  /tmp/out/calibration-prepared.tgz
+          s3:
+            Access Key Secret:
+              Key:     AWS_ACCESS_KEY_ID
+              Name:    aws-creds
+            Bucket:    {{inputs.parameters.output_bucket}}
+            Endpoint:  s3.amazonaws.com
+            Key:       {{inputs.parameters.output_prefix}}/calibration-prepared.tgz
+            Region:    us-east-1
+            Secret Key Secret:
+              Key:   AWS_SECRET_ACCESS_KEY
+              Name:  aws-creds
+        Parameters:
+          Name:  prepared_bucket
+          Value From:
+            Path:  /tmp/out/.prepared_bucket
+          Name:    prepared_s3_key
+          Value From:
+            Path:  /tmp/out/.prepared_key
+      Script:
+        Command:
+          bash
+          -lc
+        Env:
+          Name:  AWS_ACCESS_KEY_ID
+          Value From:
+            Secret Key Ref:
+              Key:   AWS_ACCESS_KEY_ID
+              Name:  aws-creds
+          Name:      AWS_SECRET_ACCESS_KEY
+          Value From:
+            Secret Key Ref:
+              Key:   AWS_SECRET_ACCESS_KEY
+              Name:  aws-creds
+          Name:      AWS_DEFAULT_REGION
+          Value:     us-east-1
+        Image:       ghcr.io/astral-sh/uv:python3.11-bookworm-slim
+        Name:        
+        Resources:
+        Source:  set -euo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y && apt-get install -y --no-install-recommends \
+  curl ca-certificates findutils coreutils gzip tar unzip && \
+  rm -rf /var/lib/apt/lists/*
+
+mkdir -p /tmp/ngiab /tmp/data /tmp/out
+
+IN_URL="{{inputs.parameters.input_s3_url}}"
+echo "Input S3 URL: ${IN_URL}"
+
+SRC_DIR="/tmp/ngiab"
+TAR=""
+if [ -n "${IN_URL}" ]; then
+  # URL takes precedence — download to our own filename
+  if ! command -v aws >/dev/null 2>&1; then
+    curl -L "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+    unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install
+  fi
+  TAR="/tmp/ngiab/from_url.tgz"
+  aws s3 cp "${IN_URL}" "${TAR}" --no-progress
+
+  # Extract (gz if possible, fall back to plain tar)
+  if ! tar -C /tmp/data -xzf "${TAR}" 2>/dev/null; then
+    tar -C /tmp/data -xf "${TAR}"
+  fi
+  SRC_DIR="/tmp/data"
+fi
+
+IN_SUB="{{inputs.parameters.input_subdir}}"
+DATA_DIR=""
+# Prefer an explicit subdir if provided
+if [ -n "${IN_SUB}" ] && [ -d "${SRC_DIR}/${IN_SUB}/config" ]; then
+  DATA_DIR="${SRC_DIR}/${IN_SUB}"
+elif [ -d "${SRC_DIR}/config" ]; then
+  DATA_DIR="${SRC_DIR}"
+else
+  # fall back: first subdir that contains config/
+  DATA_DIR="$(find "${SRC_DIR}" -mindepth 1 -maxdepth 1 -type d -exec test -d '{}/config' ';' -print -quit || true)"
+fi
+
+if [ ! -d "${DATA_DIR}/config" ]; then
+  echo "ERROR: could not locate NGIAB data folder with config/ under ${SRC_DIR}"
+  find "${SRC_DIR}" -maxdepth 2 -type d -print || true
+  exit 2
+fi
+
+GAGE="{{inputs.parameters.gage}}"
+ITERS="{{inputs.parameters.iterations}}"
+WARMUP="{{inputs.parameters.warmup}}"
+CR="{{inputs.parameters.calibration_ratio}}"
+FORCE="{{inputs.parameters.force}}"
+DEBUG="{{inputs.parameters.debug}}"
+
+set +o pipefail
+uvx ngiab-cal "$DATA_DIR" -g "$GAGE" -i "$ITERS" -w "$WARMUP" --calibration_ratio "$CR" \
+  $( [ "$FORCE" = "true" ] && echo "-f" ) \
+  $( [ "$DEBUG" = "true" ] && echo "--debug" )
+set -o pipefail
+
+tar -C "$(dirname "$DATA_DIR")" -czf /tmp/out/calibration-prepared.tgz "$(basename "$DATA_DIR")"
+
+printf "%s\n" "{{inputs.parameters.output_bucket}}" > /tmp/out/.prepared_bucket
+printf "%s\n" "{{inputs.parameters.output_prefix}}/calibration-prepared.tgz" > /tmp/out/.prepared_key
+
+    namespaced/ngiab-data-preprocess/main:
+      Inputs:
+        Parameters:
+          Default:  test-ngen
+          Name:     output_bucket
+          Default:  demo/default
+          Name:     output_prefix
+          Default:  gage
+          Name:     selector_type
+          Default:  01359139
+          Name:     selector_value
+          Default:  
+          Name:     vpu
+          Default:  2020-01-01
+          Name:     start_date
+          Default:  2020-01-15
+          Name:     end_date
+          Default:  ngiab
+          Name:     output_name
+          Default:  nwm
+          Name:     source
+          Default:  false
+          Name:     debug
+          Default:  false
+          Name:     all
+          Default:  true
+          Name:     subset
+          Default:  true
+          Name:     forcings
+          Default:  true
+          Name:     realization
+          Default:  false
+          Name:     run
+          Default:  false
+          Name:     validate
+      Metadata:
+      Name:  main
+      Outputs:
+        Artifacts:
+          Name:  preprocess
+          Path:  /root/ngiab_preprocess_output/{{inputs.parameters.output_name}}
+          s3:
+            Access Key Secret:
+              Key:     AWS_ACCESS_KEY_ID
+              Name:    aws-creds
+            Bucket:    {{inputs.parameters.output_bucket}}
+            Endpoint:  s3.amazonaws.com
+            Key:       {{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz
+            Region:    us-east-1
+            Secret Key Secret:
+              Key:   AWS_SECRET_ACCESS_KEY
+              Name:  aws-creds
+        Parameters:
+          Name:  preprocess_bucket
+          Value From:
+            Path:  /tmp/out/.s3_bucket
+          Name:    preprocess_s3_key
+          Value From:
+            Path:  /tmp/out/.s3_key
+          Name:    preprocess_s3_url
+          Value From:
+            Path:  /tmp/out/.s3_url
+      Script:
+        Command:
+          bash
+          -lc
+        Image:  ghcr.io/astral-sh/uv:python3.11-bookworm-slim
+        Name:   
+        Resources:
+        Source:  set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y && apt-get install -y --no-install-recommends \
+  curl ca-certificates findutils coreutils gzip tar && \
+  rm -rf /var/lib/apt/lists/*
+
+SEL="{{inputs.parameters.selector_type}}"
+VAL="{{inputs.parameters.selector_value}}"
+VPU="{{inputs.parameters.vpu}}"
+START="{{inputs.parameters.start_date}}"
+END="{{inputs.parameters.end_date}}"
+OUT="{{inputs.parameters.output_name}}"
+SRC="{{inputs.parameters.source}}"
+DBG="{{inputs.parameters.debug}}"
+
+DO_ALL="{{inputs.parameters.all}}"
+DO_SUB="{{inputs.parameters.subset}}"
+DO_FOR="{{inputs.parameters.forcings}}"
+DO_REAL="{{inputs.parameters.realization}}"
+DO_RUN="{{inputs.parameters.run}}"
+DO_VALID="{{inputs.parameters.validate}}"
+
+IDFLAG="-i"
+IDVAL="$VAL"
+case "$SEL" in
+  gage)      case "$IDVAL" in gage-*) ;; *) IDVAL="gage-$IDVAL" ;; esac ;;
+  catchment) case "$IDVAL" in cat-*)  ;; *) IDVAL="cat-$IDVAL"  ;; esac ;;
+  latlon)    IDFLAG="-l" ;;
+esac
+
+STEPS=""
+if [ "$DO_ALL" = "true" ]; then
+  STEPS="-sfr"; DO_RUN="true"
+else
+  [ "$DO_SUB"  = "true" ] && STEPS="${STEPS}s"
+  [ "$DO_FOR"  = "true" ] && STEPS="${STEPS}f"
+  [ "$DO_REAL" = "true" ] && STEPS="${STEPS}r"
+  [ -n "$STEPS" ] && STEPS="-$STEPS" || STEPS=""
+fi
+
+[ -n "$VPU" ] && VPUFLAG="--vpu $VPU" || VPUFLAG=""
+[ "$DBG"      = "true" ] && DBGFLAG="-D" || DBGFLAG=""
+[ "$DO_RUN"   = "true" ] && RUNFLAG="--run" || RUNFLAG=""
+[ "$DO_VALID" = "true" ] && VALIDFLAG="--validate" || VALIDFLAG=""
+
+set +o pipefail
+yes "" | uvx ngiab-prep \
+  $IDFLAG "$IDVAL" $STEPS $RUNFLAG $VALIDFLAG $DBGFLAG $VPUFLAG \
+  --start "$START" --end "$END" \
+  -o "$OUT" \
+  --source "$SRC"
+set -o pipefail
+
+OUTROOT="${HOME}/ngiab_preprocess_output"
+TARGET="${OUTROOT}/${OUT}"
+
+if [ ! -d "$TARGET" ]; then
+  mkdir -p "$TARGET"
+  NEWEST="$(find "$OUTROOT" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2- || true)"
+  [ -n "${NEWEST:-}" ] && cp -a "${NEWEST}/." "${TARGET}/" || true
+fi
+
+mkdir -p /tmp/out
+printf "%s\n" "{{inputs.parameters.output_bucket}}" > /tmp/out/.s3_bucket
+printf "%s\n" "{{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz" > /tmp/out/.s3_key
+printf "s3://%s/%s\n" "{{inputs.parameters.output_bucket}}" "{{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz" > /tmp/out/.s3_url
+
+echo "Final staged directory: ${TARGET}"
+ls -lah "$TARGET" || true
+
+    namespaced/ngiab-run/main:
+      Inputs:
+        Artifacts:
+          Name:      dataset
+          Optional:  true
+          Path:      /tmp/in
+          s3:
+            Access Key Secret:
+              Key:     AWS_ACCESS_KEY_ID
+              Name:    aws-creds
+            Bucket:    {{inputs.parameters.input_bucket}}
+            Endpoint:  s3.amazonaws.com
+            Key:       {{inputs.parameters.input_key}}
+            Region:    us-east-1
+            Secret Key Secret:
+              Key:   AWS_SECRET_ACCESS_KEY
+              Name:  aws-creds
+        Parameters:
+          Default:  test-ngen
+          Name:     output_bucket
+          Default:  demo/default
+          Name:     output_prefix
+          Default:  
+          Name:     final_prefix
+          Default:  ngiab
+          Name:     output_name
+          Default:  
+          Name:     input_bucket
+          Default:  
+          Name:     input_key
+          Default:  
+          Name:     input_s3_key
+          Default:  
+          Name:     input_s3_url
+          Default:  ngiab
+          Name:     input_subdir
+          Default:  8
+          Name:     ngen_np
+          Default:  awiciroh/ciroh-ngen-image:latest
+          Name:     image_ngen
+      Metadata:
+      Name:  main
+      Outputs:
+        Artifacts:
+          Name:  restarts-dir
+          Path:  /workspace/data/restarts
+          s3:
+            Access Key Secret:
+              Key:     AWS_ACCESS_KEY_ID
+              Name:    aws-creds
+            Bucket:    {{inputs.parameters.output_bucket}}
+            Endpoint:  s3.amazonaws.com
+            Key:       {{inputs.parameters.output_prefix}}/restarts.tgz
+            Region:    us-east-1
+            Secret Key Secret:
+              Key:   AWS_SECRET_ACCESS_KEY
+              Name:  aws-creds
+          Archive:
+            None:
+          Name:  dataset-full
+          Path:  /tmp/{{inputs.parameters.output_name}}.tgz
+          s3:
+            Access Key Secret:
+              Key:     AWS_ACCESS_KEY_ID
+              Name:    aws-creds
+            Bucket:    {{inputs.parameters.output_bucket}}
+            Endpoint:  s3.amazonaws.com
+            Key:       {{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz
+            Region:    us-east-1
+            Secret Key Secret:
+              Key:   AWS_SECRET_ACCESS_KEY
+              Name:  aws-creds
+        Parameters:
+          Name:  restarts_s3_key
+          Value From:
+            Path:  /tmp/out/.restarts_key
+          Name:    dataset_s3_key
+          Value From:
+            Path:  /tmp/out/.dataset_key
+      Script:
+        Command:
+          bash
+          -lc
+        Env:
+          Name:  AWS_ACCESS_KEY_ID
+          Value From:
+            Secret Key Ref:
+              Key:   AWS_ACCESS_KEY_ID
+              Name:  aws-creds
+          Name:      AWS_SECRET_ACCESS_KEY
+          Value From:
+            Secret Key Ref:
+              Key:   AWS_SECRET_ACCESS_KEY
+              Name:  aws-creds
+          Name:      AWS_DEFAULT_REGION
+          Value:     us-east-1
+        Image:       {{inputs.parameters.image_ngen}}
+        Name:        
+        Resources:
+        Source:  set -euo pipefail
+
+mkdir -p /tmp/in /tmp/data /workspace/data /tmp/out
+# Make these early so artifact archiving and parameter saves always work
+mkdir -p /workspace/data/outputs /workspace/data/restarts
+printf "%s\n" "{{inputs.parameters.output_bucket}}" > /tmp/out/.bucket
+printf "%s\n" "{{inputs.parameters.output_prefix}}/restarts.tgz" > /tmp/out/.restarts_key
+
+IN_URL="{{inputs.parameters.input_s3_url}}"
+SRC_DIR="/tmp/in"
+
+pkg_install() {
+  if command -v dnf >/dev/null 2>&1; then
+    dnf install -y "$@" || dnf install -y --setopt=install_weak_deps=False "$@"
+  elif command -v microdnf >/dev/null 2>&1; then
+    microdnf install -y "$@"
+  elif command -v yum >/dev/null 2>&1; then
+    yum install -y "$@"
+  elif command -v apt-get >/dev/null 2>&1; then
+    apt-get update -y && apt-get install -y --no-install-recommends "$@"
+  fi
+}
+
+ensure_aws() {
+  command -v unzip >/dev/null 2>&1 || pkg_install unzip
+  command -v curl  >/dev/null 2>&1 || pkg_install curl ca-certificates
+  if ! command -v aws >/dev/null 2>&1; then
+    curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+    unzip -q /tmp/awscliv2.zip -d /tmp
+    /tmp/aws/install -i /usr/local/aws-cli -b /usr/local/bin
+  fi
+}
+
+# ---------------- Standalone: fetch the URL ----------------
+if [ -n "${IN_URL}" ]; then
+  if echo "${IN_URL}" | grep -q '^s3://'; then
+    ensure_aws
+    echo "aws s3 cp ${IN_URL} /tmp/data/input.tgz"
+    aws s3 cp "${IN_URL}" /tmp/data/input.tgz --no-progress
+  else
+    command -v curl >/dev/null 2>&1 || pkg_install curl ca-certificates
+    echo "curl -fL ${IN_URL} -o /tmp/data/input.tgz"
+    curl -fL "${IN_URL}" -o /tmp/data/input.tgz
+  fi
+  [ -s /tmp/data/input.tgz ] || { echo "Missing /tmp/data/input.tgz"; exit 2; }
+  tar -C /tmp/data -xzf /tmp/data/input.tgz 2>/dev/null || tar -C /tmp/data -xf /tmp/data/input.tgz
+  SRC_DIR="/tmp/data"
+fi
+
+# ---------------- Chained/Artifact path normalize ----------------
+ib="{{inputs.parameters.input_bucket}}"
+ik="$(printf "%s" "{{inputs.parameters.input_key}}")"
+[ -z "$ik" ] && ik="$(printf "%s" "{{inputs.parameters.input_s3_key}}")"
+
+# If the "key" is actually a full s3 URL, parse it and override bucket/key
+if printf '%s' "$ik" | grep -q '^s3://'; then
+  u="${ik#s3://}"
+  ib="${u%%/*}"
+  ik="${u#*/}"
+fi
+# Strip any accidental leading slashes from key
+ik="${ik#/}"
+
+# If /tmp/in is still our source and it's empty, pull with aws s3 cp
+if [ "${SRC_DIR}" = "/tmp/in" ]; then
+  if [ -f "${SRC_DIR}" ]; then
+    tar -C /tmp/data -xzf "${SRC_DIR}" 2>/dev/null || tar -C /tmp/data -xf "${SRC_DIR}"
+    SRC_DIR="/tmp/data"
+  elif [ -d "${SRC_DIR}" ]; then
+    tgz="$(find "${SRC_DIR}" -maxdepth 1 -type f \( -name '*.tgz' -o -name '*.tar.gz' -o -name '*.tar' \) | head -n1 || true)"
+    if [ -n "${tgz}" ]; then
+      tar -C /tmp/data -xzf "${tgz}" 2>/dev/null || tar -C /tmp/data -xf "${tgz}"
+      SRC_DIR="/tmp/data"
+    fi
+  fi
+
+  if [ "${SRC_DIR}" = "/tmp/in" ] && [ -n "$ib" ] && [ -n "$ik" ]; then
+    ensure_aws
+    echo "aws s3 cp s3://${ib}/${ik} /tmp/data/input.tgz"
+    aws s3 cp "s3://${ib}/${ik}" /tmp/data/input.tgz --no-progress
+    [ -s /tmp/data/input.tgz ] || { echo "No such S3 object: s3://${ib}/${ik}"; exit 254; }
+    tar -C /tmp/data -xzf /tmp/data/input.tgz 2>/dev/null || tar -C /tmp/data -xf /tmp/data/input.tgz
+    SRC_DIR="/tmp/data"
+  fi
+fi
+
+# ---------------- Find dataset root (contains config/) ----------------
+IN_SUB="{{inputs.parameters.input_subdir}}"
+DATA_DIR=""
+if [ -n "${IN_SUB}" ] && [ -d "${SRC_DIR}/${IN_SUB}/config" ]; then
+  DATA_DIR="${SRC_DIR}/${IN_SUB}"
+elif [ -d "${SRC_DIR}/config" ]; then
+  DATA_DIR="${SRC_DIR}"
+else
+  DATA_DIR="$(find "${SRC_DIR}" -mindepth 1 -maxdepth 2 -type d -exec test -d '{}/config' ';' -print -quit || true)"
+fi
+
+if [ -z "${DATA_DIR}" ] || [ ! -d "${DATA_DIR}/config" ]; then
+  echo "ERROR: Could not find dataset root with config/ under ${SRC_DIR}"
+  find "${SRC_DIR}" -maxdepth 2 -type d -print || true
+  exit 2
+fi
+
+# ---------------- Stage and run ----------------
+cp -a "${DATA_DIR}/." "/workspace/data/"
+set +e
+/ngen/HelloNGEN.sh /workspace/data auto "{{inputs.parameters.ngen_np}}" local
+rc=$?
+set -e
+echo "HelloNGEN exit code: ${rc}"
+
+# --- Package full dataset as a single tar with a top-level "<output_name>/" dir
+OUT_NAME="{{inputs.parameters.output_name}}"
+OUT_TGZ="/tmp/${OUT_NAME}.tgz"
+
+mkdir -p "/tmp/pkg/${OUT_NAME}"
+cp -a /workspace/data/. "/tmp/pkg/${OUT_NAME}/"
+tar -C /tmp/pkg -czf "${OUT_TGZ}" "${OUT_NAME}"
+
+# record the dataset key for downstream steps
+printf "%s\n" "{{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz" > /tmp/out/.dataset_key
+
+    namespaced/ngiab-teehr/main:
+      Inputs:
+        Parameters:
+          Default:  test-ngen
+          Name:     output_bucket
+          Default:  demo/default
+          Name:     output_prefix
+          Default:  
+          Name:     final_prefix
+          Default:  test-ngen
+          Name:     input_bucket
+          Default:  
+          Name:     input_s3_key
+          Default:  
+          Name:     input_s3_url
+          Default:  outputs
+          Name:     teehr_inputs_subdir
+          Default:  teehr
+          Name:     teehr_results_subdir
+          Default:  
+          Name:     teehr_args
+          Default:  awiciroh/ngiab-teehr:x86
+          Name:     image_teehr
+      Metadata:
+      Name:  main
+      Outputs:
+        Artifacts:
+          Archive:
+            None:
+          Name:  teehr-results
+          Path:  /tmp/teehr_results.tgz
+          s3:
+            Access Key Secret:
+              Key:     AWS_ACCESS_KEY_ID
+              Name:    aws-creds
+            Bucket:    {{inputs.parameters.output_bucket}}
+            Endpoint:  s3.amazonaws.com
+            Key:       {{inputs.parameters.output_prefix}}/teehr_results.tgz
+            Region:    us-east-1
+            Secret Key Secret:
+              Key:   AWS_SECRET_ACCESS_KEY
+              Name:  aws-creds
+      Script:
+        Command:
+          bash
+          -lc
+        Env:
+          Name:  AWS_ACCESS_KEY_ID
+          Value From:
+            Secret Key Ref:
+              Key:   AWS_ACCESS_KEY_ID
+              Name:  aws-creds
+          Name:      AWS_SECRET_ACCESS_KEY
+          Value From:
+            Secret Key Ref:
+              Key:   AWS_SECRET_ACCESS_KEY
+              Name:  aws-creds
+          Name:      AWS_DEFAULT_REGION
+          Value:     us-east-1
+        Image:       {{inputs.parameters.image_teehr}}
+        Name:        
+        Resources:
+        Source:  set -euo pipefail
+
+# tools (aws, curl) ...
+ensure_tools() {
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -y && apt-get install -y --no-install-recommends unzip curl ca-certificates || true
+  elif command -v dnf >/dev/null 2>&1; then dnf install -y unzip curl ca-certificates || true
+  elif command -v yum >/dev/null 2>&1; then yum install -y unzip curl ca-certificates || true
+  fi
+  if ! command -v aws >/dev/null 2>&1; then
+    curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+    unzip -q /tmp/awscliv2.zip -d /tmp
+    /tmp/aws/install -i /usr/local/aws-cli -b /usr/local/bin
+  fi
+}
+
+unpack_nested() {
+  local found=1
+  while [ $found -eq 1 ]; do
+    found=0
+    while IFS= read -r -d '' f; do
+      echo "Unpacking nested archive: $f"
+      local d; d="$(dirname "$f")"
+      tar -xzf "$f" -C "$d" 2>/dev/null || tar -xf "$f" -C "$d"
+      rm -f "$f"
+      found=1
+    done < <(find /app/data -type f \( -name '*.tgz' -o -name '*.tar.gz' -o -name '*.tar' \) -print0)
+  done
+}
+
+mkdir -p /app/data "/app/data/{{inputs.parameters.teehr_inputs_subdir}}" "/app/data/{{inputs.parameters.teehr_results_subdir}}"
+
+# --- Fetch dataset (chained or standalone) ---
+ensure_tools
+if [ -n "{{inputs.parameters.input_s3_key}}" ]; then
+  echo "aws s3 cp s3://{{inputs.parameters.input_bucket}}/{{inputs.parameters.input_s3_key}} /tmp/in.tgz"
+  aws s3 cp "s3://{{inputs.parameters.input_bucket}}/{{inputs.parameters.input_s3_key}}" /tmp/in.tgz --no-progress
+  tar -C /app/data -xzf /tmp/in.tgz 2>/dev/null || tar -C /app/data -xf /tmp/in.tgz
+elif [ -n "{{inputs.parameters.input_s3_url}}" ]; then
+  if echo "{{inputs.parameters.input_s3_url}}" | grep -q '^s3://'; then
+    aws s3 cp "{{inputs.parameters.input_s3_url}}" /tmp/in.tgz --no-progress
+  else
+    curl -fL "{{inputs.parameters.input_s3_url}}" -o /tmp/in.tgz
+  fi
+  [ -s /tmp/in.tgz ] || { echo "No dataset found"; exit 2; }
+  tar -C /app/data -xzf /tmp/in.tgz 2>/dev/null || tar -C /app/data -xf /tmp/in.tgz
+else
+  echo "No input provided (input_s3_key/input_s3_url)."
+  exit 2
+fi
+
+# explode any inner archives
+unpack_nested
+
+# normalize config path and inputs dir
+if [ ! -d /app/data/config ] && [ -d /app/data/ngiab/config ]; then
+  shopt -s dotglob; mv /app/data/ngiab/* /app/data/ || true; rmdir /app/data/ngiab || true
+fi
+[ -f /app/data/config/realization.json ] || { echo "Missing /app/data/config/realization.json"; exit 2; }
+
+INPUT_DIR_CANDIDATES=(
+  "/app/data/{{inputs.parameters.teehr_inputs_subdir}}"
+  "/app/data/outputs"
+  "/app/data/ngiab/outputs"
+)
+INPUT_DIR=""
+for d in "${INPUT_DIR_CANDIDATES[@]}"; do [ -d "$d" ] && INPUT_DIR="$d" && break; done
+[ -n "$INPUT_DIR" ] || { echo "No outputs/ found"; exit 2; }
+
+RESULTS_DIR="/app/data/{{inputs.parameters.teehr_results_subdir}}"
+mkdir -p "$RESULTS_DIR"
+
+echo "TEEHR INPUT_DIR=$INPUT_DIR"
+echo "TEEHR RESULTS_DIR=$RESULTS_DIR"
+
+cd /app
+export TEEHR_INPUTS_DIR="$INPUT_DIR"
+export TEEHR_RESULTS_DIR="$RESULTS_DIR"
+
+if [ -n "{{inputs.parameters.teehr_args}}" ]; then
+  python -u teehr_ngen.py {{inputs.parameters.teehr_args}}
+else
+  python -u teehr_ngen.py
+fi
+
+# flatten any archives created by the evaluator
+unpack_nested
+find "$RESULTS_DIR" -mindepth 1 -print -quit >/dev/null 2>&1 || : > "$RESULTS_DIR/_empty.txt"
+
+# package FULL DATASET + TEEHR RESULTS under top 'ngiab/' folder
+PKG="/tmp/pkg"; TOP="ngiab"
+mkdir -p "$PKG/$TOP"
+shopt -s dotglob; cp -a /app/data/* "$PKG/$TOP"/
+
+tar -C "$PKG" -czf /tmp/teehr_results.tgz "$TOP"
+
+Events:
+  Type     Reason               Age    From                 Message
+  ----     ------               ----   ----                 -------
+  Normal   WorkflowRunning      7m25s  workflow-controller  Workflow Running
+  Normal   WorkflowNodeRunning  7m24s  workflow-controller  Running node ngiab-chain-ckmlz
+  Normal   WorkflowNodeRunning  7m15s  workflow-controller  Running node ngiab-chain-ckmlz.t-pre-process-00
+  Normal   WorkflowNodeRunning  7m15s  workflow-controller  Running node ngiab-chain-ckmlz.t-pre-process-2-00
+  Normal   WorkflowNodeRunning  7m15s  workflow-controller  Running node ngiab-chain-ckmlz.t-teehr-00
+  Warning  WorkflowNodeFailed   6m49s  workflow-controller  Failed node ngiab-chain-ckmlz.t-teehr-00: main: Error (exit code 2)

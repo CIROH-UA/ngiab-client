@@ -27,7 +27,8 @@ function Toolbar() {
     runWorkflow,
     setSelectedWorkflow,        // <-- new from provider
     state,
-    applyTemplate
+    applyTemplate,
+    uiMode, setUiMode,
   } = useWorkflows();
 
 
@@ -43,6 +44,10 @@ function Toolbar() {
     { value: 'cal->run',                  label: 'calibration-run → ngiab-run' },
     { value: 'cal->run->teehr',           label: 'calibration-run → ngiab-run → ngiab-teehr' },
     { value: 'run->teehr',                label: 'ngiab-run → ngiab-teehr' },
+  ];
+  const MODE_OPTIONS = [
+    { value: 'real', label: 'Real' },
+    { value: 'dummy', label: 'Dummy' },
   ];
 
   // react-window powered MenuList for react-select
@@ -125,6 +130,14 @@ function Toolbar() {
         overflowY: 'auto',              // scroll if buttons wrap
       }}
     >
+    <div style={{ minWidth: 160 }}>
+        <Select
+          options={MODE_OPTIONS}
+          value={MODE_OPTIONS.find(o => o.value === uiMode)}
+          onChange={(opt) => setUiMode(opt?.value || 'real')}
+          placeholder="Mode"
+        />
+    </div>
 
       <strong style={{ marginBottom: 4 }}>My Workflows</strong>
       <Select

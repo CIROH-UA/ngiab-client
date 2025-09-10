@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: dummy-preprocess
+  namespace: argo
+spec:
+  entrypoint: main
+  templates:
+  - name: main
+    metadata:
+      labels:
+        app: ngiab
+        stage: pre-process
+    inputs:
+      parameters:
+        - { name: output_bucket, default: "test-ngen" }
+        - { name: output_prefix, default: "demo/default" }
+        - { name: output_name,   default: "ngiab" }
+        - { name: sleep_sec,     default: "1" }
+    script:
+      image: alpine:3.19
+      command: [sh, -lc]
+      source: |
+        set -e
+        echo "[PRE] starting dummy preprocess …"
+        echo "[PRE] args: bucket={{inputs.parameters.output_bucket}} prefix={{inputs.parameters.output_prefix}}"
+        sleep {{inputs.parameters.sleep_sec}}
+        mkdir -p /tmp/pkg/{{inputs.parameters.output_name}}/config
+        mkdir -p /tmp/pkg/{{inputs.parameters.output_name}}/outputs   # 👇 create outputs/
+        echo '{}' > /tmp/pkg/{{inputs.parameters.output_name}}/config/realization.json
+        echo "ok"  > /tmp/pkg/{{inputs.parameters.output_name}}/outputs/_ok.txt
+        echo "{{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz" > /tmp/.dataset_key
+        tar -C /tmp/pkg -czf /tmp/dataset.tgz {{inputs.parameters.output_name}}
+    outputs:
+      parameters:
+        - name: dataset_s3_key
+          valueFrom: { path: /tmp/.dataset_key }
+      artifacts:
+        - name: dataset-full
+          path: /tmp/dataset.tgz
+          archive: { none: {} }
+          s3:
+            endpoint: s3.amazonaws.com
+            bucket: "{{inputs.parameters.output_bucket}}"
+            key: "{{inputs.parameters.output_prefix}}/{{inputs.parameters.output_name}}.tgz"
+            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }

@@ -5,7 +5,7 @@ import os
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
-
+import itertools
 from importlib import resources
 
 from sqlalchemy import select, func
@@ -39,9 +39,100 @@ _TEMPLATE_FILES = {
     "ngiab-calibration-run": "ngiab-calibration-run.yaml",
     "ngiab-run": "ngiab-run.yaml",
     "ngiab-teehr": "ngiab-teehr.yaml",
+    # Dummy variants (update filenames to wherever you ship them)
+    "dummy-preprocess": "dummy-preprocess.yaml",
+    "dummy-calibration-config": "dummy-calibration-config.yaml",
+    "dummy-calibration-run": "dummy-calibration-run.yaml",
+    "dummy-run": "dummy-run.yaml",
+    "dummy-teehr": "dummy-teehr.yaml",
 }
 
 _TERMINAL = {"Succeeded", "Failed", "Error", "Terminated"}
+
+
+# --- ADD/REPLACE: helpers near your other small helpers ----------------------
+
+def _slug(x: str) -> str:
+    import re
+    return re.sub(r"[^a-zA-Z0-9\-]+", "-", str(x)).strip("-").lower() or "n"
+
+def _kind_tag(kind_or_label: str) -> str:
+    k = (kind_or_label or "").lower()
+    # normalize a few variants we've seen in the UI
+    if "pre-process" in k or "preprocess" in k:
+        return "pre"
+    if "calibration-config" in k:
+        return "cal_cfg"
+    if "calibration-run" in k:
+        return "cal_run"
+    if "teehr" in k:
+        return "teehr"
+    if ("ngiab" in k) and ("run" in k):
+        return "run"
+    return "other"
+
+def _allowed_parent(parent_tag: str, child_tag: str) -> bool:
+    # Stage-to-stage rules:
+    # pre -> cal_cfg -> cal_run -> run -> teehr
+    if child_tag == "cal_cfg":
+        return parent_tag == "pre"
+    if child_tag == "cal_run":
+        return parent_tag == "cal_cfg"
+    if child_tag == "run":
+        # run can take from cal_run, or (fallbacks) cal_cfg, pre
+        return parent_tag in ("cal_run", "cal_cfg", "pre")
+    if child_tag == "teehr":
+        return parent_tag == "run"
+    # default: no constraints
+    return True
+
+def _parent_preference_order(tag: str) -> int:
+    # Smaller number == stronger preference when multiple valid parents exist
+    # Used only for the 'run' stage to choose cal_run over cal_cfg over pre
+    order = {"cal_run": 0, "cal_cfg": 1, "pre": 2, "run": 0, "other": 9}
+    return order.get(tag, 9)
+
+def _normalize_edges(edges_in) -> list[tuple[str, str]]:
+    """Accept either [{'source': 'a', 'target': 'b'}, ...] or [('a','b'), ...]."""
+    out: list[tuple[str, str]] = []
+    for e in edges_in or []:
+        if isinstance(e, dict):
+            s, t = e.get("source"), e.get("target")
+        elif isinstance(e, (list, tuple)) and len(e) >= 2:
+            s, t = e[0], e[1]
+        else:
+            continue
+        if s is not None and t is not None:
+            out.append((str(s), str(t)))
+    return out
+
+def _topo_layers(nodes: list[dict], edges: list) -> list[list[str]]:
+    """Topological layering; edges can be normalized tuples or dicts."""
+    # normalize edges first
+    e2 = _normalize_edges(edges)
+    ids = [str(n["id"]) for n in nodes]
+    indeg = {i: 0 for i in ids}
+    adj = {i: [] for i in ids}
+    for (s, t) in e2:
+        if s in adj and t in indeg:
+            adj[s].append(t)
+            indeg[t] += 1
+    layers, frontier = [], [i for i in ids if indeg[i] == 0]
+    seen = set()
+    while frontier:
+        layers.append(frontier[:])
+        seen.update(frontier)
+        nxt = []
+        for u in frontier:
+            for v in adj[u]:
+                indeg[v] -= 1
+                if indeg[v] == 0 and v not in seen:
+                    nxt.append(v)
+        frontier = nxt
+    # Any nodes not reached (e.g. cyclic or isolated) go into a last layer
+    if len(seen) != len(ids):
+        layers.append([i for i in ids if i not in seen])
+    return layers
 
 
 async def _watch_workflow_nodes(
@@ -254,29 +345,29 @@ def _ensure_template_exists_or_create(name: str) -> None:
 def _has_edge(edges: List[dict], src: str, dst: str) -> bool:
     return any(e.get("source") == src and e.get("target") == dst for e in (edges or []))
 
-def _topo_layers(nodes: List[dict], edges: List[dict]) -> List[List[str]]:
-    ids = [n["id"] for n in nodes]
-    indeg = {i: 0 for i in ids}
-    adj = {i: [] for i in ids}
-    for e in edges or []:
-        if e["source"] in adj and e["target"] in indeg:
-            adj[e["source"]].append(e["target"])
-            indeg[e["target"]] += 1
-    layers, frontier = [], [i for i in ids if indeg[i] == 0]
-    seen = set()
-    while frontier:
-        layers.append(frontier[:])
-        seen.update(frontier)
-        nxt = []
-        for u in frontier:
-            for v in adj[u]:
-                indeg[v] -= 1
-                if indeg[v] == 0 and v not in seen:
-                    nxt.append(v)
-        frontier = nxt
-    if len(seen) != len(ids):
-        layers.append([i for i in ids if i not in seen])
-    return layers
+# def _topo_layers(nodes: List[dict], edges: List[dict]) -> List[List[str]]:
+#     ids = [n["id"] for n in nodes]
+#     indeg = {i: 0 for i in ids}
+#     adj = {i: [] for i in ids}
+#     for e in edges or []:
+#         if e["source"] in adj and e["target"] in indeg:
+#             adj[e["source"]].append(e["target"])
+#             indeg[e["target"]] += 1
+#     layers, frontier = [], [i for i in ids if indeg[i] == 0]
+#     seen = set()
+#     while frontier:
+#         layers.append(frontier[:])
+#         seen.update(frontier)
+#         nxt = []
+#         for u in frontier:
+#             for v in adj[u]:
+#                 indeg[v] -= 1
+#                 if indeg[v] == 0 and v not in seen:
+#                     nxt.append(v)
+#         frontier = nxt
+#     if len(seen) != len(ids):
+#         layers.append([i for i in ids if i not in seen])
+#     return layers
 
 # ---------- S3 helpers ----------
 def _parse_s3_url(u: str) -> Tuple[str, str]:
@@ -301,19 +392,49 @@ def _run_id() -> str:
 def _bucket() -> str:
     return os.getenv("NGIAB_S3_BUCKET", "test-ngen")
 
-def _kind_to_template(kind: str) -> str:
+# def _kind_to_template(kind: str) -> str:
+#     k = (kind or "").lower()
+#     if "pre-process" in k or "preprocess" in k:
+#         return "ngiab-data-preprocess"
+#     if "calibration-config" in k:
+#         return "ngiab-calibration-config"    
+#     if "calibration-run" in k:
+#         return "ngiab-calibration-run"
+#     if "run" in k and "ngiab" in k:
+#         return "ngiab-run"
+#     if "teehr" in k:
+#         return "ngiab-teehr"
+#     return "ngiab-run"
+
+def _kind_to_template(kind: str, mode: str = "real") -> str:
+    """Map UI node kind to a WorkflowTemplate name for the selected mode."""
+    mode = (mode or "real").lower()
+    # Real templates (provided)
+    REAL = {
+        "pre-process":        "ngiab-data-preprocess",
+        "preprocess":         "ngiab-data-preprocess",
+        "calibration-config": "ngiab-calibration-config",
+        "calibration-run":    "ngiab-calibration-run",
+        "run ngiab":          "ngiab-run",
+        "teehr":              "ngiab-teehr",
+        "default":            "ngiab-run",
+    }
+    # Dummy templates (adjust names to your cluster if different)
+    DUMMY = {
+        "pre-process":        "dummy-preprocess",
+        "preprocess":         "dummy-preprocess",
+        "calibration-config": "dummy-calibration-config",
+        "calibration-run":    "dummy-calibration-run",
+        "run ngiab":          "dummy-run",
+        "teehr":              "dummy-teehr",
+        "default":            "dummy-run",
+    }
+    table = REAL if mode == "real" else DUMMY
     k = (kind or "").lower()
-    if "pre-process" in k or "preprocess" in k:
-        return "ngiab-data-preprocess"
-    if "calibration-config" in k:
-        return "ngiab-calibration-config"    
-    if "calibration-run" in k:
-        return "ngiab-calibration-run"
-    if "run" in k and "ngiab" in k:
-        return "ngiab-run"
-    if "teehr" in k:
-        return "ngiab-teehr"
-    return "ngiab-run"
+    for key, tpl in table.items():
+        if key != "default" and key in k:
+            return tpl
+    return table["default"]
 
 def _job_root_prefix(user: str, wf_uuid: str) -> str:
     # user/<workflow-uuid>/<argo-job-name>
@@ -666,103 +787,36 @@ class NgiabBackendHandler(MBH):
 
 
     # ---------------- helpers ----------------
-    def _ensure_templates_for_nodes(self, nodes: List[dict]) -> None:
-        needed = {_kind_to_template((n.get("label") or n.get("id") or "")) for n in nodes}
+    # def _ensure_templates_for_nodes(self, nodes: List[dict]) -> None:
+    #     needed = {_kind_to_template((n.get("label") or n.get("id") or "")) for n in nodes}
+    def _ensure_templates_for_nodes(self, nodes: List[dict], mode: str) -> None:
+        needed = {_kind_to_template((n.get("label") or n.get("id") or ""), mode) for n in nodes}
+        log.info("[DAG] ensure templates: %s", needed)
         for tpl in needed:
             _ensure_template_exists_or_create(tpl)
 
+# --- REPLACE the whole _build_chain_workflow(...) with the version below -----
 
     def _build_chain_workflow(
         self,
         chain: list[dict],
         user: str,
         wf_uuid: str,
-        edges: list[dict] | None = None,  # pass UI edges for correct fan-in/out
+        edges: list[dict] | None = None,
+
+        mode: str = "real",
     ) -> tuple[Workflow, dict[str, list[str]]]:
-        """
-        Build a DAG with per-parent fan-out and per-instance unique output prefixes.
-        Every task instance gets a stable branch suffix (its task name), which is
-        appended to output_prefix (and final_prefix when set) to avoid S3 key collisions.
-        """
-        import re
-
-        def _slug(x: str) -> str:
-            return re.sub(r"[^a-zA-Z0-9\\-]+", "-", str(x)).strip("-").lower() or "n"
-
-        def _node_id(n: dict) -> str:
-            return str(n.get("id") or n.get("label"))
-
-        # Restrict graph to selected nodes/edges
-        nodes_by_id = {_node_id(n): n for n in chain}
-        node_ids = list(nodes_by_id.keys())
-
-        edges_in: list[dict] = []
-        if edges:
-            for e in edges:
-                s, t = e.get("source"), e.get("target")
-                if s in nodes_by_id and t in nodes_by_id:
-                    edges_in.append({"source": s, "target": t})
-
-        # Fallback linear edges if none were provided/retained
-        if not edges_in and len(chain) > 1:
-            for i in range(len(chain) - 1):
-                edges_in.append({"source": _node_id(chain[i]), "target": _node_id(chain[i + 1])})
-
-        # Parents/children maps
-        parents = {nid: [] for nid in node_ids}
-        children = {nid: [] for nid in node_ids}
-        for e in edges_in:
-            s, t = e["source"], e["target"]
-            if s in nodes_by_id and t in nodes_by_id:
-                parents[t].append(s)
-                children[s].append(t)
-
-        topo_layers = _topo_layers([{"id": nid} for nid in node_ids], edges_in)
-        sinks = {nid for nid in node_ids if not children[nid]}
-
-        def _is_dataset_consumer(kind: str) -> bool:
-            lk = (kind or "").lower()
-            return (
-                ("calibration-config" in lk)
-                or ("calibration-run" in lk)
-                or (("ngiab" in lk) and ("run" in lk))
-                or ("teehr" in lk)
-            )
-
-        def _dataset_pointer_from_params(kind: str, params: dict, inherit: dict | None = None) -> dict:
-            lk = (kind or "").lower()
-            inherit = dict(inherit or {})
-
-            if ("preprocess" in lk) or ("pre-process" in lk):
-                inherit.update({
-                    "dataset_bucket": params.get("output_bucket", ""),
-                    "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/{params.get('output_name','ngiab')}.tgz",
-                })
-                return inherit
-
-            if "calibration-config" in lk:
-                inherit.update({
-                    "dataset_bucket": params.get("output_bucket", ""),
-                    "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/calibration-prepared.tgz",
-                })
-                return inherit
-
-            if (("ngiab" in lk) and ("run" in lk)):
-                inherit.update({
-                    "dataset_bucket": params.get("output_bucket", ""),
-                    "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/{params.get('output_name','ngiab')}.tgz",
-                })             
-                return inherit
-            return inherit
+        from hera.workflows.models import TemplateRef, Arguments
+        def _label(n: dict) -> str:
+            return str(n.get("label") or n.get("id") or "").strip()
 
         def _make_params(node: dict, last_flag: bool, incoming: dict | None, branch: str) -> dict:
-            """Build params and *append the branch suffix* to output/final prefixes."""
-            kind = node.get("label") or node.get("id")
+            """Build params and append the branch suffix to output/final prefixes."""
+            kind = _label(node)
             cfg = (node.get("config") or {})
             upstream_key = None
             if incoming and incoming.get("dataset_bucket") and incoming.get("dataset_key"):
                 upstream_key = incoming["dataset_key"]
-
             upstream_bucket = incoming.get("dataset_bucket") if incoming else None
             params = _params_for(
                 kind, cfg, user, wf_uuid, last_in_chain=last_flag,
@@ -773,39 +827,114 @@ class NgiabBackendHandler(MBH):
                 params.setdefault("input_bucket", incoming["dataset_bucket"])
                 params.setdefault("input_key", incoming["dataset_key"])
                 params.setdefault("input_s3_key", incoming["dataset_key"])
-
-            # <<< crucial: uniqueize output paths per task instance >>>
+            # unique branch path for outputs
             base = params.get("output_prefix")
             if base:
-                params["output_prefix"] = f"{base.rstrip('/')}/{branch}"  # branch = task name (e.g., t-pre-process-00)
+                params["output_prefix"] = f"{base.rstrip('/')}/{branch}"
             if params.get("final_prefix"):
                 params["final_prefix"] = f"{params['final_prefix'].rstrip('/')}/{branch}"
             return params
 
+        def _dataset_pointer_from_params(kind: str, params: dict, inherit: dict | None = None) -> dict:
+            lk = (kind or "").lower()
+            inherit = dict(inherit or {})
+            if ("preprocess" in lk) or ("pre-process" in lk):
+                inherit.update({
+                    "dataset_bucket": params.get("output_bucket", ""),
+                    "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/{params.get('output_name','ngiab')}.tgz",
+                })
+                return inherit
+            if "calibration-config" in lk:
+                inherit.update({
+                    "dataset_bucket": params.get("output_bucket", ""),
+                    "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/calibration-prepared.tgz",
+                })
+                return inherit
+            if "calibration-run" in lk:
+                inherit.update({
+                    "dataset_bucket": params.get("output_bucket", ""),
+                    "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/calibrated.tgz",
+                })
+                return inherit
+            if (("ngiab" in lk) and ("run" in lk)):
+                inherit.update({
+                    "dataset_bucket": params.get("output_bucket", ""),
+                    "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/{params.get('output_name','ngiab')}.tgz",
+                })
+                return inherit
+            if "teehr" in lk:
+                # teehr packages into teehr_results.tgz
+                inherit.update({
+                    "dataset_bucket": params.get("output_bucket", ""),
+                    "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/teehr_results.tgz",
+                })
+                return inherit
+            return inherit
+
         ws = make_ws()
+
+        # Keep only nodes provided in 'chain'
+        nodes_by_id: dict[str, dict] = {str(n["id"]): n for n in chain}
+        node_ids = list(nodes_by_id.keys())
+
+        # Normalize the incoming UI edges to (src, dst)
+        norm_edges = _normalize_edges(edges or [])
+        log.info("[DAG] UI edges (normalized): %s", norm_edges)
+
+        # Build parents/children maps on the induced subgraph
+        parents = {nid: [] for nid in node_ids}
+        children = {nid: [] for nid in node_ids}
+        for (s, t) in norm_edges:
+            if s in nodes_by_id and t in nodes_by_id:
+                parents[t].append(s)
+                children[s].append(t)
+
+        # Topological order
+        topo_layers = _topo_layers([{"id": nid} for nid in node_ids], norm_edges)
+        log.info("[DAG] topo layers: %s", topo_layers)
+
+        # Tags by node id
+        kind_by_id = {}
+        tag_by_id = {}
+        for nid, node in nodes_by_id.items():
+            k = node.get("label") or node.get("id") or ""
+            kind_by_id[nid] = k
+            tag_by_id[nid] = _kind_tag(k)
+
+        sinks = {nid for nid in node_ids if not children[nid]}
+
+        def _is_dataset_consumer(tag: str) -> bool:
+            return tag in {"cal_cfg", "cal_run", "run", "teehr"}
+
         with Workflow(generate_name="ngiab-chain-", entrypoint="main", workflows_service=ws) as w:
+            tasks_by_node: dict[str, list[str]] = {nid: [] for nid in node_ids}
             with DAG(name="main"):
-                # For each UI node, keep list of created task instances with their dataset pointers
                 instances_by_node: dict[str, list[dict]] = {}
 
                 for layer in topo_layers:
                     for nid in layer:
                         node = nodes_by_id[nid]
                         kind = node.get("label") or node.get("id")
-                        tpl_name = _kind_to_template(kind)
+                        tag = tag_by_id[nid]
+                        # tpl_name = _kind_to_template(kind)
+                        tpl_name = _kind_to_template(kind, mode)
                         _ensure_template_exists_or_create(tpl_name)
 
                         is_last = nid in sinks
-                        parent_ids = parents.get(nid, [])
+                        raw_parents = parents.get(nid, [])
+                        valid_parent_ids = [pid for pid in raw_parents if _allowed_parent(tag_by_id[pid], tag)]
+                        if tag == "run" and len(valid_parent_ids) > 1:
+                            valid_parent_ids.sort(key=lambda x: _parent_preference_order(tag_by_id[x]))
+
                         parent_instances: list[dict] = []
-                        for pid in parent_ids:
+                        for pid in valid_parent_ids:
                             parent_instances.extend(instances_by_node.get(pid, []))
 
                         created: list[dict] = []
-                        if parent_instances and _is_dataset_consumer(kind):
-                            # fan-out: one child instance per parent instance
+                        if parent_instances and _is_dataset_consumer(tag):
+                            # fan-out
                             for idx, pinst in enumerate(parent_instances):
-                                tname = f"t-{_slug(nid)}-{idx:02d}"
+                                tname = f"t-{_slug(kind)}-{_slug(nid)}-{idx:02d}"
                                 params = _make_params(node, is_last, incoming=pinst, branch=tname)
                                 Task(
                                     name=tname,
@@ -813,12 +942,17 @@ class NgiabBackendHandler(MBH):
                                     arguments=Arguments(parameters=[Parameter(name=k, value=v) for k, v in params.items()]),
                                     dependencies=[pinst["task"]],
                                 )
+                                tasks_by_node[nid].append(tname)
                                 pointer = _dataset_pointer_from_params(kind, params, inherit=pinst)
-                                created.append({"task": tname, **pointer})
+                                pointer.update({"task": tname, "kind": kind, "tag": tag})
+                                created.append(pointer)
                         else:
-                            # single instance: depend on all upstreams (if any)
-                            dep_names = [pi["task"] for pi in parent_instances]
-                            tname = f"t-{_slug(nid)}-00"
+                            # single instance (optional fan-in)
+                            dep_names = []
+                            for pid in valid_parent_ids:
+                                for pi in instances_by_node.get(pid, []):
+                                    dep_names.append(pi["task"])
+                            tname = f"t-{_slug(kind)}-{_slug(nid)}-00"
                             incoming = parent_instances[0] if len(parent_instances) == 1 else None
                             params = _make_params(node, is_last, incoming=incoming, branch=tname)
                             Task(
@@ -827,15 +961,265 @@ class NgiabBackendHandler(MBH):
                                 arguments=Arguments(parameters=[Parameter(name=k, value=v) for k, v in params.items()]),
                                 dependencies=dep_names or None,
                             )
+                            tasks_by_node[nid].append(tname)
                             pointer = _dataset_pointer_from_params(kind, params, inherit=incoming or {})
-                            created.append({"task": tname, **pointer})
+                            pointer.update({"task": tname, "kind": kind, "tag": tag})
+                            created.append(pointer)
 
                         instances_by_node[nid] = created
 
-        
-        task_names = {nid: [i["task"] for i in lst] for nid, lst in instances_by_node.items()}
-        return w, task_names
+        return w, tasks_by_node
 
+
+
+
+    # def _build_chain_workflow(
+    #     self,
+    #     chain: list[dict],
+    #     user: str,
+    #     wf_uuid: str,
+    #     edges: list[dict] | None = None,  # pass UI edges for correct fan-in/out
+    # ) -> Workflow:
+    #     """
+    #     Build a DAG that respects stage-to-stage dependencies with the right fan-out.
+    #     Key fixes:
+    #       • Child tasks only depend on valid producer kinds for that stage.
+    #       • ngiab-run prefers (in order) calibration-run > calibration-config > pre-process.
+    #       • ngiab-teehr depends *only* on ngiab-run; if no parent is present, it runs standalone.
+    #       • Per-instance unique output_prefix branch to avoid S3 key collisions.
+    #     """
+    #     import re
+
+    #     log.debug("[DAG] building chain workflow for %d nodes", len(chain))
+
+    #     # ---------- helpers ----------
+    #     def _slug(x: str) -> str:
+    #         return re.sub(r"[^a-zA-Z0-9\\-]", "-", str(x)).strip("-").lower() or "n"
+
+    #     def _node_id(n: dict) -> str:
+    #         return str(n.get("id") or n.get("label"))
+
+    #     def _label(n: dict) -> str:
+    #         return str(n.get("label") or n.get("id") or "").strip()
+
+    #     def _stage_of(kind: str) -> str:
+    #         k = (kind or "").lower()
+    #         if "pre-process" in k or "preprocess" in k:
+    #             return "pre"
+    #         if "calibration-config" in k:
+    #             return "cfg"
+    #         if "calibration-run" in k:
+    #             return "cal"
+    #         if ("run" in k) and ("ngiab" in k):
+    #             return "run"
+    #         if "teehr" in k:
+    #             return "teehr"
+    #         return "other"
+
+    #     # Which parents are valid producers for each stage?
+    #     VALID_PARENTS = {
+    #         "pre":   set(),                 # roots
+    #         "cfg":   {"pre"},
+    #         "cal":   {"cfg"},
+    #         # run prefers best available parent by rank order:
+    #         "run":   {"pre", "cfg", "cal"},
+    #         # teehr STRICTLY depends on run when present:
+    #         "teehr": {"run"},
+    #         "other": set(),
+    #     }
+    #     STAGE_RANK = {"pre": 1, "cfg": 2, "cal": 3, "run": 4, "teehr": 5, "other": 0}
+
+    #     def _allowed_parent(child_stage: str, parent_stage: str) -> bool:
+    #         return parent_stage in VALID_PARENTS.get(child_stage, set())
+
+    #     def _best_stage_for_run(parent_stages: list[str]) -> set[str]:
+    #         # For ngiab-run, prefer highest ranked stage among connected parents
+    #         # i.e., if any cal present -> only depend on cal; else cfg; else pre.
+    #         if not parent_stages:
+    #             return set()
+    #         stages = set(parent_stages)
+    #         for prefer in ("cal", "cfg", "pre"):
+    #             if prefer in stages:
+    #                 return {prefer}
+    #         return {max(stages, key=lambda s: STAGE_RANK.get(s, 0))}
+
+    #     def _stage_tag(kind: str) -> str:
+    #         return _stage_of(kind)
+
+    #     # ---------- graph restriction to selected nodes ----------
+    #     nodes_by_id = {_node_id(n): n for n in chain}
+    #     node_ids = list(nodes_by_id.keys())
+
+    #     edges_in: list[dict] = []
+    #     if edges:
+    #         for e in edges:
+    #             s, t = e.get("source"), e.get("target")
+    #             if s in nodes_by_id and t in nodes_by_id:
+    #                 edges_in.append({"source": s, "target": t})
+
+    #     # Fallback linear edges if none present
+    #     if not edges_in and len(chain) > 1:
+    #         for i in range(len(chain) - 1):
+    #             edges_in.append({"source": _node_id(chain[i]), "target": _node_id(chain[i+1])})
+
+    #     # Parents/children maps
+    #     parents = {nid: [] for nid in node_ids}
+    #     children = {nid: [] for nid in node_ids}
+    #     for e in edges_in:
+    #         s, t = e["source"], e["target"]
+    #         if s in nodes_by_id and t in nodes_by_id:
+    #             parents[t].append(s)
+    #             children[s].append(t)
+
+    #     # Topological layers (existing helper)
+    #     topo_layers = _topo_layers([{"id": nid} for nid in node_ids], edges_in)
+    #     sinks = {nid for nid in node_ids if not children[nid]}
+    #     log.debug("[DAG] topo layers: %s", topo_layers)
+
+    #     def _is_dataset_consumer(kind: str) -> bool:
+    #         lk = (kind or "").lower()
+    #         return (
+    #             ("calibration-config" in lk)
+    #             or ("calibration-run" in lk)
+    #             or (("ngiab" in lk) and ("run" in lk))
+    #             or ("teehr" in lk)
+    #         )
+
+    #     def _dataset_pointer_from_params(kind: str, params: dict, inherit: dict | None = None) -> dict:
+    #         lk = (kind or "").lower()
+    #         inherit = dict(inherit or {})
+    #         if ("preprocess" in lk) or ("pre-process" in lk):
+    #             inherit.update({
+    #                 "dataset_bucket": params.get("output_bucket", ""),
+    #                 "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/{params.get('output_name','ngiab')}.tgz",
+    #             })
+    #             return inherit
+    #         if "calibration-config" in lk:
+    #             inherit.update({
+    #                 "dataset_bucket": params.get("output_bucket", ""),
+    #                 "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/calibration-prepared.tgz",
+    #             })
+    #             return inherit
+    #         if "calibration-run" in lk:
+    #             inherit.update({
+    #                 "dataset_bucket": params.get("output_bucket", ""),
+    #                 "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/calibrated.tgz",
+    #             })
+    #             return inherit
+    #         if (("ngiab" in lk) and ("run" in lk)):
+    #             inherit.update({
+    #                 "dataset_bucket": params.get("output_bucket", ""),
+    #                 "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/{params.get('output_name','ngiab')}.tgz",
+    #             })
+    #             return inherit
+    #         if "teehr" in lk:
+    #             # teehr packages into teehr_results.tgz
+    #             inherit.update({
+    #                 "dataset_bucket": params.get("output_bucket", ""),
+    #                 "dataset_key": f"{params.get('output_prefix','').rstrip('/')}/teehr_results.tgz",
+    #             })
+    #             return inherit
+    #         return inherit
+
+    #     def _make_params(node: dict, last_flag: bool, incoming: dict | None, branch: str) -> dict:
+    #         """Build params and append the branch suffix to output/final prefixes."""
+    #         kind = _label(node)
+    #         cfg = (node.get("config") or {})
+    #         upstream_key = None
+    #         if incoming and incoming.get("dataset_bucket") and incoming.get("dataset_key"):
+    #             upstream_key = incoming["dataset_key"]
+    #         upstream_bucket = incoming.get("dataset_bucket") if incoming else None
+    #         params = _params_for(
+    #             kind, cfg, user, wf_uuid, last_in_chain=last_flag,
+    #             upstream_key=upstream_key, upstream_bucket=upstream_bucket
+    #         )
+    #         # If we know the producing bucket/key, set explicit inputs for artifact binding
+    #         if incoming and incoming.get("dataset_bucket") and incoming.get("dataset_key"):
+    #             params.setdefault("input_bucket", incoming["dataset_bucket"])
+    #             params.setdefault("input_key", incoming["dataset_key"])
+    #             params.setdefault("input_s3_key", incoming["dataset_key"])
+    #         # unique branch path for outputs
+    #         base = params.get("output_prefix")
+    #         if base:
+    #             params["output_prefix"] = f"{base.rstrip('/')}/{branch}"
+    #         if params.get("final_prefix"):
+    #             params["final_prefix"] = f"{params['final_prefix'].rstrip('/')}/{branch}"
+    #         return params
+
+    #     ws = make_ws()
+    #     with Workflow(generate_name="ngiab-chain-", entrypoint="main", workflows_service=ws) as w:
+    #         with DAG(name="main"):
+    #             instances_by_node: dict[str, list[dict]] = {}
+
+    #             for layer in topo_layers:
+    #                 for nid in layer:
+    #                     node = nodes_by_id[nid]
+    #                     kind = _label(node)
+    #                     stage = _stage_of(kind)
+    #                     tpl_name = _kind_to_template(kind)
+
+    #                     # Which parents *in the UI graph*?
+    #                     parent_ids = parents.get(nid, [])
+    #                     # Filter only valid producers by stage:
+    #                     parent_stages = [ _stage_of(_label(nodes_by_id[pid])) for pid in parent_ids ]
+    #                     if stage == "run":
+    #                         # Prefer best stage among available parents
+    #                         keep_stages = _best_stage_for_run(parent_stages)
+    #                     else:
+    #                         keep_stages = {s for s in parent_stages if _allowed_parent(stage, s)}
+    #                     filtered_parent_ids = [
+    #                         pid for pid in parent_ids
+    #                         if _stage_of(_label(nodes_by_id[pid])) in keep_stages
+    #                     ]
+
+    #                     log.debug("[DAG] node %s (%s): parents=%s -> filtered=%s (stages=%s -> keep=%s)",
+    #                               nid, stage, parent_ids, filtered_parent_ids, parent_stages, keep_stages)
+
+    #                     is_last = nid in sinks
+    #                     parent_instances: list[dict] = []
+    #                     for pid in filtered_parent_ids:
+    #                         parent_instances.extend(instances_by_node.get(pid, []))
+
+    #                     created: list[dict] = []
+    #                     stag = _stage_tag(kind)
+
+    #                     if parent_instances and _is_dataset_consumer(kind):
+    #                         # fan-out: one child instance per valid parent instance
+    #                         for idx, pinst in enumerate(parent_instances):
+    #                             tname = f"t-{stag}-{_slug(nid)}-{idx:02d}"
+    #                             params = _make_params(node, is_last, incoming=pinst, branch=tname)
+    #                             log.debug("[DAG] CREATE %s -> depends=[%s]  incoming=%s  params.out_prefix=%s",
+    #                                       tname, pinst.get("task"), {"b": pinst.get("dataset_bucket"), "k": pinst.get("dataset_key")},
+    #                                       params.get("output_prefix"))
+    #                             Task(
+    #                                 name=tname,
+    #                                 template_ref=TemplateRef(name=tpl_name, template="main"),
+    #                                 arguments=Arguments(parameters=[Parameter(name=k, value=v) for k, v in params.items()]),
+    #                                 dependencies=[pinst["task"]],
+    #                             )
+    #                             pointer = _dataset_pointer_from_params(kind, params, inherit=pinst)
+    #                             created.append({"task": tname, "kind": kind, **pointer})
+    #                     else:
+    #                         # single instance: depend on all (filtered) upstreams (if any)
+    #                         dep_names = [pi["task"] for pi in parent_instances]
+    #                         tname = f"t-{stag}-{_slug(nid)}-00"
+    #                         incoming = parent_instances[0] if len(parent_instances) == 1 else None
+    #                         params = _make_params(node, is_last, incoming=incoming, branch=tname)
+    #                         log.debug("[DAG] CREATE %s -> deps=%s incoming=%s params.out_prefix=%s",
+    #                                   tname, dep_names, {"b": (incoming or {}).get("dataset_bucket"), "k": (incoming or {}).get("dataset_key")},
+    #                                   params.get("output_prefix"))
+    #                         Task(
+    #                             name=tname,
+    #                             template_ref=TemplateRef(name=tpl_name, template="main"),
+    #                             arguments=Arguments(parameters=[Parameter(name=k, value=v) for k, v in params.items()]),
+    #                             dependencies=dep_names or None,
+    #                         )
+    #                         pointer = _dataset_pointer_from_params(kind, params, inherit=incoming or {})
+    #                         created.append({"task": tname, "kind": kind, **pointer})
+
+    #                     instances_by_node[nid] = created
+
+    #     return w
     @MBH.action_handler
     async def receive_get_workflow(self, event, action, data, session: AsyncSession):
         """Return {nodes, edges} for a workflow id. Falls back to Node rows if graph is missing."""
@@ -910,6 +1294,7 @@ class NgiabBackendHandler(MBH):
         selected_wf_id = data.get("workflowId")
         nodes = wf_data.get("nodes", [])
         edges = wf_data.get("edges", [])
+        mode  = (data or {}).get("mode") or "real"
         selected_ids: List[str] = data.get("selected") or []
         user = _user_id(self)
         run_id = _run_id()
@@ -966,8 +1351,8 @@ class NgiabBackendHandler(MBH):
         edges_kept = [e for e in edges_sub if e["source"] in keep and e["target"] in keep]
 
         # Ensure templates exist for everything we’re about to run
-        self._ensure_templates_for_nodes(chain_nodes)
-
+        # self._ensure_templates_for_nodes(chain_nodes)
+        self._ensure_templates_for_nodes(chain_nodes, mode)
 
         # Reuse selected workflow row if provided; else create a new one
         wt_row = await self._get_or_create_template_row(session, "ngiab-chain", user, {"source": "yaml"})
@@ -1021,7 +1406,10 @@ class NgiabBackendHandler(MBH):
 
         # Build the DAG with fan-out semantics (per-parent instances) and submit
         try:
-            w, tasks_by_node = self._build_chain_workflow(chain_nodes, user, wf_uuid=str(wf_row.id), edges=edges_kept)
+            # w, tasks_by_node = self._build_chain_workflow(chain_nodes, user, wf_uuid=str(wf_row.id), edges=edges_kept)
+            w, tasks_by_node = self._build_chain_workflow(
+                chain_nodes, user, wf_uuid=str(wf_row.id), edges=edges_kept, mode=mode
+            )            
             w.create()
             # mark the workflow row as running and set last_run_at
             await _set_workflow_status(session, wf_row.id, "running", touch_last_run=True)

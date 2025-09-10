@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useReducer, useRef, useContext } from 'react';
+import React, { useEffect, useMemo, useReducer, useRef, useContext, useState } from 'react';
 import { WorkflowsContext } from '../contexts/workflowsContext';
 import { workflowsReducer, initialState } from '../store/reducers/workflowsReducer';
 import { types } from '../store/actions/actionsTypes';
@@ -57,6 +57,7 @@ function isWeaklyConnected(nodes, edges) {
 export function WorkflowsProvider({ children }) {
   const [state, dispatch] = useReducer(workflowsReducer, initialState);
   const { backend } = useContext(AppContext);
+  const [uiMode, setUiMode] = useState('real');
 
   // local helpers to mirror reducer behavior
   const labelFor = (kind) => {
@@ -233,6 +234,7 @@ export function WorkflowsProvider({ children }) {
       workflow: { nodes, edges },
       selected: selectedIds,
       workflowId: state.ui?.selectedWorkflowId || null,
+      mode: uiMode,
     };
 
     try {
@@ -278,7 +280,8 @@ export function WorkflowsProvider({ children }) {
     addNode, removeSelected, applyTemplate,
     startPlayback, resetPlayback,
     setSelectedWorkflow,
-  }), [state]);
+    uiMode, setUiMode,
+  }), [state, uiMode]);
 
   return <WorkflowsContext.Provider value={value}>{children}</WorkflowsContext.Provider>;
 }
