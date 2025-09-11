@@ -1,0 +1,1 @@
+from .home import ModelsConsumer  # <-- ensures decorator runs at import time

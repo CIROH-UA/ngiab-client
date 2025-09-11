@@ -8,7 +8,7 @@ from channels.consumer import AsyncConsumer
 from tethys_sdk.routing import consumer
 
 from .backend_actions import BackendActions
-from .handlers import NgiabBackendHandler
+from .handlers import NgiabBackendHandler, HomeImportHandler
 from tethysapp.ngiab.app import App
 
 log = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class BackendConsumer(AsyncConsumer):
 
     async def websocket_connect(self, event):
         # register handlers
-        self.handlers = (NgiabBackendHandler(self),)
+        self.handlers = (NgiabBackendHandler(self),HomeImportHandler(self))
 
         # Join a broadcast group (optional; useful for server->all pushes)
         self.group_name = "workflows"

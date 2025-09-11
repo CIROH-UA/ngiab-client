@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ngiab-visualization
+  namespace: argo
+spec:
+  entrypoint: main
+  templates:
+  - name: main
+    inputs:
+      parameters:
+        - { name: output_bucket,         default: "test-ngen" }
+        - { name: output_prefix,         default: "demo/default" }
+        - { name: final_prefix,          default: "" }
+        - { name: input_bucket,          default: "test-ngen" }
+        - { name: input_s3_key,          default: "" }     # chained S3 object key (file)
+        - { name: input_s3_url,          default: "" }     # standalone s3://... or https://...
+        - { name: inputs_subdir,         default: "outputs" }
+        - { name: results_subdir,        default: "" }
+        - { name: args,            default: "" }
+        - { name: image,           default: "" }
+    script:
+      image: "{{inputs.parameters.image}}"
+      command: [bash, -lc]
+      env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_ACCESS_KEY_ID } }
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom: { secretKeyRef: { name: aws-creds, key: AWS_SECRET_ACCESS_KEY } }
+        - name: AWS_DEFAULT_REGION
+          value: us-east-1
+      source: |
+        set -euo pipefail
+
+
+    outputs:
+      artifacts:
+        - name: ngiab-visualization
+          path: /tmp/ngiab_visualization.tgz
+          archive: { none: {} }
+          s3:
+            endpoint: s3.amazonaws.com
+            region: us-east-1
+            bucket: "{{inputs.parameters.output_bucket}}"
+            
+            accessKeySecret: { name: aws-creds, key: AWS_ACCESS_KEY_ID }
+            secretKeySecret:  { name: aws-creds, key: AWS_SECRET_ACCESS_KEY }
+

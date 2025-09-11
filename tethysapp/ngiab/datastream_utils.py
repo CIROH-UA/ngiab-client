@@ -4,13 +4,30 @@ import os
 import tarfile
 import uuid
 import shutil
+import tempfile
+from typing import Iterable
 from pathlib import Path
 from botocore import UNSIGNED
 from botocore.client import Config
 from botocore.exceptions import ClientError, BotoCoreError
-
+from urllib.parse import urlparse
+import re
 
 from .utils import _get_conf_file
+
+
+
+def _sanitize_folder_name(name: str) -> str:
+    """
+    Sanitize the requested destination folder name:
+    - strip common tar extensions (so 'run.tgz' -> 'run')
+    - trim whitespace and leading/trailing slashes
+    - replace illegal/odd characters with underscores
+    """
+    name = strip_tar_ext(name or "")
+    name = name.strip().strip("/\\")
+    name = re.sub(r"[^A-Za-z0-9._-]+", "_", name)
+    return name or "ngen-run"
 
 def list_public_s3_folders(
     bucket: str = "ciroh-community-ngen-datastream",
@@ -242,48 +259,111 @@ def _extract_keep_ngen_run(
     dst_name: str = "ngen-run",
 ) -> Path:
     """
-    Extract only the subtree  home/ec2-user/outputs/ngen-run/
-    from *tar_path* into *work_dir*, rename it to *dst_name*, delete the
-    tarball, and prune any *new* empty directories that were created.
+    Extract only the single *top-level directory* subtree (the first path segment)
+    from *tar_path* into *work_dir*, rename it to *dst_name*, delete the tarball,
+    and leave *work_dir* otherwise untouched.
 
-    Anything that already existed inside *work_dir* is left untouched.
+    This does NOT assume any specific name like 'home/ec2-user/outputs/ngen-run/' or
+    'ngen-run/'. It simply finds the first directory at the archive root and keeps
+    that whole subtree.
+
+    Returns the pathlib.Path to work_dir/dst_name.
     """
+
+    def _norm(name: str) -> str:
+        # Normalize tar member name to a safe, comparable relative POSIX path.
+        name = name.replace("\\", "/")
+        while name.startswith("./"):
+            name = name[2:]
+        while name.startswith("/"):
+            name = name[1:]
+        return name
+
+    def _is_within_directory(directory: str, target: str) -> bool:
+        # Path traversal guard for extraction
+        abs_directory = os.path.abspath(directory)
+        abs_target = os.path.abspath(target)
+        return os.path.commonprefix([abs_directory, abs_target]) == abs_directory
+
+    def _safe_extract(tar, members, path: str) -> None:
+        for m in members:
+            dest = os.path.join(path, _norm(m.name))
+            if not _is_within_directory(path, dest):
+                raise RuntimeError(f"Blocked suspicious path in tar: {m.name!r}")
+        tar.extractall(path=path, members=members)
+
     work_dir = Path(work_dir).resolve()
-    KEEP_PREFIX = "home/ec2-user/outputs/ngen-run/"
-
-    # ── record what was already in work_dir ──────────────────────────────
-    preexisting = {p for p in work_dir.rglob("*") if p.is_dir()}
-
-    # ── 1. selective extraction ──────────────────────────────────────────
-    with tarfile.open(tar_path, "r:*") as tar:
-        wanted = [m for m in tar.getmembers()
-                  if m.name.startswith(KEEP_PREFIX)]
-        if not wanted:
-            raise FileNotFoundError(
-                f"{KEEP_PREFIX!r} not found inside {tar_path}"
-            )
-        tar.extractall(path=work_dir, members=wanted)
-
-    # ── 2. remove the tarball itself ─────────────────────────────────────
-    os.remove(tar_path)
-
-    # ── 3. move/rename the kept subtree ─────────────────────────────────
-    kept_src = work_dir / KEEP_PREFIX.rstrip("/")
+    work_dir.mkdir(parents=True, exist_ok=True)
     kept_dst = work_dir / dst_name
-    kept_dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(kept_src), kept_dst)
 
-    # ── 4. prune *new* empty directories (bottom-up) ────────────────────
-    for path in sorted(work_dir.rglob("*"), reverse=True):
-        if (
-            path.is_dir()
-            and path not in preexisting
-            and path != kept_dst
-        ):
-            try:
-                path.rmdir()          # succeeds only if directory is empty
-            except OSError:
-                pass                  # not empty → keep it
+    with tarfile.open(tar_path, "r:*") as tar:
+        members = list(tar.getmembers())
+        names = [_norm(m.name) for m in members]
+
+        # Collect top-level directory candidates in *archive order*.
+        top_dirs_ordered = []
+        seen = set()
+        for nm in names:
+            if not nm:
+                continue
+            if "/" not in nm:
+                # This is a root-level file (no directory) → ignore for subtree detection.
+                continue
+            top = nm.split("/", 1)[0]
+            if top and top not in seen:
+                seen.add(top)
+                top_dirs_ordered.append(top)
+
+        if not top_dirs_ordered:
+            # No directory subtree at the root; provide hints.
+            root_files = sorted({p for p in names if p and "/" not in p})[:8]
+            raise FileNotFoundError(
+                f"No top-level directory subtree found in {tar_path}.\n"
+                f"Archive appears to contain files at root instead. Root files (sample): {root_files}"
+            )
+
+        # Choose the first top-level directory in archive order.
+        base_prefix = top_dirs_ordered[0]
+        base_prefix_with_slash = base_prefix + "/"
+
+        kept_members = [
+            m for m in members
+            if _norm(m.name) == base_prefix or _norm(m.name).startswith(base_prefix_with_slash)
+        ]
+        if not kept_members:
+            raise FileNotFoundError(
+                f"Found top-level dir '{base_prefix}', but no members under it in {tar_path}"
+            )
+
+        # Extract into a temp dir, then move the selected subtree as *dst_name*.
+        with tempfile.TemporaryDirectory(dir=str(work_dir)) as tmpdir:
+            _safe_extract(tar, kept_members, tmpdir)
+            src_dir = Path(tmpdir) / base_prefix
+
+            # Some tars may not include an explicit dir entry; ensure src_dir exists.
+            if not src_dir.exists():
+                parts = base_prefix.split("/")
+                probe = None
+                for i in range(len(parts), 0, -1):
+                    cand = Path(tmpdir) / "/".join(parts[:i])
+                    if cand.exists():
+                        probe = cand
+                        break
+                src_dir = probe if probe is not None else Path(tmpdir)
+
+            if kept_dst.exists():
+                if kept_dst.is_dir():
+                    shutil.rmtree(kept_dst)
+                else:
+                    kept_dst.unlink()
+            kept_dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src_dir), kept_dst)
+
+    # Remove the tarball itself (match previous behavior).
+    try:
+        os.remove(tar_path)
+    except OSError:
+        pass
 
     return kept_dst
 
@@ -417,3 +497,97 @@ def get_datastream_id_from_conf_file(datastream_folder_name: str) -> str:
             return datastream["id"]
     
     return None
+
+def parse_s3_uri(s3_uri: str) -> tuple[str, str]:
+    """
+    Parse an S3 URI or URL into (bucket, key).
+    Supports:
+      - s3://bucket/key
+      - https://bucket.s3.amazonaws.com/key
+      - https://s3.amazonaws.com/bucket/key
+    """
+    if not s3_uri:
+        raise ValueError("Empty S3 URI.")
+    s3_uri = s3_uri.strip()
+
+    if s3_uri.startswith("s3://"):
+        p = urlparse(s3_uri)
+        bucket, key = p.netloc, p.path.lstrip("/")
+        if not bucket or not key:
+            raise ValueError(f"Invalid S3 URI: {s3_uri}")
+        return bucket, key
+
+    if s3_uri.startswith("https://"):
+        u = urlparse(s3_uri)
+        host = u.netloc
+        path = u.path.lstrip("/")
+        if host.endswith(".s3.amazonaws.com"):
+            bucket = host[: -len(".s3.amazonaws.com")]
+            key = path
+            if not bucket or not key:
+                raise ValueError(f"Invalid S3 URL: {s3_uri}")
+            return bucket, key
+        if host == "s3.amazonaws.com":
+            parts = path.split("/", 1)
+            if len(parts) != 2:
+                raise ValueError(f"Invalid path-style S3 URL: {s3_uri}")
+            return parts[0], parts[1]
+
+    raise ValueError(f"Unsupported S3 URI scheme: {s3_uri}")
+
+def strip_tar_ext(name: str) -> str:
+    """Remove common tar extensions to derive a folder name."""
+    return re.sub(r"\.(tar\.gz|tar\.bz2|tar\.xz|tar|tgz|tbz2|txz)$", "", name, flags=re.IGNORECASE)
+
+def check_if_s3_uri_exists(s3_uri: str) -> bool:
+    """HEAD the object addressed by s3_uri."""
+    bucket, key = parse_s3_uri(s3_uri)
+    s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED))
+    try:
+        s3.head_object(Bucket=bucket, Key=key)
+        return True
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+            return False
+        raise
+
+def download_and_extract_tar_from_s3_uri(
+    s3_uri: str,
+    name_folder: str = "",
+) -> str:
+    bucket, tar_key = parse_s3_uri(s3_uri)
+    datastream_conf_dir_path = _get_datastream_conf_dir()
+
+    # Choose final destination folder name (use user value if provided)
+    requested = (name_folder or "").strip()
+    dst_name = _sanitize_folder_name(requested) if requested else strip_tar_ext(os.path.basename(tar_key)) or "ngen-run"
+
+    # --- NEW: download into a unique temp dir under the conf dir ---
+    with tempfile.TemporaryDirectory(dir=datastream_conf_dir_path) as tmpdir:
+        local_tar_path = os.path.join(tmpdir, os.path.basename(tar_key))
+        # Download
+        try:
+            _download_tar_from_s3(bucket, tar_key, local_tar_path)
+        except FileNotFoundError as e:
+            raise RuntimeError(f"Datastream tar not found: {s3_uri}") from e
+        except (ClientError, BotoCoreError) as e:
+            raise RuntimeError(f"Failed to download {s3_uri}: {e}") from e
+        except Exception as e:
+            raise RuntimeError(f"Failed to download {s3_uri}: {e}") from e
+
+        # Extract first subtree into the conf dir, under dst_name
+        _extract_keep_ngen_run(
+            tar_path=local_tar_path,
+            work_dir=datastream_conf_dir_path,
+            dst_name=dst_name,
+        )
+
+    # Update configs
+    individual_datastream = _add_datastream_data_to_conf(
+        label=dst_name,
+        bucket=bucket,
+        local_path=f"{datastream_conf_dir_path}/{dst_name}",
+        prefix=tar_key,
+    )
+    _add_datastream_data_to_model_conf(individual_datastream)
+    return individual_datastream["id"]

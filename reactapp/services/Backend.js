@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 
 export default class Backend {
   constructor(rootUrl) {
+  // constructor(rootUrl) {
     const tethys_portal_host = getTethysPortalHost();
     const hostname = tethys_portal_host.hostname;
     // If you want to use the portal's port, replace with: const port = tethys_portal_host.port;
@@ -16,6 +17,14 @@ export default class Backend {
     } else {
       this.wsUrl = `${protocol}://${hostname}${window.location.pathname}ws/`;
     }
+
+
+    // Derive the app root like: /apps/<slug>/
+    // const match = window.location.pathname.match(/^(.*?\/apps\/[^/]+\/)/);
+    // const appRoot = match ? match[1] : "/";
+    // const consumer = String(consumerPath).replace(/^\/|\/$/g, "");
+    // const hostWithPort = port ? `${hostname}:${port}` : hostname;
+    // this.wsUrl = `${protocol}://${hostWithPort}${appRoot}${consumer}/ws/`;
 
     this.rootUrl = rootUrl;
     this.webSocket = null;
