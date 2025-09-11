@@ -25,9 +25,16 @@ spec:
         - { name: realization,default: "true" }
         - { name: run,        default: "false" }
         - { name: validate,   default: "false" }
+
     script:
       image: ghcr.io/astral-sh/uv:python3.11-bookworm-slim
       command: [bash, -lc]
+      resources:
+        requests:
+          cpu: "2"
+          memory: "8Gi"
+        limits:
+          memory: "8Gi"
       source: |
         set -euo pipefail
         export DEBIAN_FRONTEND=noninteractive
