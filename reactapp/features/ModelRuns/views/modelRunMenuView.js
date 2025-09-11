@@ -1,14 +1,12 @@
-import React, { Fragment } from 'react';
-import DataStreamMenu from 'features/DataStream/components/dataStreamMenu';
+import React, { Fragment, useState } from 'react';
 import NgenMenuWrapper from 'features/ngen/components/ngenMenus';
+import ModelRunsSelect from '../components/modelRunsSelect';
 
-
-const DataStreamMenuView = ({
+const ModelRunMenuView = ({
   toggleSingleRow,
   setIsLoading,
-  setIsDataStreamMenuOpen,
+  setIsMenuOpen,
   singleRowOn
-  
 }) => {
   
   return (
@@ -16,14 +14,13 @@ const DataStreamMenuView = ({
       <NgenMenuWrapper 
           toggleSingleRow={toggleSingleRow}
           setIsLoading={setIsLoading}
-          setIsNgenMenuOpen={setIsDataStreamMenuOpen}
+          setIsNgenMenuOpen={setIsMenuOpen}
           singleRowOn={singleRowOn}
-          MenuComponent={DataStreamMenu}
+          MenuComponent={ModelRunsSelect}
       />
-
     </Fragment>
 
   );
 };
 
-export default DataStreamMenuView;
+export default ModelRunMenuView;

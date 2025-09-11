@@ -1,15 +1,14 @@
-import { Fragment, useState, lazy,Suspense, useContext  } from 'react';
+import { useState,Suspense, useContext  } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
 import { ModelRunsProvider } from 'features/ModelRuns/providers/modelRunsProvider';
 import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
 import { ToastContainer } from 'react-toastify';
 import Button from 'react-bootstrap/Button';
 import styled from 'styled-components';
-import { GoGraph,GoChevronDown  } from "react-icons/go";
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 import HydroFabricView from './hydroFabricView.js';
 import MapComponent from 'features/Map/components/mapgl.js';
-import ModelRunsView from 'features/ModelRuns/views/modelsView.js';
+import ModelRunMenuView from 'features/ModelRuns/views/modelRunMenuView';
 import { AppContext } from "context/context";
 
 const ToggleButton = styled(Button)`
@@ -52,21 +51,17 @@ const NGIABView = () => {
         <ModelRunsProvider>
           <HydroFabricProvider>
             <ToastContainer stacked  />
-            <ModelRunsView
-              singleRowOn={singleRowOn}
-              toggleSingleRow={toggleSingleRow}
-              setIsLoading={setIsLoading}
-              setIsModelRunListOpen={setIsModelRunListOpen}
-            />
               <MapContainer 
-                $fullScreen={singleRowOn}
-                
+                $fullScreen={singleRowOn} 
               >
                 <MapComponent />
               </MapContainer>
-              <ToggleButton $fullScreen={singleRowOn}  onClick={() => toggleSingleRow(prev => !prev)}>
-                {singleRowOn ? <GoGraph size={20} /> : <GoChevronDown size={20} />}
-              </ToggleButton>
+              <ModelRunMenuView
+                  toggleSingleRow={toggleSingleRow} 
+                  setIsLoading={setIsLoading}
+                  setIsMenuOpen={setIsModelRunListOpen}
+                  singleRowOn={singleRowOn}
+              />
               <HydroFabricContainer 
                 $fullScreen={singleRowOn} 
                 isModelRunListOpen={isModelRunListOpen}  

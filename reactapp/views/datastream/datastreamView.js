@@ -59,8 +59,6 @@ const DataStreamView = () => {
                   setIsDataStreamMenuOpen={setIsDataStreamMenuOpen}
                   singleRowOn={singleRowOn}
               />
-
-              
               <HydroFabricContainer 
                 $fullScreen={singleRowOn} 
                 isModelRunListOpen={isDataStreamMenuOpen}  
