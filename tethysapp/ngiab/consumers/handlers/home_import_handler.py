@@ -7,9 +7,13 @@ from typing import Any, Dict
 from ...datastream_utils import (
     check_if_s3_uri_exists,
     download_and_extract_tar_from_s3_uri,
-    parse_s3_uri,
+    parse_s3_uri
 )
 
+from ...utils import (
+    _build_geospatial_payload,
+    get_model_runs_selectable
+)
 log = logging.getLogger(__name__)
 
 class HomeImportHandler:
@@ -66,11 +70,25 @@ class HomeImportHandler:
             log.exception("Import failed.")
             await self.consumer.send_error(f"Import failed: {e}", action, data)
             return
+        
+        try:
+            model_run_id = datastream_id  # controller expects this name
+            await asyncio.to_thread(_build_geospatial_payload, model_run_id)
+        except Exception as e:
+            # We don't hard-fail the whole import; just report a warning
+            log.warning("Geo warm-up failed; frontend will attempt lazy load. %s", e, exc_info=True)        
+
+        try:
+            model_run_select =  get_model_runs_selectable()
+        except Exception as e:
+            log.warning("Failed to get model runs for select list update. %s", e, exc_info=True)
+            model_run_select = []
 
         await self.consumer.send_action(
             "IMPORT_DONE",
             {
                 "id": datastream_id,
+                "mode_run_select": model_run_select,
                 "s3_uri": s3_uri,
                 "bucket": bucket,
                 "tar_key": tar_key,

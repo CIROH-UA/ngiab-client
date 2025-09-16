@@ -6,7 +6,7 @@ import duckdb
 import xarray as xr
 import os
 from collections import defaultdict
-
+import geopandas as gpd
 def _get_conf_file():
     home_path = os.environ.get("HOME", "/tmp")
     conf_base_path = os.environ.get("VISUALIZER_CONF", f"{home_path}/ngiab_visualizer/ngiab_visualizer.json")
@@ -544,3 +544,20 @@ def check_troute_id(df, id):
         # Flat-indexed DataFrame: Check in the `featureID` column
         return int(id) in df["featureID"].values
 
+
+def _build_geospatial_payload(model_run_id: str) -> dict:
+    resp = {}
+    gepackage_file_path = find_gpkg_file_path(model_run_id)
+    gdf = gpd.read_file(gepackage_file_path, layer="nexus")
+    gdf = append_ngen_usgs_column(gdf, model_run_id)
+    gdf = append_nwm_usgs_column(gdf, model_run_id)
+    gdf = gdf.to_crs("EPSG:4326")
+    flow_paths_ids = gdf["toid"].tolist()
+    bounds = gdf.total_bounds.tolist()
+    data = json.loads(gdf.to_json())
+    resp["nexus"] = data
+    resp["nexus_ids"] = getNexusList(model_run_id)
+    resp["bounds"] = bounds
+    resp["catchments"] = getCatchmentsList(model_run_id)
+    resp["flow_paths_ids"] = flow_paths_ids
+    return resp

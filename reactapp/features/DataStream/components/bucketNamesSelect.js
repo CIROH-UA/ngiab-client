@@ -2,7 +2,7 @@ import React, { useState, useEffect, Fragment  } from 'react';
 import styled from 'styled-components';
 import { Button, Spinner} from 'react-bootstrap';
 import appAPI from 'services/api/app';
-import SelectComponent from './selectComponent';
+import SelectComponent from 'components/selectComponent';
 import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import { toast } from 'react-toastify';
 
