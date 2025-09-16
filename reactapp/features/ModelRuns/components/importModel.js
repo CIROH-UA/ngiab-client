@@ -1,6 +1,5 @@
 import React, { Fragment, useState, useContext } from 'react';
 import styled from 'styled-components';
-import { FaPlus } from "react-icons/fa";
 import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
 import Form from 'react-bootstrap/Form';
@@ -85,8 +84,9 @@ const ImportModel = () => {
         onClick={openModal}
         title="Import from S3"
         aria-label="Import from S3"
+        style={{ width: '100%', marginTop: '10px' }}
       >
-        <FaPlus size={10} /> Import
+         Import Model
       </Button>
 
       <ThemedModal show={showS3Modal} onHide={closeModal}>
