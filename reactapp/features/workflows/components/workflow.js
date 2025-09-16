@@ -284,6 +284,36 @@ export default function Workflow() {
     (changes) => dispatch({ type: types.EDGES_CHANGE, payload: changes }),
     [dispatch]
   );
+
+ const onReconnect = useCallback(
+   (oldEdge, newConnection) => {
+     // 1) remove the old edge
+     dispatch({
+       type: types.EDGES_CHANGE,
+       payload: [{ id: oldEdge.id, type: 'remove' }],
+     });
+     // 2) add a new edge to the new connection; reuse old id if your reducer supports it
+     dispatch({
+       type: types.ADD_EDGE,
+       payload: { ...newConnection, id: oldEdge.id }, // keeping id is optional
+     });
+   },
+   [dispatch]
+ );
+
+ // delete edges when selected and user presses Delete/Backspace
+ const onEdgesDelete = useCallback(
+   (deleted) => {
+     if (!deleted?.length) return;
+     dispatch({
+       type: types.EDGES_CHANGE,
+       payload: deleted.map((e) => ({ id: e.id, type: 'remove' })),
+     });
+   },
+   [dispatch]
+ );
+
+
   const onConnect = useCallback(
     (connection) => dispatch({ type: types.ADD_EDGE, payload: connection }),
     [dispatch]
@@ -315,6 +345,9 @@ export default function Workflow() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onReconnect={onReconnect}
+        onEdgesDelete={onEdgesDelete}
+        deleteKeyCode={['Delete', 'Backspace']}
         isValidConnection={isValidConnection}
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
