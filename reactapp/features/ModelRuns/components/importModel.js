@@ -55,7 +55,7 @@ const ImportModel = () => {
   const { backend } = useContext(AppContext);
   
   const [showS3Modal, setShowS3Modal] = useState(false);
-  const [s3Uri, setS3Uri] = useState('s3://ciroh-community-ngen-datastream/demo/default/ngen-run.tar.gz');
+  const [s3Uri, setS3Uri] = useState('');
   const [folderName, setFolderName] = useState('');
 
   const openModal = () => setShowS3Modal(true);
