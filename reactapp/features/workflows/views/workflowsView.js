@@ -130,14 +130,14 @@ function Toolbar() {
         overflowY: 'auto',              // scroll if buttons wrap
       }}
     >
-    <div style={{ minWidth: 160 }}>
+    {/* <div style={{ minWidth: 160 }}>
         <Select
           options={MODE_OPTIONS}
           value={MODE_OPTIONS.find(o => o.value === uiMode)}
           onChange={(opt) => setUiMode(opt?.value || 'real')}
           placeholder="Mode"
         />
-    </div>
+    </div> */}
 
       <strong style={{ marginBottom: 4 }}>My Workflows</strong>
       <Select

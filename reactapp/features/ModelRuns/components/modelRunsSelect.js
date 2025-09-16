@@ -11,8 +11,8 @@ import Tooltip from 'react-bootstrap/Tooltip';
 import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import appAPI from 'services/api/app';
-import SelectComponent from './selectComponent';
-
+import SelectComponent from 'components/selectComponent';
+import ImportModel from 'features/ModelRuns/components/importModel';
 
 
 const Container = styled.div`
@@ -137,6 +137,7 @@ const ModelRunsSelect = ({
                       />
                   </Fragment>
               }
+              <ImportModel />
             </Content>
           </Container>
     </Fragment>

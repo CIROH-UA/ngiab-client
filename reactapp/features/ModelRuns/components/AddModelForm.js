@@ -1,6 +1,6 @@
 import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
-import ImportInputForm from './ImportInputForm';
+import ImportInputForm from './importModel';
 const Container = styled.div`
   position: absolute;
   top: 0;

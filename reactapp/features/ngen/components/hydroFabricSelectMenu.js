@@ -1,6 +1,6 @@
 import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
-import HydroFabricSelect from 'features/DataStream/components/hydroFabricSelect';
+import HydroFabricSelect from 'features/ngen/components/hydroFabricSelect';
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
 import Button from 'react-bootstrap/Button';
