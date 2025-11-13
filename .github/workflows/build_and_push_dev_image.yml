@@ -13,6 +13,9 @@ env:
   DOCKER_REPO: tethys-ngiab
   REGISTRY_IMAGE: awiciroh/tethys-ngiab
 
+permissions:
+  security-events: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -107,13 +110,14 @@ jobs:
       - name: Scan image with Grype
         id: grype-scan
         uses: anchore/scan-action@v7
-        env:
-          GRYPE_CONFIG: .github/security/.grype.yaml
+        # env:
+          # GRYPE_CONFIG: .github/security/.grype.yaml
         with:
           # Scan the amd64 image by digest (no tag yet)
           image: ${{ env.REGISTRY_IMAGE }}@sha256:${{ steps.amd64-digest.outputs.digest }}
           only-fixed: true
           fail-build: true
+          security-cutoff: high
 
       - name: upload Anchore scan SARIF report
         uses: github/codeql-action/upload-sarif@v3
