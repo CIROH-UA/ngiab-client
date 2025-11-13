@@ -112,8 +112,6 @@ jobs:
         with:
           # Scan the amd64 image by digest (no tag yet)
           image: ${{ env.REGISTRY_IMAGE }}@sha256:${{ steps.amd64-digest.outputs.digest }}
-          registry-username: ${{ secrets.DOCKER_BUILDER_USERNAME }}
-          registry-password: ${{ secrets.DOCKER_BUILDER_TOKEN }}
           only-fixed: true
           fail-build: true
           output-format: table
