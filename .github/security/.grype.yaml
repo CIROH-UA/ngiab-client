@@ -16,13 +16,6 @@ ignore:
       name: python
       type: binary
     reason: "Pinned to an older CPython until conda-build grows support for the latest version."
-  # - package:
-  #     name: django
-  #     type: python
-  #   reason: "Only django 5.x has vulnerabilities that have been resolved"
-  # - package:
-  #     name: social-auth-app-django
-  #     type: python
-  #   reason: "Fixed version not yet availble for versions of conda < 5.1"
+
 
 
