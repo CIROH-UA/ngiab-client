@@ -80,13 +80,11 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # NEW: scan comes after build, before merge
+  # scan comes after build, before merge
   scan:
     runs-on: ubuntu-latest
     needs:
       - build
-    permissions:
-      security-events: write   # optional here; safe to keep
 
     steps:
       - name: Download amd64 digest
@@ -107,29 +105,43 @@ jobs:
           username: ${{ secrets.DOCKER_BUILDER_USERNAME }}
           password: ${{ secrets.DOCKER_BUILDER_TOKEN }}
 
+      # Let Grype fail, but don't stop the job yet
       - name: Scan image with Grype
         id: grype-scan
+        continue-on-error: true
         uses: anchore/scan-action@v7
-        # env:
-          # GRYPE_CONFIG: .github/security/.grype.yaml
         with:
           # Scan the amd64 image by digest (no tag yet)
           image: ${{ env.REGISTRY_IMAGE }}@sha256:${{ steps.amd64-digest.outputs.digest }}
           only-fixed: true
-          fail-build: true
-          security-cutoff: high
+          severity-cutoff: high
+          # default is SARIF already, but we can be explicit:
+          output-format: sarif
 
+      # Always upload SARIF, even if the Grype step "failed"
       - name: upload Anchore scan SARIF report
+        if: ${{ always() && steps.grype-scan.outputs.sarif != '' }}
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: ${{ steps.grype-scan.outputs.sarif }}
 
+      # Also dump the SARIF path for debugging
       - name: Inspect action SARIF report
-        run: cat ${{ steps.grype-scan.outputs.sarif }}          
+        if: ${{ always() && steps.grype-scan.outputs.sarif != '' }}
+        run: cat ${{ steps.grype-scan.outputs.sarif }}
+
+      # NOW actually fail the job if the scan step failed
+      # (this blocks the merge job and prevents pushing)
+      - name: Fail job if Grype found issues or errored
+        if: ${{ steps.grype-scan.outcome == 'failure' }}
+        run: |
+          echo "Grype scan failed (vulnerabilities or error). Failing job so images are not pushed."
+          exit 1
+
   merge:
     runs-on: ubuntu-latest
     needs:
-      - scan   # <- only push/tag if scan succeeded
+      - scan   # <- only push/tag if scan job as a whole succeeded
 
     steps:
       - name: Download digests
