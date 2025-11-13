@@ -16,6 +16,3 @@ ignore:
       name: python
       type: binary
     reason: "Pinned to an older CPython until conda-build grows support for the latest version."
-
-
-
