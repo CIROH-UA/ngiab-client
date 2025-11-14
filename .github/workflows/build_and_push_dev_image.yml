@@ -110,6 +110,8 @@ jobs:
         id: grype-scan
         continue-on-error: true
         uses: anchore/scan-action@v7
+        env:
+          GRYPE_CONFIG: .github/security/.grype.yaml
         with:
           # Scan the amd64 image by digest (no tag yet)
           image: ${{ env.REGISTRY_IMAGE }}@sha256:${{ steps.amd64-digest.outputs.digest }}
