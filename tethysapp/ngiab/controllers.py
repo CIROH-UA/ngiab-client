@@ -455,7 +455,7 @@ def getDataStreamTarFile(request):
 
     tar_key     = "/".join(parts) + "/ngen-run.tar.gz"
     name_folder = "_".join(filter(None, [avail_date, ngen_forecast, ngen_cycle, ngen_ensemble, ngen_vpu]))
-
+    # breakpoint()
     # ── Fast path: already downloaded ─────────────────────────────────────
     if check_if_datastream_data_exists(name_folder):
         unique_id = get_datastream_id_from_conf_file(name_folder)

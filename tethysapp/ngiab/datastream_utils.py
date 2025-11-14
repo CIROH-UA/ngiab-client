@@ -249,21 +249,22 @@ def _extract_keep_ngen_run(
     Anything that already existed inside *work_dir* is left untouched.
     """
     work_dir = Path(work_dir).resolve()
-    KEEP_PREFIX = "home/ec2-user/outputs/ngen-run/"
-
+    KEEP_PREFIX = "ngen-run"
+    # breakpoint()
     # ── record what was already in work_dir ──────────────────────────────
-    preexisting = {p for p in work_dir.rglob("*") if p.is_dir()}
-
+    # preexisting = {p for p in work_dir.rglob("*") if p.is_dir()}
+    # breakpoint()
     # ── 1. selective extraction ──────────────────────────────────────────
     with tarfile.open(tar_path, "r:*") as tar:
-        wanted = [m for m in tar.getmembers()
-                  if m.name.startswith(KEEP_PREFIX)]
-        if not wanted:
-            raise FileNotFoundError(
-                f"{KEEP_PREFIX!r} not found inside {tar_path}"
-            )
-        tar.extractall(path=work_dir, members=wanted)
-
+        # wanted = [m for m in tar.getmembers()
+        #           if m.name.startswith(KEEP_PREFIX)]
+        # if not wanted:
+        #     raise FileNotFoundError(
+        #         f"{KEEP_PREFIX!r} not found inside {tar_path}"
+        #     )
+    # tar.extractall(path=work_dir, members=wanted)
+        tar.extractall(path=work_dir)
+    # breakpoint()
     # ── 2. remove the tarball itself ─────────────────────────────────────
     os.remove(tar_path)
 
@@ -274,16 +275,16 @@ def _extract_keep_ngen_run(
     shutil.move(str(kept_src), kept_dst)
 
     # ── 4. prune *new* empty directories (bottom-up) ────────────────────
-    for path in sorted(work_dir.rglob("*"), reverse=True):
-        if (
-            path.is_dir()
-            and path not in preexisting
-            and path != kept_dst
-        ):
-            try:
-                path.rmdir()          # succeeds only if directory is empty
-            except OSError:
-                pass                  # not empty → keep it
+    # for path in sorted(work_dir.rglob("*"), reverse=True):
+    #     if (
+    #         path.is_dir()
+    #         and path not in preexisting
+    #         and path != kept_dst
+    #     ):
+    #         try:
+    #             path.rmdir()          # succeeds only if directory is empty
+    #         except OSError:
+    #             pass                  # not empty → keep it
 
     return kept_dst
 
