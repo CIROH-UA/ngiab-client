@@ -1,5 +1,6 @@
 
-FROM gioelkin/tethys-ngiab:dev-r1
+FROM tethysplatform/tethys-core:dev-py3.12-dj5.2 
+
 
 ###################
 # BUILD ARGUMENTS #
