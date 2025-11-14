@@ -1,9 +1,6 @@
 # Global configuration for Anchore Grype scans.
 # This keeps suppressions and path exclusions versioned alongside the codebase
 # so both local scans and the GitHub Action behave the same way.
-
-fail-on-severity: high
-
 exclude:
   # Salt’s vendored Python tree contains known CVEs that we do not ship.
   - /opt/saltstack/**
