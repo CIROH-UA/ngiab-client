@@ -162,11 +162,6 @@ const MapComponent = () => {
             'circle-color': [
               'step',
               ['get', 'point_count'],
-              // theme === 'dark' ? '#51bbd6' : '#1f78b4',
-              // 10,
-              // theme === 'dark' ? '#6610f2' : '#33a02c',
-              // 50,
-              // theme === 'dark' ? '#20c997' : '#e31a1c',
               '#51bbd6' ,
               10,
               '#6610f2',
@@ -240,56 +235,56 @@ const MapComponent = () => {
   // --------------------------------------------
   // Data fetching: get geospatial data and filters
   // --------------------------------------------
-  useEffect(() => {
-    const protocol = new Protocol({ metadata: true });
-    maplibregl.addProtocol('pmtiles', protocol.tile);
-
-    if (!modelRunsState.base_model_id) return;
-
-    appAPI.getGeoSpatialData({ model_run_id: modelRunsState.base_model_id })
-      .then((response) => {
-        if (response.error) {
-          toast.error("Error fetching Model Run Data", { autoClose: 1000 });
-          hydroFabricActions.reset();
-          setNexusPoints(null);
-          setCatchmentsFilterIds(null);
-          setFlowPathsFilterIds(null);
-          setNexusFilterIds(null);
-          setSelectedCatchmentId(null);
-          setSelectedNexusId(null);
-          return;
-        }
-
-        toast.success("Successfully retrieved Model Run Data", { autoClose: 1000 });
-        setNexusPoints(response.nexus);
-        setCatchmentsFilterIds(response.catchments);
-        setFlowPathsFilterIds(response.flow_paths_ids);
-        setNexusFilterIds(response.nexus_ids);
-
-        if (response.bounds && mapRef.current) {
-          mapRef.current.fitBounds(response.bounds, {
-            padding: 20,
-            duration: 1000,
-          });
-        }
-      })
-      .catch((error) => {
-        console.error('Geospatial data fetch failed:', error);
-      });
-
-    return () => {
-      maplibregl.removeProtocol('pmtiles');
-    };
-  }, [theme, modelRunsState.base_model_id]);
-
   // useEffect(() => {
-  //   // Reset highlights when geometry layers are hidden
   //   const protocol = new Protocol({ metadata: true });
   //   maplibregl.addProtocol('pmtiles', protocol.tile);
+
+  //   if (!modelRunsState.base_model_id) return;
+
+  //   appAPI.getGeoSpatialData({ model_run_id: modelRunsState.base_model_id })
+  //     .then((response) => {
+  //       if (response.error) {
+  //         toast.error("Error fetching Model Run Data", { autoClose: 1000 });
+  //         hydroFabricActions.reset();
+  //         setNexusPoints(null);
+  //         setCatchmentsFilterIds(null);
+  //         setFlowPathsFilterIds(null);
+  //         setNexusFilterIds(null);
+  //         setSelectedCatchmentId(null);
+  //         setSelectedNexusId(null);
+  //         return;
+  //       }
+
+  //       toast.success("Successfully retrieved Model Run Data", { autoClose: 1000 });
+  //       setNexusPoints(response.nexus);
+  //       setCatchmentsFilterIds(response.catchments);
+  //       setFlowPathsFilterIds(response.flow_paths_ids);
+  //       setNexusFilterIds(response.nexus_ids);
+
+  //       if (response.bounds && mapRef.current) {
+  //         mapRef.current.fitBounds(response.bounds, {
+  //           padding: 20,
+  //           duration: 1000,
+  //         });
+  //       }
+  //     })
+  //     .catch((error) => {
+  //       console.error('Geospatial data fetch failed:', error);
+  //     });
+
   //   return () => {
   //     maplibregl.removeProtocol('pmtiles');
   //   };
-  // }, []);
+  // }, [theme, modelRunsState.base_model_id]);
+
+  useEffect(() => {
+    // Reset highlights when geometry layers are hidden
+    const protocol = new Protocol({ metadata: true });
+    maplibregl.addProtocol('pmtiles', protocol.tile);
+    return () => {
+      maplibregl.removeProtocol('pmtiles');
+    };
+  }, []);
 
   useEffect(() => {
     // Clear highlights when geometry changes
@@ -427,32 +422,97 @@ const MapComponent = () => {
         type="fill"
         source-layer="divides"
         paint={{
-          'fill-color': 'rgba(0, 200, 0, 0.3)',
-          'fill-outline-color': 'rgba(0, 200, 0, 1)',
+        'fill-color': theme === 'dark'
+          ? 'rgba(238, 51, 119, 0.316)'
+          : 'rgba(91, 44, 111, 0.316)',
+        'fill-outline-color': theme === 'dark'
+          ? 'rgba(238, 51, 119, 0.7)'
+          : 'rgba(91, 44, 111, 0.7)',
+        // 'fill-opacity': { stops: [[7, 0], [11, 1]] },
         }}
-      />
+     />
       {/* Example: flowpaths from this pmtiles */}
       <Layer
         id="vpu01-flowpaths"
         type="line"
         source-layer="flowpaths"
         paint={{
-          'line-color': '#ff8800',
-          'line-width': 2,
+          'line-color': theme === 'dark' ? '#0077bb' : '#000000',
+          'line-width': { stops: [[7, 1], [10, 2]] },
+          'line-opacity': { stops: [[7, 0], [11, 1]] },
         }}
       />
-      <Layer
-        id="vpu01-nexus"
-        type="circle"
-        source-layer="nexus"
-        paint={{
-          'circle-radius': 5,
-          'circle-color': '#0000ff',
-        }}
-      />
-    </Source>
 
+    </Source>
     <Source
+      id="nexus-points"
+      type="vector"
+      url={`pmtiles://${modelRunsState.current_geometry}`}
+      cluster={true}
+      clusterRadius={50}
+      clusterMaxZoom={14}   
+    >
+      <Layer
+          key="clusters"
+          id="clusters"
+          type="circle"
+          source-layer="nexus"
+          filter={['has', 'point_count']}
+          paint={{
+            'circle-color': [
+              'step',
+              ['get', 'point_count'],
+              '#51bbd6' ,
+              10,
+              '#6610f2',
+              50,
+              '#20c997',
+            ],
+            'circle-radius': [
+              'step',
+              ['get', 'point_count'],
+              15,
+              10,
+              25,
+              50,
+              35,
+            ],
+          }}
+        />
+        <Layer
+          key="cluster-count"
+          id="cluster-count"
+          type="symbol"
+          source-layer="nexus"
+          filter={['has', 'point_count']}
+          layout={{
+            'text-field': '{point_count_abbreviated}',
+            'text-font': ['Noto Sans Regular'],
+            'text-size': 12,
+            'text-anchor': 'center',
+            'text-justify': 'center',
+            'symbol-placement': 'point',
+          }}
+          paint={{
+            'text-color': '#ffffff',
+          }}
+        />
+        <Layer
+          key="unclustered-point"
+          id="unclustered-point"
+          type="circle"
+          source-layer="nexus"
+          filter={['!', ['has', 'point_count']]}
+          paint={{
+            'circle-color': theme === 'dark' ? '#4f5b67' : '#1f78b4',
+            'circle-radius': 7,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
+          }}
+        />
+
+    </Source>
+    {/* <Source
       key={`nexus-source-${isClustered}`}
       id="nexus-points"
       type="geojson"
@@ -462,7 +522,7 @@ const MapComponent = () => {
       clusterMaxZoom={14}
     >
       {nexusLayers}
-    </Source>
+    </Source> */}
   </Map>
   );
 };
