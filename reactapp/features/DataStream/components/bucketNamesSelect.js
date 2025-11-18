@@ -4,7 +4,9 @@ import { Button, Spinner} from 'react-bootstrap';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
+import { useDataStreamModelRuns } from '../hooks/useDataStreamModelRuns';
 import { toast } from 'react-toastify';
+import { vpu_layers } from './config';
 
 const StyledButton = styled(Button)`
   
@@ -70,6 +72,8 @@ export default function BucketNamesSelect() {
 
   const {state,actions} = useModelRunsContext();
 
+  // const {state: dsState, actions: dsActions} = useDataStreamModelRuns();
+  
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [loadingText, setLoadingText] = useState("");
@@ -317,7 +321,10 @@ export default function BucketNamesSelect() {
 
   const handleChangeVpu = (e) => {
     resetVpu();
+    console.log(e[0].value);
     setSelectedVpu(e[0].value);
+    const needed_vpu = vpu_layers[e[0].value];
+    actions.set_current_geometry(needed_vpu);
     setSuccess(true);
   }
 

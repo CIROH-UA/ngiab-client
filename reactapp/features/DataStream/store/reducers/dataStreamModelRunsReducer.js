@@ -2,6 +2,7 @@ import { dataStreamModelRunActionsTypes } from '../actions/actionsTypes';
 
 const dataStreamModelRunsInitialStore = {
     state:{
+        current_geometry: null,
         model_runs: [],
         current_model_runs: [],
         base_model_id: null,
@@ -35,7 +36,15 @@ const dataStreamModelRunsReducer = (state, action) => {
                     ...state.state,
                     base_model_id: action.payload
                 }
-            }; 
+            };
+        case dataStreamModelRunActionsTypes.set_current_geometry:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    current_geometry: action.payload
+                }
+            };
         case dataStreamModelRunActionsTypes.reset:
             return dataStreamModelRunsInitialStore;
         default:

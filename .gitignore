@@ -46,3 +46,5 @@ coverage
 # singularity
 
 .*sif
+.data
+scripts/out

@@ -2,6 +2,7 @@ import { modelRunActionsTypes } from '../actions/actionsTypes';
 
 const modelRunsInitialStore = {
     state:{
+        current_geometry: null,
         model_runs: [],
         current_model_runs: [],
         base_model_id: null,
@@ -35,7 +36,15 @@ const modelRunsReducer = (state, action) => {
                     ...state.state,
                     base_model_id: action.payload
                 }
-            }; 
+            };
+        case modelRunActionsTypes.set_current_geometry:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    current_geometry: action.payload
+                }
+            };            
         case modelRunActionsTypes.reset:
             return modelRunsInitialStore;
         default:

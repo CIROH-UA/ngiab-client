@@ -5,8 +5,10 @@ import { Protocol } from 'pmtiles';
 import appAPI from 'services/api/app';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
+
 import useTheme from 'hooks/useTheme';
 import { toast } from 'react-toastify';
+
 
 const onMapLoad = (event) => {
   const map = event.target;
@@ -40,6 +42,7 @@ const onMapLoad = (event) => {
 const MapComponent = () => {
   const { state: hydroFabricState, actions: hydroFabricActions } = useHydroFabricContext();
   const { state: modelRunsState } = useModelRunsContext();
+  // const { state: dataStreamState } = useDataStreamModelRuns();
   const theme = useTheme();
   const mapRef = useRef(null);
 
@@ -279,7 +282,21 @@ const MapComponent = () => {
     };
   }, [theme, modelRunsState.base_model_id]);
 
+  // useEffect(() => {
+  //   // Reset highlights when geometry layers are hidden
+  //   const protocol = new Protocol({ metadata: true });
+  //   maplibregl.addProtocol('pmtiles', protocol.tile);
+  //   return () => {
+  //     maplibregl.removeProtocol('pmtiles');
+  //   };
+  // }, []);
 
+  useEffect(() => {
+    // Clear highlights when geometry changes
+    console.log('Geometry changed, resetting highlights.');
+    console.log(modelRunsState.current_geometry);
+  }, [modelRunsState.current_geometry]);
+  
   // ------------------------------------
   // ON CLICK: update state based on clicked layer
   // ------------------------------------
@@ -363,66 +380,90 @@ const MapComponent = () => {
   const sourceKey = isClustered ? 'clustered-nexus' : 'unclustered-nexus';
 
   return (
-    <Map
-      ref={mapRef}
-      initialViewState={{ longitude: -96, latitude: 40, zoom: 4 }}
-      style={{ width: '100%', height: '100%' }}
-      mapLib={maplibregl}
-      mapStyle={mapStyleUrl}
-      onClick={handleMapClick}
-      onLoad={onMapLoad}
+  <Map
+    ref={mapRef}
+    initialViewState={{ longitude: -96, latitude: 40, zoom: 4 }}
+    style={{ width: '100%', height: '100%' }}
+    mapLib={maplibregl}
+    mapStyle={mapStyleUrl}
+    onClick={handleMapClick}
+    onLoad={onMapLoad}
+  >
+    {/* Existing CONUS source (keep as-is) */}
+    <Source
+      id="conus"
+      type="vector"
+      url="pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles"
     >
-      <Source
-        id="conus"
-        type="vector"
-        url="pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles"
-      >
-        {catchmentConfig && <Layer {...catchmentConfig} />}
-        {flowPathsConfig && <Layer {...flowPathsConfig} />}
-        {conusGaugesConfig && <Layer {...conusGaugesConfig} />}
-        <Layer
-          id="catchment-highlight"
-          type="fill"
-          source="hydrofabric"
-          source-layer="conus_divides"
-          filter={selectedCatchmentId 
-            ? ['==', ['get', 'divide_id'], selectedCatchmentId]
-            : ['==', ['get', 'divide_id'], '']}
-          paint={{
-            'fill-color': '#ff0000',
-            'fill-outline-color': '#ffffff',
-            'fill-opacity': 0.5,
-          }}
-          layout={{ visibility: isCatchmentHidden ? 'none' : 'visible' }}
-        />
-      </Source>
+      {catchmentConfig && <Layer {...catchmentConfig} />}
+      {flowPathsConfig && <Layer {...flowPathsConfig} />}
+      {conusGaugesConfig && <Layer {...conusGaugesConfig} />}
+      <Layer
+        id="catchment-highlight"
+        type="fill"
+        source="hydrofabric"
+        source-layer="conus_divides"
+        filter={selectedCatchmentId 
+          ? ['==', ['get', 'divide_id'], selectedCatchmentId]
+          : ['==', ['get', 'divide_id'], '']}
+        paint={{
+          'fill-color': '#ff0000',
+          'fill-outline-color': '#ffffff',
+          'fill-opacity': 0.5,
+        }}
+        layout={{ visibility: isCatchmentHidden ? 'none' : 'visible' }}
+      />
+    </Source>
 
-      <Source
-          key={`nexus-source-${isClustered}`}
-          id="nexus-points"
-          type="geojson"
-          data={nexusPoints}
-          cluster={isClustered}
-          clusterRadius={50}
-          clusterMaxZoom={14}
-        >
-          {nexusLayers}
-        </Source>
+    {/* NEW: VPU_01 pmtiles from MinIO */}
+    <Source
+      id="vpu01"
+      type="vector"
+      url={`pmtiles://${modelRunsState.current_geometry}`}
+    >
+      {/* Example: divides from this pmtiles */}
+      <Layer
+        id="vpu01-divides"
+        type="fill"
+        source-layer="divides"
+        paint={{
+          'fill-color': 'rgba(0, 200, 0, 0.3)',
+          'fill-outline-color': 'rgba(0, 200, 0, 1)',
+        }}
+      />
+      {/* Example: flowpaths from this pmtiles */}
+      <Layer
+        id="vpu01-flowpaths"
+        type="line"
+        source-layer="flowpaths"
+        paint={{
+          'line-color': '#ff8800',
+          'line-width': 2,
+        }}
+      />
+      <Layer
+        id="vpu01-nexus"
+        type="circle"
+        source-layer="nexus"
+        paint={{
+          'circle-radius': 5,
+          'circle-color': '#0000ff',
+        }}
+      />
+    </Source>
 
-      {/* {nexusPoints && (
-        <Source
-          key={`nexus-source-${isClustered}`}
-          id="nexus-points"
-          type="geojson"
-          data={nexusPoints}
-          cluster={isClustered}
-          clusterRadius={50}
-          clusterMaxZoom={14}
-        >
-          {nexusLayers}
-        </Source>
-      )} */}
-    </Map>
+    <Source
+      key={`nexus-source-${isClustered}`}
+      id="nexus-points"
+      type="geojson"
+      data={nexusPoints}
+      cluster={isClustered}
+      clusterRadius={50}
+      clusterMaxZoom={14}
+    >
+      {nexusLayers}
+    </Source>
+  </Map>
   );
 };
 

@@ -9,6 +9,7 @@ const useModelRuns = () => {
         set_model_run_list: (model_run_list) => dispatch({ type: modelRunActionsTypes.set_model_run_list, payload: model_run_list }),
         set_current_model_runs: (current_model_runs_list) => dispatch({ type: modelRunActionsTypes.set_current_model_runs, payload: current_model_runs_list }),
         set_base_model_id: (base_model_id) => dispatch({ type: modelRunActionsTypes.set_base_model_id, payload: base_model_id }),
+        set_current_geometry: (geometry) => dispatch({ type: modelRunActionsTypes.set_current_geometry, payload: geometry }),
         reset: () => dispatch({ type: modelRunActionsTypes.reset }),
     };
     return { state, actions };
