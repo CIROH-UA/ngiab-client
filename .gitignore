@@ -48,3 +48,4 @@ coverage
 .*sif
 .data
 scripts/out
+scripts/convert_outputs
