@@ -181,7 +181,7 @@ gpkg_to_mbtiles() {
 
   echo ">> Merging into ${OUT_MB} …"
   tile-join -o "${OUT_MB}" --no-tile-size-limit "${MB_LIST[@]}"
-  echo "✅ Wrote ${OUT_MB}"
+  echo "Wrote ${OUT_MB}"
   return 0
 }
 
@@ -201,7 +201,7 @@ mkdir -p "$(dirname "${OUTPUT_PM}")"
 echo ">> Converting MBTiles to PMTiles: ${TMP_MB} -> ${OUTPUT_PM}"
 pmtiles convert "${TMP_MB}" "${OUTPUT_PM}"
 
-echo "✅ Done. Wrote PMTiles to ${OUTPUT_PM}"
+echo "Wrote PMTiles to ${OUTPUT_PM}"
 EOF
 
 RUN chmod +x /usr/local/bin/gpkg2pmtiles.sh
