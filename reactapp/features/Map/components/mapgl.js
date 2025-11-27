@@ -66,6 +66,7 @@ const MapComponent = () => {
       ? 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/dark-style.json'
       : 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/light-style.json';
 
+
   // Memoized layer config for catchments
   const catchmentConfig = useMemo(() => {
     if (!catchmentsFilterIds) return null;
@@ -127,7 +128,7 @@ const MapComponent = () => {
 
   // Memoized nexus layers
   const nexusLayers = useMemo(() => {
-    if (!nexusPoints || isNexusHidden) return null;
+    if (isNexusHidden) return null;
 
     const baseLayers = [];
     const highlightLayer = (
@@ -135,7 +136,7 @@ const MapComponent = () => {
         key="nexus-highlight"
         id="nexus-highlight"
         type="circle"
-        source="nexus-points"
+        source-layer="nexus"
         filter={selectedNexusId ? [
           'all',
           ['!', ['has', 'point_count']],
@@ -156,7 +157,7 @@ const MapComponent = () => {
           key="clusters"
           id="clusters"
           type="circle"
-          source="nexus-points"
+          source-layer="nexus"
           filter={['has', 'point_count']}
           paint={{
             'circle-color': [
@@ -183,7 +184,7 @@ const MapComponent = () => {
           key="cluster-count"
           id="cluster-count"
           type="symbol"
-          source="nexus-points"
+          source-layer="nexus"
           filter={['has', 'point_count']}
           layout={{
             'text-field': '{point_count_abbreviated}',
@@ -202,7 +203,7 @@ const MapComponent = () => {
           key="unclustered-point"
           id="unclustered-point"
           type="circle"
-          source="nexus-points"
+          source-layer="nexus"
           filter={['!', ['has', 'point_count']]}
           paint={{
             'circle-color': theme === 'dark' ? '#4f5b67' : '#1f78b4',
@@ -218,7 +219,7 @@ const MapComponent = () => {
           key="all-points"
           id="all-points"
           type="circle"
-          source="nexus-points"
+          source-layer="nexus"
           paint={{
             'circle-color': theme === 'dark' ? '#4f5b67' : '#1f78b4',
             'circle-radius': 7,
@@ -228,7 +229,7 @@ const MapComponent = () => {
         />
       );
     }
-
+    console.log('Nexus layers computed:', baseLayers, highlightLayer);
     return [...baseLayers, highlightLayer];
   }, [nexusPoints, isClustered, isNexusHidden, theme, selectedNexusId]);
 
@@ -296,6 +297,7 @@ const MapComponent = () => {
   // ON CLICK: update state based on clicked layer
   // ------------------------------------
   const handleMapClick = async (event) => {
+    console.log('Map clicked at:', event);
     const map = event.target;
     const isClusteredNow = !!hydroFabricState.nexus.geometry?.clustered;
 
@@ -306,7 +308,7 @@ const MapComponent = () => {
       if (isClusteredNow) layersToQuery.push('clusters');
     }
     if (!isCatchmentHidden) {
-      layersToQuery.push('catchments-layer');
+      layersToQuery.push('divides');
     }
     if (layersToQuery.length === 0) return;
 
@@ -390,7 +392,7 @@ const MapComponent = () => {
       type="vector"
       url="pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles"
     >
-      {catchmentConfig && <Layer {...catchmentConfig} />}
+      {/* {catchmentConfig && <Layer {...catchmentConfig} />}
       {flowPathsConfig && <Layer {...flowPathsConfig} />}
       {conusGaugesConfig && <Layer {...conusGaugesConfig} />}
       <Layer
@@ -407,7 +409,7 @@ const MapComponent = () => {
           'fill-opacity': 0.5,
         }}
         layout={{ visibility: isCatchmentHidden ? 'none' : 'visible' }}
-      />
+      /> */}
     </Source>
 
     {/* NEW: VPU_01 pmtiles from MinIO */}
@@ -418,7 +420,7 @@ const MapComponent = () => {
     >
       {/* Example: divides from this pmtiles */}
       <Layer
-        id="vpu01-divides"
+        id="divides"
         type="fill"
         source-layer="divides"
         paint={{
@@ -433,7 +435,7 @@ const MapComponent = () => {
      />
       {/* Example: flowpaths from this pmtiles */}
       <Layer
-        id="vpu01-flowpaths"
+        id="flowpaths"
         type="line"
         source-layer="flowpaths"
         paint={{
@@ -445,14 +447,15 @@ const MapComponent = () => {
 
     </Source>
     <Source
-      id="nexus-points"
+      id="nexus"
       type="vector"
       url={`pmtiles://${modelRunsState.current_geometry}`}
       cluster={true}
       clusterRadius={50}
       clusterMaxZoom={14}   
     >
-      <Layer
+      {nexusLayers}
+      {/* <Layer
           key="clusters"
           id="clusters"
           type="circle"
@@ -509,20 +512,10 @@ const MapComponent = () => {
             'circle-stroke-width': 2,
             'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
           }}
-        />
+        /> */}
 
     </Source>
-    {/* <Source
-      key={`nexus-source-${isClustered}`}
-      id="nexus-points"
-      type="geojson"
-      data={nexusPoints}
-      cluster={isClustered}
-      clusterRadius={50}
-      clusterMaxZoom={14}
-    >
-      {nexusLayers}
-    </Source> */}
+
   </Map>
   );
 };

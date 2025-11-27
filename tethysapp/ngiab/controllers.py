@@ -1,6 +1,8 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 import pandas as pd
 import os
+import io
+import pyarrow as pa
 import json
 import geopandas as gpd
 from tethys_sdk.routing import controller
@@ -35,9 +37,13 @@ from .datastream_utils import (
     get_datastream_id_from_conf_file,
     check_if_s3_file_exists
 )
-
+from .data_utils import (
+    convert_nc_2_df,
+    convert_df_2_bytes,
+)
 from .app import App
 from botocore.exceptions import ClientError, BotoCoreError
+import logging
 
 # the following error is fixed with this lines
 # https://stackoverflow.com/a/79163867
@@ -45,6 +51,8 @@ import pyproj
 
 pyproj.network.set_network_enabled(False)
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 @controller
 def home(request):
@@ -159,7 +167,58 @@ def getGeoSpatialData(request):
 
 
 @controller
+def getParquetPerVpu(request):
+    breakpoint()
+    print("Getting parquet file per vpu...")
+    file_prefix_list =  json.loads(request.body.decode("utf-8"))['nc_files']
+    vpu_gpkg = json.loads(request.body.decode("utf-8"))['vpu_gpkg']
+    dfs = []
+    for file_prefix in file_prefix_list:
+        df = convert_nc_2_df(
+            s3_nc_url=file_prefix,
+            s3_gpkg_url=vpu_gpkg,
+        )
+        dfs.append(df)
+    complete_df = pd.concat(dfs, ignore_index=True)
+    print(complete_df.head())
+    # 👉 Convert to Arrow Table
+    table = pa.Table.from_pandas(complete_df)
+
+    # 👉 Write as Arrow IPC stream
+    buf = io.BytesIO()
+    with pa.ipc.new_stream(buf, table.schema) as writer:
+        writer.write_table(table)
+    buf.seek(0)
+
+    return HttpResponse(
+        buf.read(),
+        content_type="application/vnd.apache.arrow.stream",
+    )
+
+
+
+@controller
 def getNexusTimeSeries(request):
+    
+    nexus_id = request.GET.get("nexus_id")
+    logger.info(f"Requested nexus_id: {nexus_id}")
+    return JsonResponse(
+        {
+            "data": [],
+            "layout": {
+                "yaxis": "Streamflow",
+                "xaxis": "",
+                "title": "",
+            },
+            "nexus_ids": [],
+            "usgs_id": None,
+        }
+    )
+    # return JsonResponse({"nexus_variables": vars})
+
+
+@controller
+def getNexusTimeSeries2(request):
     model_run_id = request.GET.get("model_run_id")
     nexus_id = request.GET.get("nexus_id")
     base_output_path = get_base_output(model_run_id)
@@ -206,9 +265,13 @@ def getNexusTimeSeries(request):
         }
     )
 
-
 @controller
 def getTrouteVariables(request):
+    vars = []
+    return JsonResponse({"troute_variables": vars})    
+
+@controller
+def getTrouteVariables2(request):
     vars = []
     model_run_id = request.GET.get("model_run_id")
     troute_id = request.GET.get("troute_id")

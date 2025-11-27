@@ -6,8 +6,11 @@ import SelectComponent from './selectComponent';
 import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import { useDataStreamModelRuns } from '../hooks/useDataStreamModelRuns';
 import { toast } from 'react-toastify';
-import { vpu_layers } from './config';
+import { vpu_layers } from '../lib/config';
+import { makePrefix, listPublicS3Files } from '../lib/s3Utils';
+import { loadVpuData } from "features/DataStream/lib/vpuDataLoader";
 
+const BUCKET = 'ciroh-community-ngen-datastream';
 const StyledButton = styled(Button)`
   
   background-color: rgba(255, 255, 255, 0.1);
@@ -319,9 +322,58 @@ export default function BucketNamesSelect() {
   }
 
 
-  const handleChangeVpu = (e) => {
+  const handleChangeVpu = async (e) => {
+    const vpu = e[0].value;
+    // handleLoading("Loading Parquet File For VPU...");
     resetVpu();
-    console.log(e[0].value);
+    const base_prefix = makePrefix(selectedDate, selectedForecast, selectedCycle, selectedEnsemble, e[0].value);
+    const files_prefix = await listPublicS3Files(base_prefix);
+    const nc_files = files_prefix.filter(f => f.endsWith('.nc'));
+    const nc_files_parsed = nc_files.map(f => `s3://${BUCKET}/${f}`);
+
+    try {
+      const vpu_gpkg = `s3://ciroh-community-ngen-datastream/v2.2_resources/${vpu}/config/nextgen_${vpu}.gpkg`;
+
+      // 👇 cacheKey ties cache to this forecast/VPU
+      const rows = await loadVpuData({
+        cacheKey: base_prefix,
+        nc_files: nc_files_parsed,
+        vpu_gpkg,
+      });
+
+      console.log("Rows from duckdb:", rows.slice(0, 5));
+
+      // TODO: put rows in state your charts/tables use
+      // setVpuRows(rows);
+
+      setSelectedVpu(vpu);
+      const needed_vpu = vpu_layers[vpu];
+      actions.set_current_geometry(needed_vpu);
+      setSuccess(true);
+      handleSuccess();
+    } catch (error) {
+      console.error("Failed", error);
+      setSelectedVpu("");
+      handleError("Error Loading Parquet File For VPU...");
+    }
+
+    // appAPI.getParquetFilePerVpu(
+    //   {
+    //     'nc_files': nc_files_parsed,
+    //     'vpu_gpkg': `s3://ciroh-community-ngen-datastream/v2.2_resources/${e[0].value}/config/nextgen_${e[0].value}.gpkg`,
+    //   },
+ 
+    //   // {"X-CSRFTOKEN": tethysAPI.getCSRF()}
+    // )
+    // .then((data) => {
+    //       console.log(data)
+    //       handleSuccess();
+    //     })
+    //     .catch((error) => {
+    //       setSelectedVpu("");
+    //       handleError("Error Loading Parquet File For VPU...");
+    //       console.error('Failed', error);
+    //     }); 
     setSelectedVpu(e[0].value);
     const needed_vpu = vpu_layers[e[0].value];
     actions.set_current_geometry(needed_vpu);

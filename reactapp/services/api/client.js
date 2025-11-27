@@ -5,6 +5,9 @@ import tethysAPI from 'services/api/tethys';
 
 const TETHYS_PORTAL_HOST = getTethysPortalHost();
 
+axios.defaults.xsrfHeaderName = "X-CSRFTOKEN"
+axios.defaults.xsrfCookieName = "csrftoken"
+
 const apiClient = axios.create({
   baseURL: `${TETHYS_PORTAL_HOST}`,
   // withCredentials: true,

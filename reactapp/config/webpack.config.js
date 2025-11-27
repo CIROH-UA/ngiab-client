@@ -84,13 +84,25 @@ module.exports = (env, argv) => {
 			minimize: true,
 		},
 		devServer: {
-			proxy: {
-				'!/static/ngiab/frontend/**': {
-					target: 'http://127.0.0.1:8000', // points to django dev server
-					changeOrigin: true,
+			proxy: [
+				{
+				// Proxy every request *except* your frontend bundle path
+				context: (pathname) => !pathname.startsWith('/static/ngiab/frontend/'),
+				target: 'http://127.0.0.1:8000',
+				changeOrigin: true,
 				},
-			},
+			],
 			open: true,
-		},
+		}
+ 
+		// devServer: {
+		// 	proxy: {
+		// 		'!/static/ngiab/frontend/**': {
+		// 			target: 'http://127.0.0.1:8000', // points to django dev server
+		// 			changeOrigin: true,
+		// 		},
+		// 	},
+		// 	open: true,
+		// },
 	}
 };
