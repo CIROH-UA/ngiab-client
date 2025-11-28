@@ -1,14 +1,13 @@
 import { Fragment, useState,Suspense, useEffect } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
-import { ModelRunsProvider } from 'features/ModelRuns/providers/modelRunsProvider';
-// import { DataStreamModelRunsProvider } from 'features/DataStream/providers/dataStreamModelRunsProvider';
+import { DataStreamProvider } from 'features/DataStream/providers/dataStreamProvider';
+import {useDataStreamContext} from 'features/DataStream/hooks/useDataStreamContext';
 import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
 import { ToastContainer } from 'react-toastify';
-import Button from 'react-bootstrap/Button';
 import styled from 'styled-components';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 import HydroFabricView from '../ngiab/hydroFabricView.js';
-import MapComponent from 'features/Map/components/mapgl.js';
+import MapComponent from 'features/Map/components/mapg.js';
 import DataStreamMenuView from 'features/DataStream/views/dataStreamMenuView.js';
 import appAPI from 'services/api/app';
 
@@ -44,15 +43,17 @@ const DataStreamView = () => {
 
   return (
     <ViewContainer>
-        <ModelRunsProvider>
+        <DataStreamProvider>
           <HydroFabricProvider>
             <ToastContainer stacked  />
 
               <MapContainer 
                 $fullScreen={singleRowOn}
               >
-                <MapComponent />
-              </MapContainer>
+                <MapComponent  
+                  cs_context={useDataStreamContext}
+                />
+              </MapContainer >
               <DataStreamMenuView
                   toggleSingleRow={toggleSingleRow} 
                   setIsLoading={setIsLoading}
@@ -72,7 +73,7 @@ const DataStreamView = () => {
                 </Suspense>
               </HydroFabricContainer>
           </HydroFabricProvider>
-        </ModelRunsProvider>
+        </DataStreamProvider>
 
 
     </ViewContainer>

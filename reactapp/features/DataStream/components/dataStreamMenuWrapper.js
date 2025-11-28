@@ -4,7 +4,7 @@ import Button from 'react-bootstrap/Button';
 
 import DataStreamMenu from 'features/DataStream/components/dataStreamMenu';
 import HydrofabricLayerMenu from 'features/DataStream/components/hydroFabricLayerMenu';
-import HydroFabricSelectMenu from 'features/DataStream/components/hydroFabricSelectMenu';
+// import HydroFabricSelectMenu from 'features/DataStream/components/hydroFabricSelectMenu';
 import HydroFabricTimeSeriesMenu from 'features/DataStream/components/hydroFabricTimeSeriesMenu';
 
 import { IoMdClose } from "react-icons/io";
@@ -103,13 +103,13 @@ const DataStreamMenuWrapper = ({
             currentMenu={currentMenu}
         />
           
-        <HydroFabricSelectMenu
+        {/* <HydroFabricSelectMenu
           isopen={isHydroFabricSelectOpen}
           handleIsOpen={handleHydroSelectMenu}
           toggleSingleRow={toggleSingleRow}
           setIsLoading={setIsLoading}
           currentMenu={currentMenu}
-        />
+        /> */}
         <HydroFabricTimeSeriesMenu
           toggleSingleRow={toggleSingleRow}
           currentMenu={currentMenu}

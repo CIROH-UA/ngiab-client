@@ -1,39 +1,3 @@
-// const CACHE_DIR = "ngiab-arrow-cache";
-
-// async function getCacheDir() {
-//   if (!("storage" in navigator) || !navigator.storage.getDirectory) {
-//     // OPFS not supported (non-Chromium, non-https, etc.)
-//     return null;
-//   }
-//   const root = await navigator.storage.getDirectory();
-//   return await root.getDirectoryHandle(CACHE_DIR, { create: true });
-// }
-
-// export async function saveArrowToCache(key, buffer) {
-//   const dir = await getCacheDir();
-//   if (!dir) return; // no-op if OPFS unavailable
-
-//   const safeName = encodeURIComponent(key) + ".arrow";
-//   const fileHandle = await dir.getFileHandle(safeName, { create: true });
-//   const writable = await fileHandle.createWritable();
-//   await writable.write(buffer);
-//   await writable.close();
-// }
-
-// export async function loadArrowFromCache(key) {
-//   const dir = await getCacheDir();
-//   if (!dir) return null;
-
-//   const safeName = encodeURIComponent(key) + ".arrow";
-//   try {
-//     const fileHandle = await dir.getFileHandle(safeName);
-//     const file = await fileHandle.getFile();
-//     return await file.arrayBuffer();
-//   } catch (e) {
-//     return null; // cache miss
-//   }
-// }
-
 const CACHE_DIR = "ngiab-arrow-cache";
 
 async function getCacheDir() {

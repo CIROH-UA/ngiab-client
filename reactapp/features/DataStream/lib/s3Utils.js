@@ -15,6 +15,12 @@ export async function listPublicS3Files(prefix = "v2.2/") {
     const url =
         `https://${bucket}.s3.us-east-1.amazonaws.com` +
         `/?list-type=2&prefix=${encodeURIComponent(prefix)}`;
+    // const targetUrl =
+    //     `https://${bucket}.s3.us-east-1.amazonaws.com/` +
+    //     `?list-type=2&prefix=${encodeURIComponent(prefix)}`;
+
+    // // encode the whole target URL as the value of `url=`
+    // const url = `https://api.cors.lol/?url=${encodeURIComponent(targetUrl)}`;
 
     const resp = await fetch(url);
     const xml = await resp.text();

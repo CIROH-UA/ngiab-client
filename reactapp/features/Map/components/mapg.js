@@ -3,8 +3,8 @@ import maplibregl from 'maplibre-gl';
 import Map, { Source, Layer } from 'react-map-gl/maplibre';
 import { Protocol } from 'pmtiles';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
-import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
 import useTheme from 'hooks/useTheme';
+import { getFlowTimeseriesForNexus } from "features/DataStream/lib/nexusTimeseries";
 
 
 
@@ -37,9 +37,11 @@ const onMapLoad = (event) => {
   });
 };
 
-const MapComponent = () => {
-  const { state: hydroFabricState, actions: hydroFabricActions } = useHydroFabricContext();
-  const { state: modelRunsState } = useModelRunsContext();
+const MapComponent = ({
+  cs_context
+ }) => {
+  const { state: hf_state, actions: hs_actions } = useHydroFabricContext();
+  const { state: cs_state } = cs_context();
   
   const theme = useTheme();
   const mapRef = useRef(null);
@@ -55,9 +57,9 @@ const MapComponent = () => {
   const [nexusFilterIds, setNexusFilterIds] = useState(null);
 
   // Derived booleans from store
-  const isClustered = hydroFabricState.nexus.geometry.clustered;
-  const isNexusHidden = hydroFabricState.nexus.geometry.hidden;
-  const isCatchmentHidden = hydroFabricState.catchment.geometry.hidden; // default false
+  const isClustered = hf_state.nexus.geometry.clustered;
+  const isNexusHidden = hf_state.nexus.geometry.hidden;
+  const isCatchmentHidden = hf_state.catchment.geometry.hidden; // default false
 
   const mapStyleUrl =
     theme === 'dark'
@@ -238,13 +240,13 @@ const MapComponent = () => {
   //   const protocol = new Protocol({ metadata: true });
   //   maplibregl.addProtocol('pmtiles', protocol.tile);
 
-  //   if (!modelRunsState.base_model_id) return;
+  //   if (!cs_state.base_model_id) return;
 
-  //   appAPI.getGeoSpatialData({ model_run_id: modelRunsState.base_model_id })
+  //   appAPI.getGeoSpatialData({ model_run_id: cs_state.base_model_id })
   //     .then((response) => {
   //       if (response.error) {
   //         toast.error("Error fetching Model Run Data", { autoClose: 1000 });
-  //         hydroFabricActions.reset();
+  //         hs_actions.reset();
   //         setNexusPoints(null);
   //         setCatchmentsFilterIds(null);
   //         setFlowPathsFilterIds(null);
@@ -274,7 +276,7 @@ const MapComponent = () => {
   //   return () => {
   //     maplibregl.removeProtocol('pmtiles');
   //   };
-  // }, [theme, modelRunsState.base_model_id]);
+  // }, [theme, cs_state.base_model_id]);
 
   useEffect(() => {
     // Reset highlights when geometry layers are hidden
@@ -288,8 +290,8 @@ const MapComponent = () => {
   useEffect(() => {
     // Clear highlights when geometry changes
     console.log('Geometry changed, resetting highlights.');
-    console.log(modelRunsState.current_geometry);
-  }, [modelRunsState.current_geometry]);
+    console.log(cs_state.geometry);
+  }, [cs_state.geometry]);
   
   // ------------------------------------
   // ON CLICK: update state based on clicked layer
@@ -297,7 +299,7 @@ const MapComponent = () => {
   const handleMapClick = async (event) => {
     console.log('Map clicked at:', event);
     const map = event.target;
-    const isClusteredNow = !!hydroFabricState.nexus.geometry?.clustered;
+    const isClusteredNow = !!hf_state.nexus.geometry?.clustered;
 
     // Build layersToQuery based on current hidden states
     const layersToQuery = [];
@@ -315,27 +317,40 @@ const MapComponent = () => {
 
     for (const feature of features) {
       const layerId = feature.layer.id;
-
+      console.log('Clicked feature from layer:', layerId, feature);
       if (layerId === 'all-points' || layerId === 'unclustered-point') {
-        // Clicked a nexus point.
-        hydroFabricActions.reset_teehr();
-        hydroFabricActions.reset_troute();
 
         const nexusId = feature.properties.id;
-        hydroFabricActions.set_nexus_id(nexusId);
-        hydroFabricActions.set_troute_id(nexusId);
-        setSelectedNexusId(nexusId);
-        setSelectedCatchmentId(null);
+        try {
+          const series = await getFlowTimeseriesForNexus(nexusId);
+          // Now you have [{ time, flow }, ...] — feed to visx, table, etc.
+          // Example:
+          // setSelectedNexusId(nexusId);
+          // setNexusFlowSeries(series);
 
-        // When clicking a nexus point, ensure catchments remain hidden.
-        if (!isNexusHidden) {
-          hydroFabricActions.show_nexus_geometry();
+          console.log("Flow timeseries for", nexusId, series.slice(0, 5));
+        } catch (err) {
+          console.error("Failed to load timeseries for", nexusId, err);
         }
+        // Clicked a nexus point.
+        // hs_actions.reset_teehr();
+        // hs_actions.reset_troute();
 
-        if (feature.properties.ngen_usgs !== 'none') {
-          hydroFabricActions.set_teehr_id(feature.properties.ngen_usgs);
-        }
-        return;
+        // const nexusId = feature.properties.id;
+        // hs_actions.set_nexus_id(nexusId);
+        // hs_actions.set_troute_id(nexusId);
+        // setSelectedNexusId(nexusId);
+        // setSelectedCatchmentId(null);
+
+        // // When clicking a nexus point, ensure catchments remain hidden.
+        // if (!isNexusHidden) {
+        //   hs_actions.show_nexus_geometry();
+        // }
+
+        // if (feature.properties.ngen_usgs !== 'none') {
+        //   hs_actions.set_teehr_id(feature.properties.ngen_usgs);
+        // }
+        // return;
       }
       
       if (layerId === 'clusters') {
@@ -352,18 +367,18 @@ const MapComponent = () => {
       
       if (layerId === 'catchments-layer') {
         // Clicked a catchment.
-        hydroFabricActions.reset_teehr();
-        hydroFabricActions.reset_troute();
+        hs_actions.reset_teehr();
+        hs_actions.reset_troute();
 
         const divideId = feature.properties.divide_id;
-        hydroFabricActions.set_catchment_id(divideId);
-        hydroFabricActions.set_troute_id(divideId);
+        hs_actions.set_catchment_id(divideId);
+        hs_actions.set_troute_id(divideId);
         setSelectedCatchmentId(divideId);
         setSelectedNexusId(null);
 
         // When clicking a catchment, ensure nexus remains hidden.
         if (!isCatchmentHidden) {
-          hydroFabricActions.show_catchment_geometry();
+          hs_actions.show_catchment_geometry();
         }
         
         return;
@@ -390,31 +405,13 @@ const MapComponent = () => {
       type="vector"
       url="pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles"
     >
-      {/* {catchmentConfig && <Layer {...catchmentConfig} />}
-      {flowPathsConfig && <Layer {...flowPathsConfig} />}
-      {conusGaugesConfig && <Layer {...conusGaugesConfig} />}
-      <Layer
-        id="catchment-highlight"
-        type="fill"
-        source="hydrofabric"
-        source-layer="conus_divides"
-        filter={selectedCatchmentId 
-          ? ['==', ['get', 'divide_id'], selectedCatchmentId]
-          : ['==', ['get', 'divide_id'], '']}
-        paint={{
-          'fill-color': '#ff0000',
-          'fill-outline-color': '#ffffff',
-          'fill-opacity': 0.5,
-        }}
-        layout={{ visibility: isCatchmentHidden ? 'none' : 'visible' }}
-      /> */}
     </Source>
 
     {/* NEW: VPU_01 pmtiles from MinIO */}
     <Source
       id="vpu01"
       type="vector"
-      url={`pmtiles://${modelRunsState.current_geometry}`}
+      url={`pmtiles://${cs_state.geometry}`}
     >
       {/* Example: divides from this pmtiles */}
       <Layer
@@ -447,7 +444,7 @@ const MapComponent = () => {
     <Source
       id="nexus"
       type="vector"
-      url={`pmtiles://${modelRunsState.current_geometry}`}
+      url={`pmtiles://${cs_state.geometry}`}
       cluster={true}
       clusterRadius={50}
       clusterMaxZoom={14}   
@@ -462,63 +459,3 @@ const MapComponent = () => {
 };
 
 export default MapComponent;
-
-
-{/* <Layer
-    key="clusters"
-    id="clusters"
-    type="circle"
-    source-layer="nexus"
-    filter={['has', 'point_count']}
-    paint={{
-      'circle-color': [
-        'step',
-        ['get', 'point_count'],
-        '#51bbd6' ,
-        10,
-        '#6610f2',
-        50,
-        '#20c997',
-      ],
-      'circle-radius': [
-        'step',
-        ['get', 'point_count'],
-        15,
-        10,
-        25,
-        50,
-        35,
-      ],
-    }}
-  />
-  <Layer
-    key="cluster-count"
-    id="cluster-count"
-    type="symbol"
-    source-layer="nexus"
-    filter={['has', 'point_count']}
-    layout={{
-      'text-field': '{point_count_abbreviated}',
-      'text-font': ['Noto Sans Regular'],
-      'text-size': 12,
-      'text-anchor': 'center',
-      'text-justify': 'center',
-      'symbol-placement': 'point',
-    }}
-    paint={{
-      'text-color': '#ffffff',
-    }}
-  />
-  <Layer
-    key="unclustered-point"
-    id="unclustered-point"
-    type="circle"
-    source-layer="nexus"
-    filter={['!', ['has', 'point_count']]}
-    paint={{
-      'circle-color': theme === 'dark' ? '#4f5b67' : '#1f78b4',
-      'circle-radius': 7,
-      'circle-stroke-width': 2,
-      'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
-    }}
-  /> */}

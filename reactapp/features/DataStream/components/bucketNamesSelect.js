@@ -3,12 +3,13 @@ import styled from 'styled-components';
 import { Button, Spinner} from 'react-bootstrap';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
-import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
-import { useDataStreamModelRuns } from '../hooks/useDataStreamModelRuns';
+// import { useModelRunsContext } from 'features/ModelRuns/hooks/useModelRunsContext';
+// import { useDataStream } from '../hooks/useDataStream';
 import { toast } from 'react-toastify';
 import { vpu_layers } from '../lib/config';
 import { makePrefix, listPublicS3Files } from '../lib/s3Utils';
-import { loadVpuData } from "features/DataStream/lib/vpuDataLoader";
+import { loadVpuData, debugVpuTable, debugFeatureIds, debugSingleFeatureId  } from "features/DataStream/lib/vpuDataLoader";
+import { useDataStreamContext } from '../hooks/useDataStreamContext';
 
 const BUCKET = 'ciroh-community-ngen-datastream';
 const StyledButton = styled(Button)`
@@ -73,9 +74,9 @@ export default function BucketNamesSelect() {
   const [selectedCycle, setSelectedCycle] = useState(null);
   const [selectedEnsemble, setSelectedEnsemble] = useState(null);
 
-  const {state,actions} = useModelRunsContext();
+  // const {state,actions} = useModelRunsContext();
 
-  // const {state: dsState, actions: dsActions} = useDataStreamModelRuns();
+  const {state: dsState, actions: dsActions} = useDataStreamContext();
   
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -153,28 +154,29 @@ export default function BucketNamesSelect() {
     }
 
 
-    appAPI.getDataStreamTarFile(params)
-    .then((data) => {
-          if (data.error) {
-            handleError("Error fetching Datastream Data");
-            return;
-          }
-          if (data.msg){
-            handleError(data.msg);
-            return;
-          }
-          actions.set_base_model_id(data.id);
-          handleSuccess();
-          // toast.success("Successfully retrieved Model Run Data", { autoClose: 1000 });
-        })
-        .catch((error) => {
-          handleError("Error Loading Datastream Data");
-          console.error('Failed', error);
-        });
+    // appAPI.getDataStreamTarFile(params)
+    // .then((data) => {
+    //       if (data.error) {
+    //         handleError("Error fetching Datastream Data");
+    //         return;
+    //       }
+    //       if (data.msg){
+    //         handleError(data.msg);
+    //         return;
+    //       }
+    //       actions.set_base_model_id(data.id);
+    //       handleSuccess();
+    //       // toast.success("Successfully retrieved Model Run Data", { autoClose: 1000 });
+    //     })
+    //     .catch((error) => {
+    //       handleError("Error Loading Datastream Data");
+    //       console.error('Failed', error);
+    //     });
   }
 
   const handleChangeDate = (e) => {
     handleLoading("Loading Available Forecast...");
+    dsActions.set_date(e[0].value);
     setSelectedDate(e[0].value);
     resetDates();
     const params = {
@@ -204,6 +206,7 @@ export default function BucketNamesSelect() {
     }
     resetForecast();
     setSelectedForecast(e[0].value);
+    dsActions.set_forecast(e[0].value);
     
 
     const GETCYCLES = isMoreRecent(selectedDate.split(".")[1]);
@@ -254,6 +257,7 @@ export default function BucketNamesSelect() {
       ngen_forecast: selectedForecast,
       ngen_cycle: e[0].value,
     }
+    dsActions.set_cycle(e[0].value);
     resetCycle();
     setSelectedCycle(e[0].value);
     // if (selectedForecast === 'medium_range'){
@@ -303,6 +307,7 @@ export default function BucketNamesSelect() {
       ngen_cycle: selectedCycle,
       ngen_ensemble: e[0].value,
     }
+    dsActions.set_time(e[0].value);
     resetEnsemble();
     setSelectedEnsemble(e[0].value);
     appAPI.getDataStreamNgiabAvailableVpus(params)
@@ -328,27 +333,31 @@ export default function BucketNamesSelect() {
     resetVpu();
     const base_prefix = makePrefix(selectedDate, selectedForecast, selectedCycle, selectedEnsemble, e[0].value);
     const files_prefix = await listPublicS3Files(base_prefix);
+    console.log("files_prefix", files_prefix);
     const nc_files = files_prefix.filter(f => f.endsWith('.nc'));
     const nc_files_parsed = nc_files.map(f => `s3://${BUCKET}/${f}`);
 
     try {
       const vpu_gpkg = `s3://ciroh-community-ngen-datastream/v2.2_resources/${vpu}/config/nextgen_${vpu}.gpkg`;
 
+
       // 👇 cacheKey ties cache to this forecast/VPU
-      const rows = await loadVpuData({
-        cacheKey: base_prefix,
+      // const rows = await loadVpuData({
+      await loadVpuData({
+        baseCacheKey: base_prefix,
         nc_files: nc_files_parsed,
         vpu_gpkg,
       });
-
-      console.log("Rows from duckdb:", rows.slice(0, 5));
-
-      // TODO: put rows in state your charts/tables use
-      // setVpuRows(rows);
+      await debugVpuTable();
+      await debugFeatureIds()
+      await debugSingleFeatureId(1012584);
+      dsActions.set_cache_key(base_prefix);
+      dsActions.set_vpu(vpu);
 
       setSelectedVpu(vpu);
       const needed_vpu = vpu_layers[vpu];
-      actions.set_current_geometry(needed_vpu);
+      // actions.set_current_geometry(needed_vpu);
+      dsActions.set_geometry(needed_vpu);
       setSuccess(true);
       handleSuccess();
     } catch (error) {
@@ -374,10 +383,10 @@ export default function BucketNamesSelect() {
     //       handleError("Error Loading Parquet File For VPU...");
     //       console.error('Failed', error);
     //     }); 
-    setSelectedVpu(e[0].value);
-    const needed_vpu = vpu_layers[e[0].value];
-    actions.set_current_geometry(needed_vpu);
-    setSuccess(true);
+    // setSelectedVpu(e[0].value);
+    // const needed_vpu = vpu_layers[e[0].value];
+    // actions.set_current_geometry(needed_vpu);
+    // setSuccess(true);
   }
 
   useEffect(() => {    

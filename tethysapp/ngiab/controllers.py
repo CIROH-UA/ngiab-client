@@ -168,7 +168,7 @@ def getGeoSpatialData(request):
 
 @controller
 def getParquetPerVpu(request):
-    breakpoint()
+    # breakpoint()
     print("Getting parquet file per vpu...")
     file_prefix_list =  json.loads(request.body.decode("utf-8"))['nc_files']
     vpu_gpkg = json.loads(request.body.decode("utf-8"))['vpu_gpkg']
@@ -180,11 +180,10 @@ def getParquetPerVpu(request):
         )
         dfs.append(df)
     complete_df = pd.concat(dfs, ignore_index=True)
+    # breakpoint()
     print(complete_df.head())
-    # 👉 Convert to Arrow Table
     table = pa.Table.from_pandas(complete_df)
 
-    # 👉 Write as Arrow IPC stream
     buf = io.BytesIO()
     with pa.ipc.new_stream(buf, table.schema) as writer:
         writer.write_table(table)
