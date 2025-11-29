@@ -2,11 +2,12 @@ import { Fragment, useState,Suspense, useEffect } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
 import { DataStreamProvider } from 'features/DataStream/providers/dataStreamProvider';
 import {useDataStreamContext} from 'features/DataStream/hooks/useDataStreamContext';
+import useTimeSeriesStore from 'features/DataStream/store/timeseries';
 import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
 import { ToastContainer } from 'react-toastify';
 import styled from 'styled-components';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
-import HydroFabricView from '../ngiab/hydroFabricView.js';
+import HydroFabricView from '../ngiab/ts.js';
 import MapComponent from 'features/Map/components/mapg.js';
 import DataStreamMenuView from 'features/DataStream/views/dataStreamMenuView.js';
 import appAPI from 'services/api/app';
@@ -52,6 +53,7 @@ const DataStreamView = () => {
               >
                 <MapComponent  
                   cs_context={useDataStreamContext}
+                  ts_store={useTimeSeriesStore}
                 />
               </MapContainer >
               <DataStreamMenuView
@@ -59,9 +61,7 @@ const DataStreamView = () => {
                   setIsLoading={setIsLoading}
                   setIsDataStreamMenuOpen={setIsDataStreamMenuOpen}
                   singleRowOn={singleRowOn}
-              />
-
-              
+              />              
               <HydroFabricContainer 
                 $fullScreen={singleRowOn} 
                 isModelRunListOpen={isDataStreamMenuOpen}  

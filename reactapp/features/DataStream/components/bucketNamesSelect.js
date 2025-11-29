@@ -340,17 +340,12 @@ export default function BucketNamesSelect() {
     try {
       const vpu_gpkg = `s3://ciroh-community-ngen-datastream/v2.2_resources/${vpu}/config/nextgen_${vpu}.gpkg`;
 
-
-      // 👇 cacheKey ties cache to this forecast/VPU
-      // const rows = await loadVpuData({
       await loadVpuData({
         baseCacheKey: base_prefix,
         nc_files: nc_files_parsed,
         vpu_gpkg,
       });
-      await debugVpuTable();
-      await debugFeatureIds()
-      await debugSingleFeatureId(1012584);
+
       dsActions.set_cache_key(base_prefix);
       dsActions.set_vpu(vpu);
 

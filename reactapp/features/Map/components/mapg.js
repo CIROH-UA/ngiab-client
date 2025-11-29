@@ -5,7 +5,7 @@ import { Protocol } from 'pmtiles';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import useTheme from 'hooks/useTheme';
 import { getFlowTimeseriesForNexus } from "features/DataStream/lib/nexusTimeseries";
-
+import { debugSingleFeatureId } from 'features/DataStream/lib/vpuDataLoader';
 
 
 const onMapLoad = (event) => {
@@ -38,9 +38,12 @@ const onMapLoad = (event) => {
 };
 
 const MapComponent = ({
-  cs_context
+  cs_context,
+  ts_store
  }) => {
   const { state: hf_state, actions: hs_actions } = useHydroFabricContext();
+  const set_series = ts_store((state) => state.set_series);
+
   const { state: cs_state } = cs_context();
   
   const theme = useTheme();
@@ -320,9 +323,11 @@ const MapComponent = ({
       console.log('Clicked feature from layer:', layerId, feature);
       if (layerId === 'all-points' || layerId === 'unclustered-point') {
 
-        const nexusId = feature.properties.id;
+        const featureId = feature.properties.id;
+        const nexusId = featureId.split('-')[1];
         try {
           const series = await getFlowTimeseriesForNexus(nexusId);
+          set_series(series);
           // Now you have [{ time, flow }, ...] — feed to visx, table, etc.
           // Example:
           // setSelectedNexusId(nexusId);

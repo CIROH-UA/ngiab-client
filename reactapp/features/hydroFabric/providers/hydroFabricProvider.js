@@ -7,14 +7,6 @@ export const HydroFabricProvider = ({ children }) => {
   const {state,actions} = useHydroFabric();
 
 
-  useEffect(() => {
-
-    return  () => {
-
-    }
-
-  }, []);
-
 
   return (
     <HydroFabricContext.Provider value={{ ...state, actions }}>  
