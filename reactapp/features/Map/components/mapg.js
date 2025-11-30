@@ -327,7 +327,11 @@ const MapComponent = ({
         const nexusId = featureId.split('-')[1];
         try {
           const series = await getFlowTimeseriesForNexus(nexusId);
-          set_series(series);
+          const xy = series.map(d => ({
+            x: new Date(d.time),
+            y: d.flow,
+          }));
+          set_series(xy);
           // Now you have [{ time, flow }, ...] — feed to visx, table, etc.
           // Example:
           // setSelectedNexusId(nexusId);

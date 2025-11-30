@@ -1,5 +1,5 @@
 // LineChart.js
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo, useEffect, useState } from 'react';
 import { Zoom, applyMatrixToPoint } from '@visx/zoom';
 import { Group } from '@visx/group';
 import { scaleLinear, scaleTime } from '@visx/scale';
@@ -21,11 +21,11 @@ import { lightTheme, darkTheme } from '@visx/xychart';
 import useTheme from 'hooks/useTheme'; // ← adjust the path if needed
 
 // Function to get units for common variables
-  const getVariableUnits = (variableName) => {
-    if (!variableName) return '';
-    console.log(variableName);
-    
-    const variableUnits = {
+const getVariableUnits = (variableName) => {
+  if (!variableName) return '';
+  // console.log(variableName);
+  
+  const variableUnits = {
     'rain_rate': 'mm/h',
     'giuh_runoff': 'mm',
     'infiltration_excess': '',
@@ -47,21 +47,37 @@ import useTheme from 'hooks/useTheme'; // ← adjust the path if needed
     'depth': 'm',
     'nudge': 'm³/s',
     'streamflow': 'm³/s',
-  };
-    const variable = variableName.toLowerCase();
-    return variableUnits[variable] ?? '';
-  };
+};
+  const variable = variableName.toLowerCase();
+  return variableUnits[variable] ?? '';
+};
 
 
 function LineChart({ width, height, data, layout }) {
+  // console.log("LineChart data:", data);
   const screenWidth = window.innerWidth;
   const fontSize = screenWidth <= 1300 ? 13 : 18;
   const fontWeight = screenWidth <= 1300 ? 600 : 500;
+
+  const [zoomKey, setZoomKey] = useState(0);
+  
   const getAxisLabelStyles = (theme) => ({
-  fill: theme === 'dark' ? '#e0e0e0' : '#000',
-  fontSize: fontSize,
-  fontWeight: fontWeight,
-});
+    fill: theme === 'dark' ? '#e0e0e0' : '#000',
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+  });
+
+  useEffect(() => {
+    // reset zoom whenever the series set or axis changes
+    setZoomKey((k) => k + 1);
+  }, [data, layout?.yaxis]);
+
+  const yAxisLabel = useMemo(() => {
+    const yaxisValue = layout?.yaxis || '';
+    if (!yaxisValue) return '';
+    const units = getVariableUnits(yaxisValue);
+    return units ? `${yaxisValue} (${units})` : yaxisValue;
+  }, [layout?.yaxis]);
 
   // Generate dynamic y-axis label
   const getYAxisLabel = () => {
@@ -98,7 +114,8 @@ function LineChart({ width, height, data, layout }) {
      Data preparation
      ───────────────────────────────────── */
   const parseDate = timeParse('%Y-%m-%d %H:%M:%S');
-  const getDate = (d) => parseDate(d.x.trim());
+  // const getDate = (d) => parseDate(d.x);
+  const getDate = (d) => d.x instanceof Date ? d.x : new Date(d.x);
   const getYValue = (d) => d.y;
 
   const safeExtent = (arr, accessor, fallback = [0, 1]) => {
@@ -106,26 +123,29 @@ function LineChart({ width, height, data, layout }) {
     return min == null || max == null ? fallback : [min, max];
   };
 
-  const allData = data.flatMap((s) => s.data ?? []);
+  const allData = useMemo(
+    () => data.flatMap((s) => s.data ?? []),
+    [data]
+  );
+
   const hasData = allData.length > 0;
 
-  /* ─────────────────────────────────────
-     Scales
-     ───────────────────────────────────── */
-  const xScale = scaleTime({
-    range: [0, innerWidth],
-    domain: safeExtent(allData, getDate, [new Date(), new Date()]),
-  });
+  const { xScale, yScale } = useMemo(() => {
+    const x = scaleTime({
+      range: [0, innerWidth],
+      domain: safeExtent(allData, getDate, [new Date(), new Date()]),
+    });
 
-  const yScale = scaleLinear({
-    range: [innerHeight, 0],
-    domain: safeExtent(allData, getYValue, [0, 1]),
-    nice: true,
-  });
+    const y = scaleLinear({
+      range: [innerHeight, 0],
+      domain: safeExtent(allData, getYValue, [0, 1]),
+      nice: true,
+    });
 
-  /* ─────────────────────────────────────
-     Visual helpers
-     ───────────────────────────────────── */
+    return { xScale: x, yScale: y };
+  }, [allData, innerWidth, innerHeight, getDate, getYValue]);
+
+
   const colors =
     theme === 'dark'
       ? ['#43b284', '#ff8c42', '#a566ff', '#20a4f3', '#ffc107']
@@ -215,8 +235,6 @@ function LineChart({ width, height, data, layout }) {
       xScale,
       yScale,
       data,
-      getDate,
-      getYValue,
       bisectDate,
       margin.left,
       margin.top,
@@ -246,6 +264,7 @@ function LineChart({ width, height, data, layout }) {
     <div style={{ position: 'relative', width, height }}>
       {hasData ? (
         <Zoom
+          key={zoomKey}
           width={innerWidth}
           height={innerHeight}
           scaleXMin={1}
@@ -365,7 +384,7 @@ function LineChart({ width, height, data, layout }) {
 
                     <AxisLeft
                       scale={newYScale}
-                      label={getYAxisLabel()}
+                      label={yAxisLabel}
                       labelProps={{ style: getAxisLabelStyles(theme) }}
                       labelOffset={80}
                       stroke={theme === 'dark' ? '#d1d5db' : '#000'}
@@ -377,7 +396,6 @@ function LineChart({ width, height, data, layout }) {
                         textAnchor: 'end',
                         
                       })}
-                      tickValues={safeXTicks}
                     />
                     <AxisBottom
                       scale={newXScale}

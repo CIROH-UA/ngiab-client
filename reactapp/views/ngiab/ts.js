@@ -17,14 +17,15 @@ const HydroFabricView = ({singleRowOn}) => {
   const series = useTimeSeriesStore((state) => state.series);
   const layout = useTimeSeriesStore((state) => state.layout);
   // If available tabs change and current activeKey is no longer available, update it.
-  useEffect(() => {
-    console.log("Time Series updated:", series);
-  }, [series]);
+  // useEffect(() => {
+  //   console.log("Time Series updated:", series);
+  // }, [series]);
 
   return (
     <ViewContainer fullScreen={singleRowOn}>
 
-          {series.length > 0 && (
+          {/* {series.length > 0 && ( */}
+          { 
               <Suspense fallback={<LoadingAnimation />}>
                 <HydroFabricPlotContainer>
                   <ParentSize>
@@ -33,7 +34,14 @@ const HydroFabricView = ({singleRowOn}) => {
                         <LineChart
                           width={width}
                           height={height}
-                          data={series}
+                          data={
+                            [
+                              {
+                                label: 'Streamflow',
+                                data: series,
+                              },
+                            ] 
+                            }
                           layout={layout}
                         />
                       )
@@ -42,7 +50,7 @@ const HydroFabricView = ({singleRowOn}) => {
                 </HydroFabricPlotContainer>:
 
               </Suspense>
-          )}
+          }
 
     </ViewContainer>
   );
