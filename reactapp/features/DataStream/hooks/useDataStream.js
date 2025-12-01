@@ -7,6 +7,7 @@ import { dataStreamActionsTypes } from '../store/actions/actionsTypes';
 const useDataStream = () => {
     const [state, dispatch] = useReducer(dataStreamReducer, dataStreamInitialStore);
     const actions = {
+        set_bucket: (bucket) => dispatch({ type: dataStreamActionsTypes.set_bucket, payload: bucket }),
         set_cache_key: (cache_key) => dispatch({ type: dataStreamActionsTypes.set_cache_key, payload: cache_key }),
         set_vpu: (vpu) => dispatch({ type: dataStreamActionsTypes.set_vpu, payload: vpu }),
         set_date: (date) => dispatch({ type: dataStreamActionsTypes.set_date, payload: date }),
