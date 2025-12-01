@@ -2,7 +2,7 @@ import { dataStreamActionsTypes } from '../actions/actionsTypes';
 
 const dataStreamInitialStore = {
     state:{
-        geometry: null,
+        geometry: 'http://localhost:9000/ciroh-community-ngen-datastream/v2.2_resources/VPU_01/config/nexus.pmtiles',
         cache_key: null,
         vpu: null,
         date: null,
