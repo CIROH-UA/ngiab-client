@@ -1,14 +1,24 @@
 import { dataStreamActionsTypes } from '../actions/actionsTypes';
 
+const getTodayDateString = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}${month}${day}`;
+}
+
 const dataStreamInitialStore = {
     state:{
+        bucket: 'ciroh-community-ngen-datastream',
         geometry: 'http://localhost:9000/ciroh-community-ngen-datastream/v2.2_resources/VPU_01/config/nexus.pmtiles',
         cache_key: null,
-        vpu: null,
-        date: null,
-        forecast: null,
+        vpu: `VPU_01`,
+        // date: `ngen.${getTodayDateString()}`,
+        date: 'ngen.20251125',
+        forecast: 'short_range',
         time: null,
-        cycle: null,
+        cycle: '00',
     },
     actions:{}
 };
@@ -16,6 +26,14 @@ const dataStreamInitialStore = {
 
 const dataStreamReducer = (state, action) => {
     switch (action.type) {
+        case dataStreamActionsTypes.set_bucket:
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    bucket: action.payload
+                }
+            };
         case dataStreamActionsTypes.set_cache_key:
             return {
                 ...state,

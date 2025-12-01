@@ -1,5 +1,5 @@
 const dataStreamActionsTypes = {
-
+    set_bucket: 'SET_BUCKET',
     set_geometry: 'SET_CURRENT_GEOMETRY',
     set_vpu: 'SET_VPU',
     set_date: 'SET_DATE',

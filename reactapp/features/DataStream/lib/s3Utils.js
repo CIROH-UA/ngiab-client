@@ -39,3 +39,8 @@ export const makePrefix = (avail_date,ngen_forecast,ngen_cycle, ngen_time, ngen_
     prefix_path = `${prefix_path}/${time_path}${ngen_vpu}/ngen-run/outputs/`;
     return prefix_path;
 }
+
+export const makeGpkgUrl = (vpu) => {
+    const vpu_gpkg = `s3://ciroh-community-ngen-datastream/v2.2_resources/${vpu}/config/nextgen_${vpu}.gpkg`;
+    return vpu_gpkg;
+}

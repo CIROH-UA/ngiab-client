@@ -8,7 +8,7 @@ import { ToastContainer } from 'react-toastify';
 import styled from 'styled-components';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 import HydroFabricView from '../ngiab/ts.js';
-import MapComponent from 'features/Map/components/mapg.js';
+import MapComponent from 'features/DataStream/components/mapg.js';
 import DataStreamMenuView from 'features/DataStream/views/dataStreamMenuView.js';
 import appAPI from 'services/api/app';
 
