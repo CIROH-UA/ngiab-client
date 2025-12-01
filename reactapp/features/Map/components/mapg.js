@@ -6,8 +6,6 @@ import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabric
 import useTheme from 'hooks/useTheme';
 import { getFlowTimeseriesForNexus } from "features/DataStream/lib/nexusTimeseries";
 
-
-
 const onMapLoad = (event) => {
   const map = event.target;
 
@@ -22,7 +20,6 @@ const onMapLoad = (event) => {
   ['nexus-points'].forEach((layerId) => {
     if (map.getLayer(layerId)) map.moveLayer(layerId);
   });
-
 
   // Ensure highlight layers are on top
   ['nexus-highlight', 'catchment-highlight'].forEach((layerId) => {
@@ -43,8 +40,7 @@ const MapComponent = ({
   const mapRef = useRef(null);
 
   // Highlight states
-  const [selectedNexusId, setSelectedNexusId] = useState(null);
-  const [selectedCatchmentId, setSelectedCatchmentId] = useState(null);
+  const [selectedFeature, setSelectedFeature] = useState(null);
 
 
   // Derived booleans from store
@@ -60,7 +56,6 @@ const MapComponent = ({
 
   // Memoized layer config for catchments
   const catchmentLayer = useMemo(() => {
-    
     const divides = (
       <Layer
         id= 'divides'
@@ -85,8 +80,8 @@ const MapComponent = ({
         source="hydrofabric"
         source-layer="conus_divides"
         filter={
-            selectedCatchmentId
-            ? ['any', ['==', ['get', 'divide_id'], selectedCatchmentId]]
+            selectedFeature
+            ? ['any', ['==', ['get', 'divide_id'], selectedFeature]]
             : ['==', ['get', 'divide_id'], '']
         }
         paint= {{
@@ -102,7 +97,7 @@ const MapComponent = ({
     );
 
     return [ divides, highlighted ]
-  }, [theme, selectedCatchmentId]);
+  }, [theme, selectedFeature]);
 
   // Memoized layer config for flowpaths
   const flowPathsConfig = useMemo(() => {
@@ -170,11 +165,11 @@ const nexusLayers = useMemo(() => {
       // Optional: ensure it's drawn above the normal points layer
       // beforeId="nexus-points"
       filter={
-        selectedNexusId
+        selectedFeature
           ? [
               'all',
               ['!', ['has', 'point_count']],     // ignore any clustered features
-              ['==', ['get', 'id'], selectedNexusId], // match the exact feature id
+              ['==', ['get', 'id'], selectedFeature], // match the exact feature id
             ]
           : ['boolean', false]                    // match nothing when not selected
       }
@@ -191,7 +186,7 @@ const nexusLayers = useMemo(() => {
 
 
   return [pointsLayer, nexusHighlightLayer];
-}, [isNexusHidden, theme, selectedNexusId]);
+}, [isNexusHidden, theme, selectedFeature]);
 
   useEffect(() => {
     // Reset highlights when geometry layers are hidden
@@ -207,8 +202,8 @@ const nexusLayers = useMemo(() => {
   // ------------------------------------
   const handleMapClick = async (event) => {
     console.log('Map clicked at:', event);
+    setSelectedFeature(null);
     const map = event.target;
-
     // Build layersToQuery based on current hidden states
     const layersToQuery = [];
     if (!isNexusHidden) {
@@ -218,19 +213,19 @@ const nexusLayers = useMemo(() => {
       layersToQuery.push('divides');
     }
     if (layersToQuery.length === 0) return;
-
     const features = map.queryRenderedFeatures(event.point, { layers: layersToQuery });
     if (!features || !features.length) return;
-
+    
     for (const feature of features) {
       const layerId = feature.layer.id;
       console.log('Clicked feature from layer:', layerId, feature);
       if (layerId === 'nexus-points'){
-        const featureId = feature.properties.id;
+        const id = feature.properties.id;
 
-        console.log('Clicked nexus feature with id:', featureId);
-        const nexusId = featureId.split('-')[1];
-        setSelectedNexusId(featureId);
+        console.log('Clicked nexus feature with id:', id);
+        const nexusId = id.split('-')[1];
+        // setSelectedNexusId(featureId);
+        setSelectedFeature(id);
 
         try {
           // const series = await getFlowTimeseriesForNexus(nexusId);
@@ -239,7 +234,6 @@ const nexusLayers = useMemo(() => {
           //   y: d.flow,
           // }));
           // set_series(xy);
-
           // console.log("Flow timeseries for", nexusId, series.slice(0, 5));
         } catch (err) {
           console.error("Failed to load timeseries for", nexusId, err);
@@ -250,10 +244,10 @@ const nexusLayers = useMemo(() => {
       if (layerId === 'divides') {
         // Clicked a catchment.
         const id = feature.properties.divide_id;
-        setSelectedCatchmentId(id);
+        setSelectedFeature(id);
         console.log(id)
-        return;
       }
+      break;
     }
   };
 
