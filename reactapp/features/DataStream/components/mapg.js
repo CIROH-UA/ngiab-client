@@ -5,6 +5,9 @@ import { Protocol } from 'pmtiles';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import useTheme from 'hooks/useTheme';
 import { getFlowTimeseriesForNexus } from "features/DataStream/lib/nexusTimeseries";
+import { makePrefix, listPublicS3Files, makeGpkgUrl } from '../lib/s3Utils';
+import { loadVpuData } from 'features/DataStream/lib/vpuDataLoader';
+
 
 const onMapLoad = (event) => {
   const map = event.target;
@@ -32,9 +35,9 @@ const MapComponent = ({
   ts_store
  }) => {
   const { state: hf_state, actions: hs_actions } = useHydroFabricContext();
+  
   const set_series = ts_store((state) => state.set_series);
-
-  const { state: cs_state } = cs_context();
+  const { state: cs_state, actions: cs_actions } = cs_context();
   
   const theme = useTheme();
   const mapRef = useRef(null);
@@ -43,8 +46,7 @@ const MapComponent = ({
   const [selectedFeature, setSelectedFeature] = useState(null);
 
 
-  // Derived booleans from store
-  const isClustered = hf_state.nexus.geometry.clustered;
+  
   const isNexusHidden = hf_state.nexus.geometry.hidden;
   const isCatchmentHidden = hf_state.catchment.geometry.hidden; // default false
 
@@ -221,20 +223,32 @@ const nexusLayers = useMemo(() => {
       console.log('Clicked feature from layer:', layerId, feature);
       if (layerId === 'nexus-points'){
         const id = feature.properties.id;
-
         console.log('Clicked nexus feature with id:', id);
         const nexusId = id.split('-')[1];
-        // setSelectedNexusId(featureId);
         setSelectedFeature(id);
+        const vpu_str = `VPU_${feature.properties.vpuid}`;
+        cs_actions.set_vpu(vpu_str);
 
         try {
-          // const series = await getFlowTimeseriesForNexus(nexusId);
-          // const xy = series.map(d => ({
-          //   x: new Date(d.time),
-          //   y: d.flow,
-          // }));
-          // set_series(xy);
-          // console.log("Flow timeseries for", nexusId, series.slice(0, 5));
+          const base_prefix = makePrefix(cs_state.date , cs_state.forecast, cs_state.cycle, cs_state.time, vpu_str);
+          const files_prefix = await listPublicS3Files(base_prefix);
+          console.log("files_prefix", files_prefix);
+          const nc_files = files_prefix.filter(f => f.endsWith('.nc'));
+          const nc_files_parsed = nc_files.map(f => `s3://${cs_state.bucket}/${f}`);
+          const vpu_gpkg = makeGpkgUrl(vpu_str);
+    
+          await loadVpuData({
+            baseCacheKey: base_prefix,
+            nc_files: nc_files_parsed,
+            vpu_gpkg,
+          });
+          const series = await getFlowTimeseriesForNexus(nexusId);
+          const xy = series.map(d => ({
+            x: new Date(d.time),
+            y: d.flow,
+          }));
+          set_series(xy);
+          console.log("Flow timeseries for", nexusId, series.slice(0, 5));
         } catch (err) {
           console.error("Failed to load timeseries for", nexusId, err);
         }
