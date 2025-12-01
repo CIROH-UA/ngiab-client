@@ -7,8 +7,6 @@ export function getDuckDB() {
     dbPromise = (async () => {
       const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
       const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
-
-      // ✅ Create a same-origin blob worker that imports the real worker
       const workerUrl = URL.createObjectURL(
         new Blob(
           [`importScripts("${bundle.mainWorker}");`],

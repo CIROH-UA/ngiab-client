@@ -108,13 +108,10 @@ export async function debugFeatureIds() {
     console.log("  ", idCol.get(i), " (typeof:", typeof idCol.get(i), ")");
   }
 }
-export async function loadVpuData({ cacheKey, nc_files, vpu_gpkg }) {
-  // 1) Try OPFS cache
-  
+export async function loadVpuData({ cacheKey, nc_files, vpu_gpkg }) { 
   console.log("loadVpuData called with cacheKey:", cacheKey);
   let buffer = await loadArrowFromCache(cacheKey);
 
-  // 2) If not cached, hit Django
   if (!buffer) {
     const res = await appAPI.getParquetPerVpu({
       nc_files,
@@ -124,16 +121,23 @@ export async function loadVpuData({ cacheKey, nc_files, vpu_gpkg }) {
     await saveArrowToCache(cacheKey, buffer);
   }
 
-  // 3) Decode Arrow IPC to Arrow Table
   const arrowTable = tableFromIPC(new Uint8Array(buffer));
 
-  // 4) Load into duckdb
   const conn = await getConnection();
 
-  // Name table per VPU/forecast if you like; here "vpu_data"
-  // Exact method name can vary by duckdb-wasm version:
-  await conn.insertArrowTable(arrowTable, { name: cacheKey });
+  const existsResult = await conn.query(`
+    SELECT COUNT(*) AS cnt
+    FROM information_schema.tables
+    WHERE table_name = '${cacheKey}'
+  `);
 
+  // DuckDB JS usually returns an Arrow Table; adapt depending on your wrapper:
+  const exists = existsResult.toArray()[0].cnt > 0;
 
+  if (!exists) {
+    await conn.insertArrowTable(arrowTable, { name: cacheKey });
+  } else {
+    console.log(`Table "${cacheKey}" already exists, skipping insertArrowTable.`);
+  }
 }
 
