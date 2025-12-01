@@ -5,7 +5,8 @@ import { Protocol } from 'pmtiles';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import useTheme from 'hooks/useTheme';
 import { getFlowTimeseriesForNexus } from "features/DataStream/lib/nexusTimeseries";
-import { makePrefix, listPublicS3Files, makeGpkgUrl } from '../lib/s3Utils';
+import { makeGpkgUrl, getNCFiles } from '../lib/s3Utils';
+import { getCacheKey } from '../lib/opfsCache';
 import { loadVpuData } from 'features/DataStream/lib/vpuDataLoader';
 
 
@@ -230,19 +231,17 @@ const nexusLayers = useMemo(() => {
         cs_actions.set_vpu(vpu_str);
 
         try {
-          const base_prefix = makePrefix(cs_state.date , cs_state.forecast, cs_state.cycle, cs_state.time, vpu_str);
-          const files_prefix = await listPublicS3Files(base_prefix);
-          console.log("files_prefix", files_prefix);
-          const nc_files = files_prefix.filter(f => f.endsWith('.nc'));
-          const nc_files_parsed = nc_files.map(f => `s3://${cs_state.bucket}/${f}`);
+          const nc_files_parsed = await getNCFiles(cs_state.date , cs_state.forecast, cs_state.cycle, cs_state.time, vpu_str);
           const vpu_gpkg = makeGpkgUrl(vpu_str);
-    
+          const cacheKey = getCacheKey(cs_state.date , cs_state.forecast, cs_state.cycle, cs_state.time, vpu_str);
+        
           await loadVpuData({
-            baseCacheKey: base_prefix,
+            cacheKey: cacheKey,
             nc_files: nc_files_parsed,
             vpu_gpkg,
           });
-          const series = await getFlowTimeseriesForNexus(nexusId);
+
+          const series = await getFlowTimeseriesForNexus(nexusId, cacheKey);
           const xy = series.map(d => ({
             x: new Date(d.time),
             y: d.flow,

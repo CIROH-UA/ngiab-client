@@ -108,9 +108,9 @@ export async function debugFeatureIds() {
     console.log("  ", idCol.get(i), " (typeof:", typeof idCol.get(i), ")");
   }
 }
-export async function loadVpuData({ baseCacheKey, nc_files, vpu_gpkg }) {
+export async function loadVpuData({ cacheKey, nc_files, vpu_gpkg }) {
   // 1) Try OPFS cache
-  const cacheKey = `${baseCacheKey}nc_file`;
+  
   console.log("loadVpuData called with cacheKey:", cacheKey);
   let buffer = await loadArrowFromCache(cacheKey);
 
@@ -130,12 +130,9 @@ export async function loadVpuData({ baseCacheKey, nc_files, vpu_gpkg }) {
   // 4) Load into duckdb
   const conn = await getConnection();
 
-  // Optional: clear old table when switching VPU
-  // await conn.query("DROP TABLE IF EXISTS vpu_data");
-
   // Name table per VPU/forecast if you like; here "vpu_data"
   // Exact method name can vary by duckdb-wasm version:
-  await conn.insertArrowTable(arrowTable, { name: "vpu_data" });
+  await conn.insertArrowTable(arrowTable, { name: cacheKey });
 
 
 }

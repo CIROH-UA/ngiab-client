@@ -40,6 +40,15 @@ export const makePrefix = (avail_date,ngen_forecast,ngen_cycle, ngen_time, ngen_
     return prefix_path;
 }
 
+export async function getNCFiles(date, forecast, cycle, time, vpu) {
+    const prefix = makePrefix(date, forecast, cycle, time, vpu);
+    const filesPrefix = await listPublicS3Files(prefix);
+    console.log("files_prefix", filesPrefix);
+    const ncFiles = filesPrefix.filter(f => f.endsWith('.nc'));
+    const ncFilesParsed = ncFiles.map(f => `s3://ciroh-community-ngen-datastream/${f}`);
+    return ncFilesParsed;
+}
+
 export const makeGpkgUrl = (vpu) => {
     const vpu_gpkg = `s3://ciroh-community-ngen-datastream/v2.2_resources/${vpu}/config/nextgen_${vpu}.gpkg`;
     return vpu_gpkg;

@@ -1,12 +1,12 @@
 // // nexusTimeseries.js
 import { getConnection } from "./duckdbClient";
 
-export async function getFlowTimeseriesForNexus(nexusId) {
+export async function getFlowTimeseriesForNexus(nexusId, cacheKey) {
   const conn = await getConnection();
-
+  
   const q = await conn.query(`
     SELECT time, flow
-    FROM vpu_data
+    FROM ${cacheKey}
     WHERE feature_id = ${nexusId}
     ORDER BY time
   `);
