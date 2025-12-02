@@ -1,8 +1,6 @@
 import styled from 'styled-components';
 import Button from 'react-bootstrap/Button';
-import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import PropTypes from 'prop-types';
-import Tooltip from 'react-bootstrap/Tooltip';
 
 
 const StyledButton = styled(Button)`

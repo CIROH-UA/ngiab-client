@@ -1,7 +1,5 @@
 import React, { Fragment } from 'react';
 import styled from 'styled-components';
-import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
-import Tooltip from 'react-bootstrap/Tooltip';
 import Button from 'react-bootstrap/Button';
 import { GoGraph  } from "react-icons/go";
 import { IoMdClose } from "react-icons/io";
@@ -39,19 +37,9 @@ const HydroFabricTimeSeriesMenu = ({
   
   return (
     <Fragment>
-            <OverlayTrigger
-              key={'right'}
-              placement={'right'}
-              overlay={
-                <Tooltip id={`tooltip-right`}>
-                  Time Series
-                </Tooltip>
-              }
-            >
-                <ToggleButton $currentMenu={currentMenu}  onClick={() => toggleSingleRow(prev => !prev)}>
-                    {singleRowOn ? <GoGraph size={15} /> : <IoMdClose size={15} />}
-                </ToggleButton>
-            </OverlayTrigger>
+        <ToggleButton $currentMenu={currentMenu}  onClick={() => toggleSingleRow(prev => !prev)}>
+          {singleRowOn ? <GoGraph size={15} /> : <IoMdClose size={15} />}
+        </ToggleButton>
     </Fragment>
 
   );
