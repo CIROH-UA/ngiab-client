@@ -2,11 +2,13 @@ import { create } from 'zustand';
 // Define the store
 const useTimeSeriesStore = create((set) => ({
     series: [],
+    feature_id: null,
     layout: {
         "yaxis": "Streamflow",
         "xaxis": "",
         "title": "",
     },
+    set_feature_id: (newFeatureId) => set({ feature_id: newFeatureId }),
     set_series: (newSeries) => set({ series: newSeries }),
     set_chart_layout: (newLayout) => set({ chart_layout: newLayout }),
 }));

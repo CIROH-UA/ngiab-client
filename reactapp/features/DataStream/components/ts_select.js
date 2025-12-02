@@ -6,8 +6,10 @@ import SelectComponent from './selectComponent';
 import { toast } from 'react-toastify';
 import { loadVpuData } from "features/DataStream/lib/vpuDataLoader";
 import { getNCFiles, makeGpkgUrl } from '../lib/s3Utils';
+import { getFlowTimeseriesForNexus } from "features/DataStream/lib/nexusTimeseries";
 import { getCacheKey } from '../lib/opfsCache';
 import { useDataStreamContext } from '../hooks/useDataStreamContext';
+import useTimeSeriesStore from '../store/timeseries';
 
 const StyledButton = styled(Button)`  
   background-color: rgba(255, 255, 255, 0.1);
@@ -111,7 +113,8 @@ export default function BucketSelect() {
   // const {state,actions} = useModelRunsContext();
 
   const {state: dsState, actions: dsActions} = useDataStreamContext();
-  
+  const set_series = useTimeSeriesStore((state) => state.set_series);
+  const feature_id = useTimeSeriesStore((state) => state.feature_id);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [loadingText, setLoadingText] = useState("");
@@ -159,12 +162,22 @@ export default function BucketSelect() {
     const nc_files_parsed = await getNCFiles(dsState.date , dsState.forecast, dsState.cycle, dsState.time, dsState.vpu);
     const vpu_gpkg = makeGpkgUrl(dsState.vpu);
     const cacheKey = getCacheKey(dsState.date , dsState.forecast, dsState.cycle, dsState.time, dsState.vpu);
-  
+    console.log(vpu_gpkg, nc_files_parsed, cacheKey);
+    const id = feature_id.split('-')[1];
     await loadVpuData({
       cacheKey: cacheKey,
       nc_files: nc_files_parsed,
       vpu_gpkg,
     });
+    const series = await getFlowTimeseriesForNexus(id, cacheKey);
+    const xy = series.map(d => ({
+      x: new Date(d.time),
+      y: d.flow,
+    }));
+    
+    set_series(xy);
+    console.log("Flow timeseries for", id, xy);
+    handleSuccess();
   }
 
   const handleChangeDate = (e) => {

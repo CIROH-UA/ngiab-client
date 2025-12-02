@@ -36,15 +36,16 @@ const MapComponent = ({
   ts_store
  }) => {
   const { state: hf_state, actions: hs_actions } = useHydroFabricContext();
-  
+  const selectedFeature = ts_store((state) => state.feature_id);
   const set_series = ts_store((state) => state.set_series);
+  const set_feature_id = ts_store((state) => state.set_feature_id);
   const { state: cs_state, actions: cs_actions } = cs_context();
   
   const theme = useTheme();
   const mapRef = useRef(null);
 
   // Highlight states
-  const [selectedFeature, setSelectedFeature] = useState(null);
+  // const [selectedFeature, setSelectedFeature] = useState(null);
 
 
   
@@ -205,7 +206,7 @@ const nexusLayers = useMemo(() => {
   // ------------------------------------
   const handleMapClick = async (event) => {
     console.log('Map clicked at:', event);
-    setSelectedFeature(null);
+    set_feature_id(null);
     const map = event.target;
     // Build layersToQuery based on current hidden states
     const layersToQuery = [];
@@ -226,7 +227,8 @@ const nexusLayers = useMemo(() => {
         const id = feature.properties.id;
         console.log('Clicked nexus feature with id:', id);
         const nexusId = id.split('-')[1];
-        setSelectedFeature(id);
+        // setSelectedFeature(id);
+        set_feature_id(id);
         const vpu_str = `VPU_${feature.properties.vpuid}`;
         cs_actions.set_vpu(vpu_str);
 
@@ -247,7 +249,7 @@ const nexusLayers = useMemo(() => {
             y: d.flow,
           }));
           set_series(xy);
-          console.log("Flow timeseries for", nexusId, series.slice(0, 5));
+          console.log("Flow timeseries for", nexusId, xy);
         } catch (err) {
           console.error("Failed to load timeseries for", nexusId, err);
         }
@@ -257,7 +259,8 @@ const nexusLayers = useMemo(() => {
       if (layerId === 'divides') {
         // Clicked a catchment.
         const id = feature.properties.divide_id;
-        setSelectedFeature(id);
+        // setSelectedFeature(id);
+        set_feature_id(id);
         console.log(id)
       }
       break;
