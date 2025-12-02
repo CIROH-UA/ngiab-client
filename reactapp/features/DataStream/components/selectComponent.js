@@ -51,7 +51,7 @@ const customStyles = {
 const SelectComponent = ({ 
   optionsList,
   onChangeHandler, 
-  
+  value 
 }) => {
   const handleChange = useCallback((option) => {
     onChangeHandler([option]);
@@ -63,6 +63,7 @@ const SelectComponent = ({
       styles={customStyles}
       filterOption={createFilter({ ignoreAccents: false })}
       options={optionsList}
+      value={value}
       onChange={handleChange}
       menuPortalTarget={document.body}
       menuShouldScrollIntoView={false}
