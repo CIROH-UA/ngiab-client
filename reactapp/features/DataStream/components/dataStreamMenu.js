@@ -1,11 +1,15 @@
 import React, { Fragment } from 'react';
 import styled from 'styled-components';
-import BucketNamesSelect from './bucketNamesSelect';
+// import BucketNamesSelect from './bucketNamesSelect';
+import BucketSelect from './ts_select';
 import Button from 'react-bootstrap/Button';
 import { FaList } from "react-icons/fa";
 import OverlayTrigger from 'react-bootstrap/OverlayTrigger';
 import Tooltip from 'react-bootstrap/Tooltip';
-
+// import ParentSize from '@visx/responsive/lib/components/ParentSize';
+// import LineChart from 'features/hydroFabric/components/chart';
+// import useTimeSeriesStore from 'features/DataStream/store/timeseries';
+// import { HydroFabricPlotContainer } from 'components/StyledContainers';
 const Container = styled.div`
   position: absolute;
   top: 0;
@@ -70,7 +74,8 @@ const DataStreamMenu = ({
   currentMenu
 }) => {
 
-
+  // const series = useTimeSeriesStore((state) => state.series);
+  // const layout = useTimeSeriesStore((state) => state.layout);
   return (
     <Fragment>
           
@@ -105,10 +110,34 @@ const DataStreamMenu = ({
                 ,feel free to go inside the bucket to explore more
               </p>
               <p><strong>Note:</strong> Data are only available for certain dates. Please verify a date’s availability before you proceed.</p>
+              <BucketSelect />
+              
+
+              {/* <BucketNamesSelect /> */}
+                  {/* <HydroFabricPlotContainer>
+                    <ParentSize>
+                      {({ width, height }) =>
+                        (
+                          <LineChart
+                            width={width}
+                            height={height}
+                            data={
+                              [
+                                {
+                                  label: 'Streamflow',
+                                  data: series,
+                                },
+                              ] 
+                              }
+                            layout={layout}
+                          />
+                        )
+                      }
+                    </ParentSize>
+                  
+                  </HydroFabricPlotContainer> */}
 
 
-
-              <BucketNamesSelect />
             </Content>
           </Container>
     </Fragment>

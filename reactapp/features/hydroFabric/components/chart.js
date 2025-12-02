@@ -79,13 +79,7 @@ function LineChart({ width, height, data, layout }) {
     return units ? `${yaxisValue} (${units})` : yaxisValue;
   }, [layout?.yaxis]);
 
-  // Generate dynamic y-axis label
-  const getYAxisLabel = () => {
-    const yaxisValue = layout?.yaxis || '';
-    const units = getVariableUnits(yaxisValue);
-    if (!units) return yaxisValue;
-    return yaxisValue + " (" + units + ")";
-  };
+
 
   /* ─────────────────────────────────────
      Hooks – always execute, no early-return
@@ -298,40 +292,7 @@ function LineChart({ width, height, data, layout }) {
                     position: 'relative',
                   }}
                 >
-                  <div style={{ display: 'flex' }}>
-                    {data.map((series, index) => (
-                      <div
-                        key={`legend-${index}`}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          marginRight: 10,
-                          padding: '2px 6px',
-                          border: '1px solid #ddd',
-                          borderRadius: 4,
-                          backgroundColor:
-                            theme === 'dark' ? '#4f5b67' : '#f0f0f0',
-                        }}
-                      >
-                        <div
-                          style={{
-                            backgroundColor: colors[index % colors.length],
-                            width: 10,
-                            height: 10,
-                            marginRight: 5,
-                          }}
-                        />
-                        <div
-                          style={{
-                            color: theme === 'dark' ? '#f0f0f0' : '#000',
-                            fontSize: 14,
-                          }}
-                        >
-                          {series.label}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                
                   <button
                     onClick={zoom.reset}
                     style={{

@@ -94,7 +94,7 @@ const HydroFabricView = ({singleRowOn}) => {
               </Suspense>
             </Tab>
           )}
-          {state.catchment.id && state.catchment.chart.series.length > 0 && (
+          {/* {state.catchment.id && state.catchment.chart.series.length > 0 && (
             <Tab eventKey="catchment_plot" title="Catchment">
               <Suspense fallback={<LoadingAnimation />}>
                 <HydroFabricPlotContainer>
@@ -160,7 +160,7 @@ const HydroFabricView = ({singleRowOn}) => {
                 <TeehrMetricsTable data={state.teehr.metrics} />
               </TeehrMetricsWrapper>
             </Tab>
-          )}
+          )} */}
         </Tabs>
       </StyledTabs>
     </ViewContainer>

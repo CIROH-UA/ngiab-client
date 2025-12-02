@@ -10,7 +10,6 @@ import LoadingAnimation from 'components/loader/LoadingAnimation';
 import HydroFabricView from '../ngiab/ts.js';
 import MapComponent from 'features/DataStream/components/mapg.js';
 import DataStreamMenuView from 'features/DataStream/views/dataStreamMenuView.js';
-import appAPI from 'services/api/app';
 
 
 const ViewContainer = styled.div`
@@ -26,21 +25,6 @@ const DataStreamView = () => {
   const [singleRowOn, toggleSingleRow] = useState(true);
   const [isDataStreamMenuOpen, setIsDataStreamMenuOpen] = useState(false);
   const [ isLoading, setIsLoading ] = useState(false);
-
-  useEffect(() => {
-    appAPI.makeDatastreamConf()
-      .then((data) => {
-        
-        if (data.error) {
-          return;
-        }
-        // toast.success("Successfully retrieved Model Run Data", { autoClose: 1000 });
-      })
-      .catch((error) => {
-        console.error('Failed', error);
-      });
-  }
-  , []);
 
   return (
     <ViewContainer>
