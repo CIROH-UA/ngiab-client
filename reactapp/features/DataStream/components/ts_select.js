@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, Fragment } from 'react';
 import styled from 'styled-components';
-import { Button, Spinner } from 'react-bootstrap';
+import { Button, Row, Spinner } from 'react-bootstrap';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 import { toast } from 'react-toastify';
@@ -10,6 +10,10 @@ import { getFlowTimeseriesForNexus } from 'features/DataStream/lib/nexusTimeseri
 import { getCacheKey } from '../lib/opfsCache';
 import { useDataStreamContext } from '../hooks/useDataStreamContext';
 import useTimeSeriesStore from '../store/timeseries';
+import { MdOutlineWaves, MdCalendarMonth, MdOutlineRefresh } from "react-icons/md";
+import { BsExclamationCircle } from "react-icons/bs";
+
+
 
 const StyledButton = styled(Button)`  
   background-color: rgba(255, 255, 255, 0.1);
@@ -47,6 +51,22 @@ const StyledLoadingMessage = styled.div`
     opacity: 1;
   }
 `;
+
+const RowStyle = styled.div`
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+`;
+
+const IconLabel = styled.span`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+`
+
+
 
 const availableForecastList = [
   { value: 'short_range', label: 'short_range' },
@@ -266,49 +286,44 @@ export default function BucketSelect() {
     <Fragment>
       <Fragment>
         {datesBucket.length > 0 && (
-          <Fragment>
-            <p>Available Dates</p>
+          <RowStyle>
+            <IconLabel> <MdCalendarMonth/> Date</IconLabel>
             <SelectComponent
               optionsList={datesBucket}
               value={selectedDateOption}
               onChangeHandler={handleChangeDate}
             />
-          </Fragment>
+          </RowStyle>
         )}
-
-        <br />
-
-        <Fragment>
-          <p>Available Forecasts</p>
+        <RowStyle>
+          <IconLabel> <BsExclamationCircle/>  Forecast</IconLabel>
           <SelectComponent
             optionsList={availableForecastList}
             value={selectedForecastOption}
             onChangeHandler={handleChangeForecast}
           />
-        </Fragment>
+        </RowStyle>
 
         {availableCyclesList[dsState.forecast]?.length > 0 && (
-          <Fragment>
-            <br />
-            <p>Available Cycles</p>
+          <RowStyle>
+            <IconLabel> <MdOutlineRefresh/> Cycle</IconLabel>
             <SelectComponent
               optionsList={availableCyclesList[dsState.forecast]}
               value={selectedCycleOption}
               onChangeHandler={handleChangeCycle}
             />
-          </Fragment>
+          </RowStyle>
         )}
 
         {availableEnsembleList[dsState.forecast]?.length > 0 && (
-          <Fragment>
-            <br />
-            <p>Available Ensembles</p>
+          <RowStyle>
+            <IconLabel> <MdOutlineWaves/> Ensembles</IconLabel>
             <SelectComponent
               optionsList={availableEnsembleList[dsState.forecast]}
               value={selectedEnsembleOption}
               onChangeHandler={handleChangeEnsemble}
             />
-          </Fragment>
+          </RowStyle>
         )}
 
         <StyledButton onClick={handleVisulization}>Visualize</StyledButton>
