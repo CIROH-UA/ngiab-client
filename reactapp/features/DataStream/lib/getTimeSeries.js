@@ -1,13 +1,13 @@
 // // nexusTimeseries.js
 import { getConnection } from "./duckdbClient";
 
-export async function getFlowTimeseriesForNexus(nexusId, cacheKey) {
+export async function getTimeseries(id, cacheKey, variable) {
   const conn = await getConnection();
   
   const q = await conn.query(`
-    SELECT time, flow
+    SELECT time, ${variable}
     FROM ${cacheKey}
-    WHERE feature_id = ${nexusId}
+    WHERE feature_id = ${id}
     ORDER BY time
   `);
 
@@ -16,7 +16,7 @@ export async function getFlowTimeseriesForNexus(nexusId, cacheKey) {
   // Extract column names from the schema
   rows.columns = q.schema.fields.map((d) => d.name);
   console.log(
-    `[getFlowTimeseriesForNexus] (literal) nexusId=${nexusId} rows=${rows.length}`
+    `[getTimeseries] (literal) id=${id} rows=${rows.length}`
   );
   return rows;
 }

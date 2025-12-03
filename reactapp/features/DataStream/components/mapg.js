@@ -4,11 +4,11 @@ import Map, { Source, Layer } from 'react-map-gl/maplibre';
 import { Protocol } from 'pmtiles';
 import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import useTheme from 'hooks/useTheme';
-import { getFlowTimeseriesForNexus } from "features/DataStream/lib/nexusTimeseries";
+import { getTimeseries } from "features/DataStream/lib/getTimeSeries";
 import { makeGpkgUrl, getNCFiles } from '../lib/s3Utils';
 import { getCacheKey } from '../lib/opfsCache';
-import { loadVpuData } from 'features/DataStream/lib/vpuDataLoader';
-
+import { loadVpuData, getVariables } from 'features/DataStream/lib/vpuDataLoader';
+import useTimeSeriesStore from '../store/timeseries';
 
 const onMapLoad = (event) => {
   const map = event.target;
@@ -33,21 +33,16 @@ const onMapLoad = (event) => {
 
 const MapComponent = ({
   cs_context,
-  ts_store
  }) => {
   const { state: hf_state, actions: hs_actions } = useHydroFabricContext();
-  const selectedFeature = ts_store((state) => state.feature_id);
-  const set_series = ts_store((state) => state.set_series);
-  const set_feature_id = ts_store((state) => state.set_feature_id);
+  const selectedFeature = useTimeSeriesStore((state) => state.feature_id);
+  const set_series = useTimeSeriesStore((state) => state.set_series);
+  const set_feature_id = useTimeSeriesStore((state) => state.set_feature_id);
+  const set_variable = useTimeSeriesStore((state) => state.set_variable);
   const { state: cs_state, actions: cs_actions } = cs_context();
   
   const theme = useTheme();
   const mapRef = useRef(null);
-
-  // Highlight states
-  // const [selectedFeature, setSelectedFeature] = useState(null);
-
-
   
   const isNexusHidden = hf_state.nexus.geometry.hidden;
   const isCatchmentHidden = hf_state.catchment.geometry.hidden; // default false
@@ -104,36 +99,43 @@ const MapComponent = ({
   }, [theme, selectedFeature]);
 
   // Memoized layer config for flowpaths
-  const flowPathsConfig = useMemo(() => {
-    return {
-      id: 'flowpaths',
-      type: 'line',
-      source: 'hydrofabric',
-      'source-layer': 'conus_flowpaths',
-      filter: ['any', ['in', 'id']],
-      paint: {
-        'line-color': theme === 'dark' ? '#0077bb' : '#000000',
-        'line-width': { stops: [[7, 1], [10, 2]] },
-        'line-opacity': { stops: [[7, 0], [11, 1]] },
-      }
-    };
+  const flowPathsLayer = useMemo(() => {
+    const layer = (
+      <Layer
+        key="flowpaths"
+        id="flowpaths"
+        type="line"
+        source="hydrofabric"
+        source-layer="conus_flowpaths"
+        filter={['any', ['in', 'id']]}
+        paint={{
+          'line-color': theme === 'dark' ? '#0077bb' : '#000000',
+          'line-width': { stops: [[7, 1], [10, 2]] },
+          'line-opacity': { stops: [[7, 0], [11, 1]] },
+        }}
+      />
+    );
+    return layer;
   }, [theme]);
 
   // Memoized layer config for gauges
-  const conusGaugesConfig = useMemo(() => {
-    
-    return {
-      id: 'conus-gauges',
-      type: 'circle',
-      source: 'hydrofabric',
-      'source-layer': 'conus_gages',
-      filter: ['any', ['in', 'nex_id']],
-      paint: {
-        'circle-radius': { stops: [[3, 2], [11, 5]] },
-        'circle-color': theme === 'dark' ? '#c8c8c8' : '#646464',
-        'circle-opacity': { stops: [[3, 0], [9, 1]] },
-      }
-    };
+  const conusGaugesLayer = useMemo(() => {
+    const layer = (
+      <Layer
+        key="conus-gauges"
+        id="conus-gauges"
+        type="circle"
+        source="hydrofabric"
+        source-layer="conus_gages"
+        filter={['any', ['in', 'nex_id']]}
+        paint={{
+          'circle-radius': { stops: [[3, 2], [11, 5]] },
+          'circle-color': theme === 'dark' ? '#c8c8c8' : '#646464',
+          'circle-opacity': { stops: [[3, 0], [9, 1]] },
+        }}
+      />
+    )
+    return layer;
   }, [theme]);
 
 
@@ -224,11 +226,11 @@ const nexusLayers = useMemo(() => {
       const layerId = feature.layer.id;
       console.log('Clicked feature from layer:', layerId, feature);
       if (layerId === 'nexus-points'){
-        const id = feature.properties.id;
+        const unbiased_id = feature.properties.id;
+        const id = unbiased_id.split('-')[1];
+        set_feature_id(unbiased_id);
+
         console.log('Clicked nexus feature with id:', id);
-        const nexusId = id.split('-')[1];
-        // setSelectedFeature(id);
-        set_feature_id(id);
         const vpu_str = `VPU_${feature.properties.vpuid}`;
         cs_actions.set_vpu(vpu_str);
 
@@ -243,15 +245,19 @@ const nexusLayers = useMemo(() => {
             vpu_gpkg,
           });
 
-          const series = await getFlowTimeseriesForNexus(nexusId, cacheKey);
+          const variables = await getVariables({cacheKey});
+          set_variable(variables[0]); // Set to first variable by default
+          
+          const series = await getTimeseries(id, cacheKey, variables[0]);
           const xy = series.map(d => ({
             x: new Date(d.time),
             y: d.flow,
           }));
+          
           set_series(xy);
-          console.log("Flow timeseries for", nexusId, xy);
+          console.log("Flow timeseries for", id, xy);
         } catch (err) {
-          console.error("Failed to load timeseries for", nexusId, err);
+          console.error("Failed to load timeseries for", id, err);
         }
 
       }
@@ -259,7 +265,6 @@ const nexusLayers = useMemo(() => {
       if (layerId === 'divides') {
         // Clicked a catchment.
         const id = feature.properties.divide_id;
-        // setSelectedFeature(id);
         set_feature_id(id);
         console.log(id)
       }
@@ -278,13 +283,14 @@ const nexusLayers = useMemo(() => {
     onClick={handleMapClick}
     onLoad={onMapLoad}
   >
-    {/* Existing CONUS source (keep as-is) */}
     <Source
       id="conus"
       type="vector"
       url="pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles"
     >
       {catchmentLayer}
+      {flowPathsLayer}
+      {conusGaugesLayer}
 
     </Source>
 

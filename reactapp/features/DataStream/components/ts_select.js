@@ -4,9 +4,9 @@ import { Button, Row, Spinner } from 'react-bootstrap';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 import { toast } from 'react-toastify';
-import { loadVpuData } from 'features/DataStream/lib/vpuDataLoader';
+import { loadVpuData, getVariables } from 'features/DataStream/lib/vpuDataLoader';
 import { getNCFiles, makeGpkgUrl } from '../lib/s3Utils';
-import { getFlowTimeseriesForNexus } from 'features/DataStream/lib/nexusTimeseries';
+import { getTimeseries } from 'features/DataStream/lib/getTimeSeries';
 import { getCacheKey } from '../lib/opfsCache';
 import { useDataStreamContext } from '../hooks/useDataStreamContext';
 import useTimeSeriesStore from '../store/timeseries';
@@ -114,6 +114,7 @@ export default function BucketSelect() {
 
   const { state: dsState, actions: dsActions } = useDataStreamContext();
   const set_series = useTimeSeriesStore((state) => state.set_series);
+  const set_variable = useTimeSeriesStore((state) => state.set_variable);
   const feature_id = useTimeSeriesStore((state) => state.feature_id);
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('');
@@ -166,14 +167,17 @@ export default function BucketSelect() {
         nc_files: nc_files_parsed,
         vpu_gpkg,
       });
-
-      const series = await getFlowTimeseriesForNexus(id, cacheKey);
+      const variables = await getVariables({cacheKey});
+      console.log('Available variables:', variables);
+      const series = await getTimeseries(id, cacheKey, variables[0]);
       const xy = series.map((d) => ({
         x: new Date(d.time),
         y: d.flow,
       }));
 
       set_series(xy);
+      set_variable(variables[0]); // Set to first variable by default
+
       console.log('Flow timeseries for', id, xy);
       handleSuccess();
     } catch (err) {

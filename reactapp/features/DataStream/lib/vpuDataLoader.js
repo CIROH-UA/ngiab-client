@@ -141,3 +141,22 @@ export async function loadVpuData({ cacheKey, nc_files, vpu_gpkg }) {
   }
 }
 
+export async function getVariables({ cacheKey }){
+  console.log("getVariables called with cacheKey:", cacheKey);
+  const conn = await getConnection();
+  // const q = await conn.query(`
+  //   SELECT * EXCEPT ('feature_id', 'time') FROM ${cacheKey} LIMIT 1
+  // `);
+  
+  const q = await conn.query(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_name = '${cacheKey}'
+      AND column_name NOT IN (
+        'ngen_id', 'usgs_id', 'nwm_id', 'feature_id', 'time', 'type'
+      )
+  `);
+
+  const cols = (await q.toArray()).map(r => r.column_name);
+  return cols;
+}

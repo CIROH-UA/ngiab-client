@@ -2,7 +2,6 @@ import { Fragment, useState,Suspense, useEffect } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
 import { DataStreamProvider } from 'features/DataStream/providers/dataStreamProvider';
 import {useDataStreamContext} from 'features/DataStream/hooks/useDataStreamContext';
-import useTimeSeriesStore from 'features/DataStream/store/timeseries';
 import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
 import { ToastContainer } from 'react-toastify';
 import styled from 'styled-components';
@@ -39,7 +38,6 @@ const DataStreamView = () => {
               >
                 <MapComponent  
                   cs_context={useDataStreamContext}
-                  ts_store={useTimeSeriesStore}
                 />
               </MapContainer >
               <DataStreamMenuView
