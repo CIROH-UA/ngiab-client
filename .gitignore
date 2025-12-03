@@ -49,3 +49,4 @@ coverage
 .data
 scripts/out
 scripts/convert_outputs
+scripts/indexes
