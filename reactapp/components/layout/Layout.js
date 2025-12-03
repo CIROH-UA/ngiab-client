@@ -50,7 +50,7 @@ export default function Layout({ navLinks = [], routes = [], children }) {
             )
           )}
         </Nav>
-                      <h5>NGIAB DataStream S3 Data</h5>
+              <h5>NGIAB DataStream S3 Data</h5>
               <p>
                 The following dates are retrieved from the bucket{' '}
                 <a
