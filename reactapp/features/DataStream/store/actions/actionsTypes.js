@@ -11,9 +11,4 @@ const dataStreamActionsTypes = {
 
 };
 
-const timseSeriesActionsTypes = {    
-    set_series: 'SET_SERIES',
-    set_chart_layout: 'SET_CHART_LAYOUT',
-};
-
-export { dataStreamActionsTypes, timseSeriesActionsTypes };
+export { dataStreamActionsTypes };

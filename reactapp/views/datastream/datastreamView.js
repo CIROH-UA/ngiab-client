@@ -26,6 +26,8 @@ const DataStreamView = () => {
   const [isDataStreamMenuOpen, setIsDataStreamMenuOpen] = useState(false);
   const [ isLoading, setIsLoading ] = useState(false);
 
+  
+
   return (
     <ViewContainer>
         <DataStreamProvider>

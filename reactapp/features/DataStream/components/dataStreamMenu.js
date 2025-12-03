@@ -2,7 +2,8 @@ import React, { Fragment } from 'react';
 import styled from 'styled-components';
 import BucketSelect from './ts_select';
 import Button from 'react-bootstrap/Button';
-import { FaList } from "react-icons/fa";
+import { FaList,  } from "react-icons/fa";
+import { MdSsidChart,MdInfoOutline  } from "react-icons/md";
 
 
 const Container = styled.div`
@@ -10,7 +11,8 @@ const Container = styled.div`
   top: 0;
   left: 0;
   height: 100vh;
-  width: 20%;
+  width: 400px;
+  padding: 20px;
   background-color: #4f5b679e;
   color: #fff;
   z-index: 1000;
@@ -23,6 +25,27 @@ const Container = styled.div`
     width: 100%;
     transform: ${({ isOpen }) => isOpen ? 'translateX(0)' : 'translateX(calc(-100%))'};
   }
+`;
+
+const Title = styled.span`
+    letter-spacing: .0125em;
+    font-family: "Google Sans", Roboto, Arial, sans-serif;
+    font-weight: 500;
+    font-size: 16px;
+    line-height: 24px;
+    align-items: center;
+    color: #dfd4d4ff;
+`
+const IconLabel = styled.span`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+`
+const Block = styled.div`
+  border: none;
+  border-top: 1px solid #ffffff33;
+  margin: 10px 0;
 `;
 
 const TogggledButton = styled(Button)`
@@ -55,13 +78,12 @@ const TogggledButton = styled(Button)`
 const Content = styled.div`
   padding: 16px;
   margin-top: 100px;
-
+  border-block: 1px solid rgb(218, 220, 224);
+  padding-block-start: 8px;
   a {
     color: white;
   }
 `;
-
-
 
 const DataStreamMenu = ({
   isopen,
@@ -74,27 +96,25 @@ const DataStreamMenu = ({
           
           {
             !isopen && 
-
               <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu} >
                 <FaList size={15} />
-              </TogggledButton>
-            
+              </TogggledButton> 
           }
           <Container isOpen={isopen}>
             <Content>
-              <p>
-                {' '}
-                <a
-                  href="https://datastream.ciroh.org/index.html#v2.2/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  ciroh-community-ngen-datastream
-                </a>{' '}
-              </p>
-              <BucketSelect />
+              <IconLabel>
+                <MdSsidChart />
+                <Title>
+                  Data Options
+                </Title>
+                <MdInfoOutline  />
+              </IconLabel>
               
+              <BucketSelect />
+
             </Content>
+
+            
           </Container>
     </Fragment>
 
