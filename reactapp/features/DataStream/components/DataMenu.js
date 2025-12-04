@@ -34,7 +34,7 @@ export default function DataMenu() {
   const set_cycle = useDataStreamStore((state) => state.set_cycle);
   const set_variables = useDataStreamStore((state) => state.set_variables);
 
-  const variable = useDataStreamStore((state) => state.variable);
+  const variable = useTimeSeriesStore((state) => state.variable);
   const set_series = useTimeSeriesStore((state) => state.set_series);
   const set_variable = useTimeSeriesStore((state) => state.set_variable);
   const feature_id = useTimeSeriesStore((state) => state.feature_id);
@@ -259,16 +259,6 @@ export default function DataMenu() {
         )}
 
         {availableEnsembleList[forecast]?.length > 0 && (
-          <Row>
-            <IconLabel> <MdOutlineWaves/> Ensembles</IconLabel>
-            <SelectComponent
-              optionsList={availableEnsembleList[forecast]}
-              value={selectedEnsembleOption}
-              onChangeHandler={handleChangeEnsemble}
-            />
-          </Row>
-        )}
-        {availableEnsembleList.length > 0 && (
           <Row>
             <IconLabel> <MdOutlineWaves/> Ensembles</IconLabel>
             <SelectComponent
