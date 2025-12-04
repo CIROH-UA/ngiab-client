@@ -37,7 +37,8 @@ export const HydroFabricContainer = (props) => {
 const StyledHydroFabricPlotContainer = styled.div`
   width: 100%;
   padding: 5px;
-  height: calc(40vh - 10px);
+  // height: calc(40vh - 10px);
+  height: 100%;
   order: 1;
   flex: 1 1 80%;
   background-color: ${(props) => props.theme === 'dark' ? '#4f5b67' : '#f9f9f9'};

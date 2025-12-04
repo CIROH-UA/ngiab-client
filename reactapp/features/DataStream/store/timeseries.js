@@ -6,8 +6,8 @@ const useTimeSeriesStore = create((set) => ({
     variable: 'flow',
     layout: {
         "yaxis": "Streamflow",
-        "xaxis": "",
-        "title": "",
+        "xaxis": "Simulation Time Period (YYYY-MM-DD)",
+        "title": "TimeSeries",
     },
     table: '',
     set_table: (newTable) => set({table: newTable}),
@@ -15,5 +15,6 @@ const useTimeSeriesStore = create((set) => ({
     set_series: (newSeries) => set({ series: newSeries }),
     set_chart_layout: (newLayout) => set({ chart_layout: newLayout }),
     set_variable: (newVariable) => set({ variable: newVariable }),
+    set_layout: (newLayout) => set({layout: newLayout })
 }));
 export default useTimeSeriesStore;

@@ -9,12 +9,12 @@ import { loadVpuData, getVariables } from 'features/DataStream/lib/vpuDataLoader
 import { getNCFiles, makeGpkgUrl } from '../lib/s3Utils';
 import { getTimeseries } from 'features/DataStream/lib/getTimeSeries';
 import { getCacheKey } from '../lib/opfsCache';
-// import { useDataStreamContext } from '../hooks/useDataStreamContext';
 import useTimeSeriesStore from '../store/timeseries';
 import useDataStreamStore from '../store/datastream';
 import { MdOutlineWaves, MdCalendarMonth, MdOutlineRefresh } from "react-icons/md";
 import { BsExclamationCircle } from "react-icons/bs";
 import { availableCyclesList, availableEnsembleList, availableForecastList } from '../lib/data';
+import { VariableAnchorOffsetCollection } from 'maplibre-gl';
 
 
 export default function DataMenu() {
@@ -39,6 +39,7 @@ export default function DataMenu() {
   const set_series = useTimeSeriesStore((state) => state.set_series);
   const set_table = useTimeSeriesStore((state) => state.set_table);
   const set_variable = useTimeSeriesStore((state) => state.set_variable);
+  const set_layout = useTimeSeriesStore((state) => state.set_layout);
   const feature_id = useTimeSeriesStore((state) => state.feature_id);
 
 
@@ -105,7 +106,11 @@ export default function DataMenu() {
 
       set_series(xy);
       set_variable(variables[0]);
-
+      set_layout({
+        'yaxis': opt.value,
+        'xaxis': "Time",
+        'title': `${id} ${opt.value}`
+      })
       console.log('Flow timeseries for', id, xy);
       handleSuccess();
     } catch (err) {
@@ -147,7 +152,12 @@ export default function DataMenu() {
       x: new Date(d.time),
       y: d[opt.value],
     }));
-    set_series(xy)
+    set_series(xy);
+    set_layout({
+      'yaxis': opt.value,
+      'xaxis': "Time",
+      'title': `${id} ${opt.value}`
+    })
   };
   /* ─────────────────────────────────────
      Fetch available dates (once)
@@ -290,7 +300,7 @@ export default function DataMenu() {
             />
           </Row>
         )}
-        <XButton onClick={handleVisulization}>Visualize</XButton>
+        <XButton onClick={handleVisulization}>Update</XButton>
       </Fragment>
 
       <LoadingMessage>

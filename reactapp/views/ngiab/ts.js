@@ -16,11 +16,11 @@ const ViewContainer = styled.div`
 
 const TimeSeriesView = ({singleRowOn}) => {
   const series = useTimeSeriesStore((state) => state.series);
+  const variable = useTimeSeriesStore((state) => state.variable);
   const layout = useTimeSeriesStore((state) => state.layout);
 
   return (
     <ViewContainer fullScreen={singleRowOn}>
-
           { 
               <Suspense fallback={<LoadingAnimation />}>
                 <HydroFabricPlotContainer>
@@ -33,7 +33,7 @@ const TimeSeriesView = ({singleRowOn}) => {
                           data={
                             [
                               {
-                                label: 'Streamflow',
+                                label: variable,
                                 data: series,
                               },
                             ] 
@@ -43,7 +43,7 @@ const TimeSeriesView = ({singleRowOn}) => {
                       )
                     }
                   </ParentSize>
-                </HydroFabricPlotContainer>:
+                </HydroFabricPlotContainer>
 
               </Suspense>
           }

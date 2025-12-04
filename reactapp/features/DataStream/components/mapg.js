@@ -128,6 +128,7 @@ const MapComponent = () => {
         type="fill"
         source="hydrofabric"
         source-layer="conus_divides"
+        beforeId='divides'
         filter={
             selectedFeature
             ? ['any', ['==', ['get', 'divide_id'], selectedFeature]]
@@ -201,7 +202,7 @@ const nexusLayers = useMemo(() => {
       source-layer="nexus"
       filter={['!', ['has', 'point_count']]}
       minzoom={5}
-      // maxzoom={16}
+      beforeId='divides'
       paint={{
         'circle-radius': 7,
         'circle-color': theme === 'dark' ? '#4f5b67' : '#1f78b4',
@@ -219,7 +220,7 @@ const nexusLayers = useMemo(() => {
       source-layer="nexus"
       minzoom={5}
       // Optional: ensure it's drawn above the normal points layer
-      // beforeId="nexus-points"
+      beforeId="nexus-points"
       filter={
         selectedFeature
           ? [
