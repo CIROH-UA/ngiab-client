@@ -7,6 +7,12 @@ export const useLayersStore = create((set) => ({
     catchments: {
         visible: true,
     },
+    flowpaths: {
+        visible: true
+    },
+    conus_gauges: {
+        visible: false
+    },
     get_nexus_visibility: () => get().nexus.visible,
     get_catchments_visibility: () => get().catchments.visible,
     set_nexus_visibility: (isVisible) => set((state) => ({
@@ -21,7 +27,18 @@ export const useLayersStore = create((set) => ({
             visible: isVisible,
         },
     })),
-    
+    set_flowpaths_visibility: (isVisible) => set((state) => ({
+        flowpaths: {
+            ...state.flowpaths,
+            visible: isVisible
+        }
+    })),
+    set_conus_gauges_visibility: (isVisible) => set((state) => ({
+        conus_gauges: {
+            ...state.conus_gauges,
+            visible: isVisible
+        }
+    }))
 }));
 
 

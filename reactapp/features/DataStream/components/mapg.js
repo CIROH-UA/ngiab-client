@@ -37,7 +37,8 @@ const MapComponent = () => {
   
   const isNexusVisible = useLayersStore((state) => state.nexus.visible);
   const isCatchmentsVisible = useLayersStore((state) => state.catchments.visible);
-
+  const isFlowPathsVisible = useLayersStore((state) => state.flowpaths.visible);
+  const isConusGaugesVisible = useLayersStore((state) => state.conus_gauges.visible)
   const selectedFeature = useTimeSeriesStore((state) => state.feature_id);
   const set_series = useTimeSeriesStore((state) => state.set_series);
   const set_feature_id = useTimeSeriesStore((state) => state.set_feature_id);
@@ -70,15 +71,12 @@ const MapComponent = () => {
 
       const feature = features[0];
       const layerId = feature.layer.id;
+      
 
-      // Use the right id field depending on the layer
-      let id = null;
-      if (layerId === 'nexus-points') {
-        id = feature.properties?.id;
-
-      } else if (layerId === 'divides') {
-        id = feature.properties?.divide_id;
-      }
+      let id =
+        layerId === 'divides'
+          ? feature.properties?.divide_id
+          : feature.properties?.id;
 
       if (!id) {
         set_hovered_feature({});
@@ -153,6 +151,7 @@ const MapComponent = () => {
 
   // Memoized layer config for flowpaths
   const flowPathsLayer = useMemo(() => {
+    if (!isFlowPathsVisible) return null
     const layer = (
       <Layer
         key="flowpaths"
@@ -160,7 +159,7 @@ const MapComponent = () => {
         type="line"
         source="hydrofabric"
         source-layer="conus_flowpaths"
-        filter={['any', ['in', 'id']]}
+        // filter={['any', ['in', 'id']]}
         paint={{
           'line-color': theme === 'dark' ? '#0077bb' : '#000000',
           'line-width': { stops: [[7, 1], [10, 2]] },
@@ -169,10 +168,11 @@ const MapComponent = () => {
       />
     );
     return layer;
-  }, [theme]);
+  }, [theme, isFlowPathsVisible]);
 
   // Memoized layer config for gauges
   const conusGaugesLayer = useMemo(() => {
+    if (!isConusGaugesVisible) return null;
     const layer = (
       <Layer
         key="conus-gauges"
@@ -180,7 +180,6 @@ const MapComponent = () => {
         type="circle"
         source="hydrofabric"
         source-layer="conus_gages"
-        filter={['any', ['in', 'nex_id']]}
         paint={{
           'circle-radius': { stops: [[3, 2], [11, 5]] },
           'circle-color': theme === 'dark' ? '#c8c8c8' : '#646464',
@@ -189,7 +188,7 @@ const MapComponent = () => {
       />
     )
     return layer;
-  }, [theme]);
+  }, [theme, isConusGaugesVisible]);
 
 
 const nexusLayers = useMemo(() => {
@@ -202,9 +201,8 @@ const nexusLayers = useMemo(() => {
       type="circle"
       source="nexus"
       source-layer="nexus"
-      filter={['!', ['has', 'point_count']]}
+      filter={['!', ['has', 'point_count']]} // do not show the clusters
       minzoom={5}
-      beforeId='divides'
       paint={{
         'circle-radius': 7,
         'circle-color': theme === 'dark' ? '#4f5b67' : '#1f78b4',
@@ -336,7 +334,7 @@ const nexusLayers = useMemo(() => {
     onClick={handleMapClick}
     onLoad={onMapLoad}
     onMouseMove={onHover}
-    interactiveLayerIds={['divides', 'nexus-points']}
+    interactiveLayerIds={['divides', 'nexus-points', 'flowpaths', 'conus-gauges']}
   >
     <Source
       id="conus"
