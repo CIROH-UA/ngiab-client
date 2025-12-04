@@ -9,6 +9,8 @@ const useTimeSeriesStore = create((set) => ({
         "xaxis": "",
         "title": "",
     },
+    table: '',
+    set_table: (newTable) => set({table: newTable}),
     set_feature_id: (newFeatureId) => set({ feature_id: newFeatureId }),
     set_series: (newSeries) => set({ series: newSeries }),
     set_chart_layout: (newLayout) => set({ chart_layout: newLayout }),

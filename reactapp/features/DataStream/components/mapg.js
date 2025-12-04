@@ -42,7 +42,8 @@ const MapComponent = () => {
   const set_series = useTimeSeriesStore((state) => state.set_series);
   const set_feature_id = useTimeSeriesStore((state) => state.set_feature_id);
   const set_variable = useTimeSeriesStore((state) => state.set_variable);
-  
+  const set_table = useTimeSeriesStore((state) => state.set_table);
+
   const nexus_pmtiles = useDataStreamStore((state) => state.nexus_pmtiles);
   const date = useDataStreamStore((state) => state.date);
   const forecast = useDataStreamStore((state) => state.forecast);
@@ -293,7 +294,7 @@ const nexusLayers = useMemo(() => {
             nc_files: nc_files_parsed,
             vpu_gpkg,
           });
-
+          set_table(cacheKey)
           const variables = await getVariables({cacheKey});
           set_variables(variables)
           set_variable(variables[0]); // Set to first variable by default

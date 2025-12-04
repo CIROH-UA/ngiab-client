@@ -35,9 +35,12 @@ export default function DataMenu() {
   const set_variables = useDataStreamStore((state) => state.set_variables);
 
   const variable = useTimeSeriesStore((state) => state.variable);
+  const table = useTimeSeriesStore((state) => state.table)
   const set_series = useTimeSeriesStore((state) => state.set_series);
+  const set_table = useTimeSeriesStore((state) => state.set_table);
   const set_variable = useTimeSeriesStore((state) => state.set_variable);
   const feature_id = useTimeSeriesStore((state) => state.feature_id);
+
 
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('');
@@ -83,8 +86,9 @@ export default function DataMenu() {
         time,
         vpu
       );
+      set_table(cacheKey)
       const id = feature_id.split('-')[1];
-
+      
       await loadVpuData({
         cacheKey,
         nc_files: nc_files_parsed,
@@ -96,11 +100,11 @@ export default function DataMenu() {
       const series = await getTimeseries(id, cacheKey, variables[0]);
       const xy = series.map((d) => ({
         x: new Date(d.time),
-        y: d.flow,
+        y: d[variables[0]],
       }));
 
       set_series(xy);
-      set_variable(variables[0]); // Set to first variable by default
+      set_variable(variables[0]);
 
       console.log('Flow timeseries for', id, xy);
       handleSuccess();
@@ -133,9 +137,17 @@ export default function DataMenu() {
     if (opt) set_time(opt.value);
   };
 
-  const handleChangeVariable = (optionArray) => {
+  const handleChangeVariable = async (optionArray) => {
     const opt = optionArray?.[0];
     if (opt) set_variable(opt.value);
+    const id =  feature_id.split('-')[1];
+    console.log(table)
+    const series = await getTimeseries(id, table, variable);
+    const xy = series.map((d) => ({
+      x: new Date(d.time),
+      y: d[opt.value],
+    }));
+    set_series(xy)
   };
   /* ─────────────────────────────────────
      Fetch available dates (once)
