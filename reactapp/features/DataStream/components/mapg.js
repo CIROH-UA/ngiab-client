@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
 import Map, { Source, Layer } from 'react-map-gl/maplibre';
 import { Protocol } from 'pmtiles';
-import { useHydroFabricContext } from 'features/hydroFabric/hooks/useHydroFabricContext';
 import useTheme from 'hooks/useTheme';
 import { getTimeseries } from "features/DataStream/lib/getTimeSeries";
 import { makeGpkgUrl, getNCFiles } from '../lib/s3Utils';
@@ -10,6 +9,7 @@ import { getCacheKey } from '../lib/opfsCache';
 import { loadVpuData, getVariables } from 'features/DataStream/lib/vpuDataLoader';
 import useTimeSeriesStore from '../store/timeseries';
 import useDataStreamStore from '../store/datastream';
+import useLayersStore from '../store/layers';
 
 const onMapLoad = (event) => {
   const map = event.target;
@@ -32,10 +32,11 @@ const onMapLoad = (event) => {
   });
 };
 
-const MapComponent = ({
-  // cs_context,
- }) => {
-  const { state: hf_state, actions: hs_actions } = useHydroFabricContext();
+const MapComponent = () => {
+  
+  const isNexusVisible = useLayersStore((state) => state.nexus.visible);
+  const isCatchmentsVisible = useLayersStore((state) => state.catchments.visible);
+
   const selectedFeature = useTimeSeriesStore((state) => state.feature_id);
   const set_series = useTimeSeriesStore((state) => state.set_series);
   const set_feature_id = useTimeSeriesStore((state) => state.set_feature_id);
@@ -53,8 +54,7 @@ const MapComponent = ({
   const theme = useTheme();
   const mapRef = useRef(null);
   
-  const isNexusHidden = hf_state.nexus.geometry.hidden;
-  const isCatchmentHidden = hf_state.catchment.geometry.hidden; // default false
+
 
   const mapStyleUrl =
     theme === 'dark'
@@ -64,6 +64,7 @@ const MapComponent = ({
 
   // Memoized layer config for catchments
   const catchmentLayer = useMemo(() => {
+    if (!isCatchmentsVisible) return null;
     const divides = (
       <Layer
         id= 'divides'
@@ -105,7 +106,7 @@ const MapComponent = ({
     );
 
     return [ divides, highlighted ]
-  }, [theme, selectedFeature]);
+  }, [theme, selectedFeature, isCatchmentsVisible]);
 
   // Memoized layer config for flowpaths
   const flowPathsLayer = useMemo(() => {
@@ -149,7 +150,7 @@ const MapComponent = ({
 
 
 const nexusLayers = useMemo(() => {
-  if (isNexusHidden) return null;
+  if (!isNexusVisible) return null;
 
   const pointsLayer = (
     <Layer
@@ -201,7 +202,7 @@ const nexusLayers = useMemo(() => {
 
 
   return [pointsLayer, nexusHighlightLayer];
-}, [isNexusHidden, theme, selectedFeature]);
+}, [isNexusVisible, theme, selectedFeature]);
 
   useEffect(() => {
     // Reset highlights when geometry layers are hidden
@@ -221,10 +222,10 @@ const nexusLayers = useMemo(() => {
     const map = event.target;
     // Build layersToQuery based on current hidden states
     const layersToQuery = [];
-    if (!isNexusHidden) {
+    if (isNexusVisible) {
       layersToQuery.push('nexus-points')
     }
-    if (!isCatchmentHidden) {
+    if (isCatchmentsVisible) {
       layersToQuery.push('divides');
     }
     if (layersToQuery.length === 0) return;

@@ -7,7 +7,7 @@ import Button from 'react-bootstrap/Button';
 import styled from 'styled-components';
 import { GoGraph,GoChevronDown  } from "react-icons/go";
 import LoadingAnimation from 'components/loader/LoadingAnimation';
-import HydroFabricView from './hydroFabricView.js';
+// import HydroFabricView from '../../features/DataStream/old/hydroFabricView.js';
 import MapComponent from 'features/Map/components/mapgl.js';
 import ModelRunsView from 'features/ModelRuns/views/modelsView.js';
 
@@ -70,9 +70,9 @@ const NGIABView = () => {
                 isModelRunListOpen={isModelRunListOpen}  
               >
                 <Suspense fallback={<LoadingAnimation />}>
-                  <HydroFabricView 
+                  {/* <HydroFabricView 
                     singleRowOn={singleRowOn} 
-                  />
+                  /> */}
                 </Suspense>
               </HydroFabricContainer>
           </HydroFabricProvider>

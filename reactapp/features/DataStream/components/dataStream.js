@@ -3,10 +3,10 @@ import styled from 'styled-components';
 import Button from 'react-bootstrap/Button';
 
 import DataStreamMenu from 'features/DataStream/components/dataStreamMenu';
-import HydrofabricLayerMenu from 'features/DataStream/components/hydroFabricLayerMenu';
+import HydrofabricLayerMenu from 'features/DataStream/old/components/hydroFabricLayerMenu';
 // import HydroFabricSelectMenu from 'features/DataStream/components/hydroFabricSelectMenu';
-import HydroFabricTimeSeriesMenu from 'features/DataStream/components/hydroFabricTimeSeriesMenu';
-
+import TimeSeriesMenu from 'features/DataStream/components/TimeSeriesMenu';
+// import {LayerControl} from './layersControl';
 import { IoMdClose } from "react-icons/io";
 
 
@@ -36,7 +36,7 @@ const TogggledButton = styled(Button)`
 
 
 
-const DataStreamMenuWrapper = ({
+const DataStream = ({
   toggleSingleRow,
   setIsLoading,
   setIsDataStreamMenuOpen,
@@ -50,23 +50,6 @@ const DataStreamMenuWrapper = ({
   const handleBucketS3Menu = () => {
     setIsBucketDatesOpen(prev => !prev);
     setIsHydroFabricSelectOpen(false);
-    setIsHydroFabricLayerOpen(false);
-    setCurrentMenu(true);
-    setIsDataStreamMenuOpen(true);
-
-  };
-
-  const handleHydroLayerMenu = () => {
-    setIsBucketDatesOpen(false);
-    setIsHydroFabricSelectOpen(false);
-    setIsHydroFabricLayerOpen(prev => !prev);
-    setCurrentMenu(true);
-    setIsDataStreamMenuOpen(true);
-  };
-
-  const handleHydroSelectMenu = () => {
-    setIsBucketDatesOpen(false);
-    setIsHydroFabricSelectOpen(prev => !prev);
     setIsHydroFabricLayerOpen(false);
     setCurrentMenu(true);
     setIsDataStreamMenuOpen(true);
@@ -97,20 +80,7 @@ const DataStreamMenuWrapper = ({
             currentMenu={currentMenu}
         />
 
-        <HydrofabricLayerMenu
-            isopen={isHydroFabricLayerOpen}
-            handleIsOpen={handleHydroLayerMenu}
-            currentMenu={currentMenu}
-        />
-          
-        {/* <HydroFabricSelectMenu
-          isopen={isHydroFabricSelectOpen}
-          handleIsOpen={handleHydroSelectMenu}
-          toggleSingleRow={toggleSingleRow}
-          setIsLoading={setIsLoading}
-          currentMenu={currentMenu}
-        /> */}
-        <HydroFabricTimeSeriesMenu
+        <TimeSeriesMenu
           toggleSingleRow={toggleSingleRow}
           currentMenu={currentMenu}
           singleRowOn={singleRowOn}
@@ -121,4 +91,4 @@ const DataStreamMenuWrapper = ({
   );
 };
 
-export default DataStreamMenuWrapper;
+export default DataStream;

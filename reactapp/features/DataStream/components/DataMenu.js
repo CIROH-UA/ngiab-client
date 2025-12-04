@@ -15,6 +15,7 @@ import useDataStreamStore from '../store/datastream';
 import { MdOutlineWaves, MdCalendarMonth, MdOutlineRefresh } from "react-icons/md";
 import { BsExclamationCircle } from "react-icons/bs";
 import { availableCyclesList, availableEnsembleList, availableForecastList } from '../lib/data';
+// import { LayerControl } from './layersControl';
 
 const availableVariables = (vs) => {
   const variables = [];
@@ -23,7 +24,7 @@ const availableVariables = (vs) => {
   }
   return variables;
 }
-export default function BucketSelect() {
+export default function DataMenu() {
   const [datesBucket, setDatesBucket] = useState([]);
 
 
@@ -289,6 +290,9 @@ export default function BucketSelect() {
           </>
         )}
       </LoadingMessage>
+      <Fragment>
+       
+      </Fragment>
     </Fragment>
   );
 }

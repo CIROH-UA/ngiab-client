@@ -7,8 +7,8 @@ const StyledHydroFabricContainer = styled.div`
   // flex: ${(props) => (props.$fullScreen ? '1 1 0%' : '1 1 40%')};
   height: ${(props) => (props.$fullScreen ? '0%' : '55%')};
   // order: 2;
-  width: ${(props) => (props.isModelRunListOpen ? '80%' : '100%')};
-  margin-left: ${(props) => (props.isModelRunListOpen ? '20%' : '0%')};
+  width: ${(props) => (props.isModelRunListOpen ? 'calc(100% -400px)' : '100%')};
+  margin-left: ${(props) => (props.isModelRunListOpen ? '400px' : '0%')};
   background-color: ${(props) => props.theme === 'dark' ? '#4f5b67' : '#ffffff'};
   position: absolute;
   bottom: 0;

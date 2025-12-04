@@ -1,8 +1,9 @@
-import React, { Fragment } from 'react';
+import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
-import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
+import HydroFabricSelect from 'features/DataStream/old/components/hydroFabricSelect';
 import Button from 'react-bootstrap/Button';
-import { IoLayers } from "react-icons/io5";
+import { IoIosOptions  } from "react-icons/io";
+
 
 const Container = styled.div`
   position: absolute;
@@ -25,12 +26,13 @@ const Container = styled.div`
   }
 `;
 
-
 const TogggledButton = styled(Button)`
-  top: 140px;
+  top: 200px;
   left: ${({ currentMenu }) => currentMenu ? '21%' : '20px'};
   position: absolute;
+  
   margin-top: 10px;
+
   transition: transform 0.3s ease;
 
   background-color: #009989;
@@ -49,7 +51,6 @@ const TogggledButton = styled(Button)`
 `;
 
 
-
 const Content = styled.div`
   padding: 16px;
   margin-top: 100px;
@@ -57,29 +58,30 @@ const Content = styled.div`
 
 
 
-const HydrofabricLayerMenu = ({
+const HydroFabricSelectMenu = ({
   isopen,
   handleIsOpen,
+  toggleSingleRow,
+  setIsLoading,
   currentMenu
 }) => {
-
-
+  
+  
   return (
     <Fragment>
-
           {
             !isopen && 
-
-              <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu}>
-                <IoLayers size={15} />
-              </TogggledButton>
-            
-
+            <TogggledButton onClick={handleIsOpen} currentMenu={currentMenu}>
+               <IoIosOptions size={15} />
+            </TogggledButton>
           }
-
           <Container isOpen={isopen}>
             <Content>
-                <HydrofabricMapControl isVisible={isopen} />
+                <HydroFabricSelect
+                    isOpen={isopen}
+                    toggleSingleRow={toggleSingleRow}
+                    setIsLoading={setIsLoading}
+                />
             </Content>
           </Container>
     </Fragment>
@@ -87,4 +89,4 @@ const HydrofabricLayerMenu = ({
   );
 };
 
-export default HydrofabricLayerMenu;
+export default HydroFabricSelectMenu;

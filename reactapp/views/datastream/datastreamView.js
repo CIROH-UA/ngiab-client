@@ -1,4 +1,4 @@
-import { Fragment, useState,Suspense, useEffect } from 'react';
+import { useState, Suspense} from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
 import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
 import { ToastContainer } from 'react-toastify';
@@ -27,10 +27,8 @@ const DataStreamView = () => {
 
   return (
     <ViewContainer>
-        {/* <DataStreamProvider> */}
           <HydroFabricProvider>
             <ToastContainer stacked  />
-
               <MapContainer 
                 $fullScreen={singleRowOn}
               >
@@ -53,7 +51,6 @@ const DataStreamView = () => {
                 </Suspense>
               </HydroFabricContainer>
           </HydroFabricProvider>
-        {/* </DataStreamProvider> */}
 
 
     </ViewContainer>

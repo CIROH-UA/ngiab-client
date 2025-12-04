@@ -1,5 +1,5 @@
 import React, { Fragment, useState } from 'react';
-import DataStreamMenuWrapper from 'features/DataStream/components/dataStreamMenuWrapper';
+import DataStream from 'features/DataStream/components/dataStream';
 
 
 const DataStreamMenuView = ({
@@ -12,7 +12,7 @@ const DataStreamMenuView = ({
   
   return (
     <Fragment>
-      <DataStreamMenuWrapper 
+      <DataStream 
           toggleSingleRow={toggleSingleRow}
           setIsLoading={setIsLoading}
           setIsDataStreamMenuOpen={setIsDataStreamMenuOpen}
