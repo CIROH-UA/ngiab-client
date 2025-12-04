@@ -21,10 +21,3 @@ export async function getTimeseries(id, cacheKey, variable) {
   return rows;
 }
 
-const availableVariables = (vs) => {
-  const variables = [];
-  for (let i = 0; i < vs.length; i++) {
-    variables.push({ value: vs[i], label: vs[i] });
-  }
-  return variables;
-}
