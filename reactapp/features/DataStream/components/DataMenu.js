@@ -142,7 +142,7 @@ export default function DataMenu() {
     if (opt) set_variable(opt.value);
     const id =  feature_id.split('-')[1];
     console.log(table)
-    const series = await getTimeseries(id, table, variable);
+    const series = await getTimeseries(id, table, opt.value);
     const xy = series.map((d) => ({
       x: new Date(d.time),
       y: d[opt.value],
