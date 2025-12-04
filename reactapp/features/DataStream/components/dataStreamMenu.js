@@ -29,13 +29,13 @@ const DataStreamMenu = ({
                   Data Options
                 </Title>
                 <MdInfoOutline  />
-              </IconLabel>
-              
+              </IconLabel>   
               <DataMenu />
-              <LayerControl />
             </Content>
 
-            
+            <Content>
+              <LayerControl />
+            </Content>
           </Container>
     </Fragment>
 

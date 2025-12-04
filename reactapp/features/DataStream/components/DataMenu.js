@@ -15,15 +15,8 @@ import useDataStreamStore from '../store/datastream';
 import { MdOutlineWaves, MdCalendarMonth, MdOutlineRefresh } from "react-icons/md";
 import { BsExclamationCircle } from "react-icons/bs";
 import { availableCyclesList, availableEnsembleList, availableForecastList } from '../lib/data';
-// import { LayerControl } from './layersControl';
 
-const availableVariables = (vs) => {
-  const variables = [];
-  for (let i = 0; i < vs.length; i++) {
-    variables.push({ value: vs[i], label: vs[i] });
-  }
-  return variables;
-}
+
 export default function DataMenu() {
   const [datesBucket, setDatesBucket] = useState([]);
 
@@ -33,6 +26,7 @@ export default function DataMenu() {
   const forecast = useDataStreamStore((state) => state.forecast);
   const time = useDataStreamStore((state) => state.time);
   const cycle = useDataStreamStore((state) => state.cycle);
+  const variables = useDataStreamStore((state) => state.variables);
 
   const set_date = useDataStreamStore((state) => state.set_date);
   const set_forecast = useDataStreamStore((state) => state.set_forecast);
@@ -40,11 +34,11 @@ export default function DataMenu() {
   const set_cycle = useDataStreamStore((state) => state.set_cycle);
   const set_variables = useDataStreamStore((state) => state.set_variables);
 
-  // const { state: dsState, actions: dsActions } = useDataStreamContext();
+  const variable = useDataStreamStore((state) => state.variable);
   const set_series = useTimeSeriesStore((state) => state.set_series);
   const set_variable = useTimeSeriesStore((state) => state.set_variable);
   const feature_id = useTimeSeriesStore((state) => state.feature_id);
-  
+
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('');
 
@@ -190,6 +184,10 @@ export default function DataMenu() {
     }
   }, [forecast, cycle, time]);
 
+  const availableVariablesList = useMemo(() => {
+    return variables.map((v) => ({ value: v, label: v }));
+  }, [variables]);
+
   /* ─────────────────────────────────────
      Selected options derived from dsState
      ───────────────────────────────────── */
@@ -216,6 +214,13 @@ export default function DataMenu() {
     const opts = availableEnsembleList[forecast] || [];
     return opts.find((opt) => opt.value === time) ?? null;
   }, [forecast, time]);
+
+  const selectedVariableOption = useMemo(() => {
+    const opts = availableVariablesList || [];
+    return opts.find((opt) => opt.value === variable) ?? null;
+  }
+  , [variables, variable]);
+
 
   /* ─────────────────────────────────────
      Render
@@ -270,6 +275,16 @@ export default function DataMenu() {
               optionsList={availableEnsembleList[forecast]}
               value={selectedEnsembleOption}
               onChangeHandler={handleChangeEnsemble}
+            />
+          </Row>
+        )}
+        { availableVariablesList.length > 0 && (
+          <Row>
+            <IconLabel> <MdOutlineWaves/> Variable</IconLabel>
+            <SelectComponent
+              optionsList={availableVariablesList}
+              value={selectedVariableOption}
+              onChangeHandler={handleChangeVariable}
             />
           </Row>
         )}

@@ -9,7 +9,7 @@ export const Container = styled.div`
   width: 400px;
   background-color: #4f5b679e;
   color: #fff;
-  
+  padding-top: 120px;
   z-index: 1000;
   transition: transform 0.3s ease;
 
@@ -119,7 +119,6 @@ export const Switch = styled(Form.Switch)`
 
 export const Content = styled.div`
   padding: 16px;
-  margin-top: 110px;
   border-block: 1px solid rgb(218, 220, 224);
   padding-block-start: 8px;
   a {
