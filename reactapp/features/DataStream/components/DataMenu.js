@@ -71,7 +71,6 @@ export default function DataMenu() {
   const handleVisulization = async () => {
     try {
       handleLoading('Loading Datastream Data');
-
       const nc_files_parsed = await getNCFiles(
         date,
         forecast,
@@ -79,7 +78,9 @@ export default function DataMenu() {
         time,
         vpu
       );
+
       const vpu_gpkg = makeGpkgUrl(vpu);
+      
       const cacheKey = getCacheKey(
         date,
         forecast,
@@ -88,6 +89,7 @@ export default function DataMenu() {
         vpu
       );
       set_table(cacheKey)
+      
       const id = feature_id.split('-')[1];
       
       await loadVpuData({
@@ -98,18 +100,19 @@ export default function DataMenu() {
       const variables = await getVariables({cacheKey});
       set_variables(variables);
       console.log('Available variables:', variables);
-      const series = await getTimeseries(id, cacheKey, variables[0]);
+      const _variable = variable ? variable : variables[0];
+      const series = await getTimeseries(id, cacheKey, _variable);
       const xy = series.map((d) => ({
         x: new Date(d.time),
         y: d[variables[0]],
       }));
 
       set_series(xy);
-      set_variable(variables[0]);
+      set_variable(_variable);
       set_layout({
-        'yaxis': opt.value,
+        'yaxis': _variable,
         'xaxis': "Time",
-        'title': `${id} ${opt.value}`
+        'title': `${id} ${_variable}`
       })
       console.log('Flow timeseries for', id, xy);
       handleSuccess();

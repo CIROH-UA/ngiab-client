@@ -3,7 +3,7 @@ import { create } from 'zustand';
 const useTimeSeriesStore = create((set) => ({
     series: [],
     feature_id: null,
-    variable: 'flow',
+    variable: '',
     layout: {
         "yaxis": "Streamflow",
         "xaxis": "Simulation Time Period (YYYY-MM-DD)",

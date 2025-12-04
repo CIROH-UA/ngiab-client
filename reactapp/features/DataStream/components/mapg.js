@@ -298,8 +298,7 @@ const nexusLayers = useMemo(() => {
           set_table(cacheKey)
           const variables = await getVariables({cacheKey});
           set_variables(variables)
-          set_variable(variables[0]); // Set to first variable by default
-          
+          set_variable(variables[0]);
           const series = await getTimeseries(id, cacheKey, variables[0]);
           const xy = series.map(d => ({
             x: new Date(d.time),

@@ -118,8 +118,10 @@ function LineChart({ width, height, data, layout }) {
   };
 
   const formatDate = timeFormat('%Y-%m-%d');
+  const formatTooltipDate = timeFormat('%Y-%m-%d %H:%M:%S'); // tooltip
   const bisectDate = bisector((d) => getDate(d)).left;
-
+ const formatYValue = (val) =>
+    val == null || Number.isNaN(val) ? '—' : val.toFixed(2);
   const rescaleXAxis = (scale, m) =>
     scale
       .copy()
@@ -240,11 +242,18 @@ function LineChart({ width, height, data, layout }) {
             const newXScale = rescaleXAxis(xScale, zoom.transformMatrix);
             const newYScale = rescaleYAxis(yScale, zoom.transformMatrix);
             const xTickValues = newXScale.ticks(xNumTicks);
-            const safeXTicks =
-              xTickValues.length > 1
-                ? xTickValues.slice(0, -1)
-                : xTickValues;
-
+            // filter out ticks that would have the same formatted label (same day)
+            const seen = new Set();
+            const uniqueXTicks = xTickValues.filter((d) => {
+              const label = formatDate(d); // '%Y-%m-%d'
+              if (seen.has(label)) return false;
+              seen.add(label);
+              return true;
+            });
+            
+            // optionally drop the very last tick to avoid label clashing at right edge
+            const safeXTicks = uniqueXTicks;
+            
             return (
               <>
                 {/* <div
@@ -462,7 +471,7 @@ function LineChart({ width, height, data, layout }) {
                   >
                     <div style={{ marginBottom: 4 }}>
                       <strong>Date: </strong>
-                      {formatDate(
+                      {formatTooltipDate(
                         getDate(tooltipData[0].dataPoint)
                       )}
                     </div>
@@ -476,7 +485,7 @@ function LineChart({ width, height, data, layout }) {
                         >
                           {d.seriesLabel}:{' '}
                         </strong>
-                        {getYValue(d.dataPoint)}
+                        {formatYValue(getYValue(d.dataPoint))}
                       </div>
                     ))}
                   </TooltipWithBounds>
