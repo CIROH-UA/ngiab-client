@@ -75,12 +75,12 @@ const MapComponent = () => {
       let id = null;
       if (layerId === 'nexus-points') {
         id = feature.properties?.id;
+
       } else if (layerId === 'divides') {
         id = feature.properties?.divide_id;
       }
 
       if (!id) {
-        // No usable id → clear
         set_hovered_feature({});
         return;
       }
@@ -88,8 +88,10 @@ const MapComponent = () => {
       set_hovered_feature({
         longitude: lngLat.lng,
         latitude: lngLat.lat,
-        id,
+        // id,
+        ...feature.properties
       });
+      console.log(feature.properties)
     },
     [set_hovered_feature]
   );
@@ -365,24 +367,16 @@ const nexusLayers = useMemo(() => {
             <PopupContent>
               <div className="popup-title">Feature</div>
 
-              <div className="popup-row">
-                <span className="popup-label">id</span>
-                <span className="popup-value">{hoveredId}</span>
-              </div>
-
-              {/* Example: show coords too */}
-              <div className="popup-row">
-                <span className="popup-label">Lon</span>
-                <span className="popup-value">
-                  {hovered_feature.longitude.toFixed(4)}
-                </span>
-              </div>
-              <div className="popup-row">
-                <span className="popup-label">Lat</span>
-                <span className="popup-value">
-                  {hovered_feature.latitude.toFixed(4)}
-                </span>
-              </div>
+              {
+                Object.keys(hovered_feature).map((key) => {
+                 return(
+                  <div className="popup-row" key={key}>
+                    <span className="popup-label">{key}</span>
+                    <span className="popup-value">{hovered_feature[key]}</span>
+                  </div>
+                 )
+                })
+              }
             </PopupContent>            
 
           </Popup>
