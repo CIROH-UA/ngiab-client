@@ -91,7 +91,7 @@ const MapComponent = () => {
         // id,
         ...feature.properties
       });
-      console.log(feature.properties)
+      
     },
     [set_hovered_feature]
   );
