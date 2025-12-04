@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useCallback, useRef, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
-import Map, { Source, Layer } from 'react-map-gl/maplibre';
+import Map, { Source, Layer, Popup } from 'react-map-gl/maplibre';
 import { Protocol } from 'pmtiles';
 import useTheme from 'hooks/useTheme';
 import { getTimeseries } from "features/DataStream/lib/getTimeSeries";
@@ -9,7 +9,8 @@ import { getCacheKey } from '../lib/opfsCache';
 import { loadVpuData, getVariables } from 'features/DataStream/lib/vpuDataLoader';
 import useTimeSeriesStore from '../store/timeseries';
 import useDataStreamStore from '../store/datastream';
-import useLayersStore from '../store/layers';
+import {useLayersStore, useFeatureStore} from '../store/layers';
+import { PopupContent } from './StyledComponents/ts';
 
 const onMapLoad = (event) => {
   const map = event.target;
@@ -50,11 +51,49 @@ const MapComponent = () => {
   const set_vpu = useDataStreamStore((state) => state.set_vpu);
   const set_variables = useDataStreamStore((state) => state.set_variables);
   
+  const set_hovered_feature = useFeatureStore((state) => state.set_hovered_feature);
+  const hovered_feature =  useFeatureStore((state) => state.hovered_feature);
   
   const theme = useTheme();
   const mapRef = useRef(null);
   
+  const onHover = useCallback(
+    (event) => {
+      const { features, lngLat } = event;
 
+      if (!features || features.length === 0) {
+        // Clear popup when not over any feature
+        set_hovered_feature({});
+        return;
+      }
+
+      const feature = features[0];
+      const layerId = feature.layer.id;
+
+      // Use the right id field depending on the layer
+      let id = null;
+      if (layerId === 'nexus-points') {
+        id = feature.properties?.id;
+      } else if (layerId === 'divides') {
+        id = feature.properties?.divide_id;
+      }
+
+      if (!id) {
+        // No usable id → clear
+        set_hovered_feature({});
+        return;
+      }
+
+      set_hovered_feature({
+        longitude: lngLat.lng,
+        latitude: lngLat.lat,
+        id,
+      });
+    },
+    [set_hovered_feature]
+  );
+
+  const hoveredId = hovered_feature?.id || '';
 
   const mapStyleUrl =
     theme === 'dark'
@@ -293,6 +332,8 @@ const nexusLayers = useMemo(() => {
     mapStyle={mapStyleUrl}
     onClick={handleMapClick}
     onLoad={onMapLoad}
+    onMouseMove={onHover}
+    interactiveLayerIds={['divides', 'nexus-points']}
   >
     <Source
       id="conus"
@@ -312,6 +353,39 @@ const nexusLayers = useMemo(() => {
     >
       {nexusLayers}
     </Source>
+
+        {hoveredId && (
+          <Popup
+            longitude={hovered_feature.longitude}
+            latitude={hovered_feature.latitude}
+            offset={[0, -10]}
+            closeButton={false}
+          >
+            <PopupContent>
+              <div className="popup-title">Feature</div>
+
+              <div className="popup-row">
+                <span className="popup-label">id</span>
+                <span className="popup-value">{hoveredId}</span>
+              </div>
+
+              {/* Example: show coords too */}
+              <div className="popup-row">
+                <span className="popup-label">Lon</span>
+                <span className="popup-value">
+                  {hovered_feature.longitude.toFixed(4)}
+                </span>
+              </div>
+              <div className="popup-row">
+                <span className="popup-label">Lat</span>
+                <span className="popup-value">
+                  {hovered_feature.latitude.toFixed(4)}
+                </span>
+              </div>
+            </PopupContent>            
+
+          </Popup>
+        )}
 
   </Map>
   );

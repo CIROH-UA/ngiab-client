@@ -75,6 +75,10 @@ const StyledMapContainer = styled.div`
   height: ${(props) => (props.$fullScreen ? '100%' : '60%')};
   background-color: ${(props) =>
     props.theme === 'dark' ? '#1f1f1f' : '#f9f9f9'};
+    
+  .maplibregl-popup-content{
+    padding: 0px
+  }
 `;
 
 export const MapContainer = (props) => {

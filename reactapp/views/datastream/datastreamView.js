@@ -7,6 +7,7 @@ import LoadingAnimation from 'components/loader/LoadingAnimation';
 import TimeSeriesView from '../ngiab/ts.js';
 import MapComponent from 'features/DataStream/components/mapg.js';
 import DataStreamMenuView from 'features/DataStream/views/dataStreamMenuView.js';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
 
 const ViewContainer = styled.div`

@@ -1,4 +1,4 @@
-import useLayersStore from '../store/layers';
+import {useLayersStore} from '../store/layers';
 import { Fragment } from 'react';
 import {Switch} from  './StyledComponents/ts';
 import { FaMapMarkerAlt } from "react-icons/fa";

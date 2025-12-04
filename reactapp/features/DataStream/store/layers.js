@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-const useLayersStore = create((set) => ({
+export const useLayersStore = create((set) => ({
     nexus: {
         visible: true,
     },
@@ -23,4 +23,12 @@ const useLayersStore = create((set) => ({
     })),
     
 }));
-export default useLayersStore;
+
+
+export const useFeatureStore = create((set) => ({
+    hovered_feature: null,
+    set_hovered_feature: (feature) =>
+        set(() => ({
+            hovered_feature: feature,
+        })),
+}));

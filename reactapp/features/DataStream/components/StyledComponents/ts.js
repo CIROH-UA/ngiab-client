@@ -1,5 +1,55 @@
 import styled from 'styled-components';
 import { Button, Form } from 'react-bootstrap';
+import useTheme from 'hooks/useTheme';
+
+
+
+const StyledPopupContent = styled.div`
+  width: 100%;
+  max-width: 100%;
+  padding: 8px 10px;
+  // border-radius: 6px;
+  background-color: ${(props) =>
+    props.theme === 'dark' ? '#2b333b' : '#ffffff'};
+  color: ${(props) =>
+    props.theme === 'dark' ? '#f8f9fa' : '#212529'};
+
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  font-size: 12px;
+  line-height: 1.4;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  .popup-title {
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .popup-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .popup-label {
+    font-weight: 500;
+    opacity: 0.8;
+  }
+
+  .popup-value {
+    font-family: monospace;
+    word-break: break-all;
+  }
+
+`;
+
+export const PopupContent = (props) => {
+  const theme = useTheme();
+  return <StyledPopupContent {...props} theme={theme} />;
+};
 
 export const Container = styled.div`
   position: absolute;
