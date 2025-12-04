@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, Fragment } from 'react';
-import styled from 'styled-components';
-import { Button, Row, Spinner } from 'react-bootstrap';
+// import styled from 'styled-components';
+import { Spinner } from 'react-bootstrap';
+import { XButton, LoadingMessage, Row, IconLabel } from './StyledComponents/ts';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 import { toast } from 'react-toastify';
@@ -8,114 +9,41 @@ import { loadVpuData, getVariables } from 'features/DataStream/lib/vpuDataLoader
 import { getNCFiles, makeGpkgUrl } from '../lib/s3Utils';
 import { getTimeseries } from 'features/DataStream/lib/getTimeSeries';
 import { getCacheKey } from '../lib/opfsCache';
-import { useDataStreamContext } from '../hooks/useDataStreamContext';
+// import { useDataStreamContext } from '../hooks/useDataStreamContext';
 import useTimeSeriesStore from '../store/timeseries';
+import useDataStreamStore from '../store/datastream';
 import { MdOutlineWaves, MdCalendarMonth, MdOutlineRefresh } from "react-icons/md";
 import { BsExclamationCircle } from "react-icons/bs";
+import { availableCyclesList, availableEnsembleList, availableForecastList } from '../lib/data';
 
-
-
-const StyledButton = styled(Button)`  
-  background-color: rgba(255, 255, 255, 0.1);
-  border: none;
-  color: white;
-  border-radius: 2px;
-  padding: 7px 8px;
-  width: 100%;
-  z-index: 1001;
-
-  &:hover,
-  &:focus {
-    background-color: rgba(0, 0, 0, 0.1) !important;
-    color: white;
-    border: none;
-    box-shadow: none;
+const availableVariables = (vs) => {
+  const variables = [];
+  for (let i = 0; i < vs.length; i++) {
+    variables.push({ value: vs[i], label: vs[i] });
   }
-`;
-
-const StyledLoadingMessage = styled.div`
-  color: white;
-  padding: 10px;
-  border-radius: 5px;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: bold;
-  width: 100%;
-  text-align: center;
-  opacity: 0.8;
-  transition: opacity 0.3s ease;
-  &:hover {
-    opacity: 1;
-  }
-`;
-
-const RowStyle = styled.div`
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-`;
-
-const IconLabel = styled.span`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-`
-
-
-
-const availableForecastList = [
-  { value: 'short_range', label: 'short_range' },
-  { value: 'medium_range', label: 'medium_range' },
-  { value: 'analysis_assim_extend', label: 'analysis_assim_extend' },
-];
-
-const availableCyclesList = {
-  short_range: [
-    { value: '00', label: '00' },
-    { value: '01', label: '01' },
-    { value: '02', label: '02' },
-    { value: '03', label: '03' },
-    { value: '04', label: '04' },
-    { value: '05', label: '05' },
-    { value: '06', label: '06' },
-    { value: '07', label: '07' },
-    { value: '08', label: '08' },
-    { value: '09', label: '09' },
-    { value: '10', label: '10' },
-    { value: '11', label: '11' },
-    { value: '12', label: '12' },
-    { value: '13', label: '13' },
-    { value: '14', label: '14' },
-    { value: '15', label: '15' },
-    { value: '16', label: '16' },
-    { value: '17', label: '17' },
-  ],
-  medium_range: [
-    { value: '00', label: '00' },
-    { value: '06', label: '06' },
-    { value: '12', label: '12' },
-  ],
-  analysis_assim_extend: [{ value: '16', label: '16' }],
-};
-
-const availableEnsembleList = {
-  short_range: [],
-  medium_range: [{ value: '1', label: '1' }],
-  analysis_assim_extend: [],
-};
-
+  return variables;
+}
 export default function BucketSelect() {
   const [datesBucket, setDatesBucket] = useState([]);
 
-  const { state: dsState, actions: dsActions } = useDataStreamContext();
+
+  const vpu = useDataStreamStore((state) => state.vpu);
+  const date = useDataStreamStore((state) => state.date);
+  const forecast = useDataStreamStore((state) => state.forecast);
+  const time = useDataStreamStore((state) => state.time);
+  const cycle = useDataStreamStore((state) => state.cycle);
+
+  const set_date = useDataStreamStore((state) => state.set_date);
+  const set_forecast = useDataStreamStore((state) => state.set_forecast);
+  const set_time = useDataStreamStore((state) => state.set_time);
+  const set_cycle = useDataStreamStore((state) => state.set_cycle);
+  const set_variables = useDataStreamStore((state) => state.set_variables);
+
+  // const { state: dsState, actions: dsActions } = useDataStreamContext();
   const set_series = useTimeSeriesStore((state) => state.set_series);
   const set_variable = useTimeSeriesStore((state) => state.set_variable);
   const feature_id = useTimeSeriesStore((state) => state.feature_id);
+  
   const [loading, setLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('');
 
@@ -146,19 +74,19 @@ export default function BucketSelect() {
       handleLoading('Loading Datastream Data');
 
       const nc_files_parsed = await getNCFiles(
-        dsState.date,
-        dsState.forecast,
-        dsState.cycle,
-        dsState.time,
-        dsState.vpu
+        date,
+        forecast,
+        cycle,
+        time,
+        vpu
       );
-      const vpu_gpkg = makeGpkgUrl(dsState.vpu);
+      const vpu_gpkg = makeGpkgUrl(vpu);
       const cacheKey = getCacheKey(
-        dsState.date,
-        dsState.forecast,
-        dsState.cycle,
-        dsState.time,
-        dsState.vpu
+        date,
+        forecast,
+        cycle,
+        time,
+        vpu
       );
       const id = feature_id.split('-')[1];
 
@@ -168,6 +96,7 @@ export default function BucketSelect() {
         vpu_gpkg,
       });
       const variables = await getVariables({cacheKey});
+      set_variables(variables);
       console.log('Available variables:', variables);
       const series = await getTimeseries(id, cacheKey, variables[0]);
       const xy = series.map((d) => ({
@@ -191,24 +120,28 @@ export default function BucketSelect() {
      ───────────────────────────────────── */
   const handleChangeDate = (optionArray) => {
     const opt = optionArray?.[0];
-    if (opt) dsActions.set_date(opt.value);
+    if (opt) set_date(opt.value);
   };
 
   const handleChangeForecast = (optionArray) => {
     const opt = optionArray?.[0];
-    if (opt) dsActions.set_forecast(opt.value);
+    if (opt) set_forecast(opt.value);
   };
 
   const handleChangeCycle = (optionArray) => {
     const opt = optionArray?.[0];
-    if (opt) dsActions.set_cycle(opt.value);
+    if (opt) set_cycle(opt.value);
   };
 
   const handleChangeEnsemble = (optionArray) => {
     const opt = optionArray?.[0];
-    if (opt) dsActions.set_time(opt.value);
+    if (opt) set_time(opt.value);
   };
 
+  const handleChangeVariable = (optionArray) => {
+    const opt = optionArray?.[0];
+    if (opt) set_variable(opt.value);
+  };
   /* ─────────────────────────────────────
      Fetch available dates (once)
      ───────────────────────────────────── */
@@ -226,9 +159,9 @@ export default function BucketSelect() {
         setDatesBucket(data.ngen_dates);
 
         // Set default date in dsState if not already set
-        if (!dsState.date && data.ngen_dates?.length) {
+        if (!date && data.ngen_dates?.length) {
           const def = data.ngen_dates[0]; // or last element if you want most recent
-          dsActions.set_date(def.value ?? def); // depends on shape
+          set_date(def.value ?? def); // depends on shape
         }
 
         toast.success('Successfully retrieved Datastream Dates From S3 Bucket', {
@@ -245,43 +178,43 @@ export default function BucketSelect() {
      When forecast changes, ensure cycle/time are valid
      ───────────────────────────────────── */
   useEffect(() => {
-    const cycles = availableCyclesList[dsState.forecast] || [];
-    if (cycles.length && !cycles.some((o) => o.value === dsState.cycle)) {
-      dsActions.set_cycle(cycles[0].value);
+    const cycles = availableCyclesList[forecast] || [];
+    if (cycles.length && !cycles.some((o) => o.value === cycle)) {
+      set_cycle(cycles[0].value);
     }
 
-    const ensembles = availableEnsembleList[dsState.forecast] || [];
-    if (ensembles.length && !ensembles.some((o) => o.value === dsState.time)) {
-      dsActions.set_time(ensembles[0].value);
+    const ensembles = availableEnsembleList[forecast] || [];
+    if (ensembles.length && !ensembles.some((o) => o.value === time)) {
+      set_time(ensembles[0].value);
     }
-  }, [dsState.forecast, dsState.cycle, dsState.time, dsActions]);
+  }, [forecast, cycle, time]);
 
   /* ─────────────────────────────────────
      Selected options derived from dsState
      ───────────────────────────────────── */
   const selectedDateOption = useMemo(
     () =>
-      datesBucket.find((opt) => opt.value === dsState.date) ??
+      datesBucket.find((opt) => opt.value === date) ??
       null,
-    [datesBucket, dsState.date]
+    [datesBucket, date]
   );
 
   const selectedForecastOption = useMemo(
     () =>
-      availableForecastList.find((opt) => opt.value === dsState.forecast) ??
+      availableForecastList.find((opt) => opt.value === forecast) ??
       null,
-    [dsState.forecast]
+    [forecast]
   );
 
   const selectedCycleOption = useMemo(() => {
-    const opts = availableCyclesList[dsState.forecast] || [];
-    return opts.find((opt) => opt.value === dsState.cycle) ?? null;
-  }, [dsState.forecast, dsState.cycle]);
+    const opts = availableCyclesList[forecast] || [];
+    return opts.find((opt) => opt.value === cycle) ?? null;
+  }, [forecast, cycle]);
 
   const selectedEnsembleOption = useMemo(() => {
-    const opts = availableEnsembleList[dsState.forecast] || [];
-    return opts.find((opt) => opt.value === dsState.time) ?? null;
-  }, [dsState.forecast, dsState.time]);
+    const opts = availableEnsembleList[forecast] || [];
+    return opts.find((opt) => opt.value === time) ?? null;
+  }, [forecast, time]);
 
   /* ─────────────────────────────────────
      Render
@@ -290,50 +223,59 @@ export default function BucketSelect() {
     <Fragment>
       <Fragment>
         {datesBucket.length > 0 && (
-          <RowStyle>
+          <Row>
             <IconLabel> <MdCalendarMonth/> Date</IconLabel>
             <SelectComponent
               optionsList={datesBucket}
               value={selectedDateOption}
               onChangeHandler={handleChangeDate}
             />
-          </RowStyle>
+          </Row>
         )}
-        <RowStyle>
+        <Row>
           <IconLabel> <BsExclamationCircle/>  Forecast</IconLabel>
           <SelectComponent
             optionsList={availableForecastList}
             value={selectedForecastOption}
             onChangeHandler={handleChangeForecast}
           />
-        </RowStyle>
+        </Row>
 
-        {availableCyclesList[dsState.forecast]?.length > 0 && (
-          <RowStyle>
+        {availableCyclesList[forecast]?.length > 0 && (
+          <Row>
             <IconLabel> <MdOutlineRefresh/> Cycle</IconLabel>
             <SelectComponent
-              optionsList={availableCyclesList[dsState.forecast]}
+              optionsList={availableCyclesList[forecast]}
               value={selectedCycleOption}
               onChangeHandler={handleChangeCycle}
             />
-          </RowStyle>
+          </Row>
         )}
 
-        {availableEnsembleList[dsState.forecast]?.length > 0 && (
-          <RowStyle>
+        {availableEnsembleList[forecast]?.length > 0 && (
+          <Row>
             <IconLabel> <MdOutlineWaves/> Ensembles</IconLabel>
             <SelectComponent
-              optionsList={availableEnsembleList[dsState.forecast]}
+              optionsList={availableEnsembleList[forecast]}
               value={selectedEnsembleOption}
               onChangeHandler={handleChangeEnsemble}
             />
-          </RowStyle>
+          </Row>
         )}
-
-        <StyledButton onClick={handleVisulization}>Visualize</StyledButton>
+        {availableEnsembleList.length > 0 && (
+          <Row>
+            <IconLabel> <MdOutlineWaves/> Ensembles</IconLabel>
+            <SelectComponent
+              optionsList={availableEnsembleList[forecast]}
+              value={selectedEnsembleOption}
+              onChangeHandler={handleChangeEnsemble}
+            />
+          </Row>
+        )}
+        <XButton onClick={handleVisulization}>Visualize</XButton>
       </Fragment>
 
-      <StyledLoadingMessage>
+      <LoadingMessage>
         {loading && (
           <>
             <Spinner
@@ -346,7 +288,7 @@ export default function BucketSelect() {
             &nbsp; {loadingText}
           </>
         )}
-      </StyledLoadingMessage>
+      </LoadingMessage>
     </Fragment>
   );
 }

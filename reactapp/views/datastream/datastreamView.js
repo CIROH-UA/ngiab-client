@@ -1,12 +1,10 @@
 import { Fragment, useState,Suspense, useEffect } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
-import { DataStreamProvider } from 'features/DataStream/providers/dataStreamProvider';
-import {useDataStreamContext} from 'features/DataStream/hooks/useDataStreamContext';
 import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
 import { ToastContainer } from 'react-toastify';
 import styled from 'styled-components';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
-import HydroFabricView from '../ngiab/ts.js';
+import TimeSeriesView from '../ngiab/ts.js';
 import MapComponent from 'features/DataStream/components/mapg.js';
 import DataStreamMenuView from 'features/DataStream/views/dataStreamMenuView.js';
 
@@ -29,16 +27,14 @@ const DataStreamView = () => {
 
   return (
     <ViewContainer>
-        <DataStreamProvider>
+        {/* <DataStreamProvider> */}
           <HydroFabricProvider>
             <ToastContainer stacked  />
 
               <MapContainer 
                 $fullScreen={singleRowOn}
               >
-                <MapComponent  
-                  cs_context={useDataStreamContext}
-                />
+                <MapComponent />
               </MapContainer >
               <DataStreamMenuView
                   toggleSingleRow={toggleSingleRow} 
@@ -51,13 +47,13 @@ const DataStreamView = () => {
                 isModelRunListOpen={isDataStreamMenuOpen}  
               >
                 <Suspense fallback={<LoadingAnimation />}>
-                  <HydroFabricView 
+                  <TimeSeriesView 
                     singleRowOn={singleRowOn} 
                   />
                 </Suspense>
               </HydroFabricContainer>
           </HydroFabricProvider>
-        </DataStreamProvider>
+        {/* </DataStreamProvider> */}
 
 
     </ViewContainer>

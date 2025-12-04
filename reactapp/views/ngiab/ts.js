@@ -4,7 +4,7 @@ import { HydroFabricPlotContainer } from '../../components/StyledContainers';
 import useTimeSeriesStore from 'features/DataStream/store/timeseries';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 import ParentSize from '@visx/responsive/lib/components/ParentSize';
-import LineChart from 'features/hydroFabric/components/chart';
+import LineChart from 'features/DataStream/components/plot';
 
 
 const ViewContainer = styled.div`
@@ -14,10 +14,9 @@ const ViewContainer = styled.div`
 `;
 
 
-const HydroFabricView = ({singleRowOn}) => {
+const TimeSeriesView = ({singleRowOn}) => {
   const series = useTimeSeriesStore((state) => state.series);
   const layout = useTimeSeriesStore((state) => state.layout);
-
 
   return (
     <ViewContainer fullScreen={singleRowOn}>
@@ -53,4 +52,4 @@ const HydroFabricView = ({singleRowOn}) => {
   );
 };
 
-export default HydroFabricView;
+export default TimeSeriesView;

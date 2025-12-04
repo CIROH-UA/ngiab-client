@@ -9,6 +9,7 @@ import { makeGpkgUrl, getNCFiles } from '../lib/s3Utils';
 import { getCacheKey } from '../lib/opfsCache';
 import { loadVpuData, getVariables } from 'features/DataStream/lib/vpuDataLoader';
 import useTimeSeriesStore from '../store/timeseries';
+import useDataStreamStore from '../store/datastream';
 
 const onMapLoad = (event) => {
   const map = event.target;
@@ -32,14 +33,22 @@ const onMapLoad = (event) => {
 };
 
 const MapComponent = ({
-  cs_context,
+  // cs_context,
  }) => {
   const { state: hf_state, actions: hs_actions } = useHydroFabricContext();
   const selectedFeature = useTimeSeriesStore((state) => state.feature_id);
   const set_series = useTimeSeriesStore((state) => state.set_series);
   const set_feature_id = useTimeSeriesStore((state) => state.set_feature_id);
   const set_variable = useTimeSeriesStore((state) => state.set_variable);
-  const { state: cs_state, actions: cs_actions } = cs_context();
+  
+  const nexus_pmtiles = useDataStreamStore((state) => state.nexus_pmtiles);
+  const date = useDataStreamStore((state) => state.date);
+  const forecast = useDataStreamStore((state) => state.forecast);
+  const time = useDataStreamStore((state) => state.time);
+  const cycle = useDataStreamStore((state) => state.cycle);
+  const set_vpu = useDataStreamStore((state) => state.set_vpu);
+  const set_variables = useDataStreamStore((state) => state.set_variables);
+  
   
   const theme = useTheme();
   const mapRef = useRef(null);
@@ -232,12 +241,12 @@ const nexusLayers = useMemo(() => {
 
         console.log('Clicked nexus feature with id:', id);
         const vpu_str = `VPU_${feature.properties.vpuid}`;
-        cs_actions.set_vpu(vpu_str);
+        set_vpu(vpu_str);
 
         try {
-          const nc_files_parsed = await getNCFiles(cs_state.date , cs_state.forecast, cs_state.cycle, cs_state.time, vpu_str);
+          const nc_files_parsed = await getNCFiles(date , forecast, cycle, time, vpu_str);
           const vpu_gpkg = makeGpkgUrl(vpu_str);
-          const cacheKey = getCacheKey(cs_state.date , cs_state.forecast, cs_state.cycle, cs_state.time, vpu_str);
+          const cacheKey = getCacheKey(date , forecast, cycle, time, vpu_str);
         
           await loadVpuData({
             cacheKey: cacheKey,
@@ -246,6 +255,7 @@ const nexusLayers = useMemo(() => {
           });
 
           const variables = await getVariables({cacheKey});
+          set_variables(variables)
           set_variable(variables[0]); // Set to first variable by default
           
           const series = await getTimeseries(id, cacheKey, variables[0]);
@@ -297,7 +307,7 @@ const nexusLayers = useMemo(() => {
     <Source
       id="nexus"
       type="vector"
-      url={`pmtiles://${cs_state.geometry}`}
+      url={`pmtiles://${nexus_pmtiles}`}
     >
       {nexusLayers}
     </Source>
