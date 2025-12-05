@@ -14,7 +14,6 @@ import { MdOutlineWaves, MdCalendarMonth, MdOutlineRefresh } from "react-icons/m
 import { BsExclamationCircle } from "react-icons/bs";
 import { availableCyclesList, availableEnsembleList, availableForecastList } from '../lib/data';
 
-
 export default function DataMenu() {
   const [datesBucket, setDatesBucket] = useState([]);
 

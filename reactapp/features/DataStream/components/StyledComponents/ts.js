@@ -1,8 +1,33 @@
 import styled from 'styled-components';
-import { Button, Form } from 'react-bootstrap';
+import { Button, Form, Modal } from 'react-bootstrap';
 import useTheme from 'hooks/useTheme';
 
+// Themed Modal wrapper
+export const ThemedModal = styled(Modal)`
+  .modal-content {
+    background-color: ${({ $themeMode }) =>
+      $themeMode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#ffffff'};
+    color: ${({ $themeMode }) =>
+      $themeMode === 'dark' ? '#f9fafb' : '#111827'};
+    border-radius: 12px;
+  }
 
+  .modal-header,
+  .modal-footer {
+    border-color: ${({ $themeMode }) =>
+      $themeMode === 'dark' ? '#374151' : '#e5e7eb'};
+  }
+
+  .btn-primary {
+    background-color: #009989;
+    border: none;
+  }
+
+  .btn-primary:hover,
+  .btn-primary:focus {
+    background-color: #007a6e;
+  }
+`;
 
 const StyledPopupContent = styled.div`
   width: 100%;
@@ -98,6 +123,22 @@ export const XButton = styled(Button)`
     box-shadow: none;
   }
 `;
+
+export const SButton = styled(Button)`
+  border: none;
+  
+  color: #f9fafb; 
+  background-color: transparent;
+  z-index: 1001;
+
+  &:hover,
+  &:focus {
+    background-color: rgba(0, 0, 0, 0.08) !important;
+    border: none;
+    box-shadow: none;
+  }
+`;
+
 
 export const LoadingMessage = styled.div`
   color: #e5e7eb;

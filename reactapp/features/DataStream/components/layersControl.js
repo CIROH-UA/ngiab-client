@@ -1,15 +1,18 @@
 import { useLayersStore } from '../store/layers';
-import { Fragment, useMemo } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Switch } from  './StyledComponents/ts';
 import { IoLayers } from "react-icons/io5";
 import { MdInfoOutline } from "react-icons/md";
-import { IconLabel, Row, Title  } from './StyledComponents/ts';
+import { IconLabel, Row, Title, SButton  } from './StyledComponents/ts';
 import { NexusSymbol, CatchmentSymbol, FlowPathSymbol, GaugeSymbol } from '../lib/layers';
 import useTheme from 'hooks/useTheme';
+import { LayerInfoModal } from './modals';
 
 export const LayerControl = () => {
   const theme = useTheme();
-
+  
+  const [modalLayerInfoShow, setModalLayerInfoShow] = useState(false);
+  
   const nexusLayer = useLayersStore((state) => state.nexus);
   const catchmentLayer = useLayersStore((state) => state.catchments);
   const flowpathsLayer = useLayersStore((state) => state.flowpaths);
@@ -68,7 +71,10 @@ export const LayerControl = () => {
       <IconLabel>
         <IoLayers />
         <Title>Layer Options</Title>
-        <MdInfoOutline />
+        <SButton bsPrefix='btn2' onClick={() => setModalLayerInfoShow(true)}>
+          <MdInfoOutline size={15} />
+        </SButton>
+
       </IconLabel>
 
       <Row>
@@ -131,6 +137,10 @@ export const LayerControl = () => {
           title="Toggle Conus Gauges Layer visualization"
         />
       </Row>
+      <LayerInfoModal
+        show={modalLayerInfoShow}
+        onHide={() => setModalLayerInfoShow(false)}
+      />
     </Fragment>
   );
 };
