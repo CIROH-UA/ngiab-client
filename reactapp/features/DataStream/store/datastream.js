@@ -3,7 +3,7 @@ import { create } from 'zustand';
 const useDataStreamStore = create((set) => ({
     bucket: 'ciroh-community-ngen-datastream',
     nexus_pmtiles: 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/nexus.pmtiles',
-    community_pmtiles: 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles"',
+    community_pmtiles: 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles',
     cache_key: null,
     vpu: `VPU_01`,
     // date: `ngen.${getTodayDateString()}`,
