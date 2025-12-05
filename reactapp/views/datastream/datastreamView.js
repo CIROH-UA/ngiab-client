@@ -41,7 +41,7 @@ const DataStreamView = () => {
                   setIsDataStreamMenuOpen={setIsDataStreamMenuOpen}
                   singleRowOn={singleRowOn}
               />              
-              <HydroFabricContainer 
+              {/* <HydroFabricContainer 
                 $fullScreen={singleRowOn} 
                 isModelRunListOpen={isDataStreamMenuOpen}  
               >
@@ -50,7 +50,7 @@ const DataStreamView = () => {
                     singleRowOn={singleRowOn} 
                   />
                 </Suspense>
-              </HydroFabricContainer>
+              </HydroFabricContainer> */}
           </HydroFabricProvider>
 
 

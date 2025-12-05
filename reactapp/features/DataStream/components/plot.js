@@ -20,6 +20,7 @@ import { RectClipPath } from '@visx/clip-path';
 import { lightTheme, darkTheme } from '@visx/xychart';
 import useTheme from 'hooks/useTheme';
 import { getVariableUnits } from '../lib/getTimeSeries';
+import { ChartHeader } from '../lib/plotUtils';
 
 
 function LineChart({ width, height, data, layout }) {
@@ -47,8 +48,8 @@ function LineChart({ width, height, data, layout }) {
   }, [layout?.yaxis]);
 
   const theme = useTheme();
-  const visxTheme = theme === 'dark' ? darkTheme : lightTheme;
-
+  // const visxTheme = theme === 'dark' ? darkTheme : lightTheme;
+  const chartTitle = layout?.title;
   const {
     tooltipData,
     tooltipLeft = 0,
@@ -57,13 +58,14 @@ function LineChart({ width, height, data, layout }) {
     hideTooltip,
   } = useTooltip();
 
-  const margin = { top: 20, right: 40, bottom: 45, left: 110 };
+  // const margin = { top: 20, right: 40, bottom: 45, left: 110 };
+  const margin = { top: 60, right: 10, bottom: 30, left: 40 };
   const innerWidth = Math.max(1, width - margin.left - margin.right);
   const innerHeight = Math.max(1, height - margin.top - margin.bottom);
   const EST_LABEL_PX = 100;
   const xNumTicks = Math.max(2, Math.floor(innerWidth / EST_LABEL_PX));
 
-  const parseDate = timeParse('%Y-%m-%d %H:%M:%S');
+  // const parseDate = timeParse('%Y-%m-%d %H:%M:%S');
   const getDate = (d) => (d.x instanceof Date ? d.x : new Date(d.x));
   const getYValue = (d) => d.y;
 
@@ -98,7 +100,7 @@ function LineChart({ width, height, data, layout }) {
     theme === 'dark'
       ? ['#2dd4bf', '#f97316', '#a855f7', '#38bdf8', '#facc15']
       : ['#1d4ed8', '#f97316', '#16a34a', '#dc2626', '#7c3aed'];
-
+      
   const tooltipStyles = {
     ...defaultStyles,
     minWidth: 60,
@@ -210,13 +212,8 @@ function LineChart({ width, height, data, layout }) {
         position: 'relative',
         width,
         height,
-        backgroundColor: theme === 'dark' ? '#1f2933' : '#ffffff', // ★ card bg
-        borderRadius: 10,                                           // ★ rounded card
-        boxShadow:
-          theme === 'dark'
-            ? '0 8px 24px rgba(0, 0, 0, 0.6)'
-            : '0 8px 24px rgba(15, 23, 42, 0.15)',                 // ★ soft shadow
-        overflow: 'hidden',                                        // ★ clip edges
+        borderRadius: 10,    
+        overflow: 'hidden',
       }}
     >
       {hasData ? (
@@ -291,6 +288,12 @@ function LineChart({ width, height, data, layout }) {
                     cursor: zoom.isDragging ? 'grabbing' : 'grab',
                   }}
                 >
+                  {chartTitle && (
+                    <ChartHeader
+                      title ={chartTitle}
+                    />
+                  )}
+
                   <RectClipPath
                     id="chart-clip"
                     x={0}
@@ -323,9 +326,9 @@ function LineChart({ width, height, data, layout }) {
 
                     <AxisLeft
                       scale={newYScale}
-                      label={yAxisLabel}
+                      // label={yAxisLabel}
                       labelProps={{ style: getAxisLabelStyles(theme) }}
-                      labelOffset={80}
+                      // labelOffset={80}
                       stroke={
                         theme === 'dark' ? '#d1d5db' : '#111827'
                       }
@@ -342,7 +345,7 @@ function LineChart({ width, height, data, layout }) {
                     <AxisBottom
                       scale={newXScale}
                       top={innerHeight}
-                      label="Simulation Time Period (YYYY-MM-DD)"
+                      // label="Simulation Time Period (YYYY-MM-DD)"
                       labelProps={{ style: getAxisLabelStyles(theme) }}
                       stroke={
                         theme === 'dark' ? '#d1d5db' : '#111827'

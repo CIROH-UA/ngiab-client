@@ -2,6 +2,22 @@ import styled from 'styled-components';
 import { Button, Form, Modal } from 'react-bootstrap';
 import useTheme from 'hooks/useTheme';
 
+
+const TimeSeriesContainer = styled.div`
+  width: 100%;
+  height: 300px;
+  order: 1;
+  flex: 1 1 80%;
+  background-color: ${(props) => props.theme === 'dark' ? '#1f2933' : '#f9f9f9'};
+`;
+
+export const TimeSeriesThemedContainer = (props) => {
+  const theme = useTheme();
+  return <TimeSeriesContainer {...props} theme={theme} />;
+};
+
+
+
 // Themed Modal wrapper
 export const ThemedModal = styled(Modal)`
   .modal-content {

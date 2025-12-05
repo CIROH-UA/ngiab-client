@@ -6,6 +6,8 @@ import { IconLabel, Title, Container, ToggleButton, SButton } from './StyledComp
 import { Content } from './StyledComponents/ts';
 import { LayerControl } from './layersControl';
 import { DataInfoModel } from './modals';
+import TimeSeriesCard from '../views/TimeseriesCard';
+
 const DataStreamMenu = ({
   isopen,
   handleIsOpen,
@@ -22,6 +24,11 @@ const DataStreamMenu = ({
               </ToggleButton> 
           }
           <Container $isOpen={isopen}>
+
+            <Content>
+
+              <TimeSeriesCard />
+            </Content>
             <Content>
               <IconLabel>
                 <MdSsidChart />

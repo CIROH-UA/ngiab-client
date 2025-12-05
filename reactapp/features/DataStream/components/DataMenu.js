@@ -14,6 +14,8 @@ import { MdOutlineWaves, MdCalendarMonth, MdOutlineRefresh } from "react-icons/m
 import { BsExclamationCircle } from "react-icons/bs";
 import { availableCyclesList, availableEnsembleList, availableForecastList } from '../lib/data';
 
+import { makeTitle } from '../lib/utils';
+
 export default function DataMenu() {
   const [datesBucket, setDatesBucket] = useState([]);
 
@@ -108,8 +110,9 @@ export default function DataMenu() {
       set_layout({
         'yaxis': _variable,
         'xaxis': "Time",
-        'title': `${id} ${_variable}`
+        'title': makeTitle(forecast, feature_id),
       })
+
       console.log('Flow timeseries for', id, xy);
       handleSuccess();
     } catch (err) {

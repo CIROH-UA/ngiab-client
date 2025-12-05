@@ -12,6 +12,7 @@ import useDataStreamStore from '../store/datastream';
 import {useLayersStore, useFeatureStore} from '../store/layers';
 import { PopupContent } from './StyledComponents/ts';
 import { reorderLayers } from '../lib/layers';
+import { makeTitle } from '../lib/utils';
 const onMapLoad = (event) => {
   const map = event.target;
 
@@ -22,17 +23,8 @@ const onMapLoad = (event) => {
     map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
   });
 
-  reorderLayers(map)
-  
-  // // Bring specific layers to front
-  // ['nexus-points'].forEach((layerId) => {
-  //   if (map.getLayer(layerId)) map.moveLayer(layerId);
-  // });
+  reorderLayers(map);
 
-  // // Ensure highlight layers are on top
-  // ['nexus-highlight', 'catchment-highlight'].forEach((layerId) => {
-  //   if (map.getLayer(layerId)) map.moveLayer(layerId);
-  // });
 };
 
 const MapComponent = () => {
@@ -46,6 +38,7 @@ const MapComponent = () => {
   const set_feature_id = useTimeSeriesStore((state) => state.set_feature_id);
   const set_variable = useTimeSeriesStore((state) => state.set_variable);
   const set_table = useTimeSeriesStore((state) => state.set_table);
+  const set_layout = useTimeSeriesStore((state) => state.set_layout);
 
   const nexus_pmtiles = useDataStreamStore((state) => state.nexus_pmtiles);
   const date = useDataStreamStore((state) => state.date);
@@ -298,12 +291,12 @@ const nexusLayers = useMemo(() => {
           const nc_files_parsed = await getNCFiles(date , forecast, cycle, time, vpu_str);
           const vpu_gpkg = makeGpkgUrl(vpu_str);
           const cacheKey = getCacheKey(date , forecast, cycle, time, vpu_str);
-        
           await loadVpuData({
             cacheKey: cacheKey,
             nc_files: nc_files_parsed,
             vpu_gpkg,
           });
+
           set_table(cacheKey)
           const variables = await getVariables({cacheKey});
           set_variables(variables)
@@ -313,8 +306,12 @@ const nexusLayers = useMemo(() => {
             x: new Date(d.time),
             y: d.flow,
           }));
-          
           set_series(xy);
+          set_layout({
+            "yaxis": variables[0],
+            "xaxis": "",
+            "title": makeTitle(forecast, unbiased_id),
+          });
           console.log("Flow timeseries for", id, xy);
         } catch (err) {
           console.error("Failed to load timeseries for", id, err);

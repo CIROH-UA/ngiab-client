@@ -4,7 +4,7 @@ import { Switch } from  './StyledComponents/ts';
 import { IoLayers } from "react-icons/io5";
 import { MdInfoOutline } from "react-icons/md";
 import { IconLabel, Row, Title, SButton  } from './StyledComponents/ts';
-import { NexusSymbol, CatchmentSymbol, FlowPathSymbol, GaugeSymbol } from '../lib/layers';
+import { NexusSymbol, CatchmentSymbol, FlowPathSymbol, GaugeSymbol, symbologyColors } from '../lib/layers';
 import useTheme from 'hooks/useTheme';
 import { LayerInfoModal } from './modals';
 
@@ -32,21 +32,7 @@ export const LayerControl = () => {
   );
 
   const colors = useMemo(
-    () => ({
-      nexusFill: theme === 'dark' ? '#4f5b67' : '#1f78b4',
-      nexusStroke: theme === 'dark' ? '#e9ecef' : '#ffffff',
-      catchmentFill:
-        theme === 'dark'
-          ? 'rgba(238, 51, 119, 0.32)'
-          : 'rgba(91, 44, 111, 0.32)',
-      catchmentStroke:
-        theme === 'dark'
-          ? 'rgba(238, 51, 119, 0.9)'
-          : 'rgba(91, 44, 111, 0.9)',
-      flowStroke: theme === 'dark' ? '#0077bb' : '#000000',
-      gaugeFill: theme === 'dark' ? '#c8c8c8' : '#646464',
-      gaugeStroke: theme === 'dark' ? '#111827' : '#ffffff',
-    }),
+    () => {return symbologyColors(theme)},
     [theme]
   );
 

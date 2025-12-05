@@ -18,6 +18,45 @@ export const reorderLayers = (map) => {
   });
 };
 
+export const symbologyColors = (theme) => ({
+      nexusFill: theme === 'dark' ? '#4f5b67' : '#1f78b4',
+      nexusStroke: theme === 'dark' ? '#e9ecef' : '#ffffff',
+      catchmentFill:
+        theme === 'dark'
+          ? 'rgba(238, 51, 119, 0.32)'
+          : 'rgba(91, 44, 111, 0.32)',
+      catchmentStroke:
+        theme === 'dark'
+          ? 'rgba(238, 51, 119, 0.9)'
+          : 'rgba(91, 44, 111, 0.9)',
+      flowStroke: theme === 'dark' ? '#0077bb' : '#000000',
+      gaugeFill: theme === 'dark' ? '#c8c8c8' : '#646464',
+      gaugeStroke: theme === 'dark' ? '#111827' : '#ffffff',
+})
+
+export const getSymbology = (typeSymbol, colors) => {
+  switch (typeSymbol) {
+    case 'nexus':
+      return (
+        <NexusSymbol fill={colors.nexusFill} stroke={colors.nexusStroke} />
+      );
+    case 'catchments':
+      return (
+        <CatchmentSymbol
+          fill={colors.catchmentFill}
+          stroke={colors.catchmentStroke}
+        />
+      );
+    case 'flowpaths':
+      return <FlowPathSymbol stroke={colors.flowStroke} />;
+    case 'conus_gauges':
+      return (
+        <GaugeSymbol fill={colors.gaugeFill} stroke={colors.gaugeStroke} />
+      );
+    default:
+      return null;
+  }
+}
 
 // --- Small SVG legend symbols ----------------------------------
 
