@@ -10,12 +10,12 @@ import { loadVpuData, getVariables } from 'features/DataStream/lib/vpuDataLoader
 import useTimeSeriesStore from '../store/timeseries';
 import useDataStreamStore from '../store/datastream';
 import {useLayersStore, useFeatureStore} from '../store/layers';
-import { PopupContent } from './StyledComponents/ts';
+import { PopupContent } from './styles/styles';
 import { reorderLayers } from '../lib/layers';
 import { makeTitle } from '../lib/utils';
+
 const onMapLoad = (event) => {
   const map = event.target;
-
   // Set pointer interactions
   const hoverLayers = ['divides', 'nexus-points'];
   hoverLayers.forEach((layer) => {
@@ -24,7 +24,6 @@ const onMapLoad = (event) => {
   });
 
   reorderLayers(map);
-
 };
 
 const MapComponent = () => {
@@ -41,6 +40,7 @@ const MapComponent = () => {
   const set_layout = useTimeSeriesStore((state) => state.set_layout);
 
   const nexus_pmtiles = useDataStreamStore((state) => state.nexus_pmtiles);
+  const conus_pmtiles = useDataStreamStore((state) => state.community_pmtiles);
   const date = useDataStreamStore((state) => state.date);
   const forecast = useDataStreamStore((state) => state.forecast);
   const time = useDataStreamStore((state) => state.time);
@@ -260,7 +260,6 @@ const nexusLayers = useMemo(() => {
   // ON CLICK: update state based on clicked layer
   // ------------------------------------
   const handleMapClick = async (event) => {
-    console.log('Map clicked at:', event);
     set_feature_id(null);
     const map = event.target;
     // Build layersToQuery based on current hidden states
@@ -345,7 +344,7 @@ const nexusLayers = useMemo(() => {
     <Source
       id="conus"
       type="vector"
-      url="pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles"
+      url={`pmtiles://${conus_pmtiles}`}
     >
       {catchmentLayer}
       {flowPathsLayer}
