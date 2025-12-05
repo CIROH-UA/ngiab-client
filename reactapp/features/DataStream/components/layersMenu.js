@@ -11,11 +11,10 @@ const LayerButton = styled(Button)`
   position: absolute;
   margin-top: 10px;
   transition: transform 0.3s ease;
-
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: #009989;
   border: none;
   color: white;
-  border-radius: 28px;
+  border-radius: 20px;
   padding: 7px 8px;
   z-index: 1001;
 
@@ -35,7 +34,7 @@ export const LayersMenu = () => {
   return (
     <Fragment>
       <LayerButton onClick={() => setIsOpen(prev => !prev)}>
-        {!open ? <IoLayers size={20} />: <IoClose size={15} />}
+        {!open ? <IoLayers size={20} />: <IoClose size={20} />}
       </LayerButton>
 
       {open && (
