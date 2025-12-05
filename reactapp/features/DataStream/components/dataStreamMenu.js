@@ -26,7 +26,7 @@ const DataStreamMenu = ({
               <IconLabel>
                 <MdSsidChart />
                 <Title>
-                  Data Options
+                  View Options
                 </Title>
                 <MdInfoOutline  />
               </IconLabel>   

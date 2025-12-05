@@ -57,29 +57,34 @@ export const Container = styled.div`
   left: 0;
   height: 100vh;
   width: 400px;
-  background-color: #4f5b679e;
-  color: #fff;
   padding-top: 120px;
+  padding-bottom: 16px;
+  background-color: #4f5b679e;
+  color: #f9fafb;
   z-index: 1000;
-  transition: transform 0.3s ease;
+  transition: transform 0.25s ease-out;
+  
+  border-radius: 0 12px 12px 0;
+  overflow-y: auto;
 
-  /* When closed, shift left so that only 40px remains visible */
+  /* When closed, hide completely to the left */
   transform: ${({ $isOpen }) =>
-    $isOpen ? 'translateX(0)' : 'translateX(calc(-100%))'};
+    $isOpen ? 'translateX(0)' : 'translateX(-100%)'};
 
-  /* On small screens, use 100% width */
   @media (max-width: 768px) {
     width: 100%;
+    border-radius: 0;
     transform: ${({ $isOpen }) =>
-      $isOpen ? 'translateX(0)' : 'translateX(calc(-100%))'};
+      $isOpen ? 'translateX(0)' : 'translateX(-100%)'};
   }
 `;
 
 
 export const XButton = styled(Button)`  
   background-color: rgba(255, 255, 255, 0.1);
+  
   border: none;
-  color: white;
+  color: #f9fafb;
   border-radius: 2px;
   padding: 7px 8px;
   width: 100%;
@@ -88,14 +93,14 @@ export const XButton = styled(Button)`
   &:hover,
   &:focus {
     background-color: rgba(0, 0, 0, 0.1) !important;
-    color: white;
+    color: #f9fafb;    
     border: none;
     box-shadow: none;
   }
 `;
 
 export const LoadingMessage = styled.div`
-  color: white;
+  color: #e5e7eb;
   padding: 10px;
   border-radius: 5px;
   z-index: 1000;
@@ -118,24 +123,30 @@ export const Row = styled.div`
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  // margin-bottom: 10px;
+  padding: 6px 0;
+  margin-bottom: 2px;
+  font-size: 13px;
 `;
 
 export const IconLabel = styled.span`
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
-  margin-bottom: 8px;
+  // font-size: 14px;
+  // margin-bottom: 8px;
+  font-size: 13px;
+  margin-bottom: 4px;
 
 `
 export const Title = styled.span`
     letter-spacing: .0125em;
     font-family: "Google Sans", Roboto, Arial, sans-serif;
-    font-weight: bold;
-    font-size: 16px;
+    font-weight: 600;
+    font-size: 15px;
     line-height: 24px;
     align-items: center;
+
 `
 export const ToggleButton = styled(Button)`
   top: ${({ $top = 0 }) => `${$top}px`};
@@ -163,16 +174,34 @@ export const ToggleButton = styled(Button)`
 
 
 export const Switch = styled(Form.Switch)`
-  
+  .form-check-input {
+    width: 34px;
+    height: 18px;
+    cursor: pointer;
+    background-color: rgba(148, 163, 184, 0.6);
+    border-radius: 999px;
+    border: none;
+    box-shadow: none;
+  }
+
+  .form-check-input:checked {
+    background-color: #009989; /* Google-style blue toggle */
+  }
+
+  .form-check-input:focus {
+    box-shadow: none;
+  }
 `;
 
-
 export const Content = styled.div`
-  padding: 16px;
-  border-block: 1px solid rgb(218, 220, 224);
-  padding-block-start: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(148, 163, 184, 0.35);
+
+  &:first-of-type {
+    border-top: none;
+  }
   a {
-    color: white;
+    color: #bfdbfe;
   }
 `;
 
