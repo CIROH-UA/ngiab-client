@@ -84,7 +84,8 @@ export const Container = styled.div`
   width: 400px;
   padding-top: 120px;
   padding-bottom: 16px;
-  background-color: #4f5b679e;
+  // background-color: #4f5b679e;
+  background-color: #1f2933;
   color: #f9fafb;
   z-index: 1000;
   transition: transform 0.25s ease-out;

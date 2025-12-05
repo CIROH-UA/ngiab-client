@@ -9,7 +9,9 @@ const StyledHydroFabricContainer = styled.div`
   // order: 2;
   width: ${(props) => (props.isModelRunListOpen ? 'calc(100% -400px)' : '100%')};
   margin-left: ${(props) => (props.isModelRunListOpen ? '400px' : '0%')};
-  background-color: ${(props) => props.theme === 'dark' ? '#4f5b67' : '#ffffff'};
+  // background-color: ${(props) => props.theme === 'dark' ? '#4f5b67' : '#ffffff'};
+  background-color: ${(props) => props.theme === 'dark' ? '#1f2933' : '#ffffff'};
+
   position: absolute;
   bottom: 0;
   right: 0;
@@ -36,12 +38,13 @@ export const HydroFabricContainer = (props) => {
 // HydroFabricPlotContainer
 const StyledHydroFabricPlotContainer = styled.div`
   width: 100%;
-  padding: 5px;
+  padding: 10px;
   // height: calc(40vh - 10px);
   height: 100%;
   order: 1;
   flex: 1 1 80%;
-  background-color: ${(props) => props.theme === 'dark' ? '#4f5b67' : '#f9f9f9'};
+  // background-color: ${(props) => props.theme === 'dark' ? '#4f5b67' : '#f9f9f9'};
+  background-color: ${(props) => props.theme === 'dark' ? '#1f2933' : '#f9f9f9'};
 `;
 
 export const HydroFabricPlotContainer = (props) => {
