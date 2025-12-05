@@ -1,9 +1,9 @@
 import { useLayersStore } from '../store/layers';
 import { Fragment, useMemo, useState } from 'react';
-import { Switch } from  './StyledComponents/ts';
+import { Switch } from  './styles/styles';
 import { IoLayers } from "react-icons/io5";
 import { MdInfoOutline } from "react-icons/md";
-import { IconLabel, Row, Title, SButton  } from './StyledComponents/ts';
+import { IconLabel, Row, Title, SButton  } from './styles/styles';
 import { NexusSymbol, CatchmentSymbol, FlowPathSymbol, GaugeSymbol, symbologyColors } from '../lib/layers';
 import useTheme from 'hooks/useTheme';
 import { LayerInfoModal } from './modals';

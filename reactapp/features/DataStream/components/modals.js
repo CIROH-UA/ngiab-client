@@ -1,6 +1,6 @@
 import Modal from 'react-bootstrap/Modal';
 import useTheme from 'hooks/useTheme';
-import { ThemedModal, XButton } from './StyledComponents/ts';
+import { ThemedModal, XButton } from './styles/styles';
 
 export const LayerInfoModal = (props) => {
   const theme = useTheme();

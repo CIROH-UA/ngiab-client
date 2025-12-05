@@ -1,8 +1,8 @@
 import React, { Fragment, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import Button from 'react-bootstrap/Button';
-import { LayerControl } from './layersControl';
-import { Content, LayersContainer } from './StyledComponents/ts';
+import { LayerControl } from '../layersControl';
+import { Content, LayersContainer } from '../styles/styles';
 import { IoLayers, IoClose } from "react-icons/io5";
 
 const LayerButton = styled(Button)`

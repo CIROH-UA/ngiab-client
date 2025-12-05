@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, Fragment } from 'react';
 import { Spinner } from 'react-bootstrap';
-import { XButton, LoadingMessage, Row, IconLabel } from './StyledComponents/ts';
+import { XButton, LoadingMessage, Row, IconLabel } from './styles/styles';
 import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 import { toast } from 'react-toastify';
@@ -158,7 +158,7 @@ export default function DataMenu() {
     set_layout({
       'yaxis': opt.value,
       'xaxis': "Time",
-      'title': `${id} ${opt.value}`
+      'title': makeTitle(forecast, feature_id),
     })
   };
   /* ─────────────────────────────────────

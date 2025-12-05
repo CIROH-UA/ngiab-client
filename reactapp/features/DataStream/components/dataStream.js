@@ -2,13 +2,13 @@ import React, { Fragment, useState } from 'react';
 import styled from 'styled-components';
 import Button from 'react-bootstrap/Button';
 
-import DataStreamMenu from 'features/DataStream/components/dataStreamMenu';
+import DataStreamMenu from 'features/DataStream/old/components/forecastMenu2';
 // import HydrofabricLayerMenu from 'features/DataStream/old/components/hydroFabricLayerMenu';
 // import HydroFabricSelectMenu from 'features/DataStream/components/hydroFabricSelectMenu';
 // import TimeSeriesMenu from 'features/DataStream/components/TimeSeriesMenu';
 // import {LayerControl} from './layersControl';
 import { IoMdClose } from "react-icons/io";
-import { LayersMenu } from './layersMenu';
+import { LayersMenu } from './menus/layersMenu';
 
 const TogggledButton = styled(Button)`
   top: 60px;
@@ -37,10 +37,10 @@ const TogggledButton = styled(Button)`
 
 
 const DataStream = ({
-  toggleSingleRow,
-  setIsLoading,
+  // toggleSingleRow,
+  // setIsLoading,
   setIsDataStreamMenuOpen,
-  singleRowOn
+  // singleRowOn
 }) => {
   const [isBucketDatesOpen, setIsBucketDatesOpen] = useState(false);
   const [isHydroFabricSelectOpen, setIsHydroFabricSelectOpen] = useState(false);

@@ -282,3 +282,19 @@ export const Content = styled.div`
   }
 `;
 
+
+const MapStyle = styled.div`
+  flex: 1 1 100%;
+  order: 1;
+  width: 100%;
+  overflow-y: hidden;
+  height: 100%;
+  .maplibregl-popup-content{
+    padding: 0px
+  }
+`;
+
+export const MapContainer = (props) => {
+  const theme = useTheme();
+  return <MapStyle {...props} theme={theme} />;
+};

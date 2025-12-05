@@ -1,14 +1,13 @@
 import React, { Fragment, useState } from 'react';
-import DataMenu from './DataMenu';
+import DataMenu from '../../components/dataDialog';
 import { FaList } from "react-icons/fa";
 import { MdSsidChart,MdInfoOutline  } from "react-icons/md";
-import { IconLabel, Title, Container, ToggleButton, SButton } from './StyledComponents/ts';
-import { Content } from './StyledComponents/ts';
-import { LayerControl } from './layersControl';
-import { DataInfoModel } from './modals';
-import TimeSeriesCard from '../views/TimeseriesCard';
+import { IconLabel, Title, Container, ToggleButton, SButton } from '../../components/styles/styles';
+import { Content } from '../../components/styles/styles';
+import { DataInfoModel } from '../../components/modals';
+import TimeSeriesCard from '../../views/TimeseriesCard';
 
-const DataStreamMenu = ({
+const ForecastMenu = ({
   isopen,
   handleIsOpen,
   currentMenu
@@ -45,13 +44,11 @@ const DataStreamMenu = ({
                   onHide={() => setModalDataInfoShow(false)}
                 /> 
             </Content>
-            {/* <Content>
-              <LayerControl />
-            </Content> */}
+
           </Container>
     </Fragment>
 
   );
 };
 
-export default DataStreamMenu;
+export default ForecastMenu;

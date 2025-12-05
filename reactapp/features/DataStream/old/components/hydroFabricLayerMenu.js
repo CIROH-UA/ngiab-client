@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import HydrofabricMapControl from 'features/hydroFabric/components/hydrofabricMapControl';
 import Button from 'react-bootstrap/Button';
 import { IoLayers } from "react-icons/io5";
-import { Container } from '../../components/StyledComponents/ts';
+import { Container } from '../../components/styles/styles';
 // const Container = styled.div`
 //   position: absolute;
 //   top: 0;
