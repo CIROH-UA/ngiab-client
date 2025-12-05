@@ -11,7 +11,7 @@ import useTimeSeriesStore from '../store/timeseries';
 import useDataStreamStore from '../store/datastream';
 import {useLayersStore, useFeatureStore} from '../store/layers';
 import { PopupContent } from './StyledComponents/ts';
-
+import { reorderLayers } from '../lib/layers';
 const onMapLoad = (event) => {
   const map = event.target;
 
@@ -22,15 +22,17 @@ const onMapLoad = (event) => {
     map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
   });
 
-  // Bring specific layers to front
-  ['nexus-points'].forEach((layerId) => {
-    if (map.getLayer(layerId)) map.moveLayer(layerId);
-  });
+  reorderLayers(map)
+  
+  // // Bring specific layers to front
+  // ['nexus-points'].forEach((layerId) => {
+  //   if (map.getLayer(layerId)) map.moveLayer(layerId);
+  // });
 
-  // Ensure highlight layers are on top
-  ['nexus-highlight', 'catchment-highlight'].forEach((layerId) => {
-    if (map.getLayer(layerId)) map.moveLayer(layerId);
-  });
+  // // Ensure highlight layers are on top
+  // ['nexus-highlight', 'catchment-highlight'].forEach((layerId) => {
+  //   if (map.getLayer(layerId)) map.moveLayer(layerId);
+  // });
 };
 
 const MapComponent = () => {
@@ -239,9 +241,6 @@ const nexusLayers = useMemo(() => {
     />
   );
 
-
-
-
   return [pointsLayer, nexusHighlightLayer];
 }, [isNexusVisible, theme, selectedFeature]);
 
@@ -253,6 +252,16 @@ const nexusLayers = useMemo(() => {
       maplibregl.removeProtocol('pmtiles');
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current && mapRef.current.getMap
+      ? mapRef.current.getMap()
+      : mapRef.current;
+
+    if (!map) return;
+
+    reorderLayers(map);
+  }, [isNexusVisible, isCatchmentsVisible, isFlowPathsVisible, isConusGaugesVisible]);
   
   // ------------------------------------
   // ON CLICK: update state based on clicked layer
