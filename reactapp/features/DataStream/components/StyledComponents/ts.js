@@ -121,6 +121,25 @@ export const Container = styled.div`
   }
 `;
 
+export const LayersContainer = styled.div`
+  position: absolute;
+  top: calc(var(--ts-header-height) + 16px);
+  right: 10px;
+  width: 250x;
+  padding: 15px;
+  background-color: #1f2933;
+  color: #f9fafb;
+  z-index: 1000;
+  transition: transform 0.25s ease-out;
+  border-radius: 8px;
+  overflow-y: auto;
+  @media (max-width: 768px) {
+    width: 100%;
+    border-radius: 0;
+  }
+`;
+
+
 
 export const XButton = styled(Button)`  
   background-color: rgba(255, 255, 255, 0.1);

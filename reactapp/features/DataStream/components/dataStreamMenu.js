@@ -45,9 +45,9 @@ const DataStreamMenu = ({
                   onHide={() => setModalDataInfoShow(false)}
                 /> 
             </Content>
-            <Content>
+            {/* <Content>
               <LayerControl />
-            </Content>
+            </Content> */}
           </Container>
     </Fragment>
 

@@ -3,12 +3,12 @@ import styled from 'styled-components';
 import Button from 'react-bootstrap/Button';
 
 import DataStreamMenu from 'features/DataStream/components/dataStreamMenu';
-import HydrofabricLayerMenu from 'features/DataStream/old/components/hydroFabricLayerMenu';
+// import HydrofabricLayerMenu from 'features/DataStream/old/components/hydroFabricLayerMenu';
 // import HydroFabricSelectMenu from 'features/DataStream/components/hydroFabricSelectMenu';
-import TimeSeriesMenu from 'features/DataStream/components/TimeSeriesMenu';
+// import TimeSeriesMenu from 'features/DataStream/components/TimeSeriesMenu';
 // import {LayerControl} from './layersControl';
 import { IoMdClose } from "react-icons/io";
-
+import { LayersMenu } from './layersMenu';
 
 const TogggledButton = styled(Button)`
   top: 60px;
@@ -79,12 +79,7 @@ const DataStream = ({
             handleIsOpen={handleBucketS3Menu}
             currentMenu={currentMenu}
         />
-
-        <TimeSeriesMenu
-          toggleSingleRow={toggleSingleRow}
-          currentMenu={currentMenu}
-          singleRowOn={singleRowOn}
-        />
+        <LayersMenu />        
 
     </Fragment>
 

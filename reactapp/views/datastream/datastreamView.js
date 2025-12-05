@@ -1,10 +1,8 @@
 import { useState, Suspense} from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
-import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
+import { MapContainer } from '../../components/StyledContainers';
 import { ToastContainer } from 'react-toastify';
 import styled from 'styled-components';
-import LoadingAnimation from 'components/loader/LoadingAnimation';
-import TimeSeriesView from '../ngiab/ts.js';
 import MapComponent from 'features/DataStream/components/mapg.js';
 import DataStreamMenuView from 'features/DataStream/views/dataStreamMenuView.js';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -40,17 +38,7 @@ const DataStreamView = () => {
                   setIsLoading={setIsLoading}
                   setIsDataStreamMenuOpen={setIsDataStreamMenuOpen}
                   singleRowOn={singleRowOn}
-              />              
-              {/* <HydroFabricContainer 
-                $fullScreen={singleRowOn} 
-                isModelRunListOpen={isDataStreamMenuOpen}  
-              >
-                <Suspense fallback={<LoadingAnimation />}>
-                  <TimeSeriesView 
-                    singleRowOn={singleRowOn} 
-                  />
-                </Suspense>
-              </HydroFabricContainer> */}
+              /> 
           </HydroFabricProvider>
 
 
