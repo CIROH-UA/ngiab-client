@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, Fragment } from 'react';
-// import styled from 'styled-components';
 import { Spinner } from 'react-bootstrap';
 import { XButton, LoadingMessage, Row, IconLabel } from './StyledComponents/ts';
 import appAPI from 'services/api/app';
@@ -14,12 +13,10 @@ import useDataStreamStore from '../store/datastream';
 import { MdOutlineWaves, MdCalendarMonth, MdOutlineRefresh } from "react-icons/md";
 import { BsExclamationCircle } from "react-icons/bs";
 import { availableCyclesList, availableEnsembleList, availableForecastList } from '../lib/data';
-import { VariableAnchorOffsetCollection } from 'maplibre-gl';
 
 
 export default function DataMenu() {
   const [datesBucket, setDatesBucket] = useState([]);
-
 
   const vpu = useDataStreamStore((state) => state.vpu);
   const date = useDataStreamStore((state) => state.date);

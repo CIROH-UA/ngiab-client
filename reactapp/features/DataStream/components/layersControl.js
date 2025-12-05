@@ -1,27 +1,56 @@
-import {useLayersStore} from '../store/layers';
-import { Fragment } from 'react';
-import {Switch} from  './StyledComponents/ts';
-import { FaMapMarkerAlt, FaMapPin } from "react-icons/fa";
-import { PiPolygonFill, PiPathLight } from "react-icons/pi";
+import { useLayersStore } from '../store/layers';
+import { Fragment, useMemo } from 'react';
+import { Switch } from  './StyledComponents/ts';
 import { IoLayers } from "react-icons/io5";
 import { MdInfoOutline } from "react-icons/md";
 import { IconLabel, Row, Title  } from './StyledComponents/ts';
+import { NexusSymbol, CatchmentSymbol, FlowPathSymbol, GaugeSymbol } from '../lib/layers';
+import useTheme from 'hooks/useTheme';
 
 export const LayerControl = () => {
+  const theme = useTheme();
+
   const nexusLayer = useLayersStore((state) => state.nexus);
   const catchmentLayer = useLayersStore((state) => state.catchments);
-  const flowpathsLayer = useLayersStore((state)=> state.flowpaths);
-  const conusGaugesLayer = useLayersStore((state)=> state.conus_gauges);
-  
+  const flowpathsLayer = useLayersStore((state) => state.flowpaths);
+  const conusGaugesLayer = useLayersStore((state) => state.conus_gauges);
 
-  const set_nexus_visibility = useLayersStore((state) => state.set_nexus_visibility);
-  const set_catchments_visibility = useLayersStore((state) => state.set_catchments_visibility);
-  const set_flowpaths_visibility = useLayersStore((state) => state.set_flowpaths_visibility)
-  const set_conus_gauges_visibility = useLayersStore((state) => state.set_conus_gauges_visibility)
+  const set_nexus_visibility = useLayersStore(
+    (state) => state.set_nexus_visibility
+  );
+  const set_catchments_visibility = useLayersStore(
+    (state) => state.set_catchments_visibility
+  );
+  const set_flowpaths_visibility = useLayersStore(
+    (state) => state.set_flowpaths_visibility
+  );
+  const set_conus_gauges_visibility = useLayersStore(
+    (state) => state.set_conus_gauges_visibility
+  );
+
+  const colors = useMemo(
+    () => ({
+      nexusFill: theme === 'dark' ? '#4f5b67' : '#1f78b4',
+      nexusStroke: theme === 'dark' ? '#e9ecef' : '#ffffff',
+      catchmentFill:
+        theme === 'dark'
+          ? 'rgba(238, 51, 119, 0.32)'
+          : 'rgba(91, 44, 111, 0.32)',
+      catchmentStroke:
+        theme === 'dark'
+          ? 'rgba(238, 51, 119, 0.9)'
+          : 'rgba(91, 44, 111, 0.9)',
+      flowStroke: theme === 'dark' ? '#0077bb' : '#000000',
+      gaugeFill: theme === 'dark' ? '#c8c8c8' : '#646464',
+      gaugeStroke: theme === 'dark' ? '#111827' : '#ffffff',
+    }),
+    [theme]
+  );
 
   const handleToggleNexusLayer = () => {
     set_nexus_visibility(!nexusLayer.visible);
   };
+
   const handleToggleCatchmentLayer = () => {
     set_catchments_visibility(!catchmentLayer.visible);
   };
@@ -29,72 +58,79 @@ export const LayerControl = () => {
   const handleToggleFlowPathsLayer = () => {
     set_flowpaths_visibility(!flowpathsLayer.visible);
   };
- 
+
   const handleToggleConusGaugesLayer = () => {
-    set_conus_gauges_visibility(!conusGaugesLayer.visible)
-  }
+    set_conus_gauges_visibility(!conusGaugesLayer.visible);
+  };
 
   return (
-    
     <Fragment>
-              <IconLabel>
-                <IoLayers />
-                <Title>
-                  Layer Options
-                </Title>
-                <MdInfoOutline  />
-              </IconLabel>
-          <Row>
-            <IconLabel>
-              <FaMapMarkerAlt style={{ marginRight: '8px' }} />
-              Nexus
-            </IconLabel>
-          <Switch
-            id="nexus-layer-switch"
-            checked={nexusLayer.visible}
-            onChange={handleToggleNexusLayer}
-            title="Toggle Nexus Layer visualization"
-          />
- 
-          </Row>
-          <Row>
-            <IconLabel>
-              <PiPolygonFill style={{ marginRight: '8px' }} />
-              Catchments
-            </IconLabel>
-          <Switch
-            id="catchment-layer-switch"
-            checked={catchmentLayer.visible}
-            onChange={handleToggleCatchmentLayer}
-            title="Toggle Catchment Layer visualization"
-          />
-          </Row>
+      <IconLabel>
+        <IoLayers />
+        <Title>Layer Options</Title>
+        <MdInfoOutline />
+      </IconLabel>
 
-          <Row>
-            <IconLabel>
-              <PiPathLight style={{ marginRight: '8px' }} />
-              FlowPaths
-            </IconLabel>
-          <Switch
-            id="flowpaths-layer-switch"
-            checked={flowpathsLayer.visible}
-            onChange={handleToggleFlowPathsLayer}
-            title="Toggle FlowPaths Layer visualization"
+      <Row>
+        <IconLabel>
+          <NexusSymbol
+            fill={colors.nexusFill}
+            stroke={colors.nexusStroke}
           />
-          </Row>
-          <Row>
-            <IconLabel>
-              <PiPathLight style={{ marginRight: '8px' }} />
-              Conus Gauges
-            </IconLabel>
-          <Switch
-            id="conus-gauges-layer-switch"
-            checked={conusGaugesLayer.visible}
-            onChange={handleToggleConusGaugesLayer}
-            title="Toggle Conus Gauges Layer visualization"
+          Nexus
+        </IconLabel>
+        <Switch
+          id="nexus-layer-switch"
+          checked={nexusLayer.visible}
+          onChange={handleToggleNexusLayer}
+          title="Toggle Nexus Layer visualization"
+        />
+      </Row>
+
+      <Row>
+        <IconLabel>
+          <CatchmentSymbol
+            fill={colors.catchmentFill}
+            stroke={colors.catchmentStroke}
           />
-          </Row>
+          Catchments
+        </IconLabel>
+        <Switch
+          id="catchment-layer-switch"
+          checked={catchmentLayer.visible}
+          onChange={handleToggleCatchmentLayer}
+          title="Toggle Catchment Layer visualization"
+        />
+      </Row>
+
+      <Row>
+        <IconLabel>
+          <FlowPathSymbol stroke={colors.flowStroke} />
+          FlowPaths
+        </IconLabel>
+        <Switch
+          id="flowpaths-layer-switch"
+          checked={flowpathsLayer.visible}
+          onChange={handleToggleFlowPathsLayer}
+          title="Toggle FlowPaths Layer visualization"
+        />
+      </Row>
+
+      <Row>
+        <IconLabel>
+          <GaugeSymbol
+            fill={colors.gaugeFill}
+            stroke={colors.gaugeStroke}
+          />
+          Conus Gauges
+        </IconLabel>
+        <Switch
+          id="conus-gauges-layer-switch"
+          checked={conusGaugesLayer.visible}
+          onChange={handleToggleConusGaugesLayer}
+          title="Toggle Conus Gauges Layer visualization"
+        />
+      </Row>
     </Fragment>
   );
 };
-
