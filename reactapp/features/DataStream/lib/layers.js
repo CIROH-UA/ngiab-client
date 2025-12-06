@@ -142,3 +142,24 @@ export const CursorSymbol = ({
     />
   </svg>
 );
+
+export const BasinSymbol = ({
+  fill = 'rgba(91, 44, 111, 0.32)',
+  stroke = 'rgba(91, 44, 111, 0.9)',
+}) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 20 20"
+    fill="none"
+    className="Eo3Yub"
+  >
+    <path
+      d="M2.0975 7.12551L10.878 1.1499L18.5 13.8414L13.378 18.8502L1 16.5158L2.0975 7.12551Z"
+      fill={fill}
+      stroke={stroke}
+      strokeWidth="1.5"
+    />
+  </svg>
+);

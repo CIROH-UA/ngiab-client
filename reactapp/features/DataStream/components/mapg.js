@@ -274,15 +274,6 @@ const nexusLayers = useMemo(() => {
     set_feature_id(null);
     const map = event.target;
 
-    // // Build layersToQuery based on current hidden states
-    // const layersToQuery = [];
-    // if (isNexusVisible) {
-    //   layersToQuery.push('nexus-points')
-    // }
-    // if (isCatchmentsVisible) {
-    //   layersToQuery.push('divides');
-    // }
-
     if (layersToQuery.length === 0) return;
 
     const features = map.queryRenderedFeatures(event.point, { layers: layersToQuery });
@@ -293,6 +284,8 @@ const nexusLayers = useMemo(() => {
       console.log('Clicked feature from layer:', layerId, feature);
       
       set_selected_feature({
+        latitude: feature.geometry.coordinates[1],
+        longitude: feature.geometry.coordinates[0],
         ...feature.properties
       })
       

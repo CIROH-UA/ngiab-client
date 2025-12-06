@@ -4,7 +4,7 @@ import { MdInfoOutline } from 'react-icons/md';
 import { IconLabel, FieldBlock, FieldValue, FieldsGrid, FieldLabel, HeaderRow } from './styles/styles';
 import { useFeatureStore } from 'features/DataStream/store/layers';
 import { formatLabel } from '../lib/utils';
-
+import { BasinSymbol } from '../lib/layers';
 export const FeatureInformation = () => {
   const selectedFeature = useFeatureStore((state) => state.selected_feature);
 
@@ -43,7 +43,7 @@ export const FeatureInformation = () => {
     }else if (typeof value === 'number') {
         displayValue = value.toFixed(4);
     }
-
+        
     fields.push({
       label: formatLabel(key),
       value: displayValue,
@@ -63,7 +63,16 @@ export const FeatureInformation = () => {
       <FieldsGrid>
         {fields.map(({ label, value }) => (
           <FieldBlock key={label}>
-            <FieldLabel>{label}</FieldLabel>
+            <FieldLabel>
+              {
+                label ==='Areasqkm' ||  label === 'Tot Drainage Areasqkm' ?
+                (
+                  <BasinSymbol stroke ={'#009989'} fill={'#009989'} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                ) : null
+                
+              }
+              {label}
+              </FieldLabel>
             <FieldValue>{value}</FieldValue>
           </FieldBlock>
         ))}

@@ -11,8 +11,19 @@ export const makeTitle = (forecast, feature_id) => {
   return capitalizeWords(`${cleanId} ${cleanForecast} Forecast`);
 };
 
-export const formatLabel = (key) =>
-  key
+export const formatLabel = (key) =>{
+ return matchDivideFeatures[key] || key
     .replace(/_/g, ' ')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+const matchDivideFeatures = {
+  'tot_drainage_areasqkm': 'Total Drainage Area (km2)',
+  'areasqm': 'Area (km2)',
+  'toid': 'To ID',
+  'vpuid': 'VPU ID',
+  'lengthkm': 'Length (km)',
+  'has_flowline': 'Has Flowline',
+  'divide_id': 'Divide ID',
+};
