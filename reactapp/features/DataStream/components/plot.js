@@ -20,10 +20,10 @@ import { RectClipPath } from '@visx/clip-path';
 import { lightTheme, darkTheme } from '@visx/xychart';
 import useTheme from 'hooks/useTheme';
 import { getVariableUnits } from '../lib/getTimeSeries';
-// import { ChartHeader } from '../lib/plotUtils';
-
+import useDataStreamStore from '../store/datastream';
 
 function LineChart({ width, height, data, layout }) {
+  const forecast = useDataStreamStore((state) => state.forecast);
   const screenWidth = window.innerWidth;
   const fontSize = screenWidth <= 1300 ? 13 : 18;
   const fontWeight = screenWidth <= 1300 ? 600 : 500;
@@ -118,9 +118,18 @@ function LineChart({ width, height, data, layout }) {
     padding: '8px 10px',                          // ★ tighter padding
   };
 
-  const formatDate = timeFormat('%Y-%m-%d');
-  const formatTooltipDate = timeFormat('%Y-%m-%d %H:%M:%S'); // tooltip
-  const bisectDate = bisector((d) => getDate(d)).left;
+//  const formatDate = timeFormat('%m/%d');
+ const formatDate = useCallback(
+    (date) => {
+      const format = forecast === 'short_range' ? '%m/%d %H:%M' : '%m/%d';
+      const formatter = timeFormat(format);
+      return formatter(date);
+    },
+    [allData]
+  ); 
+  
+ const formatTooltipDate = timeFormat('%Y-%m-%d %H:%M:%S'); // tooltip
+ const bisectDate = bisector((d) => getDate(d)).left;
  const formatYValue = (val) =>
     val == null || Number.isNaN(val) ? '—' : val.toFixed(2);
   const rescaleXAxis = (scale, m) =>
@@ -205,6 +214,34 @@ function LineChart({ width, height, data, layout }) {
     return m;
   };
 
+  const getSafeXTicks = useCallback((newXScale, zoom) => {
+    // const newXScale = rescaleXAxis(xScale, zoom.transformMatrix);
+    const rawTicks = newXScale.ticks(xNumTicks);
+
+    if (forecast === 'short_range') {
+      // const newXScale = rescaleXAxis(xScale, zoom.transformMatrix);
+      // const rawTicks = newXScale.ticks(xNumTicks);
+      const domainStart = newXScale.domain()[0];
+      
+      // ensure the very first tick is the domain start
+      const xTickValues = [domainStart, ...rawTicks].sort((a, b) => a - b);
+      // filter out ticks that would have the same formatted label (same day)
+      const seen = new Set();
+      const uniqueXTicks = xTickValues.filter((d) => {
+        const label = formatDate(d); // '%Y-%m-%d'
+        if (seen.has(label)) return false;
+        seen.add(label);
+        return true;
+      });
+      uniqueXTicks.pop();
+      return uniqueXTicks;
+    }
+    else{
+      const xTickValues = newXScale.ticks(xNumTicks);
+      return xTickValues;
+    }
+  },[allData]);
+
   return (
     <div
       style={{
@@ -237,19 +274,7 @@ function LineChart({ width, height, data, layout }) {
           {(zoom) => {
             const newXScale = rescaleXAxis(xScale, zoom.transformMatrix);
             const newYScale = rescaleYAxis(yScale, zoom.transformMatrix);
-            const xTickValues = newXScale.ticks(xNumTicks);
-            // filter out ticks that would have the same formatted label (same day)
-            const seen = new Set();
-            const uniqueXTicks = xTickValues.filter((d) => {
-              const label = formatDate(d); // '%Y-%m-%d'
-              if (seen.has(label)) return false;
-              seen.add(label);
-              return true;
-            });
-            
-            // optionally drop the very last tick to avoid label clashing at right edge
-            const safeXTicks = uniqueXTicks;
-            
+            const safeXTicks = getSafeXTicks(newXScale,zoom);
             return (
               <>
                 {/* <div
