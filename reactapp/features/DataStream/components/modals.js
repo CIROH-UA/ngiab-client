@@ -52,11 +52,20 @@ export const DataInfoModel = (props) => {
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        <p>
-          Cras mattis consectetur purus sit amet fermentum. Cras justo odio,
-          dapibus ac facilisis in, egestas eget quam.  Morbi leo risus, porta ac
-          consectetur ac, vestibulum at eros.
-        </p>
+        <div>
+          <p>
+            The following dates are retrieved from the bucket{' '}
+            <a
+              href="https://datastream.ciroh.org/index.html#v2.2/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ciroh-community-ngen-datastream
+            </a>{' '}
+            ,feel free to go inside the bucket to explore more
+          </p>
+          <p><strong>Note:</strong> Data are only available for certain dates. Please verify a date’s availability before you proceed.</p>
+        </div>
       </Modal.Body>
       <Modal.Footer>
         <XButton onClick={props.onHide}>Close</XButton>

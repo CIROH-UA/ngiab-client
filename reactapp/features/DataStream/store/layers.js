@@ -46,6 +46,12 @@ export const useLayersStore = create((set) => ({
 
 export const useFeatureStore = create((set) => ({
     hovered_feature: null,
+    selected_feature: null,
+    
+    set_selected_feature: (feature) =>
+        set(() => ({
+            selected_feature: feature,
+        })),
     set_hovered_feature: (feature) =>
         set(() => ({
             hovered_feature: feature,

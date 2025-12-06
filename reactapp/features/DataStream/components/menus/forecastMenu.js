@@ -4,7 +4,7 @@ import { Content, Container } from '../styles/styles';
 import TimeSeriesCard from '../TimeseriesCard';
 import useTimeSeriesStore from 'features/DataStream/store/timeseries';
 import { ForecastHeader } from 'features/DataStream/components/ForecastHeader';
-
+import { FeatureInformation } from '../featureInformation';
 const ForecastMenu = () => {
 
   const feature_id = useTimeSeriesStore((state) => state.feature_id);
@@ -29,13 +29,12 @@ const ForecastMenu = () => {
             </div>
             
             <Content>
-
               <TimeSeriesCard />
-
               <DataMenu />
-
             </Content>
-
+            <Content>
+              <FeatureInformation />
+            </Content>
           </Container>
     </Fragment>
 

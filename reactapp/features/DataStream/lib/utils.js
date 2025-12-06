@@ -11,3 +11,8 @@ export const makeTitle = (forecast, feature_id) => {
   return capitalizeWords(`${cleanId} ${cleanForecast} Forecast`);
 };
 
+export const formatLabel = (key) =>
+  key
+    .replace(/_/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (c) => c.toUpperCase());

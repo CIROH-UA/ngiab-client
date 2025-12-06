@@ -13,6 +13,7 @@ import {useLayersStore, useFeatureStore} from '../store/layers';
 import { PopupContent } from './styles/styles';
 import { reorderLayers } from '../lib/layers';
 import { makeTitle } from '../lib/utils';
+import { use } from 'react';
 
 const onMapLoad = (event) => {
   const map = event.target;
@@ -52,7 +53,7 @@ const MapComponent = () => {
     
   const set_hovered_feature = useFeatureStore((state) => state.set_hovered_feature);
   const hovered_feature =  useFeatureStore((state) => state.hovered_feature);
-  
+  const set_selected_feature = useFeatureStore((state) => state.set_selected_feature);
   
 
   const theme = useTheme();
@@ -262,32 +263,43 @@ const nexusLayers = useMemo(() => {
     reorderLayers(map);
   }, [isNexusVisible, isCatchmentsVisible, isFlowPathsVisible, isConusGaugesVisible]);
   
-  // ------------------------------------
-  // ON CLICK: update state based on clicked layer
-  // ------------------------------------
+  const layersToQuery = useMemo(() => {
+    const layers = [];
+    if (isNexusVisible) layers.push('nexus-points');
+    if (isCatchmentsVisible) layers.push('divides');
+    return layers;
+  }, [isNexusVisible, isCatchmentsVisible]);
+
   const handleMapClick = async (event) => {
     set_feature_id(null);
     const map = event.target;
-    // Build layersToQuery based on current hidden states
-    const layersToQuery = [];
-    if (isNexusVisible) {
-      layersToQuery.push('nexus-points')
-    }
-    if (isCatchmentsVisible) {
-      layersToQuery.push('divides');
-    }
+
+    // // Build layersToQuery based on current hidden states
+    // const layersToQuery = [];
+    // if (isNexusVisible) {
+    //   layersToQuery.push('nexus-points')
+    // }
+    // if (isCatchmentsVisible) {
+    //   layersToQuery.push('divides');
+    // }
+
     if (layersToQuery.length === 0) return;
+
     const features = map.queryRenderedFeatures(event.point, { layers: layersToQuery });
     if (!features || !features.length) return;
     
     for (const feature of features) {
       const layerId = feature.layer.id;
       console.log('Clicked feature from layer:', layerId, feature);
+      
+      set_selected_feature({
+        ...feature.properties
+      })
+      
       if (layerId === 'nexus-points'){
         const unbiased_id = feature.properties.id;
         const id = unbiased_id.split('-')[1];
         set_feature_id(unbiased_id);
-
         console.log('Clicked nexus feature with id:', id);
         const vpu_str = `VPU_${feature.properties.vpuid}`;
         set_vpu(vpu_str);
@@ -301,7 +313,6 @@ const nexusLayers = useMemo(() => {
             nc_files: nc_files_parsed,
             vpu_gpkg,
           });
-
           set_table(cacheKey)
           const variables = await getVariables({cacheKey});
           set_variables(variables)

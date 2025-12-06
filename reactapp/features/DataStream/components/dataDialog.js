@@ -305,7 +305,9 @@ export default function DataMenu() {
             />
           </Row>
         )}
-        <XButton onClick={handleVisulization}>Update</XButton>
+        <div style={{marginTop: '10px', paddingLeft: '100px', paddingRight: '100px'}}>
+          <XButton onClick={handleVisulization}>Update</XButton>
+        </div>
       </Fragment>
 
       <LoadingMessage>

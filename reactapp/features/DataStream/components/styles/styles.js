@@ -22,9 +22,10 @@ export const ThemedModal = styled(Modal)`
     background-color: ${({ $themeMode }) =>
       $themeMode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#ffffff'};
     color: ${({ $themeMode }) =>
-      $themeMode === 'dark' ? '#f9fafb' : '#111827'};
+      $themeMode === 'dark' ? 'var(--text-color)' : '#111827'};
     border-radius: 12px;
   }
+
 
   .modal-header,
   .modal-footer {
@@ -40,6 +41,10 @@ export const ThemedModal = styled(Modal)`
   .btn-primary:hover,
   .btn-primary:focus {
     background-color: #007a6e;
+  }
+  .modal-body a {
+    color: ${({ $themeMode }) =>
+      $themeMode === 'dark' ? 'var(--text-color)' : '#111827'};
   }
 `;
 
@@ -134,8 +139,6 @@ export const LayersContainer = styled.div`
     border-radius: 0;
   }
 `;
-
-
 
 export const XButton = styled(Button)`  
   background-color: rgba(255, 255, 255, 0.1);
@@ -265,8 +268,8 @@ export const Switch = styled(Form.Switch)`
 
 export const Content = styled.div`
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
-
+  // border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+  border-block-end: 1px solid rgb(218, 220, 224);
   &:first-of-type {
     border-bottom: none;
   }
@@ -291,3 +294,29 @@ export const MapContainer = (props) => {
   const theme = useTheme();
   return <MapStyle {...props} theme={theme} />;
 };
+
+export const HeaderRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+`;
+
+export const FieldsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+  row-gap: 8px;
+`;
+
+export const FieldBlock = styled.div``;
+
+export const FieldLabel = styled.div`
+  font-size: 12px;
+  font-weight: 500;  
+`;
+
+export const FieldValue = styled.div`
+  font-size: 12px;
+  font-weight: 500;
+`;
