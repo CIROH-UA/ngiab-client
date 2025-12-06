@@ -37,7 +37,7 @@ const ForecastMenu = () => {
               <IconLabel>
                 <MdSsidChart />
                 <Title>
-                  View Options
+                  Data Options
                 </Title>
                 <SButton bsPrefix='btn2' onClick={() => setModalDataInfoShow(true)}>
                   <MdInfoOutline size={15} />

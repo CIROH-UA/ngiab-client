@@ -4,7 +4,7 @@ import { Switch } from  './styles/styles';
 import { IoLayers } from "react-icons/io5";
 import { MdInfoOutline } from "react-icons/md";
 import { IconLabel, Row, Title, SButton  } from './styles/styles';
-import { NexusSymbol, CatchmentSymbol, FlowPathSymbol, GaugeSymbol, symbologyColors } from '../lib/layers';
+import { NexusSymbol, CatchmentSymbol, FlowPathSymbol, GaugeSymbol, symbologyColors, CursorSymbol } from '../lib/layers';
 import useTheme from 'hooks/useTheme';
 import { LayerInfoModal } from './modals';
 
@@ -17,7 +17,8 @@ export const LayerControl = () => {
   const catchmentLayer = useLayersStore((state) => state.catchments);
   const flowpathsLayer = useLayersStore((state) => state.flowpaths);
   const conusGaugesLayer = useLayersStore((state) => state.conus_gauges);
-
+  const layerHoveredEnabled = useLayersStore((state) => state.hovered_enabled);
+  
   const set_nexus_visibility = useLayersStore(
     (state) => state.set_nexus_visibility
   );
@@ -29,6 +30,10 @@ export const LayerControl = () => {
   );
   const set_conus_gauges_visibility = useLayersStore(
     (state) => state.set_conus_gauges_visibility
+  );
+
+  const set_hovered_enabled = useLayersStore(
+    (state) => state.set_hovered_enabled
   );
 
   const colors = useMemo(
@@ -50,6 +55,10 @@ export const LayerControl = () => {
 
   const handleToggleConusGaugesLayer = () => {
     set_conus_gauges_visibility(!conusGaugesLayer.visible);
+  };
+
+  const handleToggleHovering = () => {
+    set_hovered_enabled(!layerHoveredEnabled);
   };
 
   return (
@@ -120,6 +129,18 @@ export const LayerControl = () => {
           id="conus-gauges-layer-switch"
           checked={conusGaugesLayer.visible}
           onChange={handleToggleConusGaugesLayer}
+          title="Toggle Conus Gauges Layer visualization"
+        />
+      </Row>
+      <Row>
+        <IconLabel>
+          <CursorSymbol/>
+          Enable Hovering 
+        </IconLabel>
+        <Switch
+          id="enable-hovering-switch"
+          checked={layerHoveredEnabled}
+          onChange={handleToggleHovering}
           title="Toggle Conus Gauges Layer visualization"
         />
       </Row>

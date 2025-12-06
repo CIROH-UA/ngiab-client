@@ -119,3 +119,26 @@ export const GaugeSymbol = ({ fill, stroke }) => (
     <circle cx="9" cy="9" r="4" fill={fill} stroke={stroke} strokeWidth="1.5" />
   </svg>
 );
+
+export const CursorSymbol = ({
+  fill = '#1f78b4',
+  stroke = '#ffffff',
+}) => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    style={{ marginRight: '6px' }}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    {/* Arrow body */}
+    <path
+      d="M4 3 L4 18 L8.5 14.5 L11 20 L13 19 L10.5 13.5 L15 13 Z"
+      fill={fill}
+      stroke={stroke}
+      strokeWidth="1.2"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    />
+  </svg>
+);

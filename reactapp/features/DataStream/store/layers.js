@@ -13,6 +13,8 @@ export const useLayersStore = create((set) => ({
     conus_gauges: {
         visible: false
     },
+    hovered_enabled: false,
+    set_hovered_enabled: (isEnabled) => set({ hovered_enabled: isEnabled }),
     get_nexus_visibility: () => get().nexus.visible,
     get_catchments_visibility: () => get().catchments.visible,
     set_nexus_visibility: (isVisible) => set((state) => ({

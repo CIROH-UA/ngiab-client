@@ -32,6 +32,8 @@ const MapComponent = () => {
   const isCatchmentsVisible = useLayersStore((state) => state.catchments.visible);
   const isFlowPathsVisible = useLayersStore((state) => state.flowpaths.visible);
   const isConusGaugesVisible = useLayersStore((state) => state.conus_gauges.visible)
+  const enabledHovering = useLayersStore((state) => state.hovered_enabled);
+
   const selectedFeature = useTimeSeriesStore((state) => state.feature_id);
   const set_series = useTimeSeriesStore((state) => state.set_series);
   const set_feature_id = useTimeSeriesStore((state) => state.set_feature_id);
@@ -47,15 +49,21 @@ const MapComponent = () => {
   const cycle = useDataStreamStore((state) => state.cycle);
   const set_vpu = useDataStreamStore((state) => state.set_vpu);
   const set_variables = useDataStreamStore((state) => state.set_variables);
-  
+    
   const set_hovered_feature = useFeatureStore((state) => state.set_hovered_feature);
   const hovered_feature =  useFeatureStore((state) => state.hovered_feature);
   
+  
+
   const theme = useTheme();
   const mapRef = useRef(null);
   
   const onHover = useCallback(
     (event) => {
+      if (!enabledHovering){
+        set_hovered_feature({});
+        return;
+      }
       const { features, lngLat } = event;
 
       if (!features || features.length === 0) {
@@ -86,10 +94,8 @@ const MapComponent = () => {
       });
       
     },
-    [set_hovered_feature]
+    [set_hovered_feature, enabledHovering]
   );
-
-  const hoveredId = hovered_feature?.id || '';
 
   const mapStyleUrl =
     theme === 'dark'
@@ -360,7 +366,7 @@ const nexusLayers = useMemo(() => {
       {nexusLayers}
     </Source>
 
-        {hoveredId && (
+        {hovered_feature?.id && (
           <Popup
             longitude={hovered_feature.longitude}
             latitude={hovered_feature.latitude}
