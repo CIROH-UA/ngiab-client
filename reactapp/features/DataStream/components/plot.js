@@ -20,7 +20,7 @@ import { RectClipPath } from '@visx/clip-path';
 import { lightTheme, darkTheme } from '@visx/xychart';
 import useTheme from 'hooks/useTheme';
 import { getVariableUnits } from '../lib/getTimeSeries';
-import { ChartHeader } from '../lib/plotUtils';
+// import { ChartHeader } from '../lib/plotUtils';
 
 
 function LineChart({ width, height, data, layout }) {
@@ -49,7 +49,8 @@ function LineChart({ width, height, data, layout }) {
 
   const theme = useTheme();
   // const visxTheme = theme === 'dark' ? darkTheme : lightTheme;
-  const chartTitle = layout?.title;
+
+  // const chartTitle = layout?.title;
   const {
     tooltipData,
     tooltipLeft = 0,
@@ -59,7 +60,7 @@ function LineChart({ width, height, data, layout }) {
   } = useTooltip();
 
   // const margin = { top: 20, right: 40, bottom: 45, left: 110 };
-  const margin = { top: 60, right: 10, bottom: 30, left: 40 };
+  const margin = { top: 40, right: 10, bottom: 30, left: 40 };
   const innerWidth = Math.max(1, width - margin.left - margin.right);
   const innerHeight = Math.max(1, height - margin.top - margin.bottom);
   const EST_LABEL_PX = 100;
@@ -288,12 +289,20 @@ function LineChart({ width, height, data, layout }) {
                     cursor: zoom.isDragging ? 'grabbing' : 'grab',
                   }}
                 >
-                  {chartTitle && (
-                    <ChartHeader
-                      title ={chartTitle}
-                    />
-                  )}
 
+                  {
+                    yAxisLabel && (
+                      <text
+                        x={0}
+                        y={15}
+                        fontSize={12}
+                        fontWeight={600}
+                        fill={theme === 'dark' ? '#e5e7eb' : '#111827'}
+                      >
+                        {yAxisLabel}
+                      </text>
+                    )
+                  }
                   <RectClipPath
                     id="chart-clip"
                     x={0}

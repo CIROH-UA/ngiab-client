@@ -1,21 +1,17 @@
 
-import React from 'react';
+import React, { Fragment } from 'react';
 import { MdLocationPin } from "react-icons/md";
-
+import { Row, IconLabel } from '../components/styles/styles';
 
 export const ChartHeader = ({ title }) =>(
-  <g transform="translate(12, 24)">
-    <MdLocationPin size={18} color="#009989" />
-    <text
-      x={24}
-      y={12}
-      fontSize={14}
-      fontWeight={600}
-      fill="#e5e7eb"
-    >
-      {title}
-    </text>
-  </g>
+  <Fragment>
+    <Row>
+      <IconLabel $fontSize={16}>
+        <MdLocationPin size={18} color="#009989" />
+        {title}
+      </IconLabel>
+    </Row>
+  </Fragment>
 );
 
 

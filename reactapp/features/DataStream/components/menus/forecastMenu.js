@@ -6,11 +6,11 @@ import { Content } from '../styles/styles';
 import { DataInfoModel } from '../modals';
 import TimeSeriesCard from '../../views/TimeseriesCard';
 import useTimeSeriesStore from 'features/DataStream/store/timeseries';
-
+import { ChartHeader } from 'features/DataStream/lib/plotUtils';
 const ForecastMenu = () => {
   const [ modalDataInfoShow, setModalDataInfoShow ] = useState(false);
   const feature_id = useTimeSeriesStore((state) => state.feature_id);
-
+  const layout = useTimeSeriesStore((state) => state.layout);
   const isopen = useMemo(() => {
     console.log('feature_id', feature_id ? 'true' : 'false');
     return feature_id ? true : false;
@@ -19,18 +19,23 @@ const ForecastMenu = () => {
   return (
     <Fragment>
           
-          {
+          {/* {
             isopen ?
               <ToggleButton onClick={()=> {!isopen}} $top={80} >
                 <MdClose size={15} />
               </ToggleButton> 
             : null
-          }
+          } */}
 
           <Container $isOpen={isopen}>
-
+            <div>
+                  {layout?.title && (
+                    <ChartHeader
+                      title ={layout.title}
+                    />
+                  )}
+            </div>
             <Content>
-
               <TimeSeriesCard />
             </Content>
             <Content>

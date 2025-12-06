@@ -94,12 +94,11 @@ export const PopupContent = (props) => {
 
 export const Container = styled.div`
   position: absolute;
-  top: 0;
+  top: calc(var(--ts-header-height));
   left: 0;
   height: 100vh;
   width: 400px;
-  padding-top: 120px;
-  padding-bottom: 16px;
+  padding-top: 10px;
   // background-color: #4f5b679e;
   background-color: #1f2933;
   color: #f9fafb;
@@ -210,11 +209,8 @@ export const IconLabel = styled.span`
   display: flex;
   align-items: center;
   gap: 6px;
-  // font-size: 14px;
-  // margin-bottom: 8px;
-  font-size: 13px;
+  font-size: ${({$fontSize = '13px'}) => `${$fontSize}px`};
   margin-bottom: 4px;
-
 `
 export const Title = styled.span`
     letter-spacing: .0125em;
