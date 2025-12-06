@@ -1,5 +1,5 @@
 import { Fragment, Suspense } from 'react';
-import { TimeSeriesThemedContainer } from '../components/styles/styles';
+import { TimeSeriesThemedContainer } from './styles/styles';
 import useTimeSeriesStore from 'features/DataStream/store/timeseries';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
 import ParentSize from '@visx/responsive/lib/components/ParentSize';

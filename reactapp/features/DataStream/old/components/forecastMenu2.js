@@ -5,7 +5,7 @@ import { MdSsidChart,MdInfoOutline  } from "react-icons/md";
 import { IconLabel, Title, Container, ToggleButton, SButton } from '../../components/styles/styles';
 import { Content } from '../../components/styles/styles';
 import { DataInfoModel } from '../../components/modals';
-import TimeSeriesCard from '../../views/TimeseriesCard';
+import TimeSeriesCard from '../../components/TimeseriesCard';
 
 const ForecastMenu = ({
   isopen,
