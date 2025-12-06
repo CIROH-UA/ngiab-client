@@ -49,8 +49,6 @@ function LineChart({ width, height, data, layout }) {
 
   const theme = useTheme();
   // const visxTheme = theme === 'dark' ? darkTheme : lightTheme;
-
-  // const chartTitle = layout?.title;
   const {
     tooltipData,
     tooltipLeft = 0,
@@ -293,8 +291,8 @@ function LineChart({ width, height, data, layout }) {
                   {
                     yAxisLabel && (
                       <text
-                        x={0}
-                        y={15}
+                        x={10}
+                        y={10}
                         fontSize={12}
                         fontWeight={600}
                         fill={theme === 'dark' ? '#e5e7eb' : '#111827'}

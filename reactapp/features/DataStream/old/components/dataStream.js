@@ -8,7 +8,7 @@ import DataStreamMenu from 'features/DataStream/old/components/forecastMenu2';
 // import TimeSeriesMenu from 'features/DataStream/components/TimeSeriesMenu';
 // import {LayerControl} from './layersControl';
 import { IoMdClose } from "react-icons/io";
-import { LayersMenu } from './menus/layersMenu';
+import { LayersMenu } from '../../components/menus/layersMenu';
 
 const TogggledButton = styled(Button)`
   top: 60px;

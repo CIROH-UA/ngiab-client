@@ -268,10 +268,10 @@ export const Switch = styled(Form.Switch)`
 
 export const Content = styled.div`
   padding: 12px 16px;
-  border-top: 1px solid rgba(148, 163, 184, 0.35);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
 
   &:first-of-type {
-    border-top: none;
+    border-bottom: none;
   }
   a {
     color: #bfdbfe;

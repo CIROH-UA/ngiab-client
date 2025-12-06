@@ -1,5 +1,5 @@
 import React, { Fragment, useState } from 'react';
-import DataStream from 'features/DataStream/components/dataStream';
+import DataStream from 'features/DataStream/old/components/dataStream';
 
 
 const DataStreamMenuView = ({
