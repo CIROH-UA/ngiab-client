@@ -8,15 +8,13 @@ const TimeSeriesContainer = styled.div`
   height: 300px;
   order: 1;
   flex: 1 1 80%;
-  background-color: ${(props) => props.theme === 'dark' ? '#1f2933' : '#f9f9f9'};
+  background-color: ${(props) => props.theme === 'dark' ? 'var(--background)' : '#f9f9f9'};
 `;
 
 export const TimeSeriesThemedContainer = (props) => {
   const theme = useTheme();
   return <TimeSeriesContainer {...props} theme={theme} />;
 };
-
-
 
 // Themed Modal wrapper
 export const ThemedModal = styled(Modal)`
@@ -96,16 +94,15 @@ export const Container = styled.div`
   position: absolute;
   top: calc(var(--ts-header-height));
   left: 0;
-  height: 100vh;
+  height: calc(100% - var(--ts-header-height));
   width: 400px;
   padding-top: 10px;
-  // background-color: #4f5b679e;
-  background-color: #1f2933;
+  background-color: var(--background-color);
   color: #f9fafb;
   z-index: 1000;
   transition: transform 0.25s ease-out;
   
-  border-radius: 0 12px 12px 0;
+  // border-radius: 0 12px 12px 0;
   overflow-y: auto;
 
   /* When closed, hide completely to the left */
