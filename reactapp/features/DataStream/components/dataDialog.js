@@ -132,6 +132,9 @@ export default function DataMenu() {
   const handleChangeForecast = (optionArray) => {
     const opt = optionArray?.[0];
     if (opt) set_forecast(opt.value);
+    if (opt.value === 'short_range') {
+      set_time(null);
+    }
   };
 
   const handleChangeCycle = (optionArray) => {
