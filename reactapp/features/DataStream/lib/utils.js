@@ -20,7 +20,7 @@ export const formatLabel = (key) =>{
 
 const matchDivideFeatures = {
   'tot_drainage_areasqkm': 'Total Drainage Area (km2)',
-  'areasqm': 'Area (km2)',
+  'areasqkm': 'Area (km2)',
   'toid': 'To ID',
   'vpuid': 'VPU ID',
   'lengthkm': 'Length (km)',

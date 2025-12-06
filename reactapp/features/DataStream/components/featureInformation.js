@@ -43,7 +43,7 @@ export const FeatureInformation = () => {
     }else if (typeof value === 'number') {
         displayValue = value.toFixed(4);
     }
-        
+
     fields.push({
       label: formatLabel(key),
       value: displayValue,
@@ -65,7 +65,7 @@ export const FeatureInformation = () => {
           <FieldBlock key={label}>
             <FieldLabel>
               {
-                label ==='Areasqkm' ||  label === 'Tot Drainage Areasqkm' ?
+                label.includes('km2') ?
                 (
                   <BasinSymbol stroke ={'#009989'} fill={'#009989'} style={{ marginRight: '4px', verticalAlign: 'middle' }} />
                 ) : null
