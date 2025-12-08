@@ -83,6 +83,22 @@ for INPUT_PATH in "${INPUT_PATHS[@]}"; do
               FROM \"divides\"
               WHERE ST_IsEmpty(geom)=0"
         ;;
+      flowpaths)
+        SQL="SELECT 'flowpaths' AS layer,
+                    id AS id,  -- adjust if your flowpaths ID column has a different name
+                    ST_X(ST_Centroid(geom)) AS lon,
+                    ST_Y(ST_Centroid(geom)) AS lat
+              FROM \"flowpaths\"
+              WHERE ST_IsEmpty(geom)=0"
+        ;;
+      lakes)
+        SQL="SELECT 'lakes' AS layer,
+                    lake_id AS id,  -- adjust if your flowpaths ID column has a different name
+                    ST_X(ST_Centroid(geom)) AS lon,
+                    ST_Y(ST_Centroid(geom)) AS lat
+              FROM \"lakes\"
+              WHERE ST_IsEmpty(geom)=0"
+        ;;        
       *)
         echo "!! Unsupported layer '${LAYER_TRIMMED}' – skipping" >&2
         continue
