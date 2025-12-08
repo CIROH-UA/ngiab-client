@@ -67,58 +67,35 @@ export default function DataMenu() {
      Visualization
      ───────────────────────────────────── */
   const handleVisulization = async () => {
+    if (!feature_id || !vpu) {
+      handleError('Please select a feature on the map first');
+      return;
+    }
+
     try {
       handleLoading('Loading Datastream Data');
-      const nc_files_parsed = await getNCFiles(
-        date,
-        forecast,
-        cycle,
-        time,
-        vpu
-      );
 
-      const vpu_gpkg = makeGpkgUrl(vpu);
-      
-      const cacheKey = getCacheKey(
+      await loadTimeSeriesForFeature({
+        feature_id,
+        vpu,
         date,
         forecast,
         cycle,
         time,
-        vpu
-      );
-      set_table(cacheKey)
-      
-      const id = feature_id.split('-')[1];
-      
-      await loadVpuData({
-        cacheKey,
-        nc_files: nc_files_parsed,
-        vpu_gpkg,
+        variable,          // current variable selection, may be null
+        set_table,
+        set_variables,
+        set_variable,
+        set_series,
+        set_layout,
       });
-      const variables = await getVariables({cacheKey});
-      set_variables(variables);
-      console.log('Available variables:', variables);
-      const _variable = variable ? variable : variables[0];
-      const series = await getTimeseries(id, cacheKey, _variable);
-      const xy = series.map((d) => ({
-        x: new Date(d.time),
-        y: d[variables[0]],
-      }));
 
-      set_series(xy);
-      set_variable(_variable);
-      set_layout({
-        'yaxis': _variable,
-        'xaxis': "Time",
-        'title': makeTitle(forecast, feature_id),
-      })
-
-      console.log('Flow timeseries for', id, xy);
       handleSuccess();
     } catch (err) {
       console.error(err);
       handleError('Error loading datastream data');
     }
+
   };
 
   /* ─────────────────────────────────────

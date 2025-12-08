@@ -277,34 +277,6 @@ function LineChart({ width, height, data, layout }) {
             const safeXTicks = getSafeXTicks(newXScale,zoom);
             return (
               <>
-                {/* <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'flex-end',
-                    marginTop: 10,
-                    marginRight: 12,
-                  }}
-                >
-                  <button
-                    onClick={zoom.reset}
-                    style={{
-                      backgroundColor:
-                        theme === 'dark' ? '#4b5563' : '#ffffff',
-                      color: theme === 'dark' ? '#f9fafb' : '#111827',
-                      border:
-                        theme === 'dark'
-                          ? '1px solid #6b7280'
-                          : '1px solid #d1d5db',
-                      fontWeight: 'bold',
-                      borderRadius: 999, // ★ pill button
-                      padding: '4px 10px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <LuExpand size={18} />
-                  </button>
-                </div> */}
-
                 <svg
                   width={width}
                   height={height}

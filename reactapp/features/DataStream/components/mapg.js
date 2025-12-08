@@ -330,9 +330,41 @@ const nexusLayers = useMemo(() => {
       
       if (layerId === 'divides') {
         // Clicked a catchment.
-        const id = feature.properties.divide_id;
-        set_feature_id(id);
-        console.log(id)
+        const unbiased_id = feature.properties.divide_id;
+        const id = unbiased_id.split('-')[1];
+        set_feature_id(unbiased_id);
+        console.log('Clicked nexus feature with id:', id);
+        const vpu_str = `VPU_${feature.properties.vpuid}`;
+        set_vpu(vpu_str);
+
+        try {
+          const nc_files_parsed = await getNCFiles(date , forecast, cycle, time, vpu_str);
+          const vpu_gpkg = makeGpkgUrl(vpu_str);
+          const cacheKey = getCacheKey(date , forecast, cycle, time, vpu_str);
+          await loadVpuData({
+            cacheKey: cacheKey,
+            nc_files: nc_files_parsed,
+            vpu_gpkg,
+          });
+          set_table(cacheKey)
+          const variables = await getVariables({cacheKey});
+          set_variables(variables)
+          set_variable(variables[0]);
+          const series = await getTimeseries(id, cacheKey, variables[0]);
+          const xy = series.map(d => ({
+            x: new Date(d.time),
+            y: d.flow,
+          }));
+          set_series(xy);
+          set_layout({
+            "yaxis": variables[0],
+            "xaxis": "",
+            "title": makeTitle(forecast, unbiased_id),
+          });
+          console.log("Flow timeseries for", id, xy);
+        } catch (err) {
+          console.error("Failed to load timeseries for", id, err);
+        }
       }
       break;
     }

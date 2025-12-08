@@ -39,7 +39,7 @@ const SearchInput = styled.input`
 
 
 
-const PARQUETURL= 'http://localhost:9000/ciroh-community-ngen-datastream/v2.2_resources/nexu_divides_index.parquet';
+const PARQUETURL= 'http://localhost:9000/ciroh-community-ngen-datastream/v2.2_resources/hydrofabric_index.parquet';
 
 const SearchBar = ({ placeholder = 'Search for an id' }) => {
 
