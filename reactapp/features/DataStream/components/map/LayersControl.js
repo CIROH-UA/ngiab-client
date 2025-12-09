@@ -1,12 +1,12 @@
-import { useLayersStore } from '../store/layers';
+import { useLayersStore } from '../../store/Layers';
 import { Fragment, useMemo, useState } from 'react';
-import { Switch } from  './styles/styles';
+import { Switch } from  '../styles/Styles';
 import { IoLayers } from "react-icons/io5";
 import { MdInfoOutline } from "react-icons/md";
-import { IconLabel, Row, Title, SButton, Content  } from './styles/styles';
-import { NexusSymbol, CatchmentSymbol, FlowPathSymbol, GaugeSymbol, symbologyColors, CursorSymbol } from '../lib/layers';
+import { IconLabel, Row, Title, SButton, Content  } from '../styles/Styles';
+import { NexusSymbol, CatchmentSymbol, FlowPathSymbol, GaugeSymbol, symbologyColors, CursorSymbol } from '../../lib/layers';
 import useTheme from 'hooks/useTheme';
-import { LayerInfoModal } from './modals';
+import { LayerInfoModal } from '../Modals';
 
 export const LayerControl = () => {
   const theme = useTheme();

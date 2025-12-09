@@ -4,15 +4,15 @@ import Map, { Source, Layer, Popup } from 'react-map-gl/maplibre';
 import { Protocol } from 'pmtiles';
 import useTheme from 'hooks/useTheme';
 import { getTimeseries } from "features/DataStream/lib/getTimeSeries";
-import { makeGpkgUrl } from '../lib/s3Utils';
-import { getCacheKey } from '../lib/opfsCache';
+import { makeGpkgUrl } from '../../lib/s3Utils';
+import { getCacheKey } from '../../lib/opfsCache';
 import { loadVpuData, getVariables } from 'features/DataStream/lib/vpuDataLoader';
-import useTimeSeriesStore from '../store/timeseries';
-import useDataStreamStore from '../store/datastream';
-import {useLayersStore, useFeatureStore} from '../store/layers';
-import { PopupContent } from './styles/styles';
-import { reorderLayers } from '../lib/layers';
-import { makeTitle, layerIdToFeatureType } from '../lib/utils';
+import useTimeSeriesStore from '../../store/Timeseries';
+import useDataStreamStore from '../../store/Datastream';
+import {useLayersStore, useFeatureStore} from '../../store/Layers';
+import { PopupContent } from '../styles/Styles';
+import { reorderLayers } from '../../lib/layers';
+import { makeTitle, layerIdToFeatureType } from '../../lib/utils';
 import { toast } from 'react-toastify';
 
 const onMapLoad = (event) => {

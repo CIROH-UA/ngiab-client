@@ -1,9 +1,9 @@
 import { Fragment, Suspense } from 'react';
-import { TimeSeriesThemedContainer } from './styles/styles';
-import useTimeSeriesStore from 'features/DataStream/store/timeseries';
+import { TimeSeriesThemedContainer } from '../styles/Styles';
+import useTimeSeriesStore from 'features/DataStream/store/Timeseries';
 import LoadingAnimation from 'features/Tethys/components/loader/LoadingAnimation';
 import ParentSize from '@visx/responsive/lib/components/ParentSize';
-import LineChart from 'features/DataStream/components/plot';
+import LineChart from 'features/DataStream/components/forecast/Plot';
 
 
 const TimeSeriesCard = () => {

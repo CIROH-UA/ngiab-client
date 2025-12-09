@@ -1,10 +1,10 @@
 // GaugeInformation.js
 import React, { Fragment } from 'react';
 import { MdInfoOutline } from 'react-icons/md';
-import { IconLabel, FieldBlock, FieldValue, FieldsGrid, FieldLabel, HeaderRow } from './styles/styles';
-import { useFeatureStore } from 'features/DataStream/store/layers';
-import { formatLabel } from '../lib/utils';
-import { BasinSymbol } from '../lib/layers';
+import { IconLabel, FieldBlock, FieldValue, FieldsGrid, FieldLabel, HeaderRow } from '../styles/Styles';
+import { useFeatureStore } from 'features/DataStream/store/Layers';
+import { formatLabel } from 'features/DataStream/lib/utils';
+import { BasinSymbol } from 'features/DataStream/lib/layers';
 
 export const FeatureInformation = () => {
   const selectedFeature = useFeatureStore((state) => state.selected_feature);

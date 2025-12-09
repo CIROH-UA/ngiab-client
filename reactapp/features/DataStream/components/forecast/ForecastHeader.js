@@ -1,8 +1,8 @@
 
 import React,{ useState } from 'react';
 import { MdLocationPin, MdClose, MdInfoOutline } from "react-icons/md";
-import { Row, IconLabel, SButton } from './styles/styles';
-import { DataInfoModel } from './modals';
+import { Row, IconLabel, SButton } from '../styles/Styles';
+import { DataInfoModel } from '../Modals';
 
 
 export const ForecastHeader = ({ title, onClick }) =>{

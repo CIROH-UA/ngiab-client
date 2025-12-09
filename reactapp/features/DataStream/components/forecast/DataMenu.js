@@ -1,19 +1,18 @@
 import React, { useState, useEffect, useMemo, Fragment } from 'react';
 import { Spinner } from 'react-bootstrap';
-import { XButton, LoadingMessage, Row, IconLabel } from './styles/styles';
-import SelectComponent from './selectComponent';
+import { XButton, LoadingMessage, Row, IconLabel } from '../styles/Styles';
+import SelectComponent from '../SelectComponent';
 import { toast } from 'react-toastify';
 import { loadVpuData, getVariables } from 'features/DataStream/lib/vpuDataLoader';
-import { makeGpkgUrl, listPublicS3Directories } from '../lib/s3Utils';
+import { makeGpkgUrl, listPublicS3Directories } from 'features/DataStream/lib/s3Utils';
 import { getTimeseries } from 'features/DataStream/lib/getTimeSeries';
-import { getCacheKey } from '../lib/opfsCache';
-import useTimeSeriesStore from '../store/timeseries';
-import useDataStreamStore from '../store/datastream';
+import { getCacheKey } from 'features/DataStream/lib/opfsCache';
+import useTimeSeriesStore from 'features/DataStream/store/Timeseries';
+import useDataStreamStore from 'features/DataStream/store/Datastream';
 import { MdOutlineWaves, MdCalendarMonth, MdOutlineRefresh } from "react-icons/md";
 import { BsExclamationCircle } from "react-icons/bs";
-import { availableCyclesList, availableEnsembleList, availableForecastList, availableModelsList } from '../lib/data';
-
-import { makeTitle } from '../lib/utils';
+import { availableCyclesList, availableEnsembleList, availableForecastList, availableModelsList } from 'features/DataStream/lib/data';
+import { makeTitle } from 'features/DataStream/lib/utils';
 
 export default function DataMenu() {
 

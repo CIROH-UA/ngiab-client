@@ -6,7 +6,7 @@ import Loader from 'features/Tethys/components/loader/Loader';
 import 'App.scss';
 
 
-import DataStreamView from 'features/DataStream/views/datastreamView';
+import DataStreamView from 'features/DataStream/views/DatastreamView';
 
 
 function App() {

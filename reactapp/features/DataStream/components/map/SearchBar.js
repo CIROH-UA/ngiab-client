@@ -1,9 +1,9 @@
 import React, {useState, useEffect } from 'react';
-import { SearchBarWrapper, SearchIcon, SearchInput } from './styles/styles';
+import { SearchBarWrapper, SearchIcon, SearchInput } from '../styles/Styles';
 import { loadIndexData, getFeatureProperties } from 'features/DataStream/lib/indexSearch';
-import useTimeSeriesStore from 'features/DataStream/store/timeseries';
-import useDataStreamStore from 'features/DataStream/store/datastream';
-import {useFeatureStore} from 'features/DataStream/store/layers';
+import useTimeSeriesStore from 'features/DataStream/store/Timeseries';
+import useDataStreamStore from 'features/DataStream/store/Datastream';
+import {useFeatureStore} from 'features/DataStream/store/Layers';
 
 const SearchBar = ({ placeholder = 'Search for an id' }) => {
   const hydrofabric_index_url = useDataStreamStore((state) => state.hydrofabric_index);

@@ -1,6 +1,6 @@
 import React, { Fragment, useState } from 'react';
-import { LayerControl } from '../layersControl';
-import { LayersContainer, LayerButton } from '../styles/styles';
+import { LayerControl } from '../map/LayersControl';
+import { LayersContainer, LayerButton } from '../styles/Styles';
 import { IoLayers, IoClose } from "react-icons/io5";
 
 export const LayersMenu = () => {

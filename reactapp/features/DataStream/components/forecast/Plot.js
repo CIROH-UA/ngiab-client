@@ -12,15 +12,14 @@ import {
   TooltipWithBounds,
   defaultStyles,
 } from '@visx/tooltip';
-import { LuExpand } from 'react-icons/lu';
 import { localPoint } from '@visx/event';
 import { GlyphCircle } from '@visx/glyph';
 import { timeParse, timeFormat } from 'd3-time-format';
 import { RectClipPath } from '@visx/clip-path';
 import { lightTheme, darkTheme } from '@visx/xychart';
 import useTheme from 'hooks/useTheme';
-import { getVariableUnits } from '../lib/getTimeSeries';
-import useDataStreamStore from '../store/datastream';
+import { getVariableUnits } from '../../lib/getTimeSeries';
+import useDataStreamStore from '../../store/Datastream';
 
 function LineChart({ width, height, data, layout }) {
   const forecast = useDataStreamStore((state) => state.forecast);
@@ -215,31 +214,8 @@ function LineChart({ width, height, data, layout }) {
   };
 
   const getSafeXTicks = useCallback((newXScale) => {
-    // const newXScale = rescaleXAxis(xScale, zoom.transformMatrix);
-    // const rawTicks = newXScale.ticks(xNumTicks);
-
-    // if (forecast === 'short_range') {
-    //   // const newXScale = rescaleXAxis(xScale, zoom.transformMatrix);
-    //   // const rawTicks = newXScale.ticks(xNumTicks);
-    //   const domainStart = newXScale.domain()[0];
-      
-    //   // ensure the very first tick is the domain start
-    //   const xTickValues = [domainStart, ...rawTicks].sort((a, b) => a - b);
-    //   // filter out ticks that would have the same formatted label (same day)
-    //   const seen = new Set();
-    //   const uniqueXTicks = xTickValues.filter((d) => {
-    //     const label = formatDate(d); // '%Y-%m-%d'
-    //     if (seen.has(label)) return false;
-    //     seen.add(label);
-    //     return true;
-    //   });
-    //   uniqueXTicks.pop();
-    //   return uniqueXTicks;
-    // }
-    // else{
       const xTickValues = newXScale.ticks(xNumTicks);
       return xTickValues;
-    // }
   },[allData]);
 
   return (

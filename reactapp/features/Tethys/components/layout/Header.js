@@ -9,7 +9,7 @@ import { LinkContainer } from 'react-router-bootstrap';
 
 import HeaderButton from 'features/Tethys/components/buttons/HeaderButton';
 import NavButton from 'features/Tethys/components/buttons/NavButton';
-import SearchBar from 'features/DataStream/components/SearchBar';
+import SearchBar from 'features/DataStream/components/map/SearchBar';
 import { AppContext } from 'features/Tethys/context/context';
 
 

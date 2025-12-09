@@ -1,10 +1,10 @@
 import React, { Fragment, useMemo } from 'react';
-import DataMenu from '../dataDialog';
-import { Content, Container } from '../styles/styles';
-import TimeSeriesCard from '../TimeseriesCard';
-import useTimeSeriesStore from 'features/DataStream/store/timeseries';
-import { ForecastHeader } from 'features/DataStream/components/ForecastHeader';
-import { FeatureInformation } from '../featureInformation';
+import DataMenu from '../forecast/DataMenu';
+import { Content, Container } from '../styles/Styles';
+import TimeSeriesCard from '../forecast/TimeseriesCard';
+import useTimeSeriesStore from 'features/DataStream/store/Timeseries';
+import { ForecastHeader } from '../forecast/ForecastHeader';
+import { FeatureInformation } from '../forecast/FeatureInformation';
 
 const ForecastMenu = () => {
 
