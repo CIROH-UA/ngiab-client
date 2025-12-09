@@ -115,12 +115,10 @@ const MapComponent = () => {
         source= 'hydrofabric'
         source-layer= 'conus_divides'
         paint= {{
-          'fill-color': theme === 'dark'
-            ? 'rgba(238, 51, 119, 0.316)'
-            : 'rgba(91, 44, 111, 0.316)',
+          "fill-color": ["rgba", 0, 0, 0, 0],
           'fill-outline-color': theme === 'dark'
-            ? 'rgba(238, 51, 119, 0.7)'
-            : 'rgba(91, 44, 111, 0.7)',
+            ? 'rgba(238, 51, 119, 0.5)'
+            : 'rgba(91, 44, 111, 0.5)',
           'fill-opacity': { stops: [[7, 0], [11, 1]] },
         }} 
       /> 
@@ -208,7 +206,7 @@ const nexusLayers = useMemo(() => {
       minzoom={5}
       paint={{
         'circle-radius': 7,
-        'circle-color': theme === 'dark' ? '#4f5b67' : '#1f78b4',
+        'circle-color': theme === 'dark' ? '#2c3e50' : '#1f78b4',
         'circle-stroke-width': 1,
         'circle-stroke-color': theme === 'dark' ? '#e9ecef' : '#ffffff',
       }}
@@ -237,7 +235,9 @@ const nexusLayers = useMemo(() => {
         'circle-radius': 10,
         'circle-stroke-width': 3,
         'circle-stroke-color': '#ffffff',
-        'circle-color': '#ff0000',
+        'circle-color': theme === 'dark' ? '#2c3e50' : '#1f78b4',
+
+
       }}
     />
   );
