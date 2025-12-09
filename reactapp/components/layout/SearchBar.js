@@ -1,14 +1,23 @@
 import React, {useState, useEffect } from 'react';
 import { SearchBarWrapper, SearchIcon, SearchInput } from '../styles';
-import { loadIndexData } from 'features/DataStream/lib/indexSearch';
+import { loadIndexData, getFeatureProperties } from 'features/DataStream/lib/indexSearch';
 import useTimeSeriesStore from 'features/DataStream/store/timeseries';
 import useDataStreamStore from 'features/DataStream/store/datastream';
+import {useFeatureStore} from 'features/DataStream/store/layers';
 
 
 const SearchBar = ({ placeholder = 'Search for an id' }) => {
   const hydrofabric_index_url = useDataStreamStore((state) => state.hydrofabric_index);
   const feature_id = useTimeSeriesStore((state) => state.feature_id);
   const set_feature_id = useTimeSeriesStore((state) => state.set_feature_id);
+  const set_selected_feature = useFeatureStore((state) => state.set_selected_feature);
+
+  const handleChange = async (e) => {
+    set_feature_id(e.target.value);
+    const properties = await getFeatureProperties({ cacheKey: 'index_data_table', feature_id: e.target.value })
+    console.log("Feature properties:", properties);
+    set_selected_feature(properties[0] || null);
+  }
 
   useEffect(() => {
     const loadSearchData = async () => {
@@ -29,7 +38,7 @@ const SearchBar = ({ placeholder = 'Search for an id' }) => {
       <SearchInput
         type="text"
         value={feature_id || ''}
-        onChange={(e) => set_feature_id(e.target.value)}
+        onChange={(e) => handleChange(e)}
         placeholder={placeholder}
         aria-label={placeholder}
       />

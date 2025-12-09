@@ -35,7 +35,7 @@ const MapComponent = () => {
   const isConusGaugesVisible = useLayersStore((state) => state.conus_gauges.visible)
   const enabledHovering = useLayersStore((state) => state.hovered_enabled);
 
-  const selectedFeature = useTimeSeriesStore((state) => state.feature_id);
+  const selectedFeatureId = useTimeSeriesStore((state) => state.feature_id);
   const set_series = useTimeSeriesStore((state) => state.set_series);
   const set_feature_id = useTimeSeriesStore((state) => state.set_feature_id);
   const set_variable = useTimeSeriesStore((state) => state.set_variable);
@@ -55,7 +55,7 @@ const MapComponent = () => {
   const set_hovered_feature = useFeatureStore((state) => state.set_hovered_feature);
   const hovered_feature =  useFeatureStore((state) => state.hovered_feature);
   const set_selected_feature = useFeatureStore((state) => state.set_selected_feature);
-  
+  const selectedMapFeature = useFeatureStore((state) => state.selected_feature);
 
   const theme = useTheme();
   const mapRef = useRef(null);
@@ -133,8 +133,8 @@ const MapComponent = () => {
         source-layer="conus_divides"
         beforeId='divides'
         filter={
-            selectedFeature
-            ? ['any', ['==', ['get', 'divide_id'], selectedFeature]]
+            selectedFeatureId
+            ? ['any', ['==', ['get', 'divide_id'], selectedFeatureId]]
             : ['==', ['get', 'divide_id'], '']
         }
         paint= {{
@@ -150,7 +150,7 @@ const MapComponent = () => {
     );
 
     return [ divides, highlighted ]
-  }, [theme, selectedFeature, isCatchmentsVisible]);
+  }, [theme, selectedFeatureId, isCatchmentsVisible]);
 
   // Memoized layer config for flowpaths
   const flowPathsLayer = useMemo(() => {
@@ -225,11 +225,11 @@ const nexusLayers = useMemo(() => {
       // Optional: ensure it's drawn above the normal points layer
       beforeId="nexus-points"
       filter={
-        selectedFeature
+        selectedFeatureId
           ? [
               'all',
               ['!', ['has', 'point_count']],     // ignore any clustered features
-              ['==', ['get', 'id'], selectedFeature], // match the exact feature id
+              ['==', ['get', 'id'], selectedFeatureId], // match the exact feature id
             ]
           : ['boolean', false]                    // match nothing when not selected
       }
@@ -243,7 +243,7 @@ const nexusLayers = useMemo(() => {
   );
 
   return [pointsLayer, nexusHighlightLayer];
-}, [isNexusVisible, theme, selectedFeature]);
+}, [isNexusVisible, theme, selectedFeatureId]);
 
   useEffect(() => {
     // Reset highlights when geometry layers are hidden
@@ -263,7 +263,25 @@ const nexusLayers = useMemo(() => {
 
     reorderLayers(map);
   }, [isNexusVisible, isCatchmentsVisible, isFlowPathsVisible, isConusGaugesVisible]);
-  
+ 
+  useEffect(() => {
+    console.log("Selected feature changed:", selectedMapFeature);
+    if (!selectedFeatureId) return;
+
+    const map = mapRef.current && mapRef.current.getMap
+      ? mapRef.current.getMap()
+      : mapRef.current;
+
+    if (!map || !map.isStyleLoaded()) return;
+
+    map.flyTo({
+      center:  [selectedMapFeature.lon, selectedMapFeature.lat],
+      zoom: 11,
+      essential: true,
+    });
+
+  }, [selectedMapFeature, isCatchmentsVisible, isNexusVisible]);
+
   const layersToQuery = useMemo(() => {
     const layers = [];
     if (isNexusVisible) layers.push('nexus-points');
