@@ -126,19 +126,40 @@ export const LayersContainer = styled.div`
   position: absolute;
   top: calc(var(--ts-header-height) + 16px);
   right: 10px;
-  width: 250x;
+  width: 250px;
   padding: 15px;
   background-color: #1f2933;
   color: #f9fafb;
   z-index: 1000;
-  transition: transform 0.25s ease-out;
+
   border-radius: 8px;
   overflow-y: auto;
+  transition: all .25s cubic-bezier(.4, 0, .2, 1);
   @media (max-width: 768px) {
     width: 100%;
     border-radius: 0;
   }
 `;
+export const LayerButton = styled(Button)`
+  top: 60px;
+  right: 1%;
+  position: absolute;
+  margin-top: 10px;
+  transition: transform 0.3s ease;
+  background-color:  ${({$bgColor = '#009989'}) => `${$bgColor}`};
+  border: none;
+  color: white;
+  border-radius: 20px;
+  padding: 7px 8px;
+  z-index: 1001;
+  &:hover, &:focus {
+    background-color: rgba(0, 0, 0, 0.1)!important;
+    color: white;
+    border: none;
+    box-shadow: none;
+  }
+`;
+
 
 export const XButton = styled(Button)`  
   background-color: rgba(255, 255, 255, 0.1);

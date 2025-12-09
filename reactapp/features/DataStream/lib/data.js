@@ -1,3 +1,8 @@
+
+export const availableModelsList = [
+  { value: 'cfe_nom', label: 'cfe_nom' },
+  { value: 'lstm', label: 'lstm' },
+];
 export const availableForecastList = [
   { value: 'short_range', label: 'short_range' },
   { value: 'medium_range', label: 'medium_range' },
@@ -24,11 +29,18 @@ export const availableCyclesList = {
     { value: '15', label: '15' },
     { value: '16', label: '16' },
     { value: '17', label: '17' },
+    { value: '18', label: '18' },
+    { value: '19', label: '19' },
+    { value: '20', label: '20' },
+    { value: '21', label: '21' },
+    { value: '22', label: '22' },
+    { value: '23', label: '23' }
   ],
   medium_range: [
     { value: '00', label: '00' },
     { value: '06', label: '06' },
     { value: '12', label: '12' },
+    { value: '18', label: '18' }
   ],
   analysis_assim_extend: [{ value: '16', label: '16' }],
 };
@@ -37,4 +49,14 @@ export const availableEnsembleList = {
   short_range: [],
   medium_range: [{ value: '1', label: '1' }],
   analysis_assim_extend: [],
+};
+
+export const FEATURE_PROPERTIES = {
+  'tot_drainage_areasqkm': 'Total Drainage Area (km2)',
+  'areasqkm': 'Area (km2)',
+  'toid': 'To ID',
+  'vpuid': 'VPU ID',
+  'lengthkm': 'Length (km)',
+  'has_flowline': 'Has Flowline',
+  'divide_id': 'Divide ID',
 };

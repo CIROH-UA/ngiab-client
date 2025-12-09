@@ -51,9 +51,14 @@ export async function loadArrowFromCache(key) {
 }
 
 
-export function getCacheKey(date, forecast, cycle, time, vpu) {
+export function getCacheKey(model, date, forecast, cycle, time, vpu) {
   if (!time){
-    return `${date}_${forecast}_${cycle}_${vpu}`.replace(/\./g,'_').replace(/\//g,'_');  
+    return `${model}_${date}_${forecast}_${cycle}_${vpu}`.replace(/\./g,'_').replace(/\//g,'_');  
   }
-  return `${date}_${forecast}_${cycle}_${time}_${vpu}`.replace(/\./g,'_').replace(/\//g,'_');
+  return `${model}_${date}_${forecast}_${cycle}_${time}_${vpu}`.replace(/\./g,'_').replace(/\//g,'_');
+}
+
+export async function checkCacheKeyExists(key) {
+  const buffer = await loadArrowFromCache(key);
+  return buffer
 }

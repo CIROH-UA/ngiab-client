@@ -4,7 +4,7 @@ import Map, { Source, Layer, Popup } from 'react-map-gl/maplibre';
 import { Protocol } from 'pmtiles';
 import useTheme from 'hooks/useTheme';
 import { getTimeseries } from "features/DataStream/lib/getTimeSeries";
-import { makeGpkgUrl, getNCFiles } from '../lib/s3Utils';
+import { makeGpkgUrl } from '../lib/s3Utils';
 import { getCacheKey } from '../lib/opfsCache';
 import { loadVpuData, getVariables } from 'features/DataStream/lib/vpuDataLoader';
 import useTimeSeriesStore from '../store/timeseries';
@@ -12,8 +12,8 @@ import useDataStreamStore from '../store/datastream';
 import {useLayersStore, useFeatureStore} from '../store/layers';
 import { PopupContent } from './styles/styles';
 import { reorderLayers } from '../lib/layers';
-import { makeTitle } from '../lib/utils';
-import { use } from 'react';
+import { makeTitle, layerIdToFeatureType } from '../lib/utils';
+import { toast } from 'react-toastify';
 
 const onMapLoad = (event) => {
   const map = event.target;
@@ -45,6 +45,7 @@ const MapComponent = () => {
   const nexus_pmtiles = useDataStreamStore((state) => state.nexus_pmtiles);
   const conus_pmtiles = useDataStreamStore((state) => state.community_pmtiles);
   const date = useDataStreamStore((state) => state.date);
+  const model = useDataStreamStore((state) => state.model);
   const forecast = useDataStreamStore((state) => state.forecast);
   const time = useDataStreamStore((state) => state.time);
   const cycle = useDataStreamStore((state) => state.cycle);
@@ -281,90 +282,58 @@ const nexusLayers = useMemo(() => {
     
     for (const feature of features) {
       const layerId = feature.layer.id;
-      console.log('Clicked feature from layer:', layerId, feature);
-      
       set_selected_feature({
         latitude: feature.geometry.coordinates[1],
         longitude: feature.geometry.coordinates[0],
         ...feature.properties
       })
-      
-      if (layerId === 'nexus-points'){
-        const unbiased_id = feature.properties.id;
-        const id = unbiased_id.split('-')[1];
+
+      const featureIdProperty = layerIdToFeatureType(layerId);
+      const unbiased_id = feature.properties[featureIdProperty];
+      const id = unbiased_id.split('-')[1];
+      const vpu_str = `VPU_${feature.properties.vpuid}`;
+      const vpu_gpkg = makeGpkgUrl(vpu_str);
+      const cacheKey = getCacheKey(model, date , forecast, cycle, time, vpu_str);
+      const toastId = toast.loading(`Loading data for id: ${id}...`, {
+        closeOnClick: false,
+        draggable: false,
+      });
+      try {
+        await loadVpuData(model, date, forecast, cycle, time, vpu_str, vpu_gpkg);
+        const variables = await getVariables({cacheKey});
+        const series = await getTimeseries(id, cacheKey, variables[0]);
+        const xy = series.map(d => ({
+          x: new Date(d.time),
+          y: d.flow,
+        }));
         set_feature_id(unbiased_id);
-        console.log('Clicked nexus feature with id:', id);
-        const vpu_str = `VPU_${feature.properties.vpuid}`;
+        set_table(cacheKey);
         set_vpu(vpu_str);
+        set_variables(variables)
+        set_variable(variables[0]);
+        set_series(xy);
+        set_layout({
+          "yaxis": variables[0],
+          "xaxis": "",
+          "title": makeTitle(forecast, unbiased_id),
+        });
 
-        try {
-          const nc_files_parsed = await getNCFiles(date , forecast, cycle, time, vpu_str);
-          const vpu_gpkg = makeGpkgUrl(vpu_str);
-          const cacheKey = getCacheKey(date , forecast, cycle, time, vpu_str);
-          await loadVpuData({
-            cacheKey: cacheKey,
-            nc_files: nc_files_parsed,
-            vpu_gpkg,
-          });
-          set_table(cacheKey)
-          const variables = await getVariables({cacheKey});
-          set_variables(variables)
-          set_variable(variables[0]);
-          const series = await getTimeseries(id, cacheKey, variables[0]);
-          const xy = series.map(d => ({
-            x: new Date(d.time),
-            y: d.flow,
-          }));
-          set_series(xy);
-          set_layout({
-            "yaxis": variables[0],
-            "xaxis": "",
-            "title": makeTitle(forecast, unbiased_id),
-          });
-          console.log("Flow timeseries for", id, xy);
-        } catch (err) {
-          console.error("Failed to load timeseries for", id, err);
-        }
-
-      }
-      
-      if (layerId === 'divides') {
-        // Clicked a catchment.
-        const unbiased_id = feature.properties.divide_id;
-        const id = unbiased_id.split('-')[1];
-        set_feature_id(unbiased_id);
-        console.log('Clicked nexus feature with id:', id);
-        const vpu_str = `VPU_${feature.properties.vpuid}`;
-        set_vpu(vpu_str);
-
-        try {
-          const nc_files_parsed = await getNCFiles(date , forecast, cycle, time, vpu_str);
-          const vpu_gpkg = makeGpkgUrl(vpu_str);
-          const cacheKey = getCacheKey(date , forecast, cycle, time, vpu_str);
-          await loadVpuData({
-            cacheKey: cacheKey,
-            nc_files: nc_files_parsed,
-            vpu_gpkg,
-          });
-          set_table(cacheKey)
-          const variables = await getVariables({cacheKey});
-          set_variables(variables)
-          set_variable(variables[0]);
-          const series = await getTimeseries(id, cacheKey, variables[0]);
-          const xy = series.map(d => ({
-            x: new Date(d.time),
-            y: d.flow,
-          }));
-          set_series(xy);
-          set_layout({
-            "yaxis": variables[0],
-            "xaxis": "",
-            "title": makeTitle(forecast, unbiased_id),
-          });
-          console.log("Flow timeseries for", id, xy);
-        } catch (err) {
-          console.error("Failed to load timeseries for", id, err);
-        }
+        toast.update(toastId, {
+          render: `Loaded data for id: ${id}`,
+          type: 'success',
+          isLoading: false,
+          autoClose: 3000,
+          closeOnClick: true,
+        });        
+      } catch (err) {
+        toast.update(toastId, {
+          render: `Failed to load data for id: ${id}`,
+          type: 'error',
+          isLoading: false,
+          autoClose: 5000,
+          closeOnClick: true,
+        });
+        console.error("Failed to load timeseries for", id, err);
       }
       break;
     }

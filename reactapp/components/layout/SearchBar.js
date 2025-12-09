@@ -1,55 +1,19 @@
 import React, {useState, useEffect } from 'react';
-import styled from 'styled-components';
-import { FiSearch } from 'react-icons/fi';
+import { SearchBarWrapper, SearchIcon, SearchInput } from '../styles';
 import { loadIndexData } from 'features/DataStream/lib/indexSearch';
 import useTimeSeriesStore from 'features/DataStream/store/timeseries';
+import useDataStreamStore from 'features/DataStream/store/datastream';
 
-
-const SearchBarWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  width: 100%;
-  max-width: 400px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  background-color: #f5f7f8;
-  box-sizing: border-box;
-  border: 1px solid #e1e4e8;
-`;
-
-const SearchIcon = styled(FiSearch)`
-  flex-shrink: 0;
-  margin-right: 8px;
-  color: #9ca3af;
-  font-size: 16px;
-`;
-
-const SearchInput = styled.input`
-  border: none;
-  outline: none;
-  width: 500px;
-  font-size: 14px;
-  background: transparent;
-  color: #111827;
-
-  &::placeholder {
-    color: #9ca3af;
-  }
-`;
-
-
-
-const PARQUETURL= 'http://localhost:9000/ciroh-community-ngen-datastream/v2.2_resources/hydrofabric_index.parquet';
 
 const SearchBar = ({ placeholder = 'Search for an id' }) => {
-
+  const hydrofabric_index_url = useDataStreamStore((state) => state.hydrofabric_index);
   const feature_id = useTimeSeriesStore((state) => state.feature_id);
   const set_feature_id = useTimeSeriesStore((state) => state.set_feature_id);
 
   useEffect(() => {
     const loadSearchData = async () => {
       try {
-        await loadIndexData({ remoteUrl: PARQUETURL } );
+        await loadIndexData({ remoteUrl: hydrofabric_index_url } );
       } catch (error) {
         console.error('Error fetching data:', error);
       }

@@ -7,7 +7,6 @@ import tempfile
 import pandas as pd
 import xarray as xr
 from urllib.parse import urlparse
-from django.http import HttpRequest
 import io
 import pyarrow as pa
 logger = logging.getLogger(__name__)
@@ -229,20 +228,4 @@ def convert_df_2_bytes(df: pd.DataFrame) -> bytes:
     buf.seek(0)
     return buf.read()
 
-def get_dataStream_outputs_prefix(request: HttpRequest):
-    """
-    Get the prefix path for DataStream outputs in the S3 bucket based on request parameters.
-    """
-    print("Getting list of available vpus in the bucket...")
-    avail_date = request.GET.get("avail_date")
-    ngen_forecast = request.GET.get("ngen_forecast")
-    prefix_path = f"v2.2/{avail_date}/{ngen_forecast}/"
-    if request.GET.get("ngen_cycle") is not None:
-        ngen_cycle = request.GET.get("ngen_cycle")
-        prefix_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_cycle}/"
-    if request.GET.get("ngen_ensemble") is not None:
-        ngen_hour = request.GET.get("ngen_ensemble")
-        prefix_path = f"v2.2/{avail_date}/{ngen_forecast}/{ngen_cycle}/{ngen_hour}/"
-    prefix_path += "ngen-run/outputs/"
 
-    return prefix_path

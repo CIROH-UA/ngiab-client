@@ -2,7 +2,7 @@
 
 import {Suspense,lazy} from 'react';
 import LoadingAnimation from 'components/loader/LoadingAnimation';
-import {TimeSeriesContainer} from 'components/StyledContainers';
+import {TimeSeriesContainer} from 'components/styles';
 
 const CatchmentSelectComponent = lazy(() => import('../../features/hydroFabric/components/catchmentsSelect'));
 const NexusSelectComponent = lazy(() => import('../../features/hydroFabric/components/nexusSelect'));

@@ -1,6 +1,7 @@
 import React, { Component, useCallback } from 'react';
 import Select, { createFilter } from 'react-select';
 import { FixedSizeList as List } from 'react-window';
+import useTheme from 'hooks/useTheme';
 
 const height = 28;
 
@@ -10,7 +11,6 @@ class MenuList extends Component {
     const [value] = getValue();
     const initialOffset = options.indexOf(value) * height;
 
-    // Dynamically adjust maxHeight
     const adjustedHeight = Math.min(children.length * height, maxHeight);
 
     return (
@@ -19,9 +19,7 @@ class MenuList extends Component {
         itemCount={children.length}
         itemSize={height}
         initialScrollOffset={initialOffset}
-        style={
-          { overflowX: 'hidden'}
-        }
+        style={{ overflowX: 'hidden' }}
       >
         {({ index, style }) => <div style={style}>{children[index]}</div>}
       </List>
@@ -29,112 +27,131 @@ class MenuList extends Component {
   }
 }
 
-const customStyles = (width = 150) => ({
-  container: (base) => ({
-    ...base,
-    width,               // 👈 control overall width
-  }),
+// theme-aware styles
+const customStyles = (theme, width = 150) => {
+  const isDark = theme === 'dark';
 
-  control: (base, state) => ({
-    ...base,
-    minHeight: 28,
-    height: 28,
-    fontSize: 12,
-    borderRadius: 4,
-    paddingTop: 0,
-    paddingBottom: 0,
-    boxShadow: state.isFocused ? '0 0 0 1px #2684ff' : 'none',
-    borderColor: state.isFocused ? '#2684ff' : base.borderColor,
-    '&:hover': {
-      borderColor: '#2684ff',
-    },
-  }),
+  const controlBg = isDark ? '#2c3e50' : '#ffffff';
+  const controlBorder = isDark ? '#4f5b67' : '#cccccc';
+  const textColor = isDark ? '#ecf0f1' : '#000000';
+  const placeholderColor = isDark ? '#b0bec5' : '#666666';
+  const menuBg = isDark ? '#2c3e50' : '#ffffff';
+  const optionHoverBg = isDark ? '#34495e' : 'rgba(38,132,255,0.1)';
+  const optionSelectedBg = isDark ? '#1abc9c' : '#2684ff';
 
-  valueContainer: (base) => ({
-    ...base,
-    padding: '0 6px',
-  }),
+  return {
+    container: (base) => ({
+      ...base,
+      width,
+      fontSize: 12,
+    }),
 
-  indicatorsContainer: (base) => ({
-    ...base,
-    height: 28,
-  }),
-  dropdownIndicator: (base) => ({
-    ...base,
-    padding: '0 4px',
-  }),
-  clearIndicator: (base) => ({
-    ...base,
-    padding: '0 4px',
-  }),
+    control: (base, state) => ({
+      ...base,
+      minHeight: 28,
+      height: 28,
+      fontSize: 12,
+      borderRadius: 4,
+      paddingTop: 0,
+      paddingBottom: 0,
+      backgroundColor: controlBg,
+      borderColor: state.isFocused ? '#2684ff' : controlBorder,
+      boxShadow: state.isFocused ? '0 0 0 1px #2684ff' : 'none',
+      '&:hover': {
+        borderColor: '#2684ff',
+      },
+    }),
 
-  // 👇 ellipsis in the selected value
-  singleValue: (base) => ({
-    ...base,
-    color: 'black',
-    maxWidth: '100%',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  }),
+    valueContainer: (base) => ({
+      ...base,
+      padding: '0 6px',
+    }),
 
-  input: (base) => ({
-    ...base,
-    color: 'black',
-    margin: 0,
-    padding: 0,
-  }),
+    indicatorsContainer: (base) => ({
+      ...base,
+      height: 28,
+    }),
+    dropdownIndicator: (base) => ({
+      ...base,
+      padding: '0 4px',
+    }),
+    clearIndicator: (base) => ({
+      ...base,
+      padding: '0 4px',
+    }),
 
-  placeholder: (base) => ({
-    ...base,
-    fontSize: 12,
-  }),
+    singleValue: (base) => ({
+      ...base,
+      color: textColor,
+      maxWidth: '100%',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    }),
 
-  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-  menu: (base) => ({
-    ...base,
-    overflowY: 'auto',
-    fontSize: 12,
-  }),
-  menuList: (base) => ({
-    ...base,
-    paddingTop: 0,
-    paddingBottom: 0,
-  }),
+    input: (base) => ({
+      ...base,
+      color: textColor,
+      margin: 0,
+      padding: 0,
+    }),
 
-  // 👇 ellipsis in each option (menu item)
-  option: (base, state) => ({
-    ...base,
-    fontSize: 12,
-    padding: '4px 8px',
-    width: '100%',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    color: 'black',
-    backgroundColor: state.isFocused
-      ? 'rgba(38, 132, 255, 0.1)'
-      : state.isSelected
-      ? '#2684ff'
-      : base.backgroundColor,
-  }),
-});
+    placeholder: (base) => ({
+      ...base,
+      fontSize: 12,
+      color: placeholderColor,
+    }),
 
+    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+    menu: (base) => ({
+      ...base,
+      overflowY: 'auto',
+      fontSize: 12,
+      backgroundColor: menuBg,
+    }),
+    menuList: (base) => ({
+      ...base,
+      paddingTop: 0,
+      paddingBottom: 0,
+    }),
 
-const SelectComponent = ({ 
+    option: (base, state) => ({
+      ...base,
+      fontSize: 12,
+      padding: '4px 8px',
+      width: '100%',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      color: state.isSelected ? '#ffffff' : textColor,
+      backgroundColor: state.isSelected
+        ? optionSelectedBg
+        : state.isFocused
+        ? optionHoverBg
+        : menuBg,
+    }),
+  };
+};
+
+const SelectComponent = ({
   optionsList,
-  onChangeHandler, 
+  onChangeHandler,
   value,
   width = 150,
 }) => {
-  const handleChange = useCallback((option) => {
-    onChangeHandler([option]);
-  }, [onChangeHandler]);
+  const theme = useTheme();          // ← returns 'dark' or 'light'
+
+  const handleChange = useCallback(
+    (option) => {
+      onChangeHandler([option]);
+    },
+    [onChangeHandler]
+  );
 
   return (
     <Select
       components={{ MenuList }}
-      styles={customStyles(width)}
+      styles={customStyles(theme, width)}
       filterOption={createFilter({ ignoreAccents: false })}
       options={optionsList}
       value={value}

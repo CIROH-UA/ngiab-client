@@ -1,26 +1,51 @@
-import { S3Client, ListObjectsCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getCacheKey, loadArrowFromCache } from "./opfsCache";
 
+export async function listPublicS3Directories(prefix = "v2.2/") {
+  const bucket = "ciroh-community-ngen-datastream";
 
-const s3Client = new S3Client({
-    region: "auto",
-});
+  // Ensure trailing slash
+  const normalizedPrefix = prefix.endsWith("/") ? prefix : `${prefix}/`;
 
-export const listS3Files = async (bucketName='ciroh-community-ngen-datastream', prefix='v2.2') => {
-  const command = new ListObjectsCommand({ Bucket: bucketName, Prefix: prefix });
-  const response = await s3Client.send(command);
-  return response.Contents.map(file => `${prefix}/${file.Key}`);
+  // S3 ListObjectsV2 with delimiter to get “folders”
+  const url =
+    `https://${bucket}.s3.us-east-1.amazonaws.com/` +
+    `?list-type=2&prefix=${encodeURIComponent(normalizedPrefix)}` +
+    `&delimiter=/`;
+
+  const resp = await fetch(url);
+  if (!resp.ok) {
+    throw new Error(`S3 list error: ${resp.status} ${resp.statusText}`);
+  }
+
+  const xml = await resp.text();
+
+  // Parse XML and extract CommonPrefixes/Prefix
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xml, "application/xml");
+
+  const prefixNodes = [...doc.getElementsByTagName("CommonPrefixes")];
+
+  // Full prefixes from S3, e.g. "v2.2/ngen.20251121/short_range/"
+  const fullPrefixes = prefixNodes
+    .map((node) => node.getElementsByTagName("Prefix")[0]?.textContent)
+    .filter(Boolean);
+
+  // If you only want the "child" folder names (e.g. just "ngen.20251121"):
+  const childNames = fullPrefixes.map((p) =>
+    p
+      .slice(normalizedPrefix.length) // remove base prefix
+      .replace(/\/$/, "")            // trim trailing slash
+  );
+
+  return { fullPrefixes, childNames };
 }
+
 export async function listPublicS3Files(prefix = "v2.2/") {
     const bucket = "ciroh-community-ngen-datastream";
     const url =
         `https://${bucket}.s3.us-east-1.amazonaws.com` +
         `/?list-type=2&prefix=${encodeURIComponent(prefix)}`;
-    // const targetUrl =
-    //     `https://${bucket}.s3.us-east-1.amazonaws.com/` +
-    //     `?list-type=2&prefix=${encodeURIComponent(prefix)}`;
 
-    // // encode the whole target URL as the value of `url=`
-    // const url = `https://api.cors.lol/?url=${encodeURIComponent(targetUrl)}`;
 
     const resp = await fetch(url);
     const xml = await resp.text();
@@ -33,15 +58,16 @@ export async function listPublicS3Files(prefix = "v2.2/") {
     return contents.map(node => node.getElementsByTagName("Key")[0].textContent);
 }
 
-export const makePrefix = (avail_date,ngen_forecast,ngen_cycle, ngen_time, ngen_vpu) => {    
-    let prefix_path = `v2.2/${avail_date}/${ngen_forecast}/${ngen_cycle}`
+export const makePrefix = (model, avail_date,ngen_forecast,ngen_cycle, ngen_time, ngen_vpu) => {    
+    let prefix_path = `outputs/${model}/v2.2_hydrofabric/${avail_date}/${ngen_forecast}/${ngen_cycle}`
     let time_path = ngen_time ? `${ngen_time}/` : '';
     prefix_path = `${prefix_path}/${time_path}${ngen_vpu}/ngen-run/outputs/`;
     return prefix_path;
 }
 
-export async function getNCFiles(date, forecast, cycle, time, vpu) {
-    const prefix = makePrefix(date, forecast, cycle, time, vpu);
+export async function getNCFiles(model, date, forecast, cycle, time, vpu, buffer) {
+    if (buffer){ return []; }
+    const prefix = makePrefix(model, date, forecast, cycle, time, vpu);
     const filesPrefix = await listPublicS3Files(prefix);
     console.log("files_prefix", filesPrefix);
     const ncFiles = filesPrefix.filter(f => f.endsWith('.nc'));

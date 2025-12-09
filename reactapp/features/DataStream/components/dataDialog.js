@@ -1,23 +1,21 @@
 import React, { useState, useEffect, useMemo, Fragment } from 'react';
 import { Spinner } from 'react-bootstrap';
 import { XButton, LoadingMessage, Row, IconLabel } from './styles/styles';
-import appAPI from 'services/api/app';
 import SelectComponent from './selectComponent';
 import { toast } from 'react-toastify';
 import { loadVpuData, getVariables } from 'features/DataStream/lib/vpuDataLoader';
-import { getNCFiles, makeGpkgUrl } from '../lib/s3Utils';
+import { makeGpkgUrl, listPublicS3Directories } from '../lib/s3Utils';
 import { getTimeseries } from 'features/DataStream/lib/getTimeSeries';
 import { getCacheKey } from '../lib/opfsCache';
 import useTimeSeriesStore from '../store/timeseries';
 import useDataStreamStore from '../store/datastream';
 import { MdOutlineWaves, MdCalendarMonth, MdOutlineRefresh } from "react-icons/md";
 import { BsExclamationCircle } from "react-icons/bs";
-import { availableCyclesList, availableEnsembleList, availableForecastList } from '../lib/data';
+import { availableCyclesList, availableEnsembleList, availableForecastList, availableModelsList } from '../lib/data';
 
 import { makeTitle } from '../lib/utils';
 
 export default function DataMenu() {
-  const [datesBucket, setDatesBucket] = useState([]);
 
   const vpu = useDataStreamStore((state) => state.vpu);
   const date = useDataStreamStore((state) => state.date);
@@ -25,12 +23,17 @@ export default function DataMenu() {
   const time = useDataStreamStore((state) => state.time);
   const cycle = useDataStreamStore((state) => state.cycle);
   const variables = useDataStreamStore((state) => state.variables);
+  const model = useDataStreamStore((state) => state.model);
+  const dates = useDataStreamStore((state) => state.dates);
 
   const set_date = useDataStreamStore((state) => state.set_date);
+  const set_dates = useDataStreamStore((state) => state.set_dates);
   const set_forecast = useDataStreamStore((state) => state.set_forecast);
   const set_time = useDataStreamStore((state) => state.set_time);
   const set_cycle = useDataStreamStore((state) => state.set_cycle);
   const set_variables = useDataStreamStore((state) => state.set_variables);
+  const set_model = useDataStreamStore((state) => state.set_model);
+  const reset_datastream_store = useDataStreamStore((state) => state.reset);
 
   const variable = useTimeSeriesStore((state) => state.variable);
   const table = useTimeSeriesStore((state) => state.table)
@@ -63,9 +66,6 @@ export default function DataMenu() {
     setLoadingText('');
   };
 
-  /* ─────────────────────────────────────
-     Visualization
-     ───────────────────────────────────── */
   const handleVisulization = async () => {
     if (!feature_id || !vpu) {
       handleError('Please select a feature on the map first');
@@ -74,23 +74,40 @@ export default function DataMenu() {
 
     try {
       handleLoading('Loading Datastream Data');
-
-      await loadTimeSeriesForFeature({
-        feature_id,
-        vpu,
+      
+      const cacheKey = getCacheKey(
+        model,
         date,
         forecast,
         cycle,
         time,
-        variable,          // current variable selection, may be null
-        set_table,
-        set_variables,
-        set_variable,
-        set_series,
-        set_layout,
+        vpu
+      );
+      const vpu_gpkg = makeGpkgUrl(vpu);      
+      const id = feature_id.split('-')[1];
+      await loadVpuData(model, date, forecast, cycle, time, vpu, vpu_gpkg);
+      const variables = await getVariables({cacheKey});
+      const _variable = variable ? variable : variables[0];
+      const series = await getTimeseries(id, cacheKey, _variable);
+      const xy = series.map((d) => ({
+        x: new Date(d.time),
+        y: d[variables[0]],
+      }));
+
+      set_table(cacheKey);
+      set_variables(variables);
+      set_series(xy);
+      set_variable(_variable);
+      set_layout({
+        'yaxis': _variable,
+        'xaxis': "Time",
+        'title': makeTitle(forecast, feature_id),
       });
 
+
       handleSuccess();
+
+      
     } catch (err) {
       console.error(err);
       handleError('Error loading datastream data');
@@ -98,9 +115,12 @@ export default function DataMenu() {
 
   };
 
-  /* ─────────────────────────────────────
-     Select change handlers
-     ───────────────────────────────────── */
+
+  const handleChangeModel = (optionArray) => {
+    const opt = optionArray?.[0];
+    if (opt) set_model(opt.value);
+  };
+
   const handleChangeDate = (optionArray) => {
     const opt = optionArray?.[0];
     if (opt) set_date(opt.value);
@@ -127,50 +147,28 @@ export default function DataMenu() {
   const handleChangeVariable = async (optionArray) => {
     const opt = optionArray?.[0];
     if (opt) set_variable(opt.value);
-    const id =  feature_id.split('-')[1];
-    console.log(table)
-    const series = await getTimeseries(id, table, opt.value);
-    const xy = series.map((d) => ({
-      x: new Date(d.time),
-      y: d[opt.value],
-    }));
-    set_series(xy);
-    set_layout({
-      'yaxis': opt.value,
-      'xaxis': "Time",
-      'title': makeTitle(forecast, feature_id),
-    })
   };
   /* ─────────────────────────────────────
      Fetch available dates (once)
      ───────────────────────────────────── */
   useEffect(() => {
-    appAPI
-      .getDataStreamNgiabDates()
-      .then((data) => {
-        if (data.error) {
-          toast.error('Error Datastream Dates From S3 Bucket', {
-            autoClose: 1000,
-          });
-          return;
-        }
+    async function fetchDates() {
+      try {
+        const { childNames } = await listPublicS3Directories(`outputs/${model}/v2.2_hydrofabric/`);
+        console.log(childNames)
+        const options = childNames.map((d) => ({ value: d, label: d }));
 
-        setDatesBucket(data.ngen_dates);
+        const dateOptions = Array.from(options).sort().reverse();
+        console.log('Fetched dates from S3:', dateOptions);
+        // setDatesBucket(dateOptions);
+        set_dates(dateOptions);
+      } catch (error) {
+        console.error('Error fetching dates from S3:', error);
+      }
+    }
+    
+    fetchDates();
 
-        // Set default date in dsState if not already set
-        if (!date && data.ngen_dates?.length) {
-          const def = data.ngen_dates[0]; // or last element if you want most recent
-          set_date(def.value ?? def); // depends on shape
-        }
-
-        toast.success('Successfully retrieved Datastream Dates From S3 Bucket', {
-          autoClose: 1000,
-        });
-      })
-      .catch((error) => {
-        console.error('Failed', error);
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // run once on mount
 
   /* ─────────────────────────────────────
@@ -197,9 +195,11 @@ export default function DataMenu() {
      ───────────────────────────────────── */
   const selectedDateOption = useMemo(
     () =>
-      datesBucket.find((opt) => opt.value === date) ??
+      // datesBucket.find((opt) => opt.value === date) ??
+      dates.find((opt) => opt.value === date) ??
       null,
-    [datesBucket, date]
+    // [datesBucket, date]
+    [dates, date]
   );
 
   const selectedForecastOption = useMemo(
@@ -207,6 +207,13 @@ export default function DataMenu() {
       availableForecastList.find((opt) => opt.value === forecast) ??
       null,
     [forecast]
+  );
+
+  const selectedModelOption = useMemo(
+    () =>
+      availableModelsList.find((opt) => opt.value === model) ??
+      null,
+    [model]
   );
 
   const selectedCycleOption = useMemo(() => {
@@ -232,16 +239,25 @@ export default function DataMenu() {
   return (
     <Fragment>
       <Fragment>
-        {datesBucket.length > 0 && (
+        <Row>
+          <IconLabel> <BsExclamationCircle/> Model </IconLabel>
+          <SelectComponent
+            optionsList={availableModelsList}
+            value={selectedModelOption}
+            onChangeHandler={handleChangeModel}
+          />
+        </Row>
+        {/* {datesBucket.length > 0 && ( */}
           <Row>
             <IconLabel> <MdCalendarMonth/> Date</IconLabel>
             <SelectComponent
-              optionsList={datesBucket}
+              // optionsList={datesBucket}
+              optionsList={dates}
               value={selectedDateOption}
               onChangeHandler={handleChangeDate}
             />
           </Row>
-        )}
+        {/* )} */}
         <Row>
           <IconLabel> <BsExclamationCircle/>  Forecast</IconLabel>
           <SelectComponent

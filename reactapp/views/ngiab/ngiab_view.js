@@ -1,7 +1,7 @@
 import { Fragment, useState, lazy,Suspense } from 'react';
 import { HydroFabricProvider } from 'features/hydroFabric/providers/hydroFabricProvider';
 import { ModelRunsProvider } from 'features/ModelRuns/providers/modelRunsProvider';
-import { HydroFabricContainer, MapContainer } from '../../components/StyledContainers';
+import { HydroFabricContainer, MapContainer } from '../../components/styles';
 import { ToastContainer } from 'react-toastify';
 import Button from 'react-bootstrap/Button';
 import styled from 'styled-components';

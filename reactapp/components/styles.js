@@ -1,7 +1,7 @@
 // containers.js
 import styled from 'styled-components';
 import useTheme from 'hooks/useTheme';
-
+import { FiSearch } from 'react-icons/fi';
 // HydroFabricContainer
 const StyledHydroFabricContainer = styled.div`
   // flex: ${(props) => (props.$fullScreen ? '1 1 0%' : '1 1 40%')};
@@ -131,3 +131,36 @@ export const TimeSeriesContainer = (props) => {
   const theme = useTheme();
   return <StyledTimeSeriesContainer {...props} theme={theme} />;
 };
+
+
+export const SearchBarWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 400px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background-color: #f5f7f8;
+  box-sizing: border-box;
+  border: 1px solid #e1e4e8;
+`;
+
+export const SearchIcon = styled(FiSearch)`
+  flex-shrink: 0;
+  margin-right: 8px;
+  color: #9ca3af;
+  font-size: 16px;
+`;
+
+export const SearchInput = styled.input`
+  border: none;
+  outline: none;
+  width: 500px;
+  font-size: 14px;
+  background: transparent;
+  color: #111827;
+
+  &::placeholder {
+    color: #9ca3af;
+  }
+`;

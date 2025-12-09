@@ -1,7 +1,8 @@
 import { tableFromIPC } from "apache-arrow";
 import appAPI from "services/api/app";
-import { saveArrowToCache, loadArrowFromCache } from "./opfsCache";
+import { saveArrowToCache, loadArrowFromCache, getCacheKey } from "./opfsCache";
 import { getConnection } from "./duckdbClient";
+import { getNCFiles } from "./s3Utils";
 
 export async function debugSingleFeatureId(featureId) {
   const conn = await getConnection();
@@ -108,11 +109,27 @@ export async function debugFeatureIds() {
     console.log("  ", idCol.get(i), " (typeof:", typeof idCol.get(i), ")");
   }
 }
-export async function loadVpuData({ cacheKey, nc_files, vpu_gpkg }) { 
+
+
+
+export async function loadVpuData(
+   
+    model,
+    date,
+    forecast,
+    cycle,
+    time,
+    vpu,
+    vpu_gpkg 
+  ) { 
+  
+  const cacheKey = getCacheKey(model, date , forecast, cycle, time, vpu);
   console.log("loadVpuData called with cacheKey:", cacheKey);
+
   let buffer = await loadArrowFromCache(cacheKey);
 
   if (!buffer) {
+    const nc_files = await getNCFiles(model, date , forecast, cycle, time, vpu);
     const res = await appAPI.getParquetPerVpu({
       nc_files,
       vpu_gpkg,
@@ -141,13 +158,11 @@ export async function loadVpuData({ cacheKey, nc_files, vpu_gpkg }) {
   }
 }
 
-export async function getVariables({ cacheKey }){
+export async function getVariables({ cacheKey }) {
   console.log("getVariables called with cacheKey:", cacheKey);
+
   const conn = await getConnection();
-  // const q = await conn.query(`
-  //   SELECT * EXCEPT ('feature_id', 'time') FROM ${cacheKey} LIMIT 1
-  // `);
-  
+
   const q = await conn.query(`
     SELECT column_name
     FROM information_schema.columns
@@ -160,3 +175,6 @@ export async function getVariables({ cacheKey }){
   const cols = (await q.toArray()).map(r => r.column_name);
   return cols;
 }
+
+
+

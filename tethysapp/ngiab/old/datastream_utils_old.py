@@ -10,7 +10,7 @@ from botocore.client import Config
 from botocore.exceptions import ClientError, BotoCoreError
 
 
-from .utils import _get_conf_file
+from .utils_old import _get_conf_file
 
 def list_public_s3_folders(
     bucket: str = "ciroh-community-ngen-datastream",
