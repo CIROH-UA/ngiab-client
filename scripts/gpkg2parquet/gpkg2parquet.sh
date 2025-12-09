@@ -70,32 +70,115 @@ for INPUT_PATH in "${INPUT_PATHS[@]}"; do
       nexus)
         SQL="SELECT 'nexus' AS layer,
                      id AS id,
-                     ST_X(ST_Centroid(geom)) AS lon,
-                     ST_Y(ST_Centroid(geom)) AS lat
+                     ST_X(
+                       ST_Transform(
+                         ST_Centroid(geom),
+                         4326
+                       )
+                     ) AS lon,
+                     ST_Y(
+                       ST_Transform(
+                         ST_Centroid(geom),
+                         4326
+                       )
+                     ) AS lat,
+                     toid AS toid,
+                     vpuid AS vpuid,
+                     poi_id AS poi_id,
+                     type AS type
               FROM \"nexus\"
               WHERE ST_IsEmpty(geom)=0"
         ;;
       divides)
         SQL="SELECT 'divides' AS layer,
                      divide_id AS id,
-                     ST_X(ST_Centroid(geom)) AS lon,
-                     ST_Y(ST_Centroid(geom)) AS lat
+                     ST_X(
+                       ST_Transform(
+                         ST_Centroid(geom),
+                         4326
+                       )
+                     ) AS lon,
+                     ST_Y(
+                       ST_Transform(
+                         ST_Centroid(geom),
+                         4326
+                       )
+                     ) AS lat,
+                     toid AS toid,
+                     vpuid AS vpuid,
+                     type AS type,
+                     ds_id AS ds_id,
+                     areasqkm AS areasqkm,
+                     lengthkm AS lengthkm,
+                     tot_drainage_areasqkm AS tot_drainage_areasqkm,
+                     has_flowline AS has_flowline
               FROM \"divides\"
               WHERE ST_IsEmpty(geom)=0"
         ;;
       flowpaths)
         SQL="SELECT 'flowpaths' AS layer,
-                    id AS id,  -- adjust if your flowpaths ID column has a different name
-                    ST_X(ST_Centroid(geom)) AS lon,
-                    ST_Y(ST_Centroid(geom)) AS lat
+                    id AS id, 
+                     ST_X(
+                       ST_Transform(
+                         ST_Centroid(geom),
+                         4326
+                       )
+                     ) AS lon,
+                     ST_Y(
+                       ST_Transform(
+                         ST_Centroid(geom),
+                         4326
+                       )
+                     ) AS lat,
+                    toid AS toid,
+                    vpuid AS vpuid,
+                    mainstem AS mainstem,
+                    \"order\" AS flow_order,
+                    hydroseq AS hydroseq,
+                    has_divide AS has_divide,
+                    divide_id AS divide_id,
+                    areasqkm AS areasqkm,
+                    lengthkm AS lengthkm,
+                    tot_drainage_areasqkm AS tot_drainage_areasqkm
               FROM \"flowpaths\"
               WHERE ST_IsEmpty(geom)=0"
         ;;
       lakes)
         SQL="SELECT 'lakes' AS layer,
-                    lake_id AS id,  -- adjust if your flowpaths ID column has a different name
-                    ST_X(ST_Centroid(geom)) AS lon,
-                    ST_Y(ST_Centroid(geom)) AS lat
+                    lake_id AS id,
+                     ST_X(
+                       ST_Transform(
+                         ST_Centroid(geom),
+                         4326
+                       )
+                     ) AS lon,
+                     ST_Y(
+                       ST_Transform(
+                         ST_Centroid(geom),
+                         4326
+                       )
+                     ) AS lat,
+                    LkArea AS LkArea,
+                    LkMxE As LkMxE,
+                    WeirC AS WeirC,
+                    WeirL AS WeirL,
+                    OrificeC AS OrificeC,
+                    OrificeA AS OrificeA,
+                    OrificeE AS OrificeE,
+                    WeirE AS WeirE,
+                    Dam_Length AS Dam_Length,
+                    domain AS domain,
+                    poi_id AS poi_id,
+                    hf_id AS hf_id,
+                    reservoir_index_AnA as reservoir_index_AnA,
+                    reservoir_index_Extended_AnA as reservoir_index_Extended_AnA,
+                    reservoir_index_GDL_AK as reservoir_index_GDL_AK,
+                    reservoir_index_Medium_Range as reservoir_index_Medium_Range,
+                    reservoir_index_Short_Range as reservoir_index_Short_Range,
+                    res_id AS res_id,
+                    vpuid AS vpuid,
+                    lake_x AS lake_x,
+                    lake_y AS lake_y
               FROM \"lakes\"
               WHERE ST_IsEmpty(geom)=0"
         ;;        
