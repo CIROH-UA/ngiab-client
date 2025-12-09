@@ -4,7 +4,7 @@ import { loadIndexData, getFeatureProperties } from 'features/DataStream/lib/ind
 import useTimeSeriesStore from 'features/DataStream/store/timeseries';
 import useDataStreamStore from 'features/DataStream/store/datastream';
 import {useFeatureStore} from 'features/DataStream/store/layers';
-
+import { getFeatureAtLngLat } from 'features/DataStream/lib/utils';
 
 const SearchBar = ({ placeholder = 'Search for an id' }) => {
   const hydrofabric_index_url = useDataStreamStore((state) => state.hydrofabric_index);
@@ -16,6 +16,8 @@ const SearchBar = ({ placeholder = 'Search for an id' }) => {
     set_feature_id(e.target.value);
     const properties = await getFeatureProperties({ cacheKey: 'index_data_table', feature_id: e.target.value })
     console.log("Feature properties:", properties);
+    // needs to amke a map part of the feature store, and that way we can access it here
+    const feature = getFeatureAtLngLat(map, selectedLng, selectedLat, layersToQuery);
     set_selected_feature(properties[0] || null);
   }
 

@@ -262,17 +262,14 @@ export default function DataMenu() {
             onChangeHandler={handleChangeModel}
           />
         </Row>
-        {/* {datesBucket.length > 0 && ( */}
-          <Row>
+           <Row>
             <IconLabel> <MdCalendarMonth/> Date</IconLabel>
             <SelectComponent
-              // optionsList={datesBucket}
               optionsList={dates}
               value={selectedDateOption}
               onChangeHandler={handleChangeDate}
             />
           </Row>
-        {/* )} */}
         <Row>
           <IconLabel> <BsExclamationCircle/>  Forecast</IconLabel>
           <SelectComponent

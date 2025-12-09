@@ -56,3 +56,16 @@ export function toWgs84From5070(x, y) {
   const [lon, lat] = proj4('EPSG:5070', 'EPSG:4326', [x, y]);
   return { lon, lat };
 }
+
+export function getFeatureAtLngLat(map, lng, lat, layersToQuery) {
+  if (!map || !layersToQuery || layersToQuery.length === 0) return null;
+
+  // 1) Convert geographic coords → screen point
+  const point = map.project([lng, lat]);
+
+  // 2) Query rendered features at that point
+  const features = map.queryRenderedFeatures(point, { layers: layersToQuery });
+
+  if (!features || !features.length) return null;
+  return features[0]; // same as what you use in handleMapClick
+}
