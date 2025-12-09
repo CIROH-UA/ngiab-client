@@ -71,10 +71,14 @@ export default function DataMenu() {
       handleError('Please select a feature on the map first');
       return;
     }
+    const toastId = toast.loading(`Loading data for id: ${feature_id}...`, {
+      closeOnClick: false,
+      draggable: false,
+    });
 
     try {
       handleLoading('Loading Datastream Data');
-      
+
       const cacheKey = getCacheKey(
         model,
         date,
@@ -103,13 +107,26 @@ export default function DataMenu() {
         'xaxis': "Time",
         'title': makeTitle(forecast, feature_id),
       });
-
+      toast.update(toastId, {
+        render: `Loaded data for id: ${feature_id}`,
+        type: 'success',
+        isLoading: false,
+        autoClose: 3000,
+        closeOnClick: true,
+      });     
 
       handleSuccess();
 
       
     } catch (err) {
       console.error(err);
+      toast.update(toastId, {
+        render: `Failed to load data for id: ${feature_id}`,
+        type: 'error',
+        isLoading: false,
+        autoClose: 5000,
+        closeOnClick: true,
+      });
       handleError('Error loading datastream data');
     }
 
@@ -148,9 +165,7 @@ export default function DataMenu() {
     const opt = optionArray?.[0];
     if (opt) set_variable(opt.value);
   };
-  /* ─────────────────────────────────────
-     Fetch available dates (once)
-     ───────────────────────────────────── */
+
   useEffect(() => {
     async function fetchDates() {
       try {
