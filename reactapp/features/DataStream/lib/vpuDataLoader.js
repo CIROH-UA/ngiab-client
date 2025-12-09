@@ -1,5 +1,5 @@
 import { tableFromIPC } from "apache-arrow";
-import appAPI from "services/api/app";
+import appAPI from "features/Tethys/services/api/app";
 import { saveArrowToCache, loadArrowFromCache, getCacheKey } from "./opfsCache";
 import { getConnection } from "./duckdbClient";
 import { getNCFiles } from "./s3Utils";

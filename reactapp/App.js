@@ -1,8 +1,8 @@
 import { Route } from 'react-router-dom';
 
-import ErrorBoundary from 'components/error/ErrorBoundary';
-import Layout from 'components/layout/Layout';
-import Loader from 'components/loader/Loader';
+import ErrorBoundary from 'features/Tethys/components/error/ErrorBoundary';
+import Layout from 'features/Tethys/components/layout/Layout';
+import Loader from 'features/Tethys/components/loader/Loader';
 import 'App.scss';
 
 // import NGIABView from 'views/ngiab/ngiab_view';
