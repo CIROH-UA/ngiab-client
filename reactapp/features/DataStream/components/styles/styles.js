@@ -101,7 +101,8 @@ export const Container = styled.div`
   left: 0;
   height: calc(100% - var(--ts-header-height));
   width: 400px;
-  padding-top: 10px;
+  // padding-top: 10px;
+  padding: 20px;
   background-color: var(--background-color);
   color: #f9fafb;
   z-index: 1000;
@@ -220,7 +221,6 @@ export const Row = styled.div`
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  // margin-bottom: 10px;
   padding: 6px 0;
   margin-bottom: 2px;
   font-size: 13px;
@@ -230,8 +230,9 @@ export const IconLabel = styled.span`
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: ${({$fontSize = '13px'}) => `${$fontSize}px`};
+  font-size: ${({$fontSize = '13'}) => `${$fontSize}px`};
   margin-bottom: 4px;
+  color: #c4fff8;
 `
 export const Title = styled.span`
     letter-spacing: .0125em;
@@ -288,7 +289,7 @@ export const Switch = styled(Form.Switch)`
 `;
 
 export const Content = styled.div`
-  padding: 12px 16px;
+  padding: 12px;
   // border-bottom: 1px solid rgba(148, 163, 184, 0.35);
   border-block-end: 1px solid rgb(218, 220, 224);
   &:first-of-type {
@@ -334,7 +335,8 @@ export const FieldBlock = styled.div``;
 
 export const FieldLabel = styled.div`
   font-size: 12px;
-  font-weight: 500;  
+  font-weight: 500;
+  color: #c4fff8;
 `;
 
 export const FieldValue = styled.div`

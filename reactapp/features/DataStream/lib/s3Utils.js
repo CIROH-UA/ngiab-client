@@ -61,7 +61,7 @@ export async function listPublicS3Files(prefix = "v2.2/") {
 export const makePrefix = (model, avail_date,ngen_forecast,ngen_cycle, ngen_time, ngen_vpu) => {    
     let prefix_path = `outputs/${model}/v2.2_hydrofabric/${avail_date}/${ngen_forecast}/${ngen_cycle}`
     let time_path = ngen_time ? `${ngen_time}/` : '';
-    prefix_path = `${prefix_path}/${time_path}${ngen_vpu}/ngen-run/outputs/`;
+    prefix_path = `${prefix_path}/${time_path}${ngen_vpu}/ngen-run/outputs/troute/`;
     return prefix_path;
 }
 

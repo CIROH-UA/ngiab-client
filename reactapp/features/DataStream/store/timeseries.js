@@ -16,6 +16,7 @@ const useTimeSeriesStore = create((set) => ({
     set_chart_layout: (newLayout) => set({ chart_layout: newLayout }),
     set_variable: (newVariable) => set({ variable: newVariable }),
     set_layout: (newLayout) => set({layout: newLayout }),
+    reset_series: () => set({ series: [] }),
     reset: () => set({
         series: [],
         feature_id: null,

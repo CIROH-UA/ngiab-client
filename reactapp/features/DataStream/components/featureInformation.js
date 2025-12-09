@@ -5,6 +5,7 @@ import { IconLabel, FieldBlock, FieldValue, FieldsGrid, FieldLabel, HeaderRow } 
 import { useFeatureStore } from 'features/DataStream/store/layers';
 import { formatLabel } from '../lib/utils';
 import { BasinSymbol } from '../lib/layers';
+
 export const FeatureInformation = () => {
   const selectedFeature = useFeatureStore((state) => state.selected_feature);
 
@@ -52,7 +53,6 @@ export const FeatureInformation = () => {
 
   return (
     <Fragment>
-
       <HeaderRow>
         <IconLabel $fontSize={14}>
           <span style={{ fontWeight: 600 }}>Feature Information</span>

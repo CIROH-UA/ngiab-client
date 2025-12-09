@@ -272,7 +272,7 @@ const nexusLayers = useMemo(() => {
       ? mapRef.current.getMap()
       : mapRef.current;
 
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map) return;
 
     map.flyTo({
       center:  [selectedMapFeature.lon, selectedMapFeature.lat],
@@ -280,7 +280,7 @@ const nexusLayers = useMemo(() => {
       essential: true,
     });
 
-  }, [selectedMapFeature, isCatchmentsVisible, isNexusVisible]);
+  }, [selectedMapFeature]);
 
   const layersToQuery = useMemo(() => {
     const layers = [];
@@ -318,6 +318,20 @@ const nexusLayers = useMemo(() => {
       });
       try {
         await loadVpuData(model, date, forecast, cycle, time, vpu_str, vpu_gpkg);
+      }
+       catch (err) {
+
+        toast.update(toastId, {
+          render: `No data for id: ${id}`,
+          type: 'warning',
+          isLoading: false,
+          autoClose: 500,
+          closeOnClick: true,
+        });
+        console.error("No data for VPU", vpu_str, err);
+        continue; // try next feature
+      }
+      try { 
         const variables = await getVariables({cacheKey});
         const series = await getTimeseries(id, cacheKey, variables[0]);
         const xy = series.map(d => ({

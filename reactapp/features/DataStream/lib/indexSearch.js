@@ -1,5 +1,5 @@
 import { getConnection } from "./duckdbClient"
-import { toWgs84From5070 } from "./utils";
+// import { toWgs84From5070 } from "./utils";
 export async function loadIndexData({ remoteUrl }) {
   const cacheKey = "index_data_table";
   console.log("loadIndexData called with cacheKey:", cacheKey);
@@ -53,18 +53,18 @@ export async function getFeatureProperties({ cacheKey, feature_id }) {
   const rows = q.toArray().map(Object.fromEntries);
   rows.columns = q.schema.fields.map((d) => d.name);
 
-  const featuresWgs84 = rows.map((row) => {
-    const { lon, lat } = toWgs84From5070(row.lon, row.lat);
-    return {
-      ...row,
-      lon: lon,
-      lat: lat,
-    };
-  });
+  // const featuresWgs84 = rows.map((row) => {
+  //   const { lon, lat } = toWgs84From5070(row.lon, row.lat);
+  //   return {
+  //     ...row,
+  //     lon: lon,
+  //     lat: lat,
+  //   };
+  // });
   // Extract column names from the schema
   console.log(
     `[getFeatureProperties] (literal) id=${feature_id} rows=${rows.length}`
   );
-  return featuresWgs84;
-
+  // return featuresWgs84;
+  return rows
 }

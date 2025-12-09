@@ -1,5 +1,5 @@
 import { FEATURE_PROPERTIES } from "./data";
-import proj4 from 'proj4';
+// import proj4 from 'proj4';
 
 function separateWords(word){
   return word.replace(/-/g, ' '); 
@@ -41,31 +41,31 @@ export const layerIdToFeatureType = (layerId) => {
   }
 };
 
-// EPSG:5070 (NAD83 / Conus Albers – units in meters)
-proj4.defs(
-  'EPSG:5070',
-  '+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 ' +
-  '+x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs'
-);
+// // EPSG:5070 (NAD83 / Conus Albers – units in meters)
+// proj4.defs(
+//   'EPSG:5070',
+//   '+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 ' +
+//   '+x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs'
+// );
 
-// WGS84 lon/lat
-proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs');
+// // WGS84 lon/lat
+// proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs');
 
-// Convenience wrapper: [x5070, y5070] → { lon, lat }
-export function toWgs84From5070(x, y) {
-  const [lon, lat] = proj4('EPSG:5070', 'EPSG:4326', [x, y]);
-  return { lon, lat };
-}
+// // Convenience wrapper: [x5070, y5070] → { lon, lat }
+// export function toWgs84From5070(x, y) {
+//   const [lon, lat] = proj4('EPSG:5070', 'EPSG:4326', [x, y]);
+//   return { lon, lat };
+// }
 
-export function getFeatureAtLngLat(map, lng, lat, layersToQuery) {
-  if (!map || !layersToQuery || layersToQuery.length === 0) return null;
+// export function getFeatureAtLngLat(map, lng, lat, layersToQuery) {
+//   if (!map || !layersToQuery || layersToQuery.length === 0) return null;
 
-  // 1) Convert geographic coords → screen point
-  const point = map.project([lng, lat]);
+//   // 1) Convert geographic coords → screen point
+//   const point = map.project([lng, lat]);
 
-  // 2) Query rendered features at that point
-  const features = map.queryRenderedFeatures(point, { layers: layersToQuery });
+//   // 2) Query rendered features at that point
+//   const features = map.queryRenderedFeatures(point, { layers: layersToQuery });
 
-  if (!features || !features.length) return null;
-  return features[0]; // same as what you use in handleMapClick
-}
+//   if (!features || !features.length) return null;
+//   return features[0]; // same as what you use in handleMapClick
+// }

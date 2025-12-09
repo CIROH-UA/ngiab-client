@@ -8,7 +8,7 @@ import { DataInfoModel } from './modals';
 export const ForecastHeader = ({ title, onClick }) =>{
   const [ modalDataInfoShow, setModalDataInfoShow ] = useState(false);
   return (
-    <div style={{ paddingLeft: '16px', paddingRight: '16px' }}>
+    <div>
       <Row>
         <IconLabel $fontSize={16}>
           <MdLocationPin size={18} color="#009989" />

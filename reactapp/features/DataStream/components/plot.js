@@ -121,7 +121,7 @@ function LineChart({ width, height, data, layout }) {
 //  const formatDate = timeFormat('%m/%d');
  const formatDate = useCallback(
     (date) => {
-      const format = forecast === 'short_range' ? '%m/%d %H:%M' : '%m/%d';
+      const format = forecast === 'short_range' ? '%H:%M' : '%m/%d';
       const formatter = timeFormat(format);
       return formatter(date);
     },
@@ -132,7 +132,7 @@ function LineChart({ width, height, data, layout }) {
  const bisectDate = bisector((d) => getDate(d)).left;
  const formatYValue = (val) =>
     val == null || Number.isNaN(val) ? '—' : val.toFixed(2);
-  const rescaleXAxis = (scale, m) =>
+ const rescaleXAxis = (scale, m) =>
     scale
       .copy()
       .domain(
@@ -214,32 +214,32 @@ function LineChart({ width, height, data, layout }) {
     return m;
   };
 
-  const getSafeXTicks = useCallback((newXScale, zoom) => {
+  const getSafeXTicks = useCallback((newXScale) => {
     // const newXScale = rescaleXAxis(xScale, zoom.transformMatrix);
-    const rawTicks = newXScale.ticks(xNumTicks);
+    // const rawTicks = newXScale.ticks(xNumTicks);
 
-    if (forecast === 'short_range') {
-      // const newXScale = rescaleXAxis(xScale, zoom.transformMatrix);
-      // const rawTicks = newXScale.ticks(xNumTicks);
-      const domainStart = newXScale.domain()[0];
+    // if (forecast === 'short_range') {
+    //   // const newXScale = rescaleXAxis(xScale, zoom.transformMatrix);
+    //   // const rawTicks = newXScale.ticks(xNumTicks);
+    //   const domainStart = newXScale.domain()[0];
       
-      // ensure the very first tick is the domain start
-      const xTickValues = [domainStart, ...rawTicks].sort((a, b) => a - b);
-      // filter out ticks that would have the same formatted label (same day)
-      const seen = new Set();
-      const uniqueXTicks = xTickValues.filter((d) => {
-        const label = formatDate(d); // '%Y-%m-%d'
-        if (seen.has(label)) return false;
-        seen.add(label);
-        return true;
-      });
-      uniqueXTicks.pop();
-      return uniqueXTicks;
-    }
-    else{
+    //   // ensure the very first tick is the domain start
+    //   const xTickValues = [domainStart, ...rawTicks].sort((a, b) => a - b);
+    //   // filter out ticks that would have the same formatted label (same day)
+    //   const seen = new Set();
+    //   const uniqueXTicks = xTickValues.filter((d) => {
+    //     const label = formatDate(d); // '%Y-%m-%d'
+    //     if (seen.has(label)) return false;
+    //     seen.add(label);
+    //     return true;
+    //   });
+    //   uniqueXTicks.pop();
+    //   return uniqueXTicks;
+    // }
+    // else{
       const xTickValues = newXScale.ticks(xNumTicks);
       return xTickValues;
-    }
+    // }
   },[allData]);
 
   return (

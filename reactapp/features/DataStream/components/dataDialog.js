@@ -76,20 +76,33 @@ export default function DataMenu() {
       draggable: false,
     });
 
-    try {
-      handleLoading('Loading Datastream Data');
 
-      const cacheKey = getCacheKey(
-        model,
-        date,
-        forecast,
-        cycle,
-        time,
-        vpu
-      );
-      const vpu_gpkg = makeGpkgUrl(vpu);      
-      const id = feature_id.split('-')[1];
+    const cacheKey = getCacheKey(
+      model,
+      date,
+      forecast,
+      cycle,
+      time,
+      vpu
+    );
+    const vpu_gpkg = makeGpkgUrl(vpu);      
+    const id = feature_id.split('-')[1];
+    try {
+      handleLoading('Loading Datastream Data');      
       await loadVpuData(model, date, forecast, cycle, time, vpu, vpu_gpkg);
+    }
+    catch (err) {
+      console.error('Error loading VPU data:', err);
+      toast.update(toastId, {
+        render: `No data for id: ${feature_id}`,
+        type: 'warning',
+        isLoading: false,
+        autoClose: 500,
+        closeOnClick: true,
+      });
+    }
+    
+    try{
       const variables = await getVariables({cacheKey});
       const _variable = variable ? variable : variables[0];
       const series = await getTimeseries(id, cacheKey, _variable);
@@ -111,22 +124,23 @@ export default function DataMenu() {
         render: `Loaded data for id: ${feature_id}`,
         type: 'success',
         isLoading: false,
-        autoClose: 3000,
+        autoClose: 300,
         closeOnClick: true,
       });     
 
       handleSuccess();
-
       
     } catch (err) {
       console.error(err);
+      // reset_datastream_store();
       toast.update(toastId, {
         render: `Failed to load data for id: ${feature_id}`,
         type: 'error',
         isLoading: false,
-        autoClose: 5000,
+        autoClose: 500,
         closeOnClick: true,
       });
+      
       handleError('Error loading datastream data');
     }
 

@@ -130,6 +130,9 @@ export async function loadVpuData(
 
   if (!buffer) {
     const nc_files = await getNCFiles(model, date , forecast, cycle, time, vpu);
+    if (nc_files.length === 0) {
+      throw new Error(`No NC files found for VPU ${vpu} with prefix.`);
+    }
     const res = await appAPI.getParquetPerVpu({
       nc_files,
       vpu_gpkg,
