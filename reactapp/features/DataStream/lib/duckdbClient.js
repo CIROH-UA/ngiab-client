@@ -34,3 +34,17 @@ export async function getConnection() {
   return await db.connect();
 }
 
+// OPTIONAL: wipe all DB state (tables, etc) but keep worker
+export async function resetDatabase() {
+  if (!dbPromise) return;
+  const db = await dbPromise;
+  await db.reset();
+}
+
+// OPTIONAL: fully tear down the worker (very heavy)
+export async function terminateDatabase() {
+  if (!dbPromise) return;
+  const db = await dbPromise;
+  await db.terminate();
+  dbPromise = null;
+}
