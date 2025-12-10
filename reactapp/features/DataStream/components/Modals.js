@@ -1,15 +1,15 @@
 import Modal from 'react-bootstrap/Modal';
-import useTheme from 'hooks/useTheme';
+
 import { ThemedModal, XButton, SButton, Row } from './styles/Styles';
 import { MdClose } from "react-icons/md";
 
 export const LayerInfoModal = (props) => {
-  const theme = useTheme();
+
 
   return (
     <ThemedModal
       {...props}
-      $themeMode={theme}
+
       size="lg"
       aria-labelledby="contained-modal-title-vcenter"
       centered
@@ -38,12 +38,12 @@ export const LayerInfoModal = (props) => {
 };
 
 export const DataInfoModel = (props) => {
-  const theme = useTheme();
+
 
   return (
     <ThemedModal
       {...props}
-      $themeMode={theme}
+
       size="lg"
       aria-labelledby="contained-modal-title-vcenter"
       centered

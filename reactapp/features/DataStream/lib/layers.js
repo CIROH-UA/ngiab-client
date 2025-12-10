@@ -18,6 +18,39 @@ export const reorderLayers = (map) => {
   });
 };
 
+export const getCentroid = (feature) => {
+  
+    const { type, coordinates } = feature.geometry;
+    let lon = null;
+    let lat = null;
+    if (type === 'Point' && Array.isArray(coordinates)) {
+      // GeoJSON Point: [lon, lat]
+      lon = coordinates[0];
+      lat = coordinates[1];
+      return { lon, lat };
+    } else if (type === 'Polygon' && Array.isArray(coordinates)) {
+      // Use outer ring to compute a simple centroid
+      const outerRing = coordinates[0] || [];
+      if (outerRing.length > 0) {
+        let sumLon = 0;
+        let sumLat = 0;
+        let count = 0;
+        for (const coord of outerRing) {
+          if (!Array.isArray(coord) || coord.length < 2) continue;
+          sumLon += coord[0];
+          sumLat += coord[1];
+          count += 1;
+        }
+        if (count > 0) {
+          lon = sumLon / count;
+          lat = sumLat / count;
+          return { lon, lat };
+        }
+      }
+    }
+
+    return {lon, lat};
+  }
 export const symbologyColors = (theme) => ({
       nexusFill: theme === 'dark' ? '#4f5b67' : '#1f78b4',
       nexusStroke: theme === 'dark' ? '#e9ecef' : '#ffffff',

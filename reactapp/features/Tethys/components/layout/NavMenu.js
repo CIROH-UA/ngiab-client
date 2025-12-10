@@ -1,11 +1,11 @@
 // NavMenu.jsx
 import React from 'react';
 import PropTypes from 'prop-types';
-import useTheme from 'hooks/useTheme';
+
 import { ThemedOffcanvas } from 'features/Tethys/components/Styles';
 
 const NavMenu = ({ children, navTitle, onNavChange, navVisible, ...props }) => {
-  const theme = useTheme();               // 'light' | 'dark'
+
   const handleClose = () => onNavChange(false);
 
   return (
@@ -13,7 +13,6 @@ const NavMenu = ({ children, navTitle, onNavChange, navVisible, ...props }) => {
       show={navVisible}
       onHide={handleClose}
       placement="end"
-      $theme={theme}
       {...props}
     >
       <ThemedOffcanvas.Header closeButton >

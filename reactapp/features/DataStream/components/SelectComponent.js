@@ -227,7 +227,7 @@ const SelectComponent = ({
   value,
   width = 150,
 }) => {
-  // const theme = useTheme();          // ← returns 'dark' or 'light'
+
 
   const handleChange = useCallback(
     (option) => {

@@ -12,6 +12,7 @@ import { useLayersStore, useFeatureStore } from '../../store/Layers';
 import { PopupContent } from '../styles/Styles';
 import { reorderLayers } from '../../lib/layers';
 import { makeTitle, layerIdToFeatureType } from '../../lib/utils';
+import { getCentroid } from '../../lib/layers';
 import { toast } from 'react-toastify';
 
 // NEW: layer hooks
@@ -220,9 +221,11 @@ const MapComponent = () => {
 
     for (const feature of features) {
       const layerId = feature.layer.id;
+      console.log('Clicked feature on layer:', layerId, feature);
+      const {lon, lat} = getCentroid(feature);
       set_selected_feature({
-        latitude: feature.geometry.coordinates[1],
-        longitude: feature.geometry.coordinates[0],
+        latitude: lat,
+        longitude: lon,
         ...feature.properties,
       });
 
