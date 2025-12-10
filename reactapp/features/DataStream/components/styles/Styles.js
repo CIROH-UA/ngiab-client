@@ -149,7 +149,7 @@ export const LayerButton = styled(Button)`
 export const XButton = styled(Button)`
   background-color: var(--button-primary-bg);
   border: none;
-  color: var(--button-primary-text);
+  color: var(--text-color);
   border-radius: 8px;
   padding: 7px 8px;
   width: 100%;
@@ -256,19 +256,22 @@ export const Switch = styled(Form.Switch)`
     width: 34px;
     height: 18px;
     cursor: pointer;
-    background-color: var(--button-primary-bg);
-    border-color: var(--ascend-text);
+    background-color: var(--switch-inactive);
+    // border-color: var(--ascend-text);
     border-radius: 999px;
     // border: none;
     box-shadow: none;
   }
 
   .form-check-input:checked {
-    background-color: var(--button-primary-hover-bg);
+    background-color: var(--switch-active);
+    border-color: var(--switch-inactive);
+
   }
 
   .form-check-input:focus {
     box-shadow: none;
+    border-color: var(--switch-inactive);
   }
 `;
 

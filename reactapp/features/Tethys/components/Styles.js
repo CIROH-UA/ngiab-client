@@ -93,6 +93,17 @@ export const CustomNavBar = styled(Navbar)`
     color: var(--text-color);
     opacity: 0.85; /* optional */
   }
+
+  &.navbar-light .navbar-brand,
+  &.navbar-light .navbar-nav .nav-link {
+    color: var(--title-text-color);
+  }
+
+  &.navbar-light .navbar-nav .nav-link:hover,
+  &.navbar-light .navbar-nav .nav-link:focus {
+    color: var(--text-color);
+    opacity: 0.85; /* optional */
+  }
 `;
 
 export const CustomDiv = styled.div`

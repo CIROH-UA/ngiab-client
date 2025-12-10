@@ -1,16 +1,15 @@
 /* Define color variables (SCSS) */
 $primary:   #ffffff;
-$secondary: #212121;
-// $secondary: #009989;
+$secondary: #2c3e50;
 $success:   #3e8d63;
-$info:      #7854e4;
+$info:      #4b0ffd;
 $warning:   #b8c924;
 $danger:    #d62518;
 $light:     #f8f9fa;
-$dark:      #343a40;
+$dark:      #32465b;
 $accent:    #da6d25;
-// $primary:   #2c3e50;
-// $secondary: #009989;
+
+
 /* Bootstrap theme map */
 $theme-colors: (
   primary: $primary,
@@ -31,15 +30,27 @@ $theme-colors: (
 
 /* Base (light) theme */
 :root {
-  --primary-color: #{$primary};
-  --title-text-color: #5f6368;
-  --ts-header-height: 56px;
   color-scheme: light dark;
-
   /* core */
   --background-color: #{$light};
   --text-color: #212121;
-  --primary-color: #{$primary};
+   --primary-color: #{$primary};
+  --title-text-color: #5f6368;
+  --ts-header-height: 56px;
+  
+  --button-primary-bg: #{$light};
+  --button-primary-hover-bg: #{$light};
+  --button-primary-text-hover: #{$secondary};
+  --button-primary-text: #5f6368;
+
+  --switch-active: #{$secondary};
+  --switch-inactive: #{$light};
+
+  --search-bg: #{$light};
+  --search-border: #{$light};
+  --search-text: #{$dark};
+  --search-placeholder: #{$dark};
+ 
 
   /* extras used in components */
   --panel-background: #f9f9f9;
@@ -54,11 +65,6 @@ $theme-colors: (
 
   --map-panel-bg: #{$light};
   --map-panel-text: #212121;
-
-  --button-primary-bg: #{$light};
-  --button-primary-hover-bg: #{$light};
-  --button-primary-text-hover: #{$secondary};
-  --button-primary-text: #5f6368;
 
   --select-control-bg: #ffffff;
   --select-control-border: #cccccc;
@@ -76,10 +82,6 @@ $theme-colors: (
   --accent-text: #5f6368;
   --hover-text: #{$secondary};
 
-  --search-bg: #f5f7f8;
-  --search-border: #e1e4e8;
-  --search-text: #111827;
-  --search-placeholder: #9ca3af;
 
     /* navbar buttons */
   --nav-button-text-color: #{$secondary};
@@ -100,9 +102,27 @@ $theme-colors: (
 /* Dark theme override */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background-color: #{$primary};
+    --primary-color: #{$secondary};
+    --title-text-color: #ffffff;
+    --background-color: #{$secondary};
     --text-color: #ffffff;
-    --primary-color: #{$light};
+    --hover-text: #{$primary};
+
+    --search-bg: #{$dark};
+    --search-border: #{$dark};
+    --search-text: #{$light};
+    --search-placeholder: #{$light};
+
+  
+    --switch-inactive: #{$dark};
+
+    --button-primary-bg: #{$dark};
+    --button-primary-hover-bg: #{$dark};
+    --button-primary-text-hover: #{$primary};
+    --button-primary-text: #c4fff8;
+    
+    // --accent-text: #c4fff8;
+    --accent-text: #cdcdcd;
 
     --panel-background: #2c3e50;
     --panel-border-color: #374151;
@@ -119,19 +139,10 @@ $theme-colors: (
     --modal-border-color: #374151;
 
     --link-color: #bfdbfe;
-    --accent-text: #c4fff8;
-
-    --search-bg: #111827;
-    --search-border: #374151;
-    --search-text: #f9fafb;
-    --search-placeholder: #9ca3af;
-
-
     --map-panel-bg: #1f2933;
     --map-panel-text: #f9fafb;
 
-    --button-primary-bg: #009989;
-    --button-primary-hover-bg: #007a6e;
+
 
     --select-control-bg: #2c3e50;
     --select-control-border: #4f5b67;

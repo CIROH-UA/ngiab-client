@@ -1,6 +1,7 @@
 import Modal from 'react-bootstrap/Modal';
 import useTheme from 'hooks/useTheme';
-import { ThemedModal, XButton } from './styles/Styles';
+import { ThemedModal, XButton, SButton, Row } from './styles/Styles';
+import { MdClose } from "react-icons/md";
 
 export const LayerInfoModal = (props) => {
   const theme = useTheme();
@@ -9,14 +10,19 @@ export const LayerInfoModal = (props) => {
     <ThemedModal
       {...props}
       $themeMode={theme}
-      size="sm"
+      size="lg"
       aria-labelledby="contained-modal-title-vcenter"
       centered
       backdrop={false}
     >
-      <Modal.Header >
+      <Modal.Header style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} >
+  
         <Modal.Title id="contained-modal-title-vcenter">
           Layer Information
+        <SButton onClick={props.onHide}>
+          <MdClose/>
+        </SButton>
+ 
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
@@ -26,9 +32,7 @@ export const LayerInfoModal = (props) => {
           consectetur ac, vestibulum at eros.
         </p>
       </Modal.Body>
-      <Modal.Footer>
-        <XButton onClick={props.onHide}>Close</XButton>
-      </Modal.Footer>
+
     </ThemedModal>
   );
 };
@@ -40,16 +44,20 @@ export const DataInfoModel = (props) => {
     <ThemedModal
       {...props}
       $themeMode={theme}
-      size="sm"
+      size="lg"
       aria-labelledby="contained-modal-title-vcenter"
       centered
       backdrop={false}
 
     >
       <Modal.Header>
-        <Modal.Title id="contained-modal-title-vcenter">
+        <Modal.Title id="contained-modal-title-vcenter" style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           Data Information
-        </Modal.Title>
+        <SButton onClick={props.onHide}>
+          <MdClose/>
+        </SButton>
+ 
+       </Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <div>
@@ -67,9 +75,7 @@ export const DataInfoModel = (props) => {
           <p><strong>Note:</strong> Data are only available for certain dates. Please verify a date’s availability before you proceed.</p>
         </div>
       </Modal.Body>
-      <Modal.Footer>
-        <XButton onClick={props.onHide}>Close</XButton>
-      </Modal.Footer>
+
     </ThemedModal>
   );
 };

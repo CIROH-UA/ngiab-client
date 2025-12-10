@@ -19,7 +19,7 @@ const Header = ({onNavChange}) => {
   
   return (
     <>
-        <CustomNavBar fixed="top" bg="primary" variant="dark" className="shadow">
+        <CustomNavBar fixed="top" className="shadow">
           <Container as="header" fluid className="px-4">
             <CustomDiv>
               <NavButton onClick={showNav}></NavButton>
