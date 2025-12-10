@@ -1,6 +1,7 @@
 /* Define color variables (SCSS) */
-$primary:   #2c3e50;
-$secondary: #009989;
+$primary:   #ffffff;
+$secondary: #212121;
+// $secondary: #009989;
 $success:   #3e8d63;
 $info:      #7854e4;
 $warning:   #b8c924;
@@ -8,7 +9,8 @@ $danger:    #d62518;
 $light:     #f8f9fa;
 $dark:      #343a40;
 $accent:    #da6d25;
-
+// $primary:   #2c3e50;
+// $secondary: #009989;
 /* Bootstrap theme map */
 $theme-colors: (
   primary: $primary,
@@ -30,6 +32,7 @@ $theme-colors: (
 /* Base (light) theme */
 :root {
   --primary-color: #{$primary};
+  --title-text-color: #5f6368;
   --ts-header-height: 56px;
   color-scheme: light dark;
 
@@ -52,9 +55,10 @@ $theme-colors: (
   --map-panel-bg: #{$light};
   --map-panel-text: #212121;
 
-  --button-primary-bg: #{$primary};
-  --button-primary-hover-bg: #{$light} ;
-  
+  --button-primary-bg: #{$light};
+  --button-primary-hover-bg: #{$light};
+  --button-primary-text-hover: #{$secondary};
+  --button-primary-text: #5f6368;
 
   --select-control-bg: #ffffff;
   --select-control-border: #cccccc;
@@ -69,7 +73,7 @@ $theme-colors: (
   --modal-border-color: #e5e7eb;
 
   --link-color: #0b74de;
-  --accent-text: rgb(95,99,104);
+  --accent-text: #5f6368;
   --hover-text: #{$secondary};
 
   --search-bg: #f5f7f8;
@@ -78,7 +82,7 @@ $theme-colors: (
   --search-placeholder: #9ca3af;
 
     /* navbar buttons */
-  --nav-button-text-color: #ffffff;
+  --nav-button-text-color: #{$secondary};
   --nav-button-hover-bg: rgba(0, 0, 0, 0.1);
 
   /* error overlay / box */
