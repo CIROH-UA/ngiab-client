@@ -96,7 +96,7 @@ function LineChart({ width, height, data, layout }) {
     hideTooltip,
   } = useTooltip();
 
-  const margin = { top: 40, right: 10, bottom: 30, left: 40 };
+  const margin = { top: 40, right: 20, bottom: 30, left: 50 };
   const innerWidth = Math.max(1, width - margin.left - margin.right);
   const innerHeight = Math.max(1, height - margin.top - margin.bottom);
   const EST_LABEL_PX = 100;
