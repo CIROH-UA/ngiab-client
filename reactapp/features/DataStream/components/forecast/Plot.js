@@ -14,10 +14,8 @@ import {
 } from '@visx/tooltip';
 import { localPoint } from '@visx/event';
 import { GlyphCircle } from '@visx/glyph';
-import { timeParse, timeFormat } from 'd3-time-format';
+import { timeFormat } from 'd3-time-format';
 import { RectClipPath } from '@visx/clip-path';
-import { lightTheme, darkTheme } from '@visx/xychart';
-import useTheme from 'hooks/useTheme';
 import { getVariableUnits } from '../../lib/getTimeSeries';
 import useDataStreamStore from '../../store/Datastream';
 
@@ -29,8 +27,52 @@ function LineChart({ width, height, data, layout }) {
 
   const [zoomKey, setZoomKey] = useState(0);
 
-  const getAxisLabelStyles = (theme) => ({
-    fill: theme === 'dark' ? '#e0e0e0' : '#111827',
+  // --- NEW: read CSS variables for chart colors ---
+  const rootStyles = getComputedStyle(document.documentElement);
+
+  const axisLabelColor =
+    rootStyles.getPropertyValue('--chart-axis-label-color').trim() ||
+    '#111827';
+  const axisStrokeColor =
+    rootStyles.getPropertyValue('--chart-axis-stroke-color').trim() ||
+    '#111827';
+  const axisTickColor =
+    rootStyles.getPropertyValue('--chart-axis-tick-color').trim() ||
+    '#111827';
+  const axisTickTextColor =
+    rootStyles.getPropertyValue('--chart-axis-tick-text-color').trim() ||
+    '#111827';
+  const gridColor =
+    rootStyles.getPropertyValue('--chart-grid-color').trim() || '#e5e7eb';
+  const tooltipBg =
+    rootStyles.getPropertyValue('--chart-tooltip-bg').trim() ||
+    'rgba(255, 255, 255, 0.95)';
+  const tooltipTextColor =
+    rootStyles.getPropertyValue('--chart-tooltip-text').trim() ||
+    '#111827';
+  const tooltipBorderColor =
+    rootStyles.getPropertyValue('--chart-tooltip-border-color').trim() ||
+    'rgba(148, 163, 184, 0.6)';
+  const crosshairColor =
+    rootStyles.getPropertyValue('--chart-crosshair-color').trim() ||
+    '#4b5563';
+  const glyphStrokeColor =
+    rootStyles.getPropertyValue('--chart-glyph-stroke-color').trim() ||
+    '#ffffff';
+  const noDataTextColor =
+    rootStyles.getPropertyValue('--chart-empty-text-color').trim() ||
+    '#6b7280';
+
+  // line colors: comma-separated in CSS var
+  const lineColorsVar = rootStyles
+    .getPropertyValue('--chart-line-colors')
+    .trim();
+  const colors = lineColorsVar
+    ? lineColorsVar.split(/\s*,\s*/)
+    : ['#1d4ed8', '#f97316', '#16a34a', '#dc2626', '#7c3aed'];
+
+  const getAxisLabelStyles = () => ({
+    fill: axisLabelColor,
     fontSize,
     fontWeight,
   });
@@ -46,8 +88,6 @@ function LineChart({ width, height, data, layout }) {
     return units ? `${yaxisValue} (${units})` : yaxisValue;
   }, [layout?.yaxis]);
 
-  const theme = useTheme();
-  // const visxTheme = theme === 'dark' ? darkTheme : lightTheme;
   const {
     tooltipData,
     tooltipLeft = 0,
@@ -56,14 +96,12 @@ function LineChart({ width, height, data, layout }) {
     hideTooltip,
   } = useTooltip();
 
-  // const margin = { top: 20, right: 40, bottom: 45, left: 110 };
   const margin = { top: 40, right: 10, bottom: 30, left: 40 };
   const innerWidth = Math.max(1, width - margin.left - margin.right);
   const innerHeight = Math.max(1, height - margin.top - margin.bottom);
   const EST_LABEL_PX = 100;
   const xNumTicks = Math.max(2, Math.floor(innerWidth / EST_LABEL_PX));
 
-  // const parseDate = timeParse('%Y-%m-%d %H:%M:%S');
   const getDate = (d) => (d.x instanceof Date ? d.x : new Date(d.x));
   const getYValue = (d) => d.y;
 
@@ -94,44 +132,33 @@ function LineChart({ width, height, data, layout }) {
     return { xScale: x, yScale: y };
   }, [allData, innerWidth, innerHeight, getDate, getYValue]);
 
-  const colors =
-    theme === 'dark'
-      ? ['#2dd4bf', '#f97316', '#a855f7', '#38bdf8', '#facc15']
-      : ['#1d4ed8', '#f97316', '#16a34a', '#dc2626', '#7c3aed'];
-      
   const tooltipStyles = {
     ...defaultStyles,
     minWidth: 60,
-    backgroundColor:
-      theme === 'dark'
-        ? 'rgba(31, 41, 55, 0.95)'
-        : 'rgba(255, 255, 255, 0.95)',
-    color: theme === 'dark' ? '#f9fafb' : '#111827',
+    backgroundColor: tooltipBg,
+    color: tooltipTextColor,
     fontSize: 14,
-    boxShadow: '0 6px 16px rgba(0, 0, 0, 0.25)', // ★ more modern shadow
-    borderRadius: 6,                              // ★ rounded tooltip
-    border:
-      theme === 'dark'
-        ? '1px solid rgba(148, 163, 184, 0.5)'
-        : '1px solid rgba(148, 163, 184, 0.6)',
-    padding: '8px 10px',                          // ★ tighter padding
+    boxShadow: '0 6px 16px rgba(0, 0, 0, 0.25)',
+    borderRadius: 6,
+    border: `1px solid ${tooltipBorderColor}`,
+    padding: '8px 10px',
   };
 
-//  const formatDate = timeFormat('%m/%d');
- const formatDate = useCallback(
+  const formatDate = useCallback(
     (date) => {
       const format = forecast === 'short_range' ? '%H:%M' : '%m/%d';
       const formatter = timeFormat(format);
       return formatter(date);
     },
-    [allData]
-  ); 
-  
- const formatTooltipDate = timeFormat('%Y-%m-%d %H:%M:%S'); // tooltip
- const bisectDate = bisector((d) => getDate(d)).left;
- const formatYValue = (val) =>
+    [forecast]
+  );
+
+  const formatTooltipDate = timeFormat('%Y-%m-%d %H:%M:%S');
+  const bisectDate = bisector((d) => getDate(d)).left;
+  const formatYValue = (val) =>
     val == null || Number.isNaN(val) ? '—' : val.toFixed(2);
- const rescaleXAxis = (scale, m) =>
+
+  const rescaleXAxis = (scale, m) =>
     scale
       .copy()
       .domain(
@@ -213,10 +240,13 @@ function LineChart({ width, height, data, layout }) {
     return m;
   };
 
-  const getSafeXTicks = useCallback((newXScale) => {
+  const getSafeXTicks = useCallback(
+    (newXScale) => {
       const xTickValues = newXScale.ticks(xNumTicks);
       return xTickValues;
-  },[allData]);
+    },
+    [xNumTicks]
+  );
 
   return (
     <div
@@ -224,7 +254,7 @@ function LineChart({ width, height, data, layout }) {
         position: 'relative',
         width,
         height,
-        borderRadius: 10,    
+        borderRadius: 10,
         overflow: 'hidden',
       }}
     >
@@ -250,7 +280,8 @@ function LineChart({ width, height, data, layout }) {
           {(zoom) => {
             const newXScale = rescaleXAxis(xScale, zoom.transformMatrix);
             const newYScale = rescaleYAxis(yScale, zoom.transformMatrix);
-            const safeXTicks = getSafeXTicks(newXScale,zoom);
+            const safeXTicks = getSafeXTicks(newXScale);
+
             return (
               <>
                 <svg
@@ -260,20 +291,18 @@ function LineChart({ width, height, data, layout }) {
                     cursor: zoom.isDragging ? 'grabbing' : 'grab',
                   }}
                 >
+                  {yAxisLabel && (
+                    <text
+                      x={10}
+                      y={10}
+                      fontSize={12}
+                      fontWeight={600}
+                      fill={axisLabelColor}
+                    >
+                      {yAxisLabel}
+                    </text>
+                  )}
 
-                  {
-                    yAxisLabel && (
-                      <text
-                        x={10}
-                        y={10}
-                        fontSize={12}
-                        fontWeight={600}
-                        fill={theme === 'dark' ? '#e5e7eb' : '#111827'}
-                      >
-                        {yAxisLabel}
-                      </text>
-                    )
-                  }
                   <RectClipPath
                     id="chart-clip"
                     x={0}
@@ -287,37 +316,27 @@ function LineChart({ width, height, data, layout }) {
                       scale={newYScale}
                       width={innerWidth}
                       height={innerHeight}
-                      stroke={
-                        theme === 'dark' ? '#4b5563' : '#e5e7eb'
-                      }                         // ★ softer grid
-                      strokeOpacity={0.25}       // ★ slightly stronger
+                      stroke={gridColor}
+                      strokeOpacity={0.25}
                       strokeWidth={1}
                     />
                     <GridColumns
                       scale={newXScale}
                       width={innerWidth}
                       height={innerHeight}
-                      stroke={
-                        theme === 'dark' ? '#4b5563' : '#e5e7eb'
-                      }                         // ★ match rows
+                      stroke={gridColor}
                       strokeOpacity={0.25}
                       strokeWidth={1}
                     />
 
                     <AxisLeft
                       scale={newYScale}
-                      // label={yAxisLabel}
-                      labelProps={{ style: getAxisLabelStyles(theme) }}
-                      // labelOffset={80}
-                      stroke={
-                        theme === 'dark' ? '#d1d5db' : '#111827'
-                      }
-                      tickStroke={
-                        theme === 'dark' ? '#9ca3af' : '#111827'
-                      }
+                      labelProps={{ style: getAxisLabelStyles() }}
+                      stroke={axisStrokeColor}
+                      tickStroke={axisTickColor}
                       tickLabelProps={() => ({
-                        fill: theme === 'dark' ? '#e5e7eb' : '#111827',
-                        fontSize: 12,          // ★ slightly smaller ticks
+                        fill: axisTickTextColor,
+                        fontSize: 12,
                         fontWeight: 500,
                         textAnchor: 'end',
                       })}
@@ -325,22 +344,17 @@ function LineChart({ width, height, data, layout }) {
                     <AxisBottom
                       scale={newXScale}
                       top={innerHeight}
-                      // label="Simulation Time Period (YYYY-MM-DD)"
-                      labelProps={{ style: getAxisLabelStyles(theme) }}
-                      stroke={
-                        theme === 'dark' ? '#d1d5db' : '#111827'
-                      }
+                      labelProps={{ style: getAxisLabelStyles() }}
+                      stroke={axisStrokeColor}
                       tickFormat={formatDate}
-                      tickStroke={
-                        theme === 'dark' ? '#9ca3af' : '#111827'
-                      }
+                      tickStroke={axisTickColor}
                       tickLabelProps={() => ({
-                        fill: theme === 'dark' ? '#e5e7eb' : '#111827',
-                        fontSize: 12,          // ★ slightly smaller ticks
+                        fill: axisTickTextColor,
+                        fontSize: 12,
                         fontWeight: 500,
                         textAnchor: 'middle',
                       })}
-                      tickValues={safeXTicks}    // ★ use computed safe ticks
+                      tickValues={safeXTicks}
                     />
 
                     <Group clipPath="url(#chart-clip)">
@@ -350,12 +364,8 @@ function LineChart({ width, height, data, layout }) {
                           stroke={colors[index % colors.length]}
                           strokeWidth={2.2}
                           data={series.data}
-                          x={(d) =>
-                            newXScale(getDate(d)) ?? 0
-                          }
-                          y={(d) =>
-                            newYScale(getYValue(d)) ?? 0
-                          }
+                          x={(d) => newXScale(getDate(d)) ?? 0}
+                          y={(d) => newYScale(getYValue(d)) ?? 0}
                         />
                       ))}
 
@@ -370,9 +380,7 @@ function LineChart({ width, height, data, layout }) {
                               x: tooltipLeft - margin.left,
                               y: innerHeight,
                             }}
-                            stroke={
-                              theme === 'dark' ? '#9ca3af' : '#4b5563'
-                            }
+                            stroke={crosshairColor}
                             strokeWidth={1.5}
                             pointerEvents="none"
                             strokeDasharray="6,3"
@@ -390,11 +398,7 @@ function LineChart({ width, height, data, layout }) {
                               fill={
                                 colors[d.seriesIndex % colors.length]
                               }
-                              stroke={
-                                theme === 'dark'
-                                  ? '#0f172a'
-                                  : '#ffffff'
-                              }
+                              stroke={glyphStrokeColor}
                               strokeWidth={2}
                             />
                           ))}
@@ -420,8 +424,7 @@ function LineChart({ width, height, data, layout }) {
                       onTouchMove={zoom.dragMove}
                       onTouchEnd={zoom.dragEnd}
                       onDoubleClick={(e) => {
-                        const point =
-                          localPoint(e) || { x: 0, y: 0 };
+                        const point = localPoint(e) || { x: 0, y: 0 };
                         zoom.scale({
                           scaleX: 1.5,
                           scaleY: 1.5,
@@ -429,8 +432,7 @@ function LineChart({ width, height, data, layout }) {
                         });
                       }}
                       onWheel={(e) => {
-                        const point =
-                          localPoint(e) || { x: 0, y: 0 };
+                        const point = localPoint(e) || { x: 0, y: 0 };
                         const delta = -e.deltaY / 500;
                         const scale = 1 + delta;
                         zoom.scale({
@@ -487,7 +489,7 @@ function LineChart({ width, height, data, layout }) {
             justifyContent: 'center',
             fontStyle: 'italic',
             fontSize: '1rem',
-            color: theme === 'dark' ? '#9ca3af' : '#6b7280',
+            color: noDataTextColor,
           }}
         >
           🛠️ No data to display

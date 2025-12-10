@@ -96,6 +96,22 @@ $theme-colors: (
   --nav-pill-active-bg: #009989;
   --nav-pill-active-text-color: #ffffff;
 
+  /* line chart colors - light */
+  --chart-axis-label-color: #111827;
+  --chart-axis-stroke-color: #111827;
+  --chart-axis-tick-color: #111827;
+  --chart-axis-tick-text-color: #111827;
+  --chart-grid-color: #e5e7eb;
+  --chart-tooltip-bg: rgba(255, 255, 255, 0.95);
+  --chart-tooltip-text: #111827;
+  --chart-tooltip-border-color: rgba(148, 163, 184, 0.6);
+  --chart-crosshair-color: #4b5563;
+  --chart-glyph-stroke-color: #ffffff;
+  --chart-empty-text-color: #6b7280;
+
+  /* comma-separated line colors */
+  --chart-line-colors: #1d4ed8, #f97316, #16a34a, #dc2626, #7c3aed;
+
 
 }
 
@@ -162,6 +178,20 @@ $theme-colors: (
     /* nav pills active state */
     --nav-pill-active-bg: #009989;       // same brand color in dark mode
     --nav-pill-active-text-color: #ffffff;
+
+    --chart-axis-label-color: #e5e7eb;
+    --chart-axis-stroke-color: #d1d5db;
+    --chart-axis-tick-color: #9ca3af;
+    --chart-axis-tick-text-color: #e5e7eb;
+    --chart-grid-color: #4b5563;
+    --chart-tooltip-bg: rgba(31, 41, 55, 0.95);
+    --chart-tooltip-text: #f9fafb;
+    --chart-tooltip-border-color: rgba(148, 163, 184, 0.5);
+    --chart-crosshair-color: #9ca3af;
+    --chart-glyph-stroke-color: #0f172a;
+    --chart-empty-text-color: #9ca3af;
+
+    --chart-line-colors: #2dd4bf, #f97316, #a855f7, #38bdf8, #facc15;
 
   }
 }

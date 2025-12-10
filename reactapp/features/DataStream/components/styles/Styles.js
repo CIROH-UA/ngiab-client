@@ -154,25 +154,27 @@ export const XButton = styled(Button)`
   width: 100%;
   z-index: 1001;
   box-shadow: none;
-  
+  border-radius: 20px;
+  border-color: transparent;
+  border: none;
   &:hover,
   &:focus {
     background-color: var(--button-primary-hover-bg);
     color: var(--button-primary-text-hover);
     box-shadow: 0 1px 2px 0 rgba(60, 64, 67, .3), 0 1px 3px 1px rgba(60, 64, 67, .15);
-
   }
 `;
 
 export const SButton = styled(Button)`
   border: none;
-  color: var(--map-panel-text);
+  color: var(--text-color);
   background-color: transparent;
   z-index: 1001;
-
+  border-radius: 20px;
   &:hover,
   &:focus {
     background-color: var(--button-primary-hover-bg); ;
+    color: var(--button-primary-text-hover);
     border: none;
     box-shadow: none;
   }
