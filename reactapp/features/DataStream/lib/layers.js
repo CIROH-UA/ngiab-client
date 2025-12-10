@@ -164,3 +164,38 @@ export const BasinSymbol = ({
   </svg>
 );
 
+export const DeleteDataIcon = (props) => (
+  <svg
+    width={24}
+    height={24}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+    {...props}
+  >
+    <rect x="6" y="4" width="12" height="2" rx="1" fill="currentColor" />
+    <rect x="7" y="6" width="10" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
+    <line x1="10" y1="8" x2="10" y2="16" stroke="currentColor" strokeWidth="1.2" />
+    <line x1="14" y1="8" x2="14" y2="16" stroke="currentColor" strokeWidth="1.2" />
+
+    <ellipse cx="18" cy="17" rx="3" ry="1.3" fill="currentColor" opacity="0.15" />
+    <ellipse cx="18" cy="17" rx="3" ry="1.3" stroke="currentColor" strokeWidth="1" />
+    <path
+      d="M15 17v2.2c0 .7 1.3 1.3 3 1.3s3-.6 3-1.3V17"
+      fill="currentColor"
+      opacity="0.05"
+    />
+    <path
+      d="M15 17v2.2c0 .7 1.3 1.3 3 1.3s3-.6 3-1.3V17"
+      stroke="currentColor"
+      strokeWidth="1"
+    />
+    <path
+      d="M15 18.1c0 .7 1.3 1.3 3 1.3s3-.6 3-1.3"
+      stroke="currentColor"
+      strokeWidth="0.8"
+      opacity="0.7"
+    />
+  </svg>
+);

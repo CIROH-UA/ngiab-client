@@ -8,11 +8,11 @@ import { getTimeseries, getVariables, checkForTable, loadVpuData } from 'feature
 import { makeTitle } from 'features/DataStream/lib/utils';
 import { getCacheKey } from 'features/DataStream/lib/opfsCache';
 import { makeGpkgUrl } from 'features/DataStream/lib/s3Utils';
+import ResetDataButton from '../forecast/cacheHandler';
 
 const SearchBar = ({ placeholder = 'Search for an id' }) => {
   const hydrofabric_index_url = useDataStreamStore((state) => state.hydrofabric_index);
   const forecast = useDataStreamStore((state) => state.forecast);
-  const table = useDataStreamStore((state) => state.table);
   const model = useDataStreamStore((state) => state.model);
   const date = useDataStreamStore((state) => state.date);
   const cycle = useDataStreamStore((state) => state.cycle);
@@ -95,6 +95,7 @@ const SearchBar = ({ placeholder = 'Search for an id' }) => {
   }, []); // dependencies array
 
   return (
+    <>
     <SearchBarWrapper>
       <SearchIcon aria-hidden="true" />
       <SearchInput
@@ -105,7 +106,9 @@ const SearchBar = ({ placeholder = 'Search for an id' }) => {
         aria-label={placeholder}
       />
     </SearchBarWrapper>
-  );
+      <ResetDataButton />
+    </>
+ );
 };
 
 export default SearchBar;

@@ -172,28 +172,32 @@ export async function dropAllVpuDataTables() {
       WHERE table_schema = 'main'
         AND table_type = 'BASE TABLE'
         AND table_name LIKE '%VPU_%'
+        AND table_name <> 'index_data_table'
     `);
 
     const rows = result.toArray();
 
     if (!rows.length) {
-      console.log("No VPU cache tables found to drop.");
+      console.log('No VPU cache tables found to drop (excluding index_data_table).');
       return;
     }
 
     for (const row of rows) {
       const schema = row.table_schema;
       const name = row.table_name;
+
       const fullName = `"${schema}"."${name}"`;
       console.log(`Dropping table ${fullName}...`);
+
       await conn.query(`DROP TABLE IF EXISTS ${fullName}`);
     }
 
-    console.log("Finished dropping VPU cache tables.");
+    console.log('Finished dropping VPU cache tables (index_data_table preserved).');
   } finally {
     await conn.close();
   }
 }
+
 
 export async function getVariables({ cacheKey }) {
   console.log("getVariables called with cacheKey:", cacheKey);
