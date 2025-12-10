@@ -15,8 +15,7 @@ const SearchBar = ({ placeholder = 'Search for an id' }) => {
     set_feature_id(e.target.value);
     const properties = await getFeatureProperties({ cacheKey: 'index_data_table', feature_id: e.target.value })
     console.log("Feature properties:", properties);
-    // needs to amke a map part of the feature store, and that way we can access it here
-    // const feature = getFeatureAtLngLat(map, selectedLng, selectedLat, layersToQuery);
+
     set_selected_feature(properties[0] || null);
   }
 
