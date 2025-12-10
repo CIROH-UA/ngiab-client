@@ -148,7 +148,7 @@ export const LayerButton = styled(Button)`
 
 export const XButton = styled(Button)`
   background-color: var(--button-primary-bg);
-  color: var(--text-color);
+  color: var(--accent-text);
   border-radius: 8px;
   padding: 7px 8px;
   width: 100%;
@@ -167,7 +167,7 @@ export const XButton = styled(Button)`
 
 export const SButton = styled(Button)`
   border: none;
-  color: var(--text-color);
+  color: var(--accent-text);
   background-color: transparent;
   z-index: 1001;
   border-radius: 20px;
