@@ -1,62 +1,49 @@
 import styled from 'styled-components';
 import { Button, Form, Modal } from 'react-bootstrap';
-import useTheme from 'hooks/useTheme';
 import { FiSearch } from 'react-icons/fi';
 
-const TimeSeriesContainer = styled.div`
+export const TimeSeriesContainer = styled.div`
   width: 100%;
   height: 300px;
   order: 1;
   flex: 1 1 80%;
-  background-color: ${(props) => props.theme === 'dark' ? 'var(--background)' : '#f9f9f9'};
+  background-color: var(--panel-background);
 `;
 
-export const TimeSeriesThemedContainer = (props) => {
-  const theme = useTheme();
-  return <TimeSeriesContainer {...props} theme={theme} />;
-};
-
-// Themed Modal wrapper
+// Themed Modal wrapper – now fully CSS-variable based
 export const ThemedModal = styled(Modal)`
   .modal-content {
-    background-color: ${({ $themeMode }) =>
-      $themeMode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : '#ffffff'};
-    color: ${({ $themeMode }) =>
-      $themeMode === 'dark' ? 'var(--text-color)' : '#111827'};
+    background-color: var(--modal-bg);
+    color: var(--modal-text-color);
     border-radius: 12px;
   }
 
-
   .modal-header,
   .modal-footer {
-    border-color: ${({ $themeMode }) =>
-      $themeMode === 'dark' ? '#374151' : '#e5e7eb'};
+    border-color: var(--modal-border-color);
   }
 
   .btn-primary {
-    background-color: #009989;
+    background-color: var(--button-primary-bg);
     border: none;
   }
 
   .btn-primary:hover,
   .btn-primary:focus {
-    background-color: #007a6e;
+    background-color: var(--button-primary-hover-bg);
   }
+
   .modal-body a {
-    color: ${({ $themeMode }) =>
-      $themeMode === 'dark' ? 'var(--text-color)' : '#111827'};
+    color: var(--link-color);
   }
 `;
 
-const StyledPopupContent = styled.div`
+export const PopupContent = styled.div`
   width: 100%;
   max-width: 100%;
   padding: 8px 10px;
-  // border-radius: 6px;
-  background-color: ${(props) =>
-    props.theme === 'dark' ? '#2b333b' : '#ffffff'};
-  color: ${(props) =>
-    props.theme === 'dark' ? '#f8f9fa' : '#212529'};
+  background-color: var(--popup-bg);
+  color: var(--popup-text-color);
 
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
   font-size: 12px;
@@ -87,13 +74,7 @@ const StyledPopupContent = styled.div`
     font-family: monospace;
     word-break: break-all;
   }
-
 `;
-
-export const PopupContent = (props) => {
-  const theme = useTheme();
-  return <StyledPopupContent {...props} theme={theme} />;
-};
 
 export const Container = styled.div`
   position: absolute;
@@ -101,17 +82,15 @@ export const Container = styled.div`
   left: 0;
   height: calc(100% - var(--ts-header-height));
   width: 400px;
-  // padding-top: 10px;
   padding: 20px;
   background-color: var(--background-color);
-  color: #f9fafb;
+  color: var(--map-panel-text);
+
   z-index: 1000;
   transition: transform 0.25s ease-out;
-  
-  // border-radius: 0 12px 12px 0;
+
   overflow-y: auto;
 
-  /* When closed, hide completely to the left */
   transform: ${({ $isOpen }) =>
     $isOpen ? 'translateX(0)' : 'translateX(-100%)'};
 
@@ -129,44 +108,48 @@ export const LayersContainer = styled.div`
   right: 10px;
   width: 250px;
   padding: 15px;
-  background-color: #1f2933;
-  color: #f9fafb;
+  background-color: var(--map-panel-bg);
+  color: var(--map-panel-text);
   z-index: 1000;
 
   border-radius: 8px;
   overflow-y: auto;
-  transition: all .25s cubic-bezier(.4, 0, .2, 1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
   @media (max-width: 768px) {
     width: 100%;
     border-radius: 0;
   }
 `;
+
 export const LayerButton = styled(Button)`
   top: 60px;
   right: 1%;
   position: absolute;
   margin-top: 10px;
   transition: transform 0.3s ease;
-  background-color:  ${({$bgColor = '#009989'}) => `${$bgColor}`};
+
+  background-color: ${({ $bgColor = 'var(--button-primary-bg)' }) =>
+    $bgColor};
   border: none;
-  color: white;
+  color: var(--accent-text);
   border-radius: 20px;
   padding: 7px 8px;
   z-index: 1001;
-  &:hover, &:focus {
-    background-color: rgba(0, 0, 0, 0.1)!important;
-    color: white;
+
+  &:hover,
+  &:focus {
+    color: var(--hover-text);
+    background-color: ${({ $bgColor = 'var(--button-primary-bg)' }) => $bgColor};
     border: none;
     box-shadow: none;
   }
 `;
 
-
-export const XButton = styled(Button)`  
-  background-color: rgba(255, 255, 255, 0.1);
-  
+export const XButton = styled(Button)`
+  background-color: var(--button-primary-bg);
   border: none;
-  color: #f9fafb;
+  color: var(--map-panel-text);
   border-radius: 2px;
   padding: 7px 8px;
   width: 100%;
@@ -174,8 +157,8 @@ export const XButton = styled(Button)`
 
   &:hover,
   &:focus {
-    background-color: rgba(0, 0, 0, 0.1) !important;
-    color: #f9fafb;    
+    background-color: var(--button-primary-hover-bg);
+    color: var(--map-panel-text);
     border: none;
     box-shadow: none;
   }
@@ -183,22 +166,20 @@ export const XButton = styled(Button)`
 
 export const SButton = styled(Button)`
   border: none;
-  
-  color: #f9fafb; 
+  color: var(--map-panel-text);
   background-color: transparent;
   z-index: 1001;
 
   &:hover,
   &:focus {
-    background-color: rgba(0, 0, 0, 0.08) !important;
+    background-color: var(--button-primary-hover-bg); ;
     border: none;
     box-shadow: none;
   }
 `;
 
-
 export const LoadingMessage = styled.div`
-  color: #e5e7eb;
+  color: var(--muted-text);
   padding: 10px;
   border-radius: 5px;
   z-index: 1000;
@@ -211,6 +192,7 @@ export const LoadingMessage = styled.div`
   text-align: center;
   opacity: 0.8;
   transition: opacity 0.3s ease;
+
   &:hover {
     opacity: 1;
   }
@@ -230,19 +212,20 @@ export const IconLabel = styled.span`
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: ${({$fontSize = '13'}) => `${$fontSize}px`};
+  font-size: ${({ $fontSize = '13' }) => `${$fontSize}px`};
   margin-bottom: 4px;
-  color: #c4fff8;
-`
-export const Title = styled.span`
-    letter-spacing: .0125em;
-    font-family: "Google Sans", Roboto, Arial, sans-serif;
-    font-weight: 600;
-    font-size: 15px;
-    line-height: 24px;
-    align-items: center;
+  color: var(--accent-text);
+`;
 
-`
+export const Title = styled.span`
+  letter-spacing: 0.0125em;
+  font-family: 'Google Sans', Roboto, Arial, sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 24px;
+  align-items: center;
+`;
+
 export const ToggleButton = styled(Button)`
   top: ${({ $top = 0 }) => `${$top}px`};
   left: ${(props) => (props.$currentMenu ? '410px' : '20px')};
@@ -252,35 +235,34 @@ export const ToggleButton = styled(Button)`
 
   transition: transform 0.3s ease;
 
-  background-color: #009989;
+  background-color: var(--button-primary-bg);
   border: none;
-  color: white;
+  color: #ffffff;
   border-radius: 5px;
   padding: 3px 10px;
   z-index: 1001;
 
   &:hover {
-    background-color: #000000b3;
-    color: white;
+    background-color: var(--button-primary-hover-bg);
+    color: #ffffff;
     border: none;
     box-shadow: none;
   }
 `;
-
 
 export const Switch = styled(Form.Switch)`
   .form-check-input {
     width: 34px;
     height: 18px;
     cursor: pointer;
-    background-color: rgba(148, 163, 184, 0.6);
+    background-color: var(--button-primary-bg);
     border-radius: 999px;
-    border: none;
+    // border: none;
     box-shadow: none;
   }
 
   .form-check-input:checked {
-    background-color: #009989; /* Google-style blue toggle */
+    background-color: var(--button-primary-hover-bg);
   }
 
   .form-check-input:focus {
@@ -290,32 +272,28 @@ export const Switch = styled(Form.Switch)`
 
 export const Content = styled.div`
   padding: 12px;
-  // border-bottom: 1px solid rgba(148, 163, 184, 0.35);
-  border-block-end: 1px solid rgb(218, 220, 224);
+  border-block-end: 1px solid var(--panel-border-color);
+
   &:first-of-type {
     border-bottom: none;
   }
+
   a {
-    color: #bfdbfe;
+    color: var(--link-color);
   }
 `;
 
-
-const MapStyle = styled.div`
+export const MapContainer = styled.div`
   flex: 1 1 100%;
   order: 1;
   width: 100%;
   overflow-y: hidden;
   height: 100%;
-  .maplibregl-popup-content{
-    padding: 0px
+
+  .maplibregl-popup-content {
+    padding: 0px;
   }
 `;
-
-export const MapContainer = (props) => {
-  const theme = useTheme();
-  return <MapStyle {...props} theme={theme} />;
-};
 
 export const HeaderRow = styled.div`
   display: flex;
@@ -336,7 +314,7 @@ export const FieldBlock = styled.div``;
 export const FieldLabel = styled.div`
   font-size: 12px;
   font-weight: 500;
-  color: #c4fff8;
+  color: var(--accent-text);
 `;
 
 export const FieldValue = styled.div`
@@ -351,15 +329,15 @@ export const SearchBarWrapper = styled.div`
   max-width: 400px;
   padding: 6px 10px;
   border-radius: 6px;
-  background-color: #f5f7f8;
+  background-color: var(--search-bg);
   box-sizing: border-box;
-  border: 1px solid #e1e4e8;
+  border: 1px solid var(--search-border);
 `;
 
 export const SearchIcon = styled(FiSearch)`
   flex-shrink: 0;
   margin-right: 8px;
-  color: #9ca3af;
+  color: var(--muted-text);
   font-size: 16px;
 `;
 
@@ -369,10 +347,10 @@ export const SearchInput = styled.input`
   width: 500px;
   font-size: 14px;
   background: transparent;
-  color: #111827;
+  color: var(--search-text);
 
   &::placeholder {
-    color: #9ca3af;
+    color: var(--search-placeholder);
   }
 `;
 
@@ -383,4 +361,3 @@ export const ViewContainer = styled.div`
   flex-direction: column;
   overflow: hidden;
 `;
-

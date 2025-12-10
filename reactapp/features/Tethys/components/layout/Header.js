@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+
 import Container from 'react-bootstrap/Container';
 import Form from 'react-bootstrap/Form';
 import Navbar from 'react-bootstrap/Navbar';
@@ -6,23 +6,12 @@ import PropTypes from 'prop-types';
 import { useContext } from 'react';
 import { BsX, BsGear } from 'react-icons/bs';
 import { LinkContainer } from 'react-router-bootstrap';
-
 import HeaderButton from 'features/Tethys/components/buttons/HeaderButton';
 import NavButton from 'features/Tethys/components/buttons/NavButton';
 import SearchBar from 'features/DataStream/components/map/SearchBar';
 import { AppContext } from 'features/Tethys/context/context';
+import { CustomNavBar, CustomDiv } from 'features/Tethys/components/Styles';
 
-
-
-const CustomNavBar = styled(Navbar)`
-  min-height: var(--ts-header-height);
-`;
-
-const CustomDiv = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 32px;
-`;
 
 const Header = ({onNavChange}) => {
   const {tethysApp, user} = useContext(AppContext);

@@ -1,9 +1,8 @@
 // NavMenu.jsx
 import React from 'react';
 import PropTypes from 'prop-types';
-import useTheme from 'hooks/useTheme';         // the hook you wrote
-import ThemedOffcanvas from './ThemedOffcanvas';
-
+import useTheme from 'hooks/useTheme';
+import { ThemedOffcanvas } from 'features/Tethys/components/Styles';
 
 const NavMenu = ({ children, navTitle, onNavChange, navVisible, ...props }) => {
   const theme = useTheme();               // 'light' | 'dark'

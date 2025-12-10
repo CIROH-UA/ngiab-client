@@ -1,5 +1,5 @@
 import { Fragment, Suspense } from 'react';
-import { TimeSeriesThemedContainer } from '../styles/Styles';
+import { TimeSeriesContainer } from '../styles/Styles';
 import useTimeSeriesStore from 'features/DataStream/store/Timeseries';
 import LoadingAnimation from 'features/Tethys/components/loader/LoadingAnimation';
 import ParentSize from '@visx/responsive/lib/components/ParentSize';
@@ -15,7 +15,7 @@ const TimeSeriesCard = () => {
     <Fragment>
           { 
               <Suspense fallback={<LoadingAnimation />}>
-                <TimeSeriesThemedContainer>
+                <TimeSeriesContainer>
                   <ParentSize>
                     {({ width, height }) =>
                       (
@@ -35,7 +35,7 @@ const TimeSeriesCard = () => {
                       )
                     }
                   </ParentSize>
-                </TimeSeriesThemedContainer>
+                </TimeSeriesContainer>
 
               </Suspense>
           }

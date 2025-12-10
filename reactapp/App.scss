@@ -1,17 +1,15 @@
-/* Define color variables */
-$primary: #2c3e50;
-$secondary: #8f5325;
-$success: #3e8d63;
-$info: #7854e4;
-$warning: #b8c924;
-$danger: #d62518;
-$light: #f8f9fa;
-$dark: #343a40;
+/* Define color variables (SCSS) */
+$primary:   #2c3e50;
+$secondary: #009989;
+$success:   #3e8d63;
+$info:      #7854e4;
+$warning:   #b8c924;
+$danger:    #d62518;
+$light:     #f8f9fa;
+$dark:      #343a40;
+$accent:    #da6d25;
 
-/* Custom accent color */
-$accent: #da6d25;
-
-/* Map colors for Bootstrap */
+/* Bootstrap theme map */
 $theme-colors: (
   primary: $primary,
   secondary: $secondary,
@@ -27,29 +25,135 @@ $theme-colors: (
 /* Import Bootstrap SCSS */
 @import "../node_modules/bootstrap/scss/bootstrap";
 
-/* Define CSS variables for theming */
+/* === THEME VARIABLES === */
+
+/* Base (light) theme */
 :root {
+  --primary-color: #{$primary};
   --ts-header-height: 56px;
   color-scheme: light dark;
 
-  /* Light theme variables */
+  /* core */
   --background-color: #{$light};
-  --text-color: #000000;
+  --text-color: #212121;
   --primary-color: #{$primary};
-  /* Additional variables */
+
+  /* extras used in components */
+  --panel-background: #f9f9f9;
+  --panel-border-color: #e5e7eb;
+  --muted-text: #9ca3af;
+
+  --offcanvas-bg: #ffffff;
+  --offcanvas-border-color: #dee2e6;
+
+  --popup-bg: #ffffff;
+  --popup-text-color: #212529;
+
+  --map-panel-bg: #{$light};
+  --map-panel-text: #212121;
+
+  --button-primary-bg: #{$primary};
+  --button-primary-hover-bg: #{$light} ;
+  
+
+  --select-control-bg: #ffffff;
+  --select-control-border: #cccccc;
+  --select-text-color: #000000;
+  --select-placeholder-color: #666666;
+  --select-menu-bg: #ffffff;
+  --select-option-hover-bg: rgba(38,132,255,0.1);
+  --select-option-selected-bg: #2684ff;
+
+  --modal-bg: #ffffff;
+  --modal-text-color: #111827;
+  --modal-border-color: #e5e7eb;
+
+  --link-color: #0b74de;
+  --accent-text: rgb(95,99,104);
+  --hover-text: #{$secondary};
+
+  --search-bg: #f5f7f8;
+  --search-border: #e1e4e8;
+  --search-text: #111827;
+  --search-placeholder: #9ca3af;
+
+    /* navbar buttons */
+  --nav-button-text-color: #ffffff;
+  --nav-button-hover-bg: rgba(0, 0, 0, 0.1);
+
+  /* error overlay / box */
+  --error-overlay-bg: #ffffff;
+  --error-box-bg: #ffffff;
+  --error-box-text-color: #111827;
+
+  /* nav pills active state */
+  --nav-pill-active-bg: #009989;
+  --nav-pill-active-text-color: #ffffff;
+
+
 }
 
+/* Dark theme override */
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Dark theme variables */
     --background-color: #{$primary};
     --text-color: #ffffff;
     --primary-color: #{$light};
-    /* Additional variables */
+
+    --panel-background: #2c3e50;
+    --panel-border-color: #374151;
+    --muted-text: #9ca3af;
+
+    --offcanvas-bg: #2c3e50;
+    --offcanvas-border-color: #333333;
+
+    --popup-bg: #2b333b;
+    --popup-text-color: #f8f9fa;
+
+    --modal-bg: rgba(255, 255, 255, 0.08);
+    --modal-text-color: var(--text-color);
+    --modal-border-color: #374151;
+
+    --link-color: #bfdbfe;
+    --accent-text: #c4fff8;
+
+    --search-bg: #111827;
+    --search-border: #374151;
+    --search-text: #f9fafb;
+    --search-placeholder: #9ca3af;
+
+
+    --map-panel-bg: #1f2933;
+    --map-panel-text: #f9fafb;
+
+    --button-primary-bg: #009989;
+    --button-primary-hover-bg: #007a6e;
+
+    --select-control-bg: #2c3e50;
+    --select-control-border: #4f5b67;
+    --select-text-color: #ecf0f1;
+    --select-placeholder-color: #b0bec5;
+    --select-menu-bg: #2c3e50;
+    --select-option-hover-bg: #34495e;
+    --select-option-selected-bg: #1abc9c;
+
+    /* navbar buttons */
+    --nav-button-text-color: #f9fafb;
+    --nav-button-hover-bg: rgba(255, 255, 255, 0.08);
+
+    /* error overlay / box for dark mode */
+    --error-overlay-bg: #000000;         // or keep #ffffff if you really want a bright whiteout
+    --error-box-bg: #111827;
+    --error-box-text-color: #f9fafb;
+
+    /* nav pills active state */
+    --nav-pill-active-bg: #009989;       // same brand color in dark mode
+    --nav-pill-active-text-color: #ffffff;
+
   }
 }
 
-/* Apply the variables */
+/* Global usage */
 html, body, #root {
   height: 100%;
   background-color: var(--background-color);
@@ -57,12 +161,11 @@ html, body, #root {
 }
 
 body {
-  /* Offset for fixed header */
   padding-top: var(--ts-header-height);
 }
 
 .form-switch .form-check-input {
-  width: 3em ;
-  height: 1.5em ;
+  width: 3em;
+  height: 1.5em;
   margin-right: 10px;
 }
