@@ -37,6 +37,7 @@ $theme-colors: (
    --primary-color: #{$primary};
   --title-text-color: #5f6368;
   --ts-header-height: 56px;
+  --map-style-url: #{'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/light-style.json'};
   
   --button-primary-bg: #{$light};
   --button-primary-hover-bg: #{$light};
@@ -108,10 +109,8 @@ $theme-colors: (
   --chart-crosshair-color: #4b5563;
   --chart-glyph-stroke-color: #ffffff;
   --chart-empty-text-color: #6b7280;
-
   /* comma-separated line colors */
   --chart-line-colors: #1d4ed8, #f97316, #16a34a, #dc2626, #7c3aed;
-
 
 }
 
@@ -123,6 +122,7 @@ $theme-colors: (
     --background-color: #{$secondary};
     --text-color: #ffffff;
     --hover-text: #{$primary};
+    --map-style-url: #{'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/dark-style.json'};
 
     --search-bg: #{$dark};
     --search-border: #{$dark};
