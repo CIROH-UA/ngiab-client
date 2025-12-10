@@ -32,7 +32,7 @@ $theme-colors: (
 :root {
   color-scheme: light dark;
   /* core */
-  --background-color: #{$light};
+  --background-color: #{$primary};
   --text-color: #212121;
    --primary-color: #{$primary};
   --title-text-color: #5f6368;
