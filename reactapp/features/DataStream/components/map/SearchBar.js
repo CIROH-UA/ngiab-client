@@ -1,6 +1,6 @@
 import React, {useState, useEffect } from 'react';
 import { SearchBarWrapper, SearchIcon, SearchInput } from '../styles/Styles';
-import { loadIndexData, getFeatureProperties } from 'features/DataStream/lib/indexSearch';
+import { loadIndexData, getFeatureProperties } from 'features/DataStream/lib/queryData';
 import useTimeSeriesStore from 'features/DataStream/store/Timeseries';
 import useDataStreamStore from 'features/DataStream/store/Datastream';
 import {useFeatureStore} from 'features/DataStream/store/Layers';

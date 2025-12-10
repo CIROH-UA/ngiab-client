@@ -16,7 +16,7 @@ import { localPoint } from '@visx/event';
 import { GlyphCircle } from '@visx/glyph';
 import { timeFormat } from 'd3-time-format';
 import { RectClipPath } from '@visx/clip-path';
-import { getVariableUnits } from '../../lib/getTimeSeries';
+import { getVariableUnits } from '../../lib/data';
 import useDataStreamStore from '../../store/Datastream';
 
 function LineChart({ width, height, data, layout }) {
