@@ -53,8 +53,8 @@ $theme-colors: (
  
 
   /* extras used in components */
-  --panel-background: #f9f9f9;
-  --panel-border-color: #e5e7eb;
+  --panel-background: #{$primary};
+  --panel-border-color: #{$primary};
   --muted-text: #9ca3af;
 
   --offcanvas-bg: #ffffff;
@@ -124,8 +124,8 @@ $theme-colors: (
     // --accent-text: #c4fff8;
     --accent-text: #cdcdcd;
 
-    --panel-background: #2c3e50;
-    --panel-border-color: #374151;
+    --panel-background: #{$secondary};
+    --panel-border-color: #{$secondary};
     --muted-text: #9ca3af;
 
     --offcanvas-bg: #2c3e50;
@@ -141,8 +141,6 @@ $theme-colors: (
     --link-color: #bfdbfe;
     --map-panel-bg: #1f2933;
     --map-panel-text: #f9fafb;
-
-
 
     --select-control-bg: #2c3e50;
     --select-control-border: #4f5b67;
