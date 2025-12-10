@@ -3,8 +3,8 @@ import Button from 'react-bootstrap/Button';
 import Navbar from 'react-bootstrap/Navbar';
 import Offcanvas from 'react-bootstrap/Offcanvas';
 
-export const StyledButton = styled(Button)`
-  background-color: var(--button-primary-bg);
+export const StyledButton = styled.button`
+  background-color: transparent;
   border: none;
   color: var(--text-color);
 
@@ -80,12 +80,37 @@ export const ErrorTitle = styled.h1`
 
 export const CustomNavBar = styled(Navbar)`
   min-height: var(--ts-header-height);
+  color: var(--title-text-color);
+
+  /* Ensure navbar brand and links use theme colors */
+  &.navbar-dark .navbar-brand,
+  &.navbar-dark .navbar-nav .nav-link {
+    color: var(--title-text-color);
+  }
+
+  &.navbar-dark .navbar-nav .nav-link:hover,
+  &.navbar-dark .navbar-nav .nav-link:focus {
+    color: var(--text-color);
+    opacity: 0.85; /* optional */
+  }
 `;
 
 export const CustomDiv = styled.div`
   display: flex;
   align-items: center;
   gap: 32px;
+
+  /* any plain anchor inside this div */
+  & a {
+    color: var(--title-text-color);
+    text-decoration: none;
+  }
+
+  & a:hover,
+  & a:focus {
+    color: var(--title-text-color);
+    text-decoration: none;
+  }
 `;
 
 export const ThemedOffcanvas = styled(Offcanvas)`

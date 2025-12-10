@@ -149,16 +149,17 @@ export const LayerButton = styled(Button)`
 export const XButton = styled(Button)`
   background-color: var(--button-primary-bg);
   border: none;
-  color: var(--map-panel-text);
-  border-radius: 2px;
+  color: var(--button-primary-text);
+  border-radius: 8px;
   padding: 7px 8px;
   width: 100%;
   z-index: 1001;
-
+  box-shadow: 0 1px 2px 0 rgba(60, 64, 67, .3), 0 1px 3px 1px rgba(60, 64, 67, .15);
+  
   &:hover,
   &:focus {
     background-color: var(--button-primary-hover-bg);
-    color: var(--map-panel-text);
+    color: var(--button-primary-text-hover);
     border: none;
     box-shadow: none;
   }
@@ -256,6 +257,7 @@ export const Switch = styled(Form.Switch)`
     height: 18px;
     cursor: pointer;
     background-color: var(--button-primary-bg);
+    border-color: var(--ascend-text);
     border-radius: 999px;
     // border: none;
     box-shadow: none;
