@@ -39,6 +39,21 @@ $theme-colors: (
   --ts-header-height: 56px;
   --map-style-url: #{'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/light-style.json'};
   
+
+  --map-divides-outline-color: rgba(91, 44, 111, 0.5);
+  --map-divides-highlight-fill: rgba(5, 49, 243, 0.32);
+  --map-divides-highlight-outline: rgba(253, 0, 253, 0.7);
+
+  --map-flowpaths-color: #000000;
+
+
+  --map-gauges-color: #646464;
+
+  
+  --map-nexus-circle-color: #1f78b4;
+  --map-nexus-stroke-color: #ffffff;
+  --map-nexus-highlight-circle-color: #1f78b4;
+
   --button-primary-bg: #{$light};
   --button-primary-hover-bg: #{$light};
   --button-primary-text-hover: #{$secondary};
@@ -123,6 +138,18 @@ $theme-colors: (
     --text-color: #ffffff;
     --hover-text: #{$primary};
     --map-style-url: #{'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/dark-style.json'};
+    --map-divides-outline-color: rgba(238, 51, 119, 0.5);
+    --map-divides-highlight-fill: rgba(24, 21, 230, 0.32);
+    --map-divides-highlight-outline: rgba(192, 20, 207, 0.7);
+
+    --map-flowpaths-color: #0077bb;
+
+    --map-gauges-color: #c8c8c8;
+
+    --map-nexus-circle-color: #2c3e50;
+    --map-nexus-stroke-color: #e9ecef;
+    --map-nexus-highlight-circle-color: #2c3e50;
+
 
     --search-bg: #{$dark};
     --search-border: #{$dark};
