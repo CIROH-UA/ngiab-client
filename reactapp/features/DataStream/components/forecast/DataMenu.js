@@ -8,10 +8,17 @@ import { makeGpkgUrl, listPublicS3Directories } from 'features/DataStream/lib/s3
 import { getCacheKey } from 'features/DataStream/lib/opfsCache';
 import useTimeSeriesStore from 'features/DataStream/store/Timeseries';
 import useDataStreamStore from 'features/DataStream/store/Datastream';
-import { MdOutlineWaves, MdCalendarMonth, MdOutlineRefresh } from "react-icons/md";
-import { BsExclamationCircle } from "react-icons/bs";
 import { availableCyclesList, availableEnsembleList, availableForecastList, availableModelsList } from 'features/DataStream/lib/data';
 import { makeTitle } from 'features/DataStream/lib/utils';
+
+import {
+  ModelIcon,
+  DateIcon,
+  ForecastIcon,
+  CycleIcon,
+  EnsembleIcon,
+  VariableIcon,
+} from 'features/DataStream/lib/layers';
 
 export default function DataMenu() {
 
@@ -267,7 +274,7 @@ export default function DataMenu() {
     <Fragment>
       <Fragment>
         <Row>
-          <IconLabel> <BsExclamationCircle/> Model </IconLabel>
+          <IconLabel> <ModelIcon/> Model </IconLabel>
           <SelectComponent
             optionsList={availableModelsList}
             value={selectedModelOption}
@@ -275,7 +282,7 @@ export default function DataMenu() {
           />
         </Row>
            <Row>
-            <IconLabel> <MdCalendarMonth/> Date</IconLabel>
+            <IconLabel> <DateIcon/> Date</IconLabel>
             <SelectComponent
               optionsList={dates}
               value={selectedDateOption}
@@ -283,7 +290,7 @@ export default function DataMenu() {
             />
           </Row>
         <Row>
-          <IconLabel> <BsExclamationCircle/>  Forecast</IconLabel>
+          <IconLabel> <ForecastIcon/>  Forecast</IconLabel>
           <SelectComponent
             optionsList={availableForecastList}
             value={selectedForecastOption}
@@ -293,7 +300,7 @@ export default function DataMenu() {
 
         {availableCyclesList[forecast]?.length > 0 && (
           <Row>
-            <IconLabel> <MdOutlineRefresh/> Cycle</IconLabel>
+            <IconLabel> <CycleIcon/> Cycle</IconLabel>
             <SelectComponent
               optionsList={availableCyclesList[forecast]}
               value={selectedCycleOption}
@@ -304,7 +311,7 @@ export default function DataMenu() {
 
         {availableEnsembleList[forecast]?.length > 0 && (
           <Row>
-            <IconLabel> <MdOutlineWaves/> Ensembles</IconLabel>
+            <IconLabel> <EnsembleIcon/> Ensembles</IconLabel>
             <SelectComponent
               optionsList={availableEnsembleList[forecast]}
               value={selectedEnsembleOption}
@@ -314,7 +321,7 @@ export default function DataMenu() {
         )}
         { availableVariablesList.length > 0 && (
           <Row>
-            <IconLabel> <MdOutlineWaves/> Variable</IconLabel>
+            <IconLabel> <VariableIcon /> Variable</IconLabel>
             <SelectComponent
               optionsList={availableVariablesList}
               value={selectedVariableOption}

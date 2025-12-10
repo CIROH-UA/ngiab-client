@@ -199,3 +199,170 @@ export const DeleteDataIcon = (props) => (
     />
   </svg>
 );
+
+
+const baseProps = {
+  width: 20,
+  height: 20,
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  xmlns: 'http://www.w3.org/2000/svg',
+  'aria-hidden': 'true',
+};
+
+// Model: small cube / block
+export const ModelIcon = (props) => (
+  <svg {...baseProps} {...props}>
+    <path
+      d="M7 9L12 6L17 9L12 12L7 9Z"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M7 9V15L12 18L17 15V9"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Date: calendar
+export const DateIcon = (props) => (
+  <svg {...baseProps} {...props}>
+    <rect
+      x="4"
+      y="6"
+      width="16"
+      height="14"
+      rx="2"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    />
+    <path
+      d="M8 4V7M16 4V7"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M4 10H20"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    />
+  </svg>
+);
+
+// Forecast: horizon + forward arrow
+export const ForecastIcon = (props) => (
+  <svg {...baseProps} {...props}>
+    {/* horizon */}
+    <path
+      d="M4 16H14"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    {/* rising curve */}
+    <path
+      d="M4 16C6.5 12 9 10 12 10"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* forward arrow */}
+    <path
+      d="M13 7L18 12L13 17"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Cycle: circular arrows
+export const CycleIcon = (props) => (
+  <svg {...baseProps} {...props}>
+    <path
+      d="M7 8H12.5C14.9853 8 17 10.0147 17 12.5C17 13.3284 16.7893 14.1074 16.4189 14.7816"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M9 5L7 8L9 11"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M17 16H11.5C9.01472 16 7 13.9853 7 11.5C7 10.6716 7.21075 9.89257 7.58107 9.21835"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M15 19L17 16L15 13"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+export const EnsembleIcon = (props) => (
+  <svg {...baseProps} {...props}>
+    <path
+      d="M4 9C5.2 8.4 6.4 8 8 8C10.5 8 11.5 10 14 10C15.6 10 16.8 9.6 18 9"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M4 12C5.2 11.4 6.4 11 8 11C10.5 11 11.5 13 14 13C15.6 13 16.8 12.6 18 12"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      opacity="0.85"
+    />
+    <path
+      d="M4 15C5.2 14.4 6.4 14 8 14C10.5 14 11.5 16 14 16C15.6 16 16.8 15.6 18 15"
+      stroke="currentColor"
+      strokeWidth="1"
+      strokeLinecap="round"
+      opacity="0.7"
+    />
+  </svg>
+);
+
+// Variable: axes + curve
+export const VariableIcon = (props) => (
+  <svg {...baseProps} {...props}>
+    {/* axes */}
+    <path
+      d="M5 18V7"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M5 18H18"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    {/* curve */}
+    <path
+      d="M7 15C9 12 10 10 12 10C14 10 15 12 17 9"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);

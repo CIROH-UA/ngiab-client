@@ -11,8 +11,7 @@ import DataStreamView from 'features/DataStream/views/DatastreamView';
 
 function App() {
   const PATH_HOME = '/';
-  const PATH_VISUALIZATION_DOCUMENTATION = 'https://docs.ciroh.org/training-NGIAB-101/visualization.html';
-  const PATH_NGIAB_SITE = 'https://ngiab.ciroh.org';
+
   return (
     <>
       <ErrorBoundary>

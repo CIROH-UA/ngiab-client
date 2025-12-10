@@ -11,6 +11,7 @@ import { makeGpkgUrl } from 'features/DataStream/lib/s3Utils';
 import ResetDataButton from '../forecast/cacheHandler';
 
 const SearchBar = ({ placeholder = 'Search for an id' }) => {
+  const [searchInput, setSearchInput] = useState('');
   const hydrofabric_index_url = useDataStreamStore((state) => state.hydrofabric_index);
   const forecast = useDataStreamStore((state) => state.forecast);
   const model = useDataStreamStore((state) => state.model);
@@ -22,7 +23,6 @@ const SearchBar = ({ placeholder = 'Search for an id' }) => {
   const set_table = useTimeSeriesStore((state) => state.set_table);
   const set_variables = useDataStreamStore((state) => state.set_variables);
 
-  const feature_id = useTimeSeriesStore((state) => state.feature_id);
   const variable = useTimeSeriesStore((state) => state.variable);
   
   const set_series = useTimeSeriesStore((state) => state.set_series);
@@ -33,10 +33,12 @@ const SearchBar = ({ placeholder = 'Search for an id' }) => {
 
   const handleChange = async (e) => {
     console.log("Search input changed:", e.target.value);
+    setSearchInput(e.target.value);
     const unbiased_id = e.target.value;
     const id = unbiased_id.split('-')[1];
-    set_feature_id(e.target.value);
     const features = await getFeatureProperties({ cacheKey: 'index_data_table', feature_id: unbiased_id });
+    if (features.length === 0) {return};
+    set_feature_id(e.target.value);
     const feature = features.length > 0 ? features[0] : null;
     set_selected_feature(feature || null);
     const vpu_str = `VPU_${feature.vpuid}`;
@@ -100,7 +102,7 @@ const SearchBar = ({ placeholder = 'Search for an id' }) => {
       <SearchIcon aria-hidden="true" />
       <SearchInput
         type="text"
-        value={feature_id || ''}
+        value={searchInput || ''}
         onChange={(e) => handleChange(e)}
         placeholder={placeholder}
         aria-label={placeholder}
