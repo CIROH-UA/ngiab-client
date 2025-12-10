@@ -22,7 +22,6 @@ const Header = ({onNavChange}) => {
         <CustomNavBar fixed="top" className="shadow">
           <Container as="header" fluid className="px-4">
             <CustomDiv>
-              <NavButton onClick={showNav}></NavButton>
               <LinkContainer to="/">
                 <Navbar.Brand className="mx-0 d-none d-sm-block">
                   <img 

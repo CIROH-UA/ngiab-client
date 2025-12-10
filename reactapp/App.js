@@ -18,12 +18,7 @@ function App() {
       <ErrorBoundary>
           <Loader>
             <Layout 
-              navLinks={[
-                {title: '🪣 Datastream S3 Bucket Visualization', to: PATH_HOME, eventKey: 'link-home'},
-                {title: 'ℹ️ About NextGen In A Box', to: PATH_NGIAB_SITE,  external: true},
-                {title: '📖 Visualizer Documentation', to: PATH_VISUALIZATION_DOCUMENTATION,  external: true},
 
-              ]}
               routes={[
                 <Route path={PATH_HOME} element={<DataStreamView />} key='route-home' />,
               ]}
