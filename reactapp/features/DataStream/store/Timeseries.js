@@ -10,6 +10,8 @@ const useTimeSeriesStore = create((set) => ({
         "title": "TimeSeries",
     },
     table: '',
+    loading: false,
+    set_loading: (isLoading) => set({ loading: isLoading }),
     set_table: (newTable) => set({table: newTable}),
     set_feature_id: (newFeatureId) => set({ feature_id: newFeatureId }),
     set_series: (newSeries) => set({ series: newSeries }),

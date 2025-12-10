@@ -46,11 +46,14 @@ const MapComponent = () => {
   const enabledHovering = useLayersStore((state) => state.hovered_enabled);
 
   const selectedFeatureId = useTimeSeriesStore((state) => state.feature_id);
+  const loading = useTimeSeriesStore((state) => state.loading);
+  const setLoading = useTimeSeriesStore((state) => state.set_loading);
   const set_series = useTimeSeriesStore((state) => state.set_series);
   const set_feature_id = useTimeSeriesStore((state) => state.set_feature_id);
   const set_variable = useTimeSeriesStore((state) => state.set_variable);
   const set_table = useTimeSeriesStore((state) => state.set_table);
   const set_layout = useTimeSeriesStore((state) => state.set_layout);
+  const reset = useTimeSeriesStore((state) => state.reset);
 
   const nexus_pmtiles = useDataStreamStore((state) => state.nexus_pmtiles);
   const conus_pmtiles = useDataStreamStore((state) => state.community_pmtiles);
@@ -209,7 +212,13 @@ const MapComponent = () => {
   }, [isNexusVisible, isCatchmentsVisible]);
 
   const handleMapClick = async (event) => {
-    set_feature_id(null);
+    if (loading) {
+      toast.info('Data is already loading, please wait...', { autoClose: 300 });
+      return;
+    }
+    setLoading(true);
+    // set_feature_id(null);
+    reset();
     const map = event.target;
 
     if (layersToQuery.length === 0) return;
@@ -250,6 +259,7 @@ const MapComponent = () => {
           closeOnClick: true,
         });
         console.error('No data for VPU', vpu_str, err);
+        setLoading(false);
         continue;
       }
       try {
@@ -270,7 +280,6 @@ const MapComponent = () => {
           xaxis: '',
           title: makeTitle(forecast, unbiased_id),
         });
-
         toast.update(toastId, {
           render: `Loaded data for id: ${id}`,
           type: 'success',
@@ -278,15 +287,17 @@ const MapComponent = () => {
           autoClose: 3000,
           closeOnClick: true,
         });
+        setLoading(false);
       } catch (err) {
-        toast.update(toastId, {
-          render: `Failed to load data for id: ${id}`,
-          type: 'error',
-          isLoading: false,
-          autoClose: 5000,
-          closeOnClick: true,
-        });
-        console.error('Failed to load timeseries for', id, err);
+          toast.update(toastId, {
+            render: `Failed to load data for id: ${id}`,
+            type: 'error',
+            isLoading: false,
+            autoClose: 5000,
+            closeOnClick: true,
+          });
+          setLoading(false);
+          console.error('Failed to load timeseries for', id, err);
       }
       break;
     }

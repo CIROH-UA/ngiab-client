@@ -3,14 +3,13 @@ import { Spinner } from 'react-bootstrap';
 import { XButton, LoadingMessage, Row, IconLabel } from '../styles/Styles';
 import SelectComponent from '../SelectComponent';
 import { toast } from 'react-toastify';
-import { loadVpuData, getVariables, getTimeseries } from 'features/DataStream/lib/queryData';
+import { loadVpuData, getVariables, getTimeseries, checkForTable } from 'features/DataStream/lib/queryData';
 import { makeGpkgUrl, listPublicS3Directories } from 'features/DataStream/lib/s3Utils';
 import { getCacheKey } from 'features/DataStream/lib/opfsCache';
 import useTimeSeriesStore from 'features/DataStream/store/Timeseries';
 import useDataStreamStore from 'features/DataStream/store/Datastream';
 import { availableCyclesList, availableEnsembleList, availableForecastList, availableModelsList } from 'features/DataStream/lib/data';
 import { makeTitle } from 'features/DataStream/lib/utils';
-
 import {
   ModelIcon,
   DateIcon,
@@ -38,18 +37,17 @@ export default function DataMenu() {
   const set_cycle = useDataStreamStore((state) => state.set_cycle);
   const set_variables = useDataStreamStore((state) => state.set_variables);
   const set_model = useDataStreamStore((state) => state.set_model);
-  const reset_datastream_store = useDataStreamStore((state) => state.reset);
+  
 
   const variable = useTimeSeriesStore((state) => state.variable);
-  const table = useTimeSeriesStore((state) => state.table)
   const set_series = useTimeSeriesStore((state) => state.set_series);
   const set_table = useTimeSeriesStore((state) => state.set_table);
   const set_variable = useTimeSeriesStore((state) => state.set_variable);
   const set_layout = useTimeSeriesStore((state) => state.set_layout);
   const feature_id = useTimeSeriesStore((state) => state.feature_id);
-
-
-  const [loading, setLoading] = useState(false);
+  const loading = useTimeSeriesStore((state) => state.loading);
+  const setLoading = useTimeSeriesStore((state) => state.set_loading);
+  const reset = useTimeSeriesStore((state) => state.reset);
   const [loadingText, setLoadingText] = useState('');
 
   /* ─────────────────────────────────────
@@ -76,38 +74,34 @@ export default function DataMenu() {
       handleError('Please select a feature on the map first');
       return;
     }
+    if (loading){
+      toast.info('Data is already loading, please wait...', { autoClose: 300});
+      return
+    }
+    
+    handleLoading('Loading Datastream Data'); 
     const toastId = toast.loading(`Loading data for id: ${feature_id}...`, {
       closeOnClick: false,
       draggable: false,
     });
-
-
-    const cacheKey = getCacheKey(
-      model,
-      date,
-      forecast,
-      cycle,
-      time,
-      vpu
-    );
-    const vpu_gpkg = makeGpkgUrl(vpu);      
-    const id = feature_id.split('-')[1];
-    try {
-      handleLoading('Loading Datastream Data');      
-      await loadVpuData(model, date, forecast, cycle, time, vpu, vpu_gpkg);
-    }
-    catch (err) {
-      console.error('Error loading VPU data:', err);
-      toast.update(toastId, {
-        render: `No data for id: ${feature_id}`,
-        type: 'warning',
-        isLoading: false,
-        autoClose: 500,
-        closeOnClick: true,
-      });
-    }
-    
     try{
+      const cacheKey = getCacheKey(
+        model,
+        date,
+        forecast,
+        cycle,
+        time,
+        vpu
+      );
+      const vpu_gpkg = makeGpkgUrl(vpu);      
+      const id = feature_id.split('-')[1];
+      const tableExists = await checkForTable(cacheKey);
+      if (!tableExists) {
+        await loadVpuData(model, date, forecast, cycle, time, vpu, vpu_gpkg);
+      } else {
+        console.log(`Table ${cacheKey} already exists.`);
+      }
+    
       const variables = await getVariables({cacheKey});
       const _variable = variable ? variable : variables[0];
       const series = await getTimeseries(id, cacheKey, _variable);
@@ -137,7 +131,6 @@ export default function DataMenu() {
       
     } catch (err) {
       console.error(err);
-      // reset_datastream_store();
       toast.update(toastId, {
         render: `Failed to load data for id: ${feature_id}`,
         type: 'error',
