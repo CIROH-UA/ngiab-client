@@ -65,6 +65,12 @@ RUN cd ${APP_SRC_ROOT} \
     && rm -rf node_modules \
     && ${PDM} install --no-editable --production
 
+# Pre-install DuckDB extensions (sqlite, iceberg) at image build time so the
+# Tethys container does not need outbound network access to extensions.duckdb.org
+# at request time. The extensions are cached under ~/.duckdb/extensions/.
+RUN cd ${APP_SRC_ROOT} \
+    && ${PDM} run python -c "import duckdb; c=duckdb.connect(); c.execute('INSTALL sqlite'); c.execute('INSTALL iceberg'); print('duckdb extensions installed:', duckdb.__version__)"
+
 ADD salt/ /srv/salt/
 
 CMD bash run.sh
