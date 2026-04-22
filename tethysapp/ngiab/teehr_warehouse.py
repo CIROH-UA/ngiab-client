@@ -323,6 +323,32 @@ class WarehouseReader:
             out.append(row)
         return out
 
+    def list_crosswalks(
+        self, secondary_prefix: Optional[str] = None
+    ) -> List[tuple]:
+        """Return (primary_location_id, secondary_location_id) pairs from the crosswalk.
+
+        Optionally filter by ``secondary_location_id`` prefix (e.g. ``"ngen"`` or
+        ``"nwm30"``). Crosswalks are warehouse-scoped, not run-scoped.
+        """
+        catalog = self._freeze_catalog()
+        xwalk_loc = catalog.get("location_crosswalks")
+        if xwalk_loc is None:
+            return []
+        if secondary_prefix is None:
+            rows = self._execute(
+                f"SELECT primary_location_id, secondary_location_id "
+                f"FROM iceberg_scan('{xwalk_loc}')"
+            ).fetchall()
+        else:
+            rows = self._execute(
+                f"SELECT primary_location_id, secondary_location_id "
+                f"FROM iceberg_scan('{xwalk_loc}') "
+                f"WHERE secondary_location_id LIKE ? || '-%'",
+                [secondary_prefix],
+            ).fetchall()
+        return list(rows)
+
     def get_joined_timeseries(
         self,
         config_name: str,

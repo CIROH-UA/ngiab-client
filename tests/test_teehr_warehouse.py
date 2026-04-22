@@ -27,6 +27,7 @@ from tethysapp.ngiab.teehr_warehouse import (
     WarehouseReader,
     WarehouseUnreachable,
 )
+from tethysapp.ngiab import utils as ngiab_utils
 
 
 WAREHOUSE_ENV = "TEEHR_TEST_WAREHOUSE"
@@ -176,6 +177,110 @@ def test_list_usgs_locations_returns_primary_ids(reader):
 
 def test_usgs_for_ngen_unknown_returns_none(reader):
     assert reader.usgs_for_ngen("ngen_ngiab", "ngen-0000000") is None
+
+
+def test_list_crosswalks_returns_all_pairs(reader):
+    pairs = reader.list_crosswalks()
+    assert pairs, "expected at least one crosswalk row"
+    for primary, secondary in pairs:
+        assert primary.startswith("usgs-")
+        assert "-" in secondary
+
+
+def test_list_crosswalks_prefix_filter(reader):
+    ngen_pairs = reader.list_crosswalks(secondary_prefix="ngen")
+    nwm_pairs = reader.list_crosswalks(secondary_prefix="nwm30")
+    assert all(p[1].startswith("ngen-") for p in ngen_pairs)
+    assert all(p[1].startswith("nwm30-") for p in nwm_pairs)
+
+
+# ---- utils.py integration helpers ---------------------------------------
+
+
+def test_sanitize_stem_rules():
+    assert ngiab_utils._sanitize_stem("AWI_16_2863657_007") == "awi_16_2863657_007"
+    assert ngiab_utils._sanitize_stem("my-run.v2") == "my_run_v2"
+    assert ngiab_utils._sanitize_stem("PLAIN") == "plain"
+
+
+def test_detect_legacy_teehr_layout_false_when_run_missing(tmp_path, monkeypatch):
+    """Unknown run id → False, not an exception."""
+    monkeypatch.setattr(
+        ngiab_utils, "_get_list_model_runs", lambda: {"model_runs": []}
+    )
+    assert ngiab_utils._detect_legacy_teehr_layout("does-not-exist") is False
+
+
+def test_detect_legacy_teehr_layout_true_when_metrics_csv_present(tmp_path, monkeypatch):
+    run_dir = tmp_path / "run_A"
+    (run_dir / "teehr").mkdir(parents=True)
+    (run_dir / "teehr" / "metrics.csv").write_text("metric,primary_location_id\n")
+    monkeypatch.setattr(
+        ngiab_utils,
+        "_get_list_model_runs",
+        lambda: {"model_runs": [{"id": "run_A", "path": str(run_dir)}]},
+    )
+    assert ngiab_utils._detect_legacy_teehr_layout("run_A") is True
+
+
+def test_resolve_configuration_name_prefers_manifest_field(monkeypatch):
+    """Persisted teehr_configuration_name wins over derivation."""
+    monkeypatch.setattr(
+        ngiab_utils,
+        "_get_list_model_runs",
+        lambda: {
+            "model_runs": [
+                {
+                    "id": "my_run",
+                    "path": "/data/renamed_dir",
+                    "teehr_configuration_name": "ngen_original_stem",
+                }
+            ]
+        },
+    )
+    assert ngiab_utils._resolve_configuration_name("my_run") == "ngen_original_stem"
+
+
+def test_resolve_configuration_name_falls_back_to_derivation(
+    warehouse_path, monkeypatch
+):
+    """With no persisted field, derive from basename and validate via warehouse."""
+    monkeypatch.setenv("TEEHR_WAREHOUSE_PATH", str(warehouse_path))
+    monkeypatch.setattr(
+        ngiab_utils,
+        "_get_list_model_runs",
+        lambda: {
+            "model_runs": [
+                {"id": "my_run", "path": "/home/aquagio/ngiab"}
+            ]
+        },
+    )
+    # Fixture warehouse was built with --data_folder_stem ngiab.
+    assert ngiab_utils._resolve_configuration_name("my_run") == "ngen_ngiab"
+
+
+def test_resolve_configuration_name_fallback_returns_none_when_derivation_misses(
+    warehouse_path, monkeypatch
+):
+    """Fallback that derives a nonexistent config name returns None (not a false match)."""
+    monkeypatch.setenv("TEEHR_WAREHOUSE_PATH", str(warehouse_path))
+    monkeypatch.setattr(
+        ngiab_utils,
+        "_get_list_model_runs",
+        lambda: {
+            "model_runs": [
+                {"id": "my_run", "path": "/somewhere/different_basename"}
+            ]
+        },
+    )
+    assert ngiab_utils._resolve_configuration_name("my_run") is None
+
+
+def test_resolve_configuration_name_unknown_run_id_returns_none(monkeypatch):
+    monkeypatch.setattr(
+        ngiab_utils, "_get_list_model_runs", lambda: {"model_runs": []}
+    )
+    assert ngiab_utils._resolve_configuration_name("nothing") is None
 
 
 # ---- get_metrics_for_location -------------------------------------------
