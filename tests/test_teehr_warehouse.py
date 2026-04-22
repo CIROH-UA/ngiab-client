@@ -204,7 +204,7 @@ def test_sanitize_stem_rules():
 
 
 def test_detect_legacy_teehr_layout_false_when_run_missing(tmp_path, monkeypatch):
-    """Unknown run id → False, not an exception."""
+    """Unknown run id -> False, not an exception."""
     monkeypatch.setattr(
         ngiab_utils, "_get_list_model_runs", lambda: {"model_runs": []}
     )
