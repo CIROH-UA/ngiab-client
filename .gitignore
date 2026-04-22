@@ -46,3 +46,6 @@ coverage
 # singularity
 
 .*sif
+
+.claude
+docs
