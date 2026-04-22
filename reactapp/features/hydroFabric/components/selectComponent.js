@@ -47,7 +47,7 @@ const customStyles = {
 };
   
 // Usage of the Select component with the custom Option component
-const SelectComponent = ({ optionsList, onChangeHandler,defaultValue }) => {
+const SelectComponent = ({ optionsList, onChangeHandler, defaultValue, virtualize = true }) => {
  // Handler for when an option is selected, wrapped in useCallback
  const handleChange = useCallback((option) => {
   onChangeHandler(`${option.value}`)
@@ -56,9 +56,14 @@ const SelectComponent = ({ optionsList, onChangeHandler,defaultValue }) => {
   //   onChangeHandler(`${option.value}`)
   // }
 
+  // Virtualized MenuList assumes flat children and does not handle grouped
+  // options. Callers that pass grouped option shape (e.g., TeehrSelect's
+  // "This run" grouping) should pass `virtualize={false}`.
+  const components = virtualize ? { MenuList } : undefined;
+
   return (
     <Select
-      components={{ MenuList }}
+      components={components}
       styles={customStyles}
       filterOption={createFilter({ ignoreAccents: false })}
       options={optionsList}
