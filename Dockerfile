@@ -67,11 +67,11 @@ RUN cd ${APP_SRC_ROOT} \
 
 # Pre-install DuckDB extensions (sqlite, iceberg) at image build time into a
 # shared, world-readable location. The Tethys runtime runs as a non-root user
-# and cannot write to /root/.duckdb/, so we install to /opt/duckdb_extensions
+# and cannot write to /root/.duckdb/, so we install to /usr/lib/tethys/duckdb_extensions
 # and have teehr_warehouse.py SET home_directory + extension_directory to
 # match. Without this, LOAD sqlite fails at runtime with:
 #   IOException: Failed to create directory "/root/.duckdb": Permission denied
-ENV DUCKDB_HOME=/opt/duckdb_extensions
+ENV DUCKDB_HOME=${TETHYS_HOME}/duckdb_extensions
 RUN mkdir -p ${DUCKDB_HOME} \
     && cd ${APP_SRC_ROOT} \
     && ${PDM} run python -c "import duckdb, os; c=duckdb.connect(); c.execute(f\"SET home_directory='{os.environ['DUCKDB_HOME']}'\"); c.execute(f\"SET extension_directory='{os.environ['DUCKDB_HOME']}'\"); c.execute('INSTALL sqlite'); c.execute('INSTALL iceberg'); print('duckdb extensions installed:', duckdb.__version__)" \
