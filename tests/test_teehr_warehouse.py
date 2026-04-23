@@ -37,7 +37,7 @@ WAREHOUSE_ENV = "TEEHR_TEST_WAREHOUSE"
 def _duckdb_home(tmp_path_factory):
     """Point DuckDB at a writable home/extension dir for local test runs.
 
-    The reader module's default DUCKDB_HOME (/opt/duckdb_extensions) only
+    The reader module's default DUCKDB_HOME (/usr/lib/tethys/duckdb_extensions) only
     exists inside the built Docker image. Tests running on a developer
     machine need a local alternative. Pre-install sqlite and iceberg into
     that dir once per session so LOAD in the reader works.
@@ -340,6 +340,29 @@ def test_get_joined_timeseries_unknown_location(reader):
         )
         == []
     )
+
+
+def test_get_joined_timeseries_x_values_are_chart_parseable(reader):
+    """x-values must be plain 'YYYY-MM-DD HH:MM:SS' strings with no tz suffix.
+
+    Regression guard: CAST(TIMESTAMPTZ AS VARCHAR) in DuckDB 1.5 appends a
+    truncated offset like '-07' that Plotly cannot parse, collapsing the
+    x-axis to today's date. strftime with an explicit format produces clean
+    output.
+    """
+    import re
+    loc = _usgs_id_with_metrics(reader, "ngen_ngiab")
+    series = reader.get_joined_timeseries(
+        "ngen_ngiab", "streamflow_hourly_inst", loc
+    )
+    iso_noisy = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$")
+    for s in series:
+        for pt in s["data"][:5]:  # spot-check first few points
+            assert isinstance(pt["x"], str), f"expected str, got {type(pt['x'])}"
+            assert iso_noisy.match(pt["x"]), (
+                f"x value {pt['x']!r} has unexpected shape; must be "
+                "'YYYY-MM-DD HH:MM:SS' with no tz suffix for Plotly parsing"
+            )
 
 
 def test_get_joined_timeseries_returns_two_series(reader):

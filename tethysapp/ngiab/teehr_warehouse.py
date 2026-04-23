@@ -41,7 +41,7 @@ SUPPORTED_TEEHR_VERSIONS = SpecifierSet(">=0.6.0,<0.7.0")
 # directory "/root/.duckdb": Permission denied' error. The Dockerfile
 # pre-installs extensions to this same path so LOAD finds them without a
 # runtime network fetch.
-DEFAULT_DUCKDB_HOME = "/opt/duckdb_extensions"
+DEFAULT_DUCKDB_HOME = "/usr/lib/tethys/duckdb_extensions"
 
 # Iceberg tables under the `teehr` namespace that the visualizer reads.
 _REQUIRED_TABLES = (
@@ -392,7 +392,11 @@ class WarehouseReader:
         # based on teehr 0.6.2. Tracked by the drift integration test.
         sql = (
             f"SELECT "
-            f"  CAST(p.value_time AS VARCHAR) AS value_time, "
+            # strftime produces 'YYYY-MM-DD HH:MM:SS' that Plotly parses cleanly.
+            # CAST(TIMESTAMPTZ AS VARCHAR) appends a truncated tz offset like
+            # '-07' (not '-07:00'), which Plotly cannot parse and collapses
+            # the x-axis to today's date.
+            f"  strftime(p.value_time, '%Y-%m-%d %H:%M:%S') AS value_time, "
             f"  p.value AS primary_value, "
             f"  s.value AS secondary_value "
             f"FROM iceberg_scan('{pri_loc}') p "
