@@ -59,6 +59,13 @@ RUN mkdir -p ${NVM_DIR} \
     && git update-index --assume-unchanged
 
 
+# Install anyio into the conda env. reactpy (shipped by the Tethys base image)
+# imports anyio at module load time, but the base image's dep graph can ship
+# reactpy without anyio present. Installing here guarantees the import chain
+# tethys_sdk.base -> ... -> tethys_components.library -> reactpy -> anyio
+# resolves. Cheap no-op if anyio is already installed.
+RUN pip install anyio
+
 RUN cd ${APP_SRC_ROOT} \
     && ${NPM} install \
     && ${NPM} run build \
