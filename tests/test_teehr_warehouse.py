@@ -33,6 +33,27 @@ from tethysapp.ngiab import utils as ngiab_utils
 WAREHOUSE_ENV = "TEEHR_TEST_WAREHOUSE"
 
 
+@pytest.fixture(autouse=True, scope="session")
+def _duckdb_home(tmp_path_factory):
+    """Point DuckDB at a writable home/extension dir for local test runs.
+
+    The reader module's default DUCKDB_HOME (/opt/duckdb_extensions) only
+    exists inside the built Docker image. Tests running on a developer
+    machine need a local alternative. Pre-install sqlite and iceberg into
+    that dir once per session so LOAD in the reader works.
+    """
+    import duckdb
+    home = tmp_path_factory.mktemp("duckdb_home")
+    os.environ["DUCKDB_HOME"] = str(home)
+    c = duckdb.connect(":memory:")
+    c.execute(f"SET home_directory='{home}'")
+    c.execute(f"SET extension_directory='{home}'")
+    c.execute("INSTALL sqlite")
+    c.execute("INSTALL iceberg")
+    c.close()
+    yield str(home)
+
+
 def _fixture_path():
     path = os.environ.get(WAREHOUSE_ENV)
     if not path:

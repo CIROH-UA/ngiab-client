@@ -59,24 +59,23 @@ RUN mkdir -p ${NVM_DIR} \
     && git update-index --assume-unchanged
 
 
-# Install anyio into the conda env. reactpy (shipped by the Tethys base image)
-# imports anyio at module load time, but the base image's dep graph can ship
-# reactpy without anyio present. Installing here guarantees the import chain
-# tethys_sdk.base -> ... -> tethys_components.library -> reactpy -> anyio
-# resolves. Cheap no-op if anyio is already installed.
-RUN pip install anyio
-
 RUN cd ${APP_SRC_ROOT} \
     && ${NPM} install \
     && ${NPM} run build \
     && rm -rf node_modules \
     && ${PDM} install --no-editable --production
 
-# Pre-install DuckDB extensions (sqlite, iceberg) at image build time so the
-# Tethys container does not need outbound network access to extensions.duckdb.org
-# at request time. The extensions are cached under ~/.duckdb/extensions/.
-RUN cd ${APP_SRC_ROOT} \
-    && ${PDM} run python -c "import duckdb; c=duckdb.connect(); c.execute('INSTALL sqlite'); c.execute('INSTALL iceberg'); print('duckdb extensions installed:', duckdb.__version__)"
+# Pre-install DuckDB extensions (sqlite, iceberg) at image build time into a
+# shared, world-readable location. The Tethys runtime runs as a non-root user
+# and cannot write to /root/.duckdb/, so we install to /opt/duckdb_extensions
+# and have teehr_warehouse.py SET home_directory + extension_directory to
+# match. Without this, LOAD sqlite fails at runtime with:
+#   IOException: Failed to create directory "/root/.duckdb": Permission denied
+ENV DUCKDB_HOME=/opt/duckdb_extensions
+RUN mkdir -p ${DUCKDB_HOME} \
+    && cd ${APP_SRC_ROOT} \
+    && ${PDM} run python -c "import duckdb, os; c=duckdb.connect(); c.execute(f\"SET home_directory='{os.environ['DUCKDB_HOME']}'\"); c.execute(f\"SET extension_directory='{os.environ['DUCKDB_HOME']}'\"); c.execute('INSTALL sqlite'); c.execute('INSTALL iceberg'); print('duckdb extensions installed:', duckdb.__version__)" \
+    && chmod -R a+rX ${DUCKDB_HOME}
 
 ADD salt/ /srv/salt/
 

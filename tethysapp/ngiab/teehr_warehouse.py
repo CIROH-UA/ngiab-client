@@ -22,6 +22,7 @@ the full design rationale (OD1, OD2, FR3).
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -32,6 +33,15 @@ from packaging.version import InvalidVersion, Version
 logger = logging.getLogger(__name__)
 
 SUPPORTED_TEEHR_VERSIONS = SpecifierSet(">=0.6.0,<0.7.0")
+
+# DuckDB 1.5's LOAD (and some other ops) resolve ~/.duckdb/ via HOME. In the
+# Tethys container HOME=/root from the build stage but the runtime runs as a
+# non-root user that can't access /root. Pointing both home_directory and
+# extension_directory at a shared writable path avoids the 'Failed to create
+# directory "/root/.duckdb": Permission denied' error. The Dockerfile
+# pre-installs extensions to this same path so LOAD finds them without a
+# runtime network fetch.
+DEFAULT_DUCKDB_HOME = "/opt/duckdb_extensions"
 
 # Iceberg tables under the `teehr` namespace that the visualizer reads.
 _REQUIRED_TABLES = (
@@ -107,6 +117,12 @@ class WarehouseReader:
         self._check_version()
         try:
             self._conn = duckdb.connect(":memory:")
+            # Point DuckDB at a shared, writable extension directory so LOAD
+            # does not try to create ~/.duckdb/ under an unwritable HOME.
+            # See DEFAULT_DUCKDB_HOME comment near the top of this module.
+            duckdb_home = os.environ.get("DUCKDB_HOME", DEFAULT_DUCKDB_HOME)
+            self._conn.execute(f"SET home_directory='{duckdb_home}'")
+            self._conn.execute(f"SET extension_directory='{duckdb_home}'")
             # Extensions are pre-installed at image build time; only LOAD here.
             self._conn.execute("LOAD sqlite")
             self._conn.execute("LOAD iceberg")
