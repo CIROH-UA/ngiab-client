@@ -54,12 +54,26 @@ CONFIG_FILE="$HOME/.host_data_path.conf"
 DOCKER_NETWORK="tethys-network"
 TETHYS_CONTAINER_NAME="tethys-ngen-portal"
 TETHYS_REPO="awiciroh/tethys-ngiab"
-TETHYS_TAG="latest"
+
 MODELS_RUNS_DIRECTORY="$HOME/ngiab_visualizer"
 DATASTREAM_DIRECTORY="$HOME/.datastream_ngiab"
 VISUALIZER_CONF="$MODELS_RUNS_DIRECTORY/ngiab_visualizer.json"
 TETHYS_PERSIST_PATH="/var/lib/tethys_persist"
 SKIP_DB_SETUP=false
+
+# TEEHR warehouse (shared across model runs). Persisted in a sibling config file
+# so runTeehr.sh and viewOnTethys.sh agree on the location. Must be mounted at
+# the SAME absolute path inside the Tethys container because Iceberg embeds
+# absolute paths in local_catalog.db and metadata/*.json.
+TEEHR_EVAL_CONFIG_FILE="$HOME/.teehr_evaluation_path.conf"
+TEEHR_WAREHOUSE_PATH=""
+
+# Parameters
+DATA_FOLDER_PATH="" # If non-empty, gets used as the gage path to import.
+TETHYS_TAG="" # If non-empty, gets used as the image tag.
+IMPORT_GAGE="ask" # "ask"/"yes"/"no"/"done"
+CLEAR_CONSOLE=true # If true, clears the console when starting execution.
+FLAGS_USED=false # Backwards compatibility. If false, uses the first argument as the data directory path.
 
 # Disable error trapping initially so we can catch and report errors
 set +e
@@ -86,23 +100,27 @@ show_loading() {
 print_section_header() {
     local title=$1
     local width=70
-    local padding=$(( (width - ${#title}) / 2 ))
+    local right_padding=$(( (width - ${#title}) / 2 ))
+    local left_padding=$(( (width - ${#title}) % 2 + right_padding ))
     
     # Create a more visually appealing section header with light blue background
     echo -e "\n\033[48;5;117m$(printf "%${width}s" " ")\033[0m"
-    echo -e "\033[48;5;117m$(printf "%${padding}s" " ")${BBlack}${title}$(printf "%${padding}s" " ")\033[0m"
+    echo -e "\033[48;5;117m$(printf "%${left_padding}s" " ")${BBlack}${title}$(printf "%${right_padding}s" " ")\033[0m"
     echo -e "\033[48;5;117m$(printf "%${width}s" " ")\033[0m\n"
 }
 
-# Simple banner without complex formatting
+# Welcome banner with improved design - fixed formatting
 print_welcome_banner() {
-    clear
+    echo -e "\n\n"
+    echo -e "\033[38;5;39m  ╔═══════════════════════════════════════════════════════════════════════════════════╗\033[0m"
+    echo -e "\033[38;5;39m  ║                                                                                   ║\033[0m"
+    echo -e "\033[38;5;39m  ║  \033[1;38;5;231mCIROH: NextGen In A Box (NGIAB) - Tethys\033[38;5;39m                                         ║\033[0m"
+    echo -e "\033[38;5;39m  ║  \033[1;38;5;231mInteractive Model Output Visualization\033[38;5;39m                                           ║\033[0m"
+    echo -e "\033[38;5;39m  ║                                                                                   ║\033[0m"
+    echo -e "\033[38;5;39m  ╚═══════════════════════════════════════════════════════════════════════════════════╝\033[0m"
     echo -e "\n"
-    echo -e "${BBlue}=================================================${Color_Off}"
-    echo -e "${BBlue}|  CIROH: NextGen In A Box (NGIAB) - Tethys     |${Color_Off}"
-    echo -e "${BBlue}|  Interactive Model Output Visualization       |${Color_Off}"
-    echo -e "${BBlue}=================================================${Color_Off}"
-    echo -e "\n${INFO_MARK} ${BWhite}Developed by CIROH${Color_Off}\n"
+    echo -e "  ${INFO_MARK} \033[1;38;5;231mDeveloped by CIROH\033[0m"
+    echo -e "\n"
     sleep 1
 }
 
@@ -136,12 +154,25 @@ else
 fi
 
 # Main functions
+load_teehr_warehouse_path() {
+    # Load TEEHR_WAREHOUSE_PATH from the runTeehr.sh config file if present.
+    # Silent no-op when the file doesn't exist -- the Tethys backend treats
+    # "no warehouse configured" as a first-class empty state.
+    if [ -f "$TEEHR_EVAL_CONFIG_FILE" ]; then
+        local candidate
+        candidate="$(cat "$TEEHR_EVAL_CONFIG_FILE")"
+        if [ -n "$candidate" ] && [ -d "$candidate" ]; then
+            TEEHR_WAREHOUSE_PATH="$candidate"
+        fi
+    fi
+}
+
 ensure_host_dir() {
     local dir="$1"
 
     # Create the directory if it doesn't exist
     if [ ! -d "$dir" ]; then
-        echo -e "${INFO_MARK} Directory ${BWhite}$dir${Color_Off} doesn't exist — creating it..."
+        echo -e "${INFO_MARK} Directory ${BWhite}$dir${Color_Off} doesn't exist - creating it..."
         mkdir -p "$dir" || { echo "Could not create directory $dir"; return 1; }
     fi
 
@@ -160,7 +191,7 @@ ensure_host_dir() {
             # 2) >&2 sends it to stderr (same stream as sudo prompt)
             # 3) sleep 0.1 lets the text reach the terminal before sudo starts
             echo -e "${INFO_MARK} ${BYellow}Reclaiming ownership of $dir " \
-                    "(sudo may prompt)…${Color_Off}" >&2
+                    "(sudo may prompt)...${Color_Off}" >&2
             sleep 0.1
             sudo chown -R "$(id -u):$(id -g)" "$dir" \
             || echo -e "${WARNING_MARK} Could not change directory ownership."
@@ -222,10 +253,12 @@ create_tethys_docker_network() {
 }
 
 set_tethys_tag() {
-    echo -e "${Color_Off}${BBlue}Specify the Tethys image tag to use: ${Color_Off}"
-    read -erp "$(echo -e "  ${ARROW} Tag (e.g. v0.2.1, default: latest): ")" TETHYS_TAG
     if [[ -z "$TETHYS_TAG" ]]; then
-        TETHYS_TAG="latest"
+        echo -e "${Color_Off}${BBlue}Specify the Tethys image tag to use: ${Color_Off}"
+        read -erp "$(echo -e "  ${ARROW} Tag (e.g. v0.2.1, default: latest): ")" TETHYS_TAG
+        if [[ -z "$TETHYS_TAG" ]]; then
+            TETHYS_TAG="latest"
+        fi
     fi
 }
 
@@ -350,11 +383,23 @@ run_tethys() {
     sleep 1
     echo -e "  ${INFO_MARK} ${BYellow}Starting Tethys container...${Color_Off}"
 
+    # Build the TEEHR warehouse mount flags conditionally -- mirrored-path
+    # bind mount is required when a warehouse is configured; skipped entirely
+    # when not so users without TEEHR set up are not blocked.
+    local teehr_mount_args=()
+    local teehr_env_args=()
+    if [ -n "$TEEHR_WAREHOUSE_PATH" ] && [ -d "$TEEHR_WAREHOUSE_PATH" ]; then
+        teehr_mount_args=(-v "$TEEHR_WAREHOUSE_PATH:$TEEHR_WAREHOUSE_PATH:ro")
+        teehr_env_args=(--env "TEEHR_WAREHOUSE_PATH=$TEEHR_WAREHOUSE_PATH")
+        echo -e "  ${INFO_MARK} Mounting TEEHR warehouse: ${BCyan}$TEEHR_WAREHOUSE_PATH${Color_Off}"
+    fi
+
     # Launch container with explicit error handling
     echo -e "  ${INFO_MARK} Running docker command..."
     docker run --rm -d \
         -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer" \
         -v "$DATASTREAM_DIRECTORY:$TETHYS_PERSIST_PATH/.datastream_ngiab" \
+        "${teehr_mount_args[@]}" \
         -p "$nginx_tethys_port:$nginx_tethys_port" \
         --network "$DOCKER_NETWORK" \
         --name "$TETHYS_CONTAINER_NAME" \
@@ -365,6 +410,7 @@ run_tethys() {
         --env VISUALIZER_CONF="$TETHYS_PERSIST_PATH/ngiab_visualizer/ngiab_visualizer.json" \
         --env NGINX_PORT="$nginx_tethys_port" \
         --env CSRF_TRUSTED_ORIGINS="$CSRF_TRUSTED_ORIGINS" \
+        "${teehr_env_args[@]}" \
         "${TETHYS_REPO}:${TETHYS_TAG}"
 
     if [ $? -eq 0 ]; then
@@ -398,7 +444,7 @@ select_tethys_image_source() {
                 [Ll]* )
                     echo -e "  ${CHECK_MARK} Using local image" ; return 0 ;;
                 [Pp]* )
-                    echo -e "  ${INFO_MARK} ${BYellow}Pulling image – this may take a moment…${Color_Off}"
+                    echo -e "  ${INFO_MARK} ${BYellow}Pulling image - this may take a moment...${Color_Off}"
                     show_loading "Downloading Tethys image" 3
                     docker pull "$image_ref" && return 0
                     echo -e "  ${CROSS_MARK} ${BRed}Failed to pull $image_ref${Color_Off}"
@@ -408,8 +454,8 @@ select_tethys_image_source() {
             esac
         done
     else
-        # No local image – pull automatically
-        echo -e "  ${INFO_MARK} ${BYellow}Image not found locally – pulling $image_ref…${Color_Off}"
+        # No local image - pull automatically
+        echo -e "  ${INFO_MARK} ${BYellow}Image not found locally - pulling $image_ref...${Color_Off}"
         show_loading "Downloading Tethys image" 3
         docker pull "$image_ref" && return 0
         echo -e "  ${CROSS_MARK} ${BRed}Failed to pull $image_ref${Color_Off}"
@@ -443,10 +489,7 @@ tear_down() {
     return 0
 }
 
-copy_models_run() {
-    local input_path="$1"
-    local models_dir="$MODELS_RUNS_DIRECTORY"
-
+prompt_fresh_start() {
     # ────────────────────────────────────────────────────────────────────
     # 0. Top-level directory already contains runs?  Ask user what to do.
     # ────────────────────────────────────────────────────────────────────
@@ -458,7 +501,7 @@ copy_models_run() {
             case "$keep_choice" in
                 [Kk]* ) break ;;   # keep as-is
                 [Ff]* )
-                    echo -e "  ${INFO_MARK} ${BYellow}Removing previous runs…" \
+                    echo -e "  ${INFO_MARK} ${BYellow}Removing previous runs..." \
                             "${LBLUE}(sudo may be required)${Color_Off}" >&2
                     rm -rf "${models_dir:?}/"* 2>/dev/null || sudo rm -rf "${models_dir:?}/"* 
                     break ;;
@@ -466,6 +509,11 @@ copy_models_run() {
             esac
         done
     fi
+}
+
+copy_models_run() {
+    local input_path="$1"
+    local models_dir="$MODELS_RUNS_DIRECTORY"
 
     # ────────────────────────────────────────────────────────────────────
     # 1. Ensure ~/ngiab_visualizer exists & is writable
@@ -481,7 +529,8 @@ copy_models_run() {
     local model_run_path="$models_dir/$base_name"
     local final_copied_path="$model_run_path"
 
-    # 3. Copy / overwrite / duplicate – user-driven
+    # 3. Copy / overwrite / duplicate - user-driven
+    overwrite_used=false # Message-passing for add_model_run()
     if [ ! -e "$model_run_path" ]; then
         cp -r "$input_path" "$models_dir/" || {
             echo -e "  ${CROSS_MARK} ${BRed}Copy failed${Color_Off}" >&2 ; return 1 ; }
@@ -497,6 +546,7 @@ copy_models_run() {
                     cp -r "$input_path" "$models_dir/" || {
                         echo -e "  ${CROSS_MARK} ${BRed}Overwrite failed${Color_Off}" >&2 ; return 1 ; }
                     echo -e "  ${CHECK_MARK} ${BCyan}Overwritten${Color_Off} ➜ $model_run_path" >&2
+                    overwrite_used=true
                     break ;;
                 [Dd]* )
                     echo -ne "  ${ARROW} ${BBlue}New directory name:${Color_Off} " >&2
@@ -530,11 +580,31 @@ add_model_run() {
     [[ -f "$json_file" ]] || echo '{"model_runs":[]}' > "$json_file"
 
     # ── 1. Gather new-run metadata ──────────────────────────────────────
-    local base_name new_uuid current_time final_path
+    local base_name new_uuid current_time final_path teehr_config_name
     base_name=$(basename "$input_path")
     new_uuid=$(uuidgen)
     current_time=$(date +"%Y-%m-%d:%H:%M:%S")
     final_path="/var/lib/tethys_persist/ngiab_visualizer/$base_name"
+
+    # Read teehr_configuration_name from the producer's manifest (if any).
+    # The manifest travels with the run directory through copy_models_run, so
+    # it's co-located at "$input_path/teehr_run_manifest.json". If absent or
+    # malformed, fall through with an empty value -- the backend's fallback
+    # derivation path will still resolve the config name at query time.
+    teehr_config_name=""
+    local manifest="$input_path/teehr_run_manifest.json"
+    if [ -f "$manifest" ]; then
+        if command -v jq >/dev/null 2>&1; then
+            teehr_config_name=$(jq -r '.teehr_configuration_name // empty' "$manifest" 2>/dev/null || true)
+        elif command -v python3 >/dev/null 2>&1; then
+            teehr_config_name=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('teehr_configuration_name') or '')" "$manifest" 2>/dev/null || true)
+        fi
+        if [ -n "$teehr_config_name" ]; then
+            echo -e "  ${INFO_MARK} Registered TEEHR configuration: ${BCyan}$teehr_config_name${Color_Off}"
+        else
+            echo -e "  ${WARNING_MARK} ${BYellow}teehr_run_manifest.json present but teehr_configuration_name missing/unparseable.${Color_Off}"
+        fi
+    fi
 
     # ── 2. Pick a jq implementation (host → docker → fail) ──────────────
     local jq_exec
@@ -543,7 +613,7 @@ add_model_run() {
     elif command -v docker >/dev/null 2>&1; then
         local jq_image="ghcr.io/jqlang/jq:latest"
         docker image inspect "$jq_image" >/dev/null 2>&1 || {
-            echo -e "  ${INFO_MARK} ${BYellow}Pulling jq helper image…${Color_Off}"
+            echo -e "  ${INFO_MARK} ${BYellow}Pulling jq helper image...${Color_Off}"
             docker pull "$jq_image" >/dev/null
         }
         jq_exec="docker run --rm -i $jq_image"
@@ -552,25 +622,55 @@ add_model_run() {
         return 1
     fi
 
-    # ── 3. Append the new record ────────────────────────────────────────
-    if $jq_exec \
+    # ── 3. If overwriting, discard the previous record ──────────────────
+    if [ ! $overwrite_used ] ; then
+        : # Nothing to do here
+    elif $jq_exec \
         --arg base_name    "$base_name" \
         --arg final_path   "$final_path" \
         --arg current_time "$current_time" \
         --arg uuid         "$new_uuid" \
         '
-        .model_runs += [{
+        del (
+            .model_runs[]
+          | select(.label == $base_name and .path == $final_path)
+        )
+        ' < "$json_file" > "${json_file}.tmp" && \
+       mv -f "${json_file}.tmp" "$json_file"; then
+        ## ► success message
+        echo -e "  ${CHECK_MARK} ${BCyan}Deregistered overwritten model runs from $json_file.${Color_Off}"
+    else
+        ## ► failure message
+        echo -e "  ${WARNING_MARK} ${BYellow}Failed to unregister overwritten model run from $json_file.${Color_Off}"
+        echo -e "    ${INFO_MARK} ${BCyan}This may result in duplicate model run listings, but is otherwise harmless.${Color_Off}"
+    fi
+
+    # ── 4. Append the new record ────────────────────────────────────────
+    # The teehr_configuration_name field is only included when non-empty so
+    # legacy entries (registered before the manifest flow existed) keep the
+    # exact same JSON shape they have today.
+    if $jq_exec \
+        --arg base_name    "$base_name" \
+        --arg final_path   "$final_path" \
+        --arg current_time "$current_time" \
+        --arg uuid         "$new_uuid" \
+        --arg teehr_cfg    "$teehr_config_name" \
+        '
+        .model_runs += [
+          ({
             label:  $base_name,
             path:   $final_path,
             date:   $current_time,
             id:     $uuid,
             subset: "",
             tags:   []
-        }]
+          }
+          + ( if $teehr_cfg == "" then {} else {teehr_configuration_name: $teehr_cfg} end ))
+        ]
         ' < "$json_file" > "${json_file}.tmp" && \
        mv -f "${json_file}.tmp" "$json_file"; then
         ## ► success message
-        echo -e "  ${CHECK_MARK} ${BCyan}Model run “$base_name” registered (${new_uuid})${Color_Off}"
+        echo -e "  ${CHECK_MARK} ${BCyan}Model run "$base_name" registered (${new_uuid})${Color_Off}"
     else
         ## ► failure message
         echo -e "  ${CROSS_MARK} ${BRed}Failed to update $json_file with new model run.${Color_Off}"
@@ -590,7 +690,7 @@ manage_datastream_cache() {
 
     # ─── Nothing inside?  Tell the user and bail out ───────────────────
     if [ -z "$(ls -A "$cache_dir" 2>/dev/null)" ]; then
-        echo -e "  ${INFO_MARK} ${LGREEN}No existing Datastream cache found –" \
+        echo -e "  ${INFO_MARK} ${LGREEN}No existing Datastream cache found -" \
                 "a fresh download will be used.${Color_Off}"
         return 0
     fi
@@ -609,7 +709,7 @@ manage_datastream_cache() {
                 break ;;
             [Ff]* )
                 echo -e "  ${INFO_MARK} ${BYellow}Clearing Datastream cache " \
-                        "(sudo may be required)…${Color_Off}"
+                        "(sudo may be required)...${Color_Off}"
                 rm -rf "${cache_dir:?}/"* 2>/dev/null || sudo rm -rf "${cache_dir:?}/"*
                 break ;;
             * )
@@ -628,13 +728,69 @@ pause_script_execution() {
     done
 }
 
+
+print_usage() {
+    echo -e "${BYellow}Usage: ${BCyan}viewOnTethys.sh [arg ...]${Color_Off}"
+    echo -e "${BYellow}Options:${Color_Off}"
+    echo -e "${BCyan}  -d [path]:${Color_Off} Designates the provided path as the data directory to import into the visualizer."
+    echo -e "${BCyan}  -h:${Color_Off} Displays usage information, then exits."
+    echo -e "${BCyan}  -i [image]:${Color_Off} Specifies which Docker image of the visualizer to run."
+    echo -e "${BCyan}  -n:${Color_Off} Launches the visualizer immediately without importing a data directory."
+    echo -e "${BCyan}  -r:${Color_Off} Retains previous console output when launching the script."
+    echo -e "${BCyan}  -t [tag]:${Color_Off} Specifies which Docker image tag of the visualizer to run."
+    echo -e "${BCyan}  -y:${Color_Off} Immediately requests to import a data directory."
+}
+
+
+# Pre-script execution
+while getopts 'd:hi:nrt:y' flag; do
+    case "${flag}" in
+        d) DATA_FOLDER_PATH="${OPTARG}" ;;
+        h) print_usage
+           exit 1 ;;
+        i) TETHYS_REPO="${OPTARG}" ;;
+        n) IMPORT_GAGE="no";;
+        r) CLEAR_CONSOLE=false ;;
+        t) TETHYS_TAG="${OPTARG}" ;;
+        y) IMPORT_GAGE="yes" ;;
+        *) echo -e "${CROSS_MARK} ${BRed}ERROR: Unrecognized flag.${Color_Off}"
+           print_usage
+           exit 1 ;;
+    esac
+    FLAGS_USED=true
+done
+
+if [ -n "$DATA_FOLDER_PATH" ] && [ "$IMPORT_GAGE" == "no" ]; then
+    echo -e "${CROSS_MARK} ${BRed}ERROR: Flags -d and -n are incompatible.${Color_Off}"
+    print_usage
+    exit 1
+fi
+
+# Backwards compatibility: If no flags provided, first argument should be used as data path
+if [ "$FLAGS_USED" == false ] && [ -n "$1" ]; then
+    DATA_FOLDER_PATH="$1"
+fi
+
+
 # Main script execution
+$CLEAR_CONSOLE && clear
 print_welcome_banner
 
-# Check if data path is provided as argument
-DATA_FOLDER_PATH="$1"
+# Check if a data path should be added
+while [[ -z "$DATA_FOLDER_PATH" && $IMPORT_GAGE == "ask" ]]; do
+    read -erp "$(echo -e "  ${ARROW} Import a NextGen model run? [Y/n]: ")" import_choice
+    if [[ "$import_choice" =~ ^[Yy] ]]; then
+        IMPORT_GAGE="yes"
+    elif [[ "$import_choice" =~ ^[Nn] ]]; then
+        echo -e "    ${CHECK_MARK} ${BGreen}Skipping NextGen model import.${Color_Off}"
+        IMPORT_GAGE="no"
+    else
+        echo -e "    ${CROSS_MARK} ${BRed}Invalid input.${Color_Off}"
+    fi
+done
 
-if [[ -z "$DATA_FOLDER_PATH" ]]; then
+# Check if data path is provided as argument
+if [[ -z "$DATA_FOLDER_PATH" && $IMPORT_GAGE == "yes" ]]; then
     # If no path provided, check if we have a saved path
     if [ -f "$CONFIG_FILE" ]; then
         LAST_PATH=$(cat "$CONFIG_FILE")
@@ -660,24 +816,34 @@ if [[ -z "$DATA_FOLDER_PATH" ]]; then
 fi
 
 # Validate the directory
-if [ ! -d "$DATA_FOLDER_PATH" ]; then
+if [[ -n "$DATA_FOLDER_PATH" && ! -d "$DATA_FOLDER_PATH" ]]; then
     echo -e "${CROSS_MARK} ${BRed}Directory does not exist: $DATA_FOLDER_PATH${Color_Off}"
     exit 1
 fi
 
 print_section_header "PREPARING VISUALIZATION ENVIRONMENT"
 
-# Copy model data to visualization directory
-final_dir=$(copy_models_run "$DATA_FOLDER_PATH") || {
-    echo -e "${CROSS_MARK} ${BRed}Failed to copy model data. Exiting.${Color_Off}"
-    exit 1
-}
+# Load TEEHR warehouse path from runTeehr.sh's config file if set. Silent when
+# unset -- the visualizer treats "no warehouse configured" as a valid state.
+load_teehr_warehouse_path
 
-# Register the model run
-add_model_run "$final_dir" || {
-    echo -e "${CROSS_MARK} ${BRed}Failed to register model run. Exiting.${Color_Off}"
-    exit 1
-}
+# If visualization directory is non-empty, offer a fresh start option
+prompt_fresh_start
+
+# If importing a model run...
+if [ -n "$DATA_FOLDER_PATH" ]; then
+    # Copy model data to visualization directory
+    final_dir=$(copy_models_run "$DATA_FOLDER_PATH") || {
+        echo -e "${CROSS_MARK} ${BRed}Failed to copy model data. Exiting.${Color_Off}"
+        exit 1
+    }
+
+    # Register the model run
+    add_model_run "$final_dir" || {
+        echo -e "${CROSS_MARK} ${BRed}Failed to register model run. Exiting.${Color_Off}"
+        exit 1
+    }
+fi
 
 # Ask what to do with ~/.datastream_ngiab
 manage_datastream_cache
