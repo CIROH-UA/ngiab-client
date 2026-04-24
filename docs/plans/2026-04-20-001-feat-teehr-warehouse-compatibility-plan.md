@@ -217,6 +217,8 @@ Grouped into phases for sequencing clarity. Unit numbering is global.
 
 - [ ] **Unit 1: Emit `teehr_run_manifest.json` from the teehr container**
 
+> **Deferred (2026-04-24).** Producer-side changes cannot land in `ngiab-teehr` at this time. Client-side derivation of `teehr_configuration_name` from the run folder basename now serves as the primary path; the manifest reader in `viewOnTethys.sh` (Unit 7) remains in place and will still take precedence if the producer ever lands this change. See `docs/plans/2026-04-24-001-feat-teehr-config-name-client-derivation-plan.md`.
+
 **Goal:** On successful completion of `scripts/teehr_ngen.py`, write a manifest file into `/app/data/` so that `viewOnTethys.sh` can read it at registration time.
 
 **Requirements:** R4, R5
@@ -446,6 +448,8 @@ Grouped into phases for sequencing clarity. Unit numbering is global.
 ### Phase D -- Orchestration (`NGIAB-CloudInfra`)
 
 - [ ] **Unit 7: `viewOnTethys.sh` -- mirrored warehouse mount + manifest ingestion**
+
+> **Updated (2026-04-24).** The manifest is now one of two sources for `teehr_configuration_name`. When the manifest is absent, `viewOnTethys.sh` derives the value from the run folder basename (`ngen_` + ASCII-sanitized lowercase basename) using the same rule the TEEHR producer applies internally, and persists it through the same jq append block. The manifest still wins when present. See `docs/plans/2026-04-24-001-feat-teehr-config-name-client-derivation-plan.md` for rationale and test scenarios. Unit 1 (producer emission) is deferred until upstream adoption.
 
 **Goal:** Mount the shared warehouse into the Tethys container on the mirrored path, expose it via env, and enrich `ngiab_visualizer.json` entries with `teehr_configuration_name` from the manifest.
 
