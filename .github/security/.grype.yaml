@@ -13,3 +13,28 @@ ignore:
       name: python
       type: binary
     reason: "Pinned to an older CPython until conda-build grows support for the latest version."
+
+  # The following come from the tethysplatform/tethys-core base image and are
+  # not controllable from this repo. Waive until the upstream base image tag
+  # bumps Django past 5.2.13 and Debian 13 picks up libngtcp2 1.11.0-1+deb13u1.
+  # Revisit when the base image is refreshed.
+  - vulnerability: GHSA-mvfq-ggxm-9mc5
+    package:
+      name: django
+      type: python
+    reason: "Django 5.2.12 shipped by tethys-core base image; upstream owns the bump to 5.2.13."
+  - vulnerability: GHSA-933h-hp56-hf7m
+    package:
+      name: django
+      type: python
+    reason: "Django 5.2.12 shipped by tethys-core base image; upstream owns the bump to 5.2.13."
+  - vulnerability: CVE-2026-40170
+    package:
+      name: libngtcp2-16
+      type: deb
+    reason: "Debian 13 libngtcp2 shipped by tethys-core base image; waiting on base image rebuild to pick up 1.11.0-1+deb13u1."
+  - vulnerability: CVE-2026-40170
+    package:
+      name: libngtcp2-crypto-gnutls8
+      type: deb
+    reason: "Debian 13 libngtcp2 shipped by tethys-core base image; waiting on base image rebuild to pick up 1.11.0-1+deb13u1."
