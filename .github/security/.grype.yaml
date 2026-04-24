@@ -38,3 +38,14 @@ ignore:
       name: libngtcp2-crypto-gnutls8
       type: deb
     reason: "Debian 13 libngtcp2 shipped by tethys-core base image; waiting on base image rebuild to pick up 1.11.0-1+deb13u1."
+
+  # npm is only used at build time (`npm install && npm run build`), and the
+  # app's node_modules is removed right after the build. npm's *own* bundled
+  # dependencies under ${NODE_VERSION_DIR}/lib/node_modules/npm/** are never
+  # invoked at runtime, so ReDoS / path-traversal findings against them have
+  # no realistic exploit path in the shipped image. We keep `npm install -g
+  # npm@latest` in the Dockerfile as the forward-looking fix; this block
+  # absorbs any residual findings from whichever subdeps npm happens to ship.
+  - package:
+      location: "/usr/local/nvm/versions/node/*/lib/node_modules/npm/**"
+    reason: "npm CLI and its vendored deps are build-time only; not reachable at runtime."

@@ -50,6 +50,7 @@ RUN mkdir -p ${NVM_DIR} \
     && nvm install ${NODE_VERSION} \
     && nvm alias default ${NODE_VERSION} \
     && nvm use default \
+    && ${NODE_VERSION_DIR}/bin/npm install -g npm@latest \
     && ls -la ${NODE_VERSION_DIR} \
     && ls -la ${NODE_VERSION_DIR}/lib \
     && pip install --user pdm \
