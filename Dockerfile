@@ -1,5 +1,5 @@
 
-FROM tethysplatform/tethys-core:dev-py3.12-dj5.2 
+FROM tethysplatform/tethys-core:dev-py3.12-dj5.2
 
 
 ###################
