@@ -1,4 +1,5 @@
 from django.http import JsonResponse
+import logging
 import pandas as pd
 import os
 import json
@@ -12,17 +13,51 @@ from .utils import (
     check_troute_id,
     get_troute_vars,
     get_troute_df,
-    get_configuration_variable_pairs,
-    get_teehr_joined_ts_path,
-    get_teehr_ts,
-    get_teehr_metrics,
     get_usgs_from_ngen_id,
     getCatchmentsList,
     find_gpkg_file_path,
     append_ngen_usgs_column,
     append_nwm_usgs_column,
     get_model_runs_selectable,
+    _resolve_configuration_name,
+    _detect_legacy_teehr_layout,
+    _open_warehouse,
+    _teehr_warehouse_path,
 )
+from .teehr_warehouse import (
+    ConfigurationNotFound,
+    TeehrWarehouseError,
+    UnsupportedWarehouseVersion,
+    WarehouseCatalogLocked,
+    WarehouseMountMirrorBroken,
+    WarehouseUnreachable,
+)
+
+logger = logging.getLogger(__name__)
+
+
+# Map warehouse exception → user-facing (status_message, severity) string pair.
+# See plan FR6 for the full state table.
+def _teehr_status_for(exc: TeehrWarehouseError):
+    if isinstance(exc, UnsupportedWarehouseVersion):
+        return (
+            "TEEHR warehouse was written by an unsupported TEEHR version.",
+            "warning",
+        )
+    if isinstance(exc, WarehouseCatalogLocked):
+        return (
+            "TEEHR warehouse is busy or improperly closed. Wait and refresh, or rerun TEEHR.",
+            "warning",
+        )
+    if isinstance(exc, WarehouseMountMirrorBroken):
+        return (
+            "TEEHR warehouse files are not reachable. Check the mount configuration.",
+            "error",
+        )
+    if isinstance(exc, WarehouseUnreachable):
+        return ("TEEHR warehouse appears empty. Run TEEHR to populate it.", "info")
+    # Generic fallback
+    return ("TEEHR warehouse could not be read.", "error")
 from .datastream_utils import (
     list_public_s3_folders,
     get_select_from_s3,
@@ -281,24 +316,80 @@ def getTrouteTimeSeries(request):
     )
 
 
-@controller
-def getTeehrTimeSeries(request):
-
-    teehr_id = request.GET.get("teehr_id")
-    model_run_id = request.GET.get("model_run_id")
-    teehr_config_variable = request.GET.get("teehr_variable")
-    teehr_configuration = teehr_config_variable.split("-")[0]
-    teehr_variable = teehr_config_variable.split("-")[1]
-    teehr_ts_path = get_teehr_joined_ts_path(
-        model_run_id, teehr_configuration, teehr_variable
-    )
-    teehr_ts = get_teehr_ts(teehr_ts_path, teehr_id, teehr_configuration)
-    teehr_metrics = get_teehr_metrics(model_run_id, teehr_id)
+def _empty_ts_response(variable, status_message, status_severity):
     return JsonResponse(
         {
-            "metrics": teehr_metrics,
-            "data": teehr_ts,
+            "metrics": [],
+            "data": [],
+            "layout": {
+                "yaxis": (variable or "").title(),
+                "xaxis": "",
+                "title": "",
+            },
+            "teehr_status": status_message,
+            "teehr_status_severity": status_severity,
+        }
+    )
+
+
+@controller
+def getTeehrTimeSeries(request):
+    # Inputs: model_run_id (the registered run), teehr_id (USGS gauge like
+    # "usgs-02464000"), teehr_variable ("<config>-<variable>" e.g.
+    # "ngen_ngiab-streamflow_hourly_inst"). The config coming from the
+    # dropdown is authoritative -- we don't re-derive it here.
+    teehr_id = request.GET.get("teehr_id")
+    model_run_id = request.GET.get("model_run_id")
+    teehr_config_variable = request.GET.get("teehr_variable") or ""
+    parts = teehr_config_variable.split("-", 1)
+    teehr_configuration = parts[0] if parts and parts[0] else None
+    teehr_variable = parts[1] if len(parts) > 1 else None
+    if not teehr_configuration or not teehr_variable:
+        return _empty_ts_response(
+            teehr_variable,
+            "No TEEHR configuration selected.",
+            "info",
+        )
+    if not _teehr_warehouse_path():
+        return _empty_ts_response(
+            teehr_variable,
+            "TEEHR warehouse is not configured. See setup docs.",
+            "info",
+        )
+    try:
+        with _open_warehouse() as reader:
+            data = reader.get_joined_timeseries(
+                teehr_configuration, teehr_variable, teehr_id
+            )
+            metrics = reader.get_metrics_for_location(teehr_configuration, teehr_id)
+    except TeehrWarehouseError as exc:
+        msg, severity = _teehr_status_for(exc)
+        logger.warning("getTeehrTimeSeries warehouse error: %s", exc)
+        return _empty_ts_response(teehr_variable, msg, severity)
+
+    if not data:
+        return _empty_ts_response(
+            teehr_variable,
+            "No TEEHR data for this location in the configured warehouse.",
+            "info",
+        )
+    return JsonResponse(
+        {
+            "metrics": metrics,
+            "data": data,
             "layout": {"yaxis": teehr_variable.title(), "xaxis": "", "title": ""},
+            "teehr_status": None,
+            "teehr_status_severity": None,
+        }
+    )
+
+
+def _empty_variables_response(status_message, status_severity):
+    return JsonResponse(
+        {
+            "teehr_variables": [],
+            "teehr_status": status_message,
+            "teehr_status_severity": status_severity,
         }
     )
 
@@ -306,11 +397,46 @@ def getTeehrTimeSeries(request):
 @controller
 def getTeehrVariables(request):
     model_run_id = request.GET.get("model_run_id")
+
+    if _detect_legacy_teehr_layout(model_run_id):
+        return _empty_variables_response(
+            "This run has legacy TEEHR output. Re-run TEEHR with the current image to view results.",
+            "warning",
+        )
+
+    if not _teehr_warehouse_path():
+        return _empty_variables_response(
+            "TEEHR warehouse is not configured. See setup docs.",
+            "info",
+        )
+
+    config_name = _resolve_configuration_name(model_run_id)
+    if config_name is None:
+        return _empty_variables_response(
+            "No TEEHR evaluation found for this run.",
+            "info",
+        )
+
     try:
-        vars = get_configuration_variable_pairs(model_run_id)
-    except Exception:
-        vars = []
-    return JsonResponse({"teehr_variables": vars})
+        with _open_warehouse() as reader:
+            variables = reader.list_configurations_for_run(config_name)
+    except TeehrWarehouseError as exc:
+        msg, severity = _teehr_status_for(exc)
+        logger.warning("getTeehrVariables warehouse error: %s", exc)
+        return _empty_variables_response(msg, severity)
+
+    if not variables:
+        return _empty_variables_response(
+            "No TEEHR evaluation found for this run.",
+            "info",
+        )
+    return JsonResponse(
+        {
+            "teehr_variables": variables,
+            "teehr_status": None,
+            "teehr_status_severity": None,
+        }
+    )
 
 
 @controller

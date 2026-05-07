@@ -46,3 +46,10 @@ coverage
 # singularity
 
 .*sif
+
+.claude
+
+# Claude / compound-engineering working docs (kept local, not versioned)
+docs/brainstorms/
+docs/plans/
+docs/solutions/

@@ -55,6 +55,7 @@ const hydroFabricInitialStore = {
       variable: null,
       variable_list: null,
       metrics: null,
+      status: { message: null, severity: null },
       chart: {
         series: [],
         layout: {
@@ -540,6 +541,20 @@ const hydroFabricReducer = (state, action) => {
           }
         }
       };
+    case hydroFabricActionsTypes.set_teehr_status:
+      return {
+        ...state,
+        state: {
+          ...state.state,
+          teehr: {
+            ...state.state.teehr,
+            status: {
+              message: action.payload?.message ?? null,
+              severity: action.payload?.severity ?? null
+            }
+          }
+        }
+      };
     case hydroFabricActionsTypes.reset_teehr:
       return {
         ...state,
@@ -551,6 +566,7 @@ const hydroFabricReducer = (state, action) => {
             variable: null,
             variable_list: null,
             metrics: null,
+            status: { message: null, severity: null },
             chart: {
               series: [],
               layout: {

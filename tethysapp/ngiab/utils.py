@@ -1,11 +1,95 @@
 import os
 import json
+import re
+import logging
 import pandas as pd
 import glob
 import duckdb
 import xarray as xr
-import os
 from collections import defaultdict
+
+from .teehr_warehouse import (
+    ConfigurationNotFound,
+    TeehrWarehouseError,
+    UnsupportedWarehouseVersion,
+    WarehouseCatalogLocked,
+    WarehouseMountMirrorBroken,
+    WarehouseReader,
+    WarehouseUnreachable,
+)
+
+logger = logging.getLogger(__name__)
+
+# ---- TEEHR warehouse integration helpers ----------------------------------
+
+
+def _teehr_warehouse_path():
+    """Return the configured TEEHR warehouse path (from env), or None."""
+    return os.environ.get("TEEHR_WAREHOUSE_PATH")
+
+
+def _sanitize_stem(basename: str) -> str:
+    """Apply the same sanitization teehr uses to build ``ngen_<stem>``.
+
+    Keep in sync with ``ngiab-teehr/scripts/teehr_ngen.py`` ``re.sub`` rule.
+    """
+    return re.sub(r"[^a-zA-Z0-9_]", "_", basename).lower()
+
+
+def _resolve_configuration_name(model_run_id):
+    """Resolve the teehr ``ngen_<stem>`` configuration name for this run.
+
+    Precedence (see plan FR2):
+      1. ``teehr_configuration_name`` field in ``ngiab_visualizer.json`` (written by
+         ``viewOnTethys.sh`` from the producer's manifest). Authoritative — never
+         overruled by derivation.
+      2. Fallback: derive from the run's ``path`` basename using the same
+         sanitization teehr applies, and validate against the warehouse
+         ``configurations`` table.
+
+    Returns the configuration name or None if it cannot be resolved.
+    """
+    model_runs = _get_list_model_runs().get("model_runs", [])
+    entry = next((m for m in model_runs if m.get("id") == model_run_id), None)
+    if entry is None:
+        return None
+    persisted = entry.get("teehr_configuration_name")
+    if persisted:
+        return persisted
+    path = entry.get("path")
+    if not path:
+        return None
+    derived = "ngen_" + _sanitize_stem(os.path.basename(path.rstrip("/")))
+    warehouse = _teehr_warehouse_path()
+    if not warehouse:
+        return None
+    try:
+        with WarehouseReader(warehouse) as reader:
+            if reader.configuration_exists(derived):
+                return derived
+    except TeehrWarehouseError:
+        logger.info("Fallback configuration validation skipped; warehouse unavailable")
+        return None
+    return None
+
+
+def _detect_legacy_teehr_layout(model_run_id):
+    """Return True if the run dir still has pre-PR ``<run>/teehr/metrics.csv``."""
+    model_path = _get_model_run_path_by_id(model_run_id)
+    if model_path is None:
+        return False
+    return os.path.exists(os.path.join(model_path, "teehr", "metrics.csv"))
+
+
+def _open_warehouse():
+    """Open a WarehouseReader from TEEHR_WAREHOUSE_PATH. Returns None if unset.
+
+    Caller is responsible for closing (or using a `with` block on the result).
+    """
+    path = _teehr_warehouse_path()
+    if not path:
+        return None
+    return WarehouseReader(path)
 
 def _get_conf_file():
     home_path = os.environ.get("HOME", "/tmp")
@@ -78,67 +162,52 @@ def find_gpkg_file_path(model_run_id):
 
 
 def append_ngen_usgs_column(gdf, model_id):
-    # Load ngen_usgs_crosswalk.parquet into DuckDB
-    base_output_teehr_path = get_base_teehr_path(model_id)
-    # Define the path to the ngen_usgs_crosswalk.parquet file
-    ngen_usgs_crosswalk_path = os.path.join(
-        base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
-    )
+    """Add ``ngen_usgs`` column mapping nexus IDs on the map to USGS gauge IDs.
 
-    if not os.path.exists(ngen_usgs_crosswalk_path):
-        # File not found, set 'ngen_usgs' column to 'none' for all entries
+    Reads the warehouse's ``location_crosswalks`` table filtered to ngen entries.
+    Rows with no matching USGS gauge get ``"none"``. Warehouse unreachable or
+    absent → every row gets ``"none"``.
+    """
+    try:
+        reader = _open_warehouse()
+        if reader is None:
+            gdf["ngen_usgs"] = "none"
+            return gdf
+        with reader:
+            crosswalks = reader.list_crosswalks(secondary_prefix="ngen")
+    except TeehrWarehouseError as exc:
+        logger.info("append_ngen_usgs_column: warehouse unavailable (%s)", exc)
         gdf["ngen_usgs"] = "none"
-    else:
-        # Query the data from DuckDB
-        query = f"""
-            SELECT secondary_location_id, primary_location_id
-            FROM '{ngen_usgs_crosswalk_path}'
-        """
-        ngen_usgs_df = duckdb.query(query).to_df()
-
-        # Create a dictionary for fast lookup, replacing 'ngen' with 'nex' in the keys
-        ngen_usgs_map = {
-            sec_id.replace("ngen", "nex"): prim_id
-            for sec_id, prim_id in zip(
-                ngen_usgs_df["secondary_location_id"],
-                ngen_usgs_df["primary_location_id"],
-            )
-        }
-
-        # Append ngen_usgs column to the GeoDataFrame
-        gdf["ngen_usgs"] = gdf["id"].apply(lambda x: ngen_usgs_map.get(x, "none"))
-
+        return gdf
+    # secondary is "ngen-XXXXX"; the gpkg nexus IDs are "nex-XXXXX". Map accordingly.
+    nex_to_usgs = {
+        secondary.replace("ngen-", "nex-", 1): primary
+        for primary, secondary in crosswalks
+    }
+    gdf["ngen_usgs"] = gdf["id"].apply(lambda x: nex_to_usgs.get(x, "none"))
     return gdf
 
 
 def append_nwm_usgs_column(gdf, model_id):
-    # Load nwm_usgs_crosswalk.parquet into DuckDB
-    base_output_teehr_path = get_base_teehr_path(model_id)
-    # Define the path to the ngen_usgs_crosswalk.parquet file
-    nwm_usgs_crosswalk_path = os.path.join(
-        base_output_teehr_path, "nwm_usgs_crosswalk.parquet"
-    )
+    """Add ``nwm_usgs`` column mapping USGS gauge IDs to NWM reach IDs.
 
-    if not os.path.exists(nwm_usgs_crosswalk_path):
-        # File not found, set 'ngen_usgs' column to 'none' for all entries
-        gdf["ngen_usgs"] = "none"
-    else:
-        query = f"""
-            SELECT primary_location_id, secondary_location_id
-            FROM '{nwm_usgs_crosswalk_path}'
-        """
-        nwm_usgs_df = duckdb.query(query).to_df()
-
-        # Create a dictionary for fast lookup
-        nwm_usgs_map = dict(
-            zip(
-                nwm_usgs_df["primary_location_id"],
-                nwm_usgs_df["secondary_location_id"],
-            )
-        )
-
-        # Append nwm_usgs column to the GeoDataFrame
-        gdf["nwm_usgs"] = gdf["ngen_usgs"].apply(lambda x: nwm_usgs_map.get(x, "none"))
+    Depends on ``ngen_usgs`` already being present on the GeoDataFrame (call
+    ``append_ngen_usgs_column`` first). Reads the warehouse's
+    ``location_crosswalks`` filtered to ``nwm30`` entries.
+    """
+    try:
+        reader = _open_warehouse()
+        if reader is None:
+            gdf["nwm_usgs"] = "none"
+            return gdf
+        with reader:
+            crosswalks = reader.list_crosswalks(secondary_prefix="nwm30")
+    except TeehrWarehouseError as exc:
+        logger.info("append_nwm_usgs_column: warehouse unavailable (%s)", exc)
+        gdf["nwm_usgs"] = "none"
+        return gdf
+    usgs_to_nwm = {primary: secondary for primary, secondary in crosswalks}
+    gdf["nwm_usgs"] = gdf["ngen_usgs"].apply(lambda x: usgs_to_nwm.get(x, "none"))
     return gdf
 
 
@@ -306,217 +375,27 @@ def getNexusIDs(model_run_id):
     ]
 
 
-def get_base_teehr_path(model_id):
-    model_path = _get_model_run_path_by_id(model_id)
-    base_output_teehr_path = os.path.join(model_path, "teehr")
-    return base_output_teehr_path
+def get_usgs_from_ngen_id(model_run_id, nexus_id):
+    """Return the USGS gauge id for a map nexus id (e.g. ``nex-485431``), or None.
 
-
-def get_usgs_from_ngen(app_workspace, ngen_id):
-    base_output_teehr_path = get_base_teehr_path(app_workspace)
-    # Define the path to the ngen_usgs_crosswalk.parquet file
-    crosswalk_file_path = os.path.join(
-        base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
-    )
-
-    # Query the parquet file with DuckDB
-    query = f"""
-        SELECT primary_location_id
-        FROM '{crosswalk_file_path}'
-        WHERE secondary_location_id = '{ngen_id}'
-        LIMIT 1;
+    Reads the warehouse's ``location_crosswalks`` table. Warehouse unreachable →
+    returns None.
     """
+    corrected = nexus_id.replace("nex-", "ngen-", 1) if nexus_id.startswith("nex-") else nexus_id
     try:
-        # Execute query and fetch result
-        result = duckdb.query(query).fetchone()
-        # If a result was found, return the primary_location_id, otherwise None
-        return result[0] if result else None
-    except Exception as e:
-        print(f"Error querying ngen_usgs_crosswalk.parquet: {e}")
-        return None
-
-
-def get_configuration_variable_pairs(model_run_id):
-    base_output_teehr_path = get_base_teehr_path(model_run_id)
-    joined_timeseries_base_path = os.path.join(
-        base_output_teehr_path, "dataset", "joined_timeseries"
-    )
-    configurations_variables = []
-
-    # Traverse the directory tree from the base path
-    for root, dirs, files in os.walk(joined_timeseries_base_path):
-        # Check if the directory matches the `configuration_name=` pattern
-        if "configuration_name=" in root:
-            # Extract the configuration name from the directory path
-            config_name = [
-                d.split("=")[1]
-                for d in root.split("/")
-                if d.startswith("configuration_name=")
-            ][0]
-
-            # Look one level deeper for `variable_name=` directories
-            for dir_name in dirs:
-                if dir_name.startswith("variable_name="):
-                    variable_name = dir_name.split("=")[1]
-
-                    # Create the dictionary with value and label
-                    config_var_pair = {
-                        "value": f"{config_name}-{variable_name}",
-                        "label": f"{config_name} {variable_name.replace('_', ' ')}",
-                    }
-                    configurations_variables.append(config_var_pair)
-
-    return configurations_variables
-
-
-def get_teehr_joined_ts_path(model_run_id,configuration, variable):
-    base_output_teehr_path = get_base_teehr_path(model_run_id)
-    joined_timeseries_path = os.path.join(
-        base_output_teehr_path, "dataset", "joined_timeseries"
-    )
-    # Build the target path
-    target_path = os.path.join(
-        joined_timeseries_path,
-        f"configuration_name={configuration}",
-        f"variable_name={variable}",
-    )
-
-    # Find the parquet file in the target directory
-    parquet_files = glob.glob(os.path.join(target_path, "*.parquet"))
-
-    # Return the parquet file path if found, otherwise return None
-    if parquet_files:
-        return parquet_files[0]  # Assuming there is only one parquet file
-    else:
-        return None
-
-
-def get_usgs_from_ngen_id(model_run_id, nexgen_id):
-    base_output_teehr_path = get_base_teehr_path(model_run_id)
-    negen_usgs_path = os.path.join(
-        base_output_teehr_path, "ngen_usgs_crosswalk.parquet"
-    )
-    # breakpoint()
-    # Open DuckDB connection
-    corrected_next_id = nexgen_id.replace("nex", "ngen")
-    conn = duckdb.connect(database=":memory:")
-    
-    try:
-
-        # Load and filter the parquet file based on the primary_location_id value
-        query = f"""
-            SELECT primary_location_id, secondary_location_id
-            FROM parquet_scan('{negen_usgs_path}')
-            WHERE secondary_location_id = '{corrected_next_id}'
-        """
-        df = conn.execute(query).fetchdf()
-        if df.empty:
+        reader = _open_warehouse()
+        if reader is None:
             return None
-        return df["primary_location_id"].values[0]
-
-    except Exception:
-        print("Error querying ngen_usgs_crosswalk.parquet")
-
-    conn.close()
+        with reader:
+            crosswalks = reader.list_crosswalks(secondary_prefix="ngen")
+    except TeehrWarehouseError as exc:
+        logger.info("get_usgs_from_ngen_id: warehouse unavailable (%s)", exc)
+        return None
+    for primary, secondary in crosswalks:
+        if secondary == corrected:
+            return primary
     return None
 
-
-def get_teehr_ts(parquet_file_path, primary_location_id_value, teehr_configuration):
-    # Open DuckDB connection
-    conn = duckdb.connect(database=":memory:")
-    # breakpoint()
-    
-    # Load and filter the parquet file based on the primary_location_id value
-    query = f"""
-        SELECT value_time, primary_value, secondary_value
-        FROM parquet_scan('{parquet_file_path}')
-        WHERE primary_location_id = '{primary_location_id_value}'
-        ORDER BY value_time
-    """
-    filtered_df = conn.execute(query).fetchdf()
-
-    # Close DuckDB connection
-    conn.close()
-
-    # Convert datetime format
-    filtered_df["value_time"] = filtered_df["value_time"].apply(
-        lambda x: x.strftime("%Y-%m-%d %H:%M:%S")
-    )
-
-    primary_data = [
-        {"x": row["value_time"], "y": row["primary_value"]}
-        for _, row in filtered_df.iterrows()
-    ]
-
-    secondary_data = [
-        {"x": row["value_time"], "y": row["secondary_value"]}
-        for _, row in filtered_df.iterrows()
-    ]
-
-    series = [
-        {"label": "USGS", "data": primary_data},
-        {
-            "label": f"{teehr_configuration.replace('_', ' ').title()}",
-            "data": secondary_data,
-        },
-    ]
-
-    return series
-
-
-def get_teehr_metrics(model_run_id: str, primary_location_id: str):
-    """
-    Return a list like
-        [
-            { "metric": "kling_gupta_efficiency",
-              "ngen": 0.81,
-              "nwm30_retrospective": 0.77,
-              ...
-            },
-            { "metric": "nash_sutcliffe_efficiency",
-              "ngen": 0.79,
-              ...
-            },
-            ...
-        ]
-
-    The function inspects whatever configurations/metrics are present in the
-    CSV – nothing is hard-coded.
-    """
-    base_output_teehr_path = get_base_teehr_path(model_run_id)
-    metrics_path           = os.path.join(base_output_teehr_path, "metrics.csv")
-
-    df = pd.read_csv(metrics_path)
-
-    # ── keep only the location we’re interested in ──────────────────────
-    df = df.loc[df["primary_location_id"] == primary_location_id]
-    if df.empty:
-        return []
-
-    # ── pivot so that             ───────────────────────────────────────
-    #       rows  → primary_location_id  (only 1 row after filter)
-    #       cols  →     metric   ┬ configuration_name
-    #                            └ (MultiIndex)
-    pivot = df.pivot(index="primary_location_id",
-                     columns="configuration_name")
-
-    # pivot.columns.levels[0] == metrics
-    # pivot.columns.levels[1] == configuration names
-    metrics_out = []
-    metrics     = pivot.columns.levels[0]
-    configs     = pivot.columns.levels[1]
-
-    for metric in metrics:
-        row = {"metric": metric}
-        for cfg in configs:
-            try:
-                row[cfg] = pivot[(metric, cfg)].iloc[0]
-            except KeyError:
-                # metric missing for this configuration → skip / set None
-                row[cfg] = None
-        metrics_out.append(row)
-
-    return metrics_out
 
 def get_troute_vars(df):
     # Check if the DataFrame has a MultiIndex

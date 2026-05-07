@@ -80,6 +80,14 @@ const useHydroFabric = () => {
       dispatch({ type: hydroFabricActionsTypes.set_teehr_series, payload: series }),
     set_teehr_chart_layout: (layout) =>
       dispatch({ type: hydroFabricActionsTypes.set_teehr_chart_layout, payload: layout }),
+    set_teehr_status: (statusOrMessage, maybeSeverity) => {
+      // Accept either (message, severity) or ({message, severity}) for caller ergonomics.
+      const payload =
+        statusOrMessage && typeof statusOrMessage === 'object'
+          ? { message: statusOrMessage.message ?? null, severity: statusOrMessage.severity ?? null }
+          : { message: statusOrMessage ?? null, severity: maybeSeverity ?? null };
+      dispatch({ type: hydroFabricActionsTypes.set_teehr_status, payload });
+    },
 
     // Resets
     reset_teehr: () =>

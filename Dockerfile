@@ -1,5 +1,5 @@
 
-FROM tethysplatform/tethys-core:dev-py3.12-dj5.2 
+FROM tethysplatform/tethys-core:dev-py3.12-dj5.2
 
 
 ###################
@@ -34,7 +34,7 @@ ENV PORTAL_SUPERUSER_PASSWORD=pass
 ENV PROJ_LIB=/opt/conda/envs/tethys/share/proj
 
 ENV NVM_DIR=/usr/local/nvm
-ENV NODE_VERSION=24.4.1
+ENV NODE_VERSION=24.14.1
 ENV NODE_VERSION_DIR=${NVM_DIR}/versions/node/v${NODE_VERSION}
 ENV NODE_PATH=${NODE_VERSION_DIR}/lib/node_modules
 ENV PATH=${NODE_VERSION_DIR}/bin:$PATH
@@ -50,6 +50,7 @@ RUN mkdir -p ${NVM_DIR} \
     && nvm install ${NODE_VERSION} \
     && nvm alias default ${NODE_VERSION} \
     && nvm use default \
+    && ${NODE_VERSION_DIR}/bin/npm install -g npm@latest \
     && ls -la ${NODE_VERSION_DIR} \
     && ls -la ${NODE_VERSION_DIR}/lib \
     && pip install --user pdm \
@@ -64,6 +65,18 @@ RUN cd ${APP_SRC_ROOT} \
     && ${NPM} run build \
     && rm -rf node_modules \
     && ${PDM} install --no-editable --production
+
+# Pre-install DuckDB extensions (sqlite, iceberg) at image build time into a
+# shared, world-readable location. The Tethys runtime runs as a non-root user
+# and cannot write to /root/.duckdb/, so we install to /usr/lib/tethys/duckdb_extensions
+# and have teehr_warehouse.py SET home_directory + extension_directory to
+# match. Without this, LOAD sqlite fails at runtime with:
+#   IOException: Failed to create directory "/root/.duckdb": Permission denied
+ENV DUCKDB_HOME=${TETHYS_HOME}/duckdb_extensions
+RUN mkdir -p ${DUCKDB_HOME} \
+    && cd ${APP_SRC_ROOT} \
+    && ${PDM} run python -c "import duckdb, os; c=duckdb.connect(); c.execute(f\"SET home_directory='{os.environ['DUCKDB_HOME']}'\"); c.execute(f\"SET extension_directory='{os.environ['DUCKDB_HOME']}'\"); c.execute('INSTALL sqlite'); c.execute('INSTALL iceberg'); print('duckdb extensions installed:', duckdb.__version__)" \
+    && chmod -R a+rX ${DUCKDB_HOME}
 
 ADD salt/ /srv/salt/
 
