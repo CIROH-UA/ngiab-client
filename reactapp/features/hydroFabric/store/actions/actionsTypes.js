@@ -40,8 +40,12 @@ const hydroFabricActionsTypes = {
     set_teehr_metrics: 'SET_TEEHR_METRICS',
     set_teehr_series: 'SET_TEEHR_SERIES',
     set_teehr_chart_layout: 'SET_TEEHR_CHART_LAYOUT',
-    
-    set_reset_teehr: 'SET_RESET_TEEHR',
+    set_teehr_status: 'SET_TEEHR_STATUS',
+
+    // FIX: was `set_reset_teehr: 'SET_RESET_TEEHR'`; 5 live callsites dispatch
+    // `reset_teehr` and the reducer case also switches on `reset_teehr` -- the
+    // old typo left this wired to undefined. See plan Unit 5.
+    reset_teehr: 'RESET_TEEHR',
     reset_nexus: 'RESET_NEXUS',
     reset_catchment: 'RESET_CATCHMENT',
     reset_troute: 'RESET_TROUTE',
