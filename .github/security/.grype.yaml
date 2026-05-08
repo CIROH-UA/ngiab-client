@@ -38,6 +38,16 @@ ignore:
       name: libngtcp2-crypto-gnutls8
       type: deb
     reason: "Debian 13 libngtcp2 shipped by tethys-core base image; waiting on base image rebuild to pick up 1.11.0-1+deb13u1."
+  - vulnerability: GHSA-grgv-6hw6-v9g4
+    package:
+      name: twisted
+      type: python
+    reason: "Twisted 25.5.0 ships in the tethys-core conda env; CVE-2026-42304 is a DoS in twisted.names (DNS server), which this app does not run. Upstream fix is 26.4.0rc2 (pre-release); revisit when tethys-core ships a stable bump."
+  - vulnerability: CVE-2026-42304
+    package:
+      name: twisted
+      type: python
+    reason: "Twisted 25.5.0 ships in the tethys-core conda env; CVE-2026-42304 is a DoS in twisted.names (DNS server), which this app does not run. Upstream fix is 26.4.0rc2 (pre-release); revisit when tethys-core ships a stable bump."
 
   # npm is only used at build time (`npm install && npm run build`), and the
   # app's node_modules is removed right after the build. npm's *own* bundled
