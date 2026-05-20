@@ -7,30 +7,23 @@ import 'App.scss';
 
 import NGIABView from 'views/ngiab/ngiab_view';
 
-import DataStreamView from 'views/datastream/datastreamView';
-
 
 function App() {
   const PATH_HOME = '/';
-  const PATH_DATASTREAM = '/datastream';
   const PATH_VISUALIZATION_DOCUMENTATION = 'https://docs.ciroh.org/training-NGIAB-101/visualization.html';
   const PATH_NGIAB_SITE = 'https://ngiab.ciroh.org';
   return (
     <>
       <ErrorBoundary>
           <Loader>
-            <Layout 
+            <Layout
               navLinks={[
                 {title: '📦 NextGen In A Box Outputs Visualization', to: PATH_HOME, eventKey: 'link-home'},
-                {title: '🪣 Datastream S3 Bucket Visualization', to: PATH_DATASTREAM, eventKey: 'link-datastream'},
-
                 {title: 'ℹ️ About NextGen In A Box', to: PATH_NGIAB_SITE,  external: true},
                 {title: '📖 Visualizer Documentation', to: PATH_VISUALIZATION_DOCUMENTATION,  external: true},
-
               ]}
               routes={[
                 <Route path={PATH_HOME} element={<NGIABView />} key='route-home' />,
-                <Route path={PATH_DATASTREAM} element={<DataStreamView />} key='route-datastream' />
               ]}
             />
           </Loader>
