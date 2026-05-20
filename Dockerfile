@@ -70,11 +70,21 @@ RUN mkdir -p ${NVM_DIR} \
     && git update-index --assume-unchanged
 
 
+# Current tethys-core base image strips gcc post-build, but pdm picks the
+# numpy sdist over the manylinux wheel and needs a compiler. Install and
+# remove in the same RUN so the final layer stays small.
+# Caveat: temporary; remove once the upstream pdm/numpy resolution is fixed.
 RUN cd ${APP_SRC_ROOT} \
     && ${NPM} install \
     && ${NPM} run build \
     && rm -rf node_modules \
-    && ${PDM} install --no-editable --production
+    && apt-get update \
+    && apt-get install -y --no-install-recommends gcc g++ python3-dev pkg-config \
+    && ${PDM} install --no-editable --production \
+    && apt-get -y purge gcc g++ python3-dev pkg-config \
+    && apt-get -y autoremove \
+    && apt-get -y clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Pre-install DuckDB extensions (sqlite, iceberg) into a www-writable, world-readable
 # location. Without this, runtime LOAD sqlite fails with:
