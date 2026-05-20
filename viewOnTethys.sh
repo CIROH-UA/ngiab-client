@@ -56,7 +56,6 @@ TETHYS_CONTAINER_NAME="tethys-ngen-portal"
 TETHYS_REPO="awiciroh/tethys-ngiab"
 
 MODELS_RUNS_DIRECTORY="$HOME/ngiab_visualizer"
-DATASTREAM_DIRECTORY="$HOME/.datastream_ngiab"
 VISUALIZER_CONF="$MODELS_RUNS_DIRECTORY/ngiab_visualizer.json"
 TETHYS_PERSIST_PATH="/var/lib/tethys_persist"
 SKIP_DB_SETUP=false
@@ -426,7 +425,6 @@ wait_container_healthy() {
 
 run_tethys() {
     ensure_host_dir "$MODELS_RUNS_DIRECTORY"
-    ensure_host_dir "$DATASTREAM_DIRECTORY"
     ensure_visualizer_conf_host_file "$VISUALIZER_CONF"
 
     echo -e "${ARROW} ${BWhite}Launching Tethys container...${Color_Off}"
@@ -473,7 +471,6 @@ run_tethys() {
     ${DOCKER_CMD} run --rm -d \
         "${USERNS_ARGS[@]}" \
         -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer${VOLUME_SUFFIX}" \
-        -v "$DATASTREAM_DIRECTORY:$TETHYS_PERSIST_PATH/.datastream_ngiab${VOLUME_SUFFIX}" \
         "${teehr_mount_args[@]}" \
         -p "$nginx_tethys_port:$CONTAINER_PORT" \
         "${NETWORK_ARGS[@]}" \
@@ -481,7 +478,6 @@ run_tethys() {
         --env MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
         --env MEDIA_URL="/media/" \
         --env SKIP_DB_SETUP="$SKIP_DB_SETUP" \
-        --env DATASTREAM_CONF="$TETHYS_PERSIST_PATH/.datastream_ngiab" \
         --env VISUALIZER_CONF="$TETHYS_PERSIST_PATH/ngiab_visualizer/ngiab_visualizer.json" \
         --env NGINX_PORT="$CONTAINER_PORT" \
         --env ALLOWED_HOSTS="$ALLOWED_HOSTS" \
@@ -769,44 +765,6 @@ add_model_run() {
 }
 
 
-manage_datastream_cache() {
-    local cache_dir="$DATASTREAM_DIRECTORY"
-
-    # Make (or fix) the directory first
-    ensure_host_dir "$cache_dir" || {
-        echo -e "  ${CROSS_MARK} ${BRed}Cannot ready $cache_dir${Color_Off}"
-        return 1
-    }
-
-    # ─── Nothing inside?  Tell the user and bail out ───────────────────
-    if [ -z "$(ls -A "$cache_dir" 2>/dev/null)" ]; then
-        echo -e "  ${INFO_MARK} ${LGREEN}No existing Datastream cache found -" \
-                "a fresh download will be used.${Color_Off}"
-        return 0
-    fi
-
-    # ─── Cache exists → ask what to do ─────────────────────────────────
-    echo -e "  ${INFO_MARK} ${BYellow}Existing Datastream cache detected:${Color_Off} $cache_dir"
-    echo -e "  ${LBLUE}Keeping it avoids re-downloading archives, but a large cache"
-    echo -e "  can slow the first container start-up depending on your system.${Color_Off}\n"
-
-    while true; do
-        echo -ne "  ${ARROW} Keep cache (K) or Fresh start (F)? [K/F]: "
-        read -r answer < /dev/tty
-        case "$answer" in
-            [Kk]* )
-                echo -e "  ${CHECK_MARK} Keeping existing cache"
-                break ;;
-            [Ff]* )
-                echo -e "  ${INFO_MARK} ${BYellow}Clearing Datastream cache " \
-                        "(sudo may be required)...${Color_Off}"
-                rm -rf "${cache_dir:?}/"* 2>/dev/null || sudo rm -rf "${cache_dir:?}/"*
-                break ;;
-            * )
-                echo -e "  ${CROSS_MARK} ${BRed}Invalid choice. Please enter 'K' or 'F'.${Color_Off}" ;;
-        esac
-    done
-}
 # Print URLs ordered by reliability for the current engine.
 #
 # Under rootless Podman on WSL the Windows browser doesn't reliably route
@@ -979,9 +937,6 @@ if [ -n "$DATA_FOLDER_PATH" ]; then
         exit 1
     }
 fi
-
-# Ask what to do with ~/.datastream_ngiab
-manage_datastream_cache
 
 print_section_header "LAUNCHING TETHYS VISUALIZATION"
 
