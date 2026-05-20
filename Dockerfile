@@ -43,6 +43,10 @@ ENV NPM=${NODE_VERSION_DIR}/bin/npm
 # PDM lives in the tethys conda env; HOME is a dedicated dir owned by www so
 # tool caches (DuckDB, pdm, pip) don't land under /root or pollute the app tree.
 ENV PDM=/opt/conda/envs/tethys/bin/pdm
+# Pin pdm to the conda env's Python so it doesn't make a private .venv under
+# the project. Required when SHELL-based conda activation is stripped (Podman
+# OCI format does this, Docker preserves it).
+ENV PDM_PYTHON=/opt/conda/envs/tethys/bin/python
 ENV HOME=/home/www
 # Required by salt state tethyscore.sls (ownership of /run/asgi, tethys.log).
 ENV NGINX_USER=www
