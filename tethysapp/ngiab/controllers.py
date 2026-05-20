@@ -1,10 +1,14 @@
-from django.http import JsonResponse
-import logging
-import pandas as pd
-import os
 import json
+import logging
+import os
+
 import geopandas as gpd
+import pandas as pd
+import pyproj
+from django.http import JsonResponse
 from tethys_sdk.routing import controller
+
+from .app import App
 from .utils import (
     get_base_output,
     getCatchmentsIds,
@@ -58,12 +62,10 @@ def _teehr_status_for(exc: TeehrWarehouseError):
         return ("TEEHR warehouse appears empty. Run TEEHR to populate it.", "info")
     # Generic fallback
     return ("TEEHR warehouse could not be read.", "error")
-from .app import App
 
-# the following error is fixed with this lines
-# https://stackoverflow.com/a/79163867
-import pyproj
 
+# Avoid pyproj network lookups at runtime (workaround for
+# https://stackoverflow.com/a/79163867).
 pyproj.network.set_network_enabled(False)
 
 
