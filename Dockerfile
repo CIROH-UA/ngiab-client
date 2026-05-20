@@ -13,8 +13,8 @@ ARG MICRO_TETHYS=true \
 #########################
 # ADD APPLICATION FILES #
 #########################
-COPY . ${TETHYS_HOME}/apps/ngiab
-COPY run.sh ${TETHYS_HOME}/run.sh
+COPY --chown=www:www . ${TETHYS_HOME}/apps/ngiab
+COPY --chown=www:www run.sh ${TETHYS_HOME}/run.sh
 
 ###############
 # ENVIRONMENT #
@@ -40,8 +40,18 @@ ENV NODE_PATH=${NODE_VERSION_DIR}/lib/node_modules
 ENV PATH=${NODE_VERSION_DIR}/bin:$PATH
 ENV NPM=${NODE_VERSION_DIR}/bin/npm
 
-ENV PDM="/root/.local/bin/pdm"
+# PDM lives in the tethys conda env; HOME is a dedicated dir owned by www so
+# tool caches (DuckDB, pdm, pip) don't land under /root or pollute the app tree.
+ENV PDM=/opt/conda/envs/tethys/bin/pdm
+ENV HOME=/home/www
+# Required by salt state tethyscore.sls (ownership of /run/asgi, tethys.log).
+ENV NGINX_USER=www
+# Default to a non-privileged port so rootless Podman can bind it.
+ENV NGINX_PORT=8080
 ENV APP_SRC_ROOT=${TETHYS_HOME}/apps/ngiab
+
+# Dedicated HOME for the www user.
+RUN mkdir -p ${HOME} && chown www:www ${HOME}
 
 # SETUP
 RUN mkdir -p ${NVM_DIR} \
@@ -53,9 +63,9 @@ RUN mkdir -p ${NVM_DIR} \
     && ${NODE_VERSION_DIR}/bin/npm install -g npm@latest \
     && ls -la ${NODE_VERSION_DIR} \
     && ls -la ${NODE_VERSION_DIR}/lib \
-    && pip install --user pdm \
-    && ${PDM} self update \
-    && cd ${APP_SRC_ROOT} \ 
+    && /opt/conda/envs/tethys/bin/pip install --no-cache-dir pdm \
+    && test -x ${PDM} \
+    && cd ${APP_SRC_ROOT} \
     && git config --global --add safe.directory '*' \
     && git update-index --assume-unchanged
 
@@ -66,11 +76,8 @@ RUN cd ${APP_SRC_ROOT} \
     && rm -rf node_modules \
     && ${PDM} install --no-editable --production
 
-# Pre-install DuckDB extensions (sqlite, iceberg) at image build time into a
-# shared, world-readable location. The Tethys runtime runs as a non-root user
-# and cannot write to /root/.duckdb/, so we install to /usr/lib/tethys/duckdb_extensions
-# and have teehr_warehouse.py SET home_directory + extension_directory to
-# match. Without this, LOAD sqlite fails at runtime with:
+# Pre-install DuckDB extensions (sqlite, iceberg) into a www-writable, world-readable
+# location. Without this, runtime LOAD sqlite fails with:
 #   IOException: Failed to create directory "/root/.duckdb": Permission denied
 ENV DUCKDB_HOME=${TETHYS_HOME}/duckdb_extensions
 RUN mkdir -p ${DUCKDB_HOME} \
@@ -80,7 +87,40 @@ RUN mkdir -p ${DUCKDB_HOME} \
 
 ADD salt/ /srv/salt/
 
+# Build-time ownership for rootless runtime use.
+# /srv/salt is intentionally NOT chowned to www: salt states are executable
+#   configuration; a runtime user shouldn't be able to mutate them.
+# /run is scoped to /run/supervisor and /run/nginx only.
+USER root
+RUN mkdir -p \
+      ${TETHYS_PERSIST} \
+      ${TETHYS_PERSIST}/ngiab_visualizer \
+      ${TETHYS_LOG} \
+      /run/supervisor \
+      /run/nginx \
+      /var/log/supervisor \
+      /var/log/nginx \
+      /var/lib/nginx \
+      /var/cache/nginx \
+      ${TETHYS_HOME}/duckdb_extensions \
+  && chown -R www:www \
+      ${TETHYS_HOME}/apps/ngiab \
+      ${TETHYS_HOME}/run.sh \
+      ${TETHYS_HOME}/duckdb_extensions \
+      ${TETHYS_PERSIST} \
+      ${TETHYS_LOG} \
+      /run/supervisor \
+      /run/nginx \
+      /var/log/supervisor \
+      /var/log/nginx \
+      /var/lib/nginx \
+      /var/cache/nginx \
+  && chmod 755 ${TETHYS_HOME}/run.sh
+
+EXPOSE 8080
+
 CMD bash run.sh
 
-HEALTHCHECK --start-period=30s --retries=12 \
-    CMD ./liveness-probe.sh
+# Absolute path so this survives WORKDIR changes.
+HEALTHCHECK --start-period=120s --retries=12 \
+    CMD ${TETHYS_HOME}/liveness-probe.sh

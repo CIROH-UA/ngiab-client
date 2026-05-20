@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Required by salt state tethyscore.sls (ownership of /run/asgi and tethys.log).
+export NGINX_USER=www
+
 tail_file() {
   echo "tailing file $1"
   ALIGN=27
@@ -23,16 +26,13 @@ echo_status() {
 
 echo_status "Starting up..."
 
+# Default port banner for users migrating from -p 80:80.
+if [ "${NGINX_PORT:-8080}" = "8080" ]; then
+  echo_status "NGINX_PORT=8080 (default). If you were using -p 80:80, switch to -p 80:8080."
+fi
 
 echo_status "Enforcing start state... (This might take a bit)"
 salt-call --local state.apply
-
-
-# echo_status "Fixing permissions"
-
-chown -R www: /usr/lib/tethys
-chown -R www: /var/log/tethys
-chmod -R 777 /var/lib/nginx
 
 echo_status "Starting supervisor"
 
@@ -44,11 +44,11 @@ echo_status "Done!"
 # Watch Logs
 echo_status "Watching logs. You can ignore errors from either apache (httpd) or nginx depending on which one you are using."
 
-log_files=("httpd/access_log" 
-"httpd/error_log" 
-"nginx/access.log" 
-"nginx/error.log" 
-"supervisor/supervisord.log" 
+log_files=("httpd/access_log"
+"httpd/error_log"
+"nginx/access.log"
+"nginx/error.log"
+"supervisor/supervisord.log"
 "tethys/tethys.log")
 
 # When this exits, exit all background tail processes
