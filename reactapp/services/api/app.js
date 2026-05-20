@@ -27,39 +27,9 @@ const appAPI = {
     getModelRuns: () => {
         return apiClient.get(`${APP_ROOT_URL}getModelRuns/`);
     },
-    // Data Stream API
-    makeDatastreamConf:()   => {
-        return apiClient.get(`${APP_ROOT_URL}makeDatastreamConf/`);
-    },
-    getDataStreamNgiabDates: () => {
-        return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabDates/`);
-    },
-    getDataStreamNgiabAvailableForecast: (params) => {
-        return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabAvailableForecast/`, { params });
-    },
-    getDataStreamNgiabAvailableCycles: (params) => {
-        return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabAvailableCycles/`, { params });
-    },
-    getDataStreamNgiabAvailableEnsembles:(params) => {
-        return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabAvailableEnsembles/`, { params });
-    },
-    getDataStreamNgiabAvailableVpus: (params) => {
-        return apiClient.get(`${APP_ROOT_URL}getDataStreamNgiabAvailableVpus/`, { params });
-    },
-    getDataStreamTarFile: (params) => {
-        return apiClient.get(`${APP_ROOT_URL}getDataStreamTarFile/`, { params });
-    },
-    checkForTarFile: (params) => {
-        return apiClient.get(`${APP_ROOT_URL}checkForTarFile/`, { params });
-    },
-    getDataStreamModelRuns: (params) => {
-        return apiClient.get(`${APP_ROOT_URL}getDataStreamModelRuns/`, { params });
-    },
     importModelRuns: (params) => {
         return apiClient.get(`${APP_ROOT_URL}importModelRuns/`, { params });
     }
-    
-
 
 }
  

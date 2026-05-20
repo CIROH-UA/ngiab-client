@@ -1,4 +1,4 @@
-# NGIAB Output and Datastream Visualizer
+# NGIAB Output Visualizer
 
 | | |
 | --- | --- |
@@ -37,7 +37,7 @@ Checking for ~/ngiab_visualizer/ngiab_visualizer.json...
 
 You should be able to see multiple outputs through the UI:
 
-![Figure 2: NGIAB Visualizer dropdown for multiple outputs ](static/imgs/fig6-2.png){alt='A screenshot of the  NGIAB and DataStream Visualizer web interface. The map displays the ability of the visualizer to use multiple outputs'}
+![Figure 2: NGIAB Visualizer dropdown for multiple outputs ](static/imgs/fig6-2.png){alt='A screenshot of the  NGIAB Visualizer web interface. The map displays the ability of the visualizer to use multiple outputs'}
 
 #### Visualizer Directory Organization
 
@@ -100,7 +100,7 @@ The user can then run `./ViewOnTethys.sh` script to spin again the container or 
 
 ### Unassisted Usage
 
-First create the `MODELS_RUNS_DIRECTORY` directory at `"$HOME/ngiab_visualizer"`, and `DATASTREAM_DIRECTORY`directory at `"$HOME/.datastream_ngiab"`, and `VISUALIZER_CONF`file at `"$MODELS_RUNS_DIRECTORY/ngiab_visualizer.json"`
+First create the `MODELS_RUNS_DIRECTORY` directory at `"$HOME/ngiab_visualizer"` and `VISUALIZER_CONF` file at `"$MODELS_RUNS_DIRECTORY/ngiab_visualizer.json"`.
 
 Copy your `my-ngen-output` into the `MODELS_RUNS_DIRECTORY` directory, and then edit the `"$MODELS_RUNS_DIRECTORY/ngiab_visualizer.json"` fie and add the your output as below.
 
@@ -130,7 +130,6 @@ export TETHYS_CONTAINER_NAME="tethys-ngen-portal"        \
        TETHYS_TAG="latest"                               \
        NGINX_PORT=80                                     \
        MODELS_RUNS_DIRECTORY="$HOME/ngiab_visualizer"    \
-       DATASTREAM_DIRECTORY="$HOME/.datastream_ngiab"    \
        VISUALIZER_CONF="$MODELS_RUNS_DIRECTORY/ngiab_visualizer.json" \
        TETHYS_PERSIST_PATH="/var/lib/tethys_persist"     \
        SKIP_DB_SETUP=false                               \
@@ -141,13 +140,11 @@ export TETHYS_CONTAINER_NAME="tethys-ngen-portal"        \
 ```bash
 docker run --rm -d \
   -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer" \
-  -v "$DATASTREAM_DIRECTORY:$TETHYS_PERSIST_PATH/.datastream_ngiab" \
   -p "$NGINX_PORT:$NGINX_PORT" \
   --name "$TETHYS_CONTAINER_NAME" \
   -e MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
   -e MEDIA_URL="/media/" \
   -e SKIP_DB_SETUP="$SKIP_DB_SETUP" \
-  -e DATASTREAM_CONF="$TETHYS_PERSIST_PATH/.datastream_ngiab" \
   -e VISUALIZER_CONF="$TETHYS_PERSIST_PATH/ngiab_visualizer/ngiab_visualizer.json" \
   -e NGINX_PORT="$NGINX_PORT" \
   -e CSRF_TRUSTED_ORIGINS="$CSRF_TRUSTED_ORIGINS" \
@@ -181,7 +178,6 @@ podman build --format docker -t ngiab-visualizer:latest .
 podman run --rm -d \
   --userns=keep-id:uid=1011 \
   -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer:Z" \
-  -v "$DATASTREAM_DIRECTORY:$TETHYS_PERSIST_PATH/.datastream_ngiab:Z" \
   -p "8080:8080" \
   --name "$TETHYS_CONTAINER_NAME" \
   -e NGINX_PORT="8080" \
@@ -190,7 +186,6 @@ podman run --rm -d \
   -e MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
   -e MEDIA_URL="/media/" \
   -e SKIP_DB_SETUP="false" \
-  -e DATASTREAM_CONF="$TETHYS_PERSIST_PATH/.datastream_ngiab" \
   -e VISUALIZER_CONF="$TETHYS_PERSIST_PATH/ngiab_visualizer/ngiab_visualizer.json" \
   ngiab-visualizer:latest
 ```
@@ -203,56 +198,23 @@ The `viewOnTethys.sh` launcher in [`NGIAB-CloudInfra`](https://github.com/CIROH-
 
 **Nexus** points can be visualized when the user selects the output that wants to visualize. Time series can be retrieved by clicking on any of the **Nexus** points, or by changing the select dropdown assigned to the Nexus. 
 
-![Figure 3: NGIAB Visualizer time series visualization from Nexus points](static/imgs/fig6-3.png){alt='A screenshot of the  NGIAB and DataStream Visualizer web interface. The map displays the ability of the visualizer to retrieve time series from Nexus points'}
+![Figure 3: NGIAB Visualizer time series visualization from Nexus points](static/imgs/fig6-3.png){alt='A screenshot of the  NGIAB Visualizer web interface. The map displays the ability of the visualizer to retrieve time series from Nexus points'}
 
 **Troute**  variables time series can also be displayed using the **Troute** select dropdown.
 
-![Figure 4: NGIAB Visualizer time series visualization from Troute variables](static/imgs/fig6-4.png){alt='A screenshot of the NGIAB and DataStream Visualizer web interface. The map displays the ability of the visualizer to retrieve time series from Troute variables'}
+![Figure 4: NGIAB Visualizer time series visualization from Troute variables](static/imgs/fig6-4.png){alt='A screenshot of the NGIAB Visualizer web interface. The map displays the ability of the visualizer to retrieve time series from Troute variables'}
 
 **Catchments** time series can be retrieved by clicking on any of the **Catchments** polygons, or by changing the select dropdown assigned to the Catchments.
 
-![Figure 5: NGIAB Visualizer time series visualization for Catchments](static/imgs/fig6-5.png){alt='A screenshot of the  NGIAB and DataStream Visualizer web interface. The map displays the ability of the visualizer to retrieve time series from Catchments variables'}
+![Figure 5: NGIAB Visualizer time series visualization for Catchments](static/imgs/fig6-5.png){alt='A screenshot of the  NGIAB Visualizer web interface. The map displays the ability of the visualizer to retrieve time series from Catchments variables'}
 
 **TEEHR** evaluation can be visualized when the user hits a point that contains **TEEHR** evaluation output, the user can also look at a **Nexus** point on the dropdown assigned and enter the id of the **Nexus** points that contains **TEEHR** evaluation output.
 
-![Figure 6: A map showing the geospatial visualization using the Data Visualizer within the Tethys framework for a selected outlet nexus point as well as displaying a time series plot between observed (labeled "USGS"; blue line) and simulated (labeled "ngen"; orange line)](static/imgs/fig6-6.png){alt='alt='A screenshot of the  NGIAB and DataStream Visualizer web interface. The left panel contains a "Time Series Menu" where the user can select a Nexus ID, variable (e.g., flow), and TEEHR data source. A map in the center displays a stream reach with a highlighted section representing the drainage basin and a blue point, indicating the selected nexus location. Below the map, a time series plot compares USGS (blue line) and Ngen (orange line) streamflow data from 2017 to 2023.'}
+![Figure 6: A map showing the geospatial visualization using the Data Visualizer within the Tethys framework for a selected outlet nexus point as well as displaying a time series plot between observed (labeled "USGS"; blue line) and simulated (labeled "ngen"; orange line)](static/imgs/fig6-6.png){alt='alt='A screenshot of the  NGIAB Visualizer web interface. The left panel contains a "Time Series Menu" where the user can select a Nexus ID, variable (e.g., flow), and TEEHR data source. A map in the center displays a stream reach with a highlighted section representing the drainage basin and a blue point, indicating the selected nexus location. Below the map, a time series plot compares USGS (blue line) and Ngen (orange line) streamflow data from 2017 to 2023.'}
 
 Similarly, a **TEEHR** evaluation metric can be visualized by going to the metrics tab
 
-[Figure 7: NGIAB Visualizer performance metrics (KGE, NSE, and relative bias). The Visualizer can also show the performance of the NWM 3.0 compared to the observed time series.](static/imgs/fig6-7.png){alt='A screenshot of the  NGIAB and DataStream Visualizer web interface. The map displays the ability of the visualizer to retrieve the TEEHR metrics on a table."Teehr Metrics" presents performance metrics (e.g., Kling-Gupta Efficiency, Nash-Sutcliffe Efficiency, and Relative Bias) for the selected model versus reference data.'}
-
-### DataStream Integration
-
-The Visualizer also allows the user to download data as well from an [S3 bucket](https://datastream.ciroh.org/index.html) containing the output of the [NextGen DataStream](https://github.com/CIROH-UA/ngen-datastream). The `ViewOnTethys.sh` script will create a `~/.datastream_ngiab` directory in which it saves all the different outputs downloaded by the visualizer. It will also create a `~/.datastream_ngiab/datastream_ngiab.json` in which metadata will be saved to locate the downloaded output directories. It serves as a cache, so it allows the user to look first at the `~/.datastream_ngiab` before trying to download the data
-
-```bash
-ℹ Reclaiming ownership of /home/aquagio/.datastream_ngiab  (sudo may prompt)...
-  ℹ No existing Datastream cache found - a fresh download will be used.
-```
-
-The `.datastream_ngiab.json` appends the different downloads with metadata that allows the user to know the file being downloaded. The `prefix` belongs to the path on the s3 bucket. The `label` is created with the following format: `ngen.<date>_<forecast_type>_<cycle>_<VPU>`
-
-```json
-{
-    "datastream": [
-        {
-            "label": "ngen.20250522_medium_range_06_VPU_02",
-            "bucket": "ciroh-community-ngen-datastream",
-            "prefix": "v2.2/ngen.20250522/medium_range/06/VPU_02/ngen-run.tar.gz",
-            "path": "/var/lib/tethys_persist/.datastream_ngiab/ngen.20250522_medium_range_06_VPU_02",
-            "date": "2021-01-01:00:00:00",
-            "id": "15145d327f19426b890e4465160f963a"
-        }
-    ]
-}
-```
-
-> **_NOTE:_** assuming only the first ensemble. If we are specific it will look like this: `ngen.<date>_<forecast_type>_<cycle>_<ensemble>_<VPU>`
-
-This functionality allows the user to be able to quicklu search the data they want from the [S3 bucket](https://datastream.ciroh.org/index.html) containing the output of the [NextGen DataStream](https://github.com/CIROH-UA/ngen-datastream). They can explore and download as needed.
-
-
-![Figure 8: NGIAB Visualizer Visualization of DataStream Data](static/imgs/fig6-8.png){alt='A screenshot of the  NGIAB and DataStream Visualizer web interface displaying the hydrofabric for DataStream output'}
+[Figure 7: NGIAB Visualizer performance metrics (KGE, NSE, and relative bias). The Visualizer can also show the performance of the NWM 3.0 compared to the observed time series.](static/imgs/fig6-7.png){alt='A screenshot of the  NGIAB Visualizer web interface. The map displays the ability of the visualizer to retrieve the TEEHR metrics on a table."Teehr Metrics" presents performance metrics (e.g., Kling-Gupta Efficiency, Nash-Sutcliffe Efficiency, and Relative Bias) for the selected model versus reference data.'}
 
 ## Development Installation
 
