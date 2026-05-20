@@ -163,7 +163,41 @@ docker ps
 
 Access at: http://localhost:80
 
+### Running with rootless Podman
 
+The image is also compatible with rootless Podman (no `sudo` required). The main differences vs. Docker:
+
+- Use port `8080` (rootless cannot bind privileged ports < 1024). Set `NGINX_PORT=8080`.
+- Pass `--userns=keep-id:uid=1011` so files written by the container's `www` user (UID 1011 in the Tethys base image) appear with the invoking user's UID on the host.
+- Append `:Z` to bind mounts on SELinux-enforcing hosts (RHEL, Fedora, Rocky, etc.).
+- Build with `--format docker` so the `HEALTHCHECK` directive is preserved (Podman's default OCI format strips it).
+- Wrap `ALLOWED_HOSTS` in literal outer double-quotes so the value survives the salt-state shell rendering inside the container.
+
+```bash
+# Build (Docker format so HEALTHCHECK is preserved)
+podman build --format docker -t ngiab-visualizer:latest .
+
+# Run
+podman run --rm -d \
+  --userns=keep-id:uid=1011 \
+  -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer:Z" \
+  -v "$DATASTREAM_DIRECTORY:$TETHYS_PERSIST_PATH/.datastream_ngiab:Z" \
+  -p "8080:8080" \
+  --name "$TETHYS_CONTAINER_NAME" \
+  -e NGINX_PORT="8080" \
+  -e ALLOWED_HOSTS='"[localhost, 127.0.0.1, <your-host-ip>]"' \
+  -e CSRF_TRUSTED_ORIGINS='["http://localhost:8080","http://127.0.0.1:8080","http://<your-host-ip>:8080"]' \
+  -e MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
+  -e MEDIA_URL="/media/" \
+  -e SKIP_DB_SETUP="false" \
+  -e DATASTREAM_CONF="$TETHYS_PERSIST_PATH/.datastream_ngiab" \
+  -e VISUALIZER_CONF="$TETHYS_PERSIST_PATH/ngiab_visualizer/ngiab_visualizer.json" \
+  ngiab-visualizer:latest
+```
+
+> **WSL note:** Windows browsers reach rootless Podman containers via the WSL VM's IP (e.g. `172.x.x.x`), not via `localhost`. Find it with `ip -4 addr show eth0` and use that address in `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS` above.
+
+The `viewOnTethys.sh` launcher in [`NGIAB-CloudInfra`](https://github.com/CIROH-UA/NGIAB-CloudInfra) handles all of this automatically when invoked with `-p`.
 
 ###  Visualization Features 
 
