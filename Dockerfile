@@ -1,6 +1,15 @@
 
 FROM tethysplatform/tethys-core:dev-py3.12-dj5.2
 
+# Upgrade vulnerable system packages from the base image. Surgical -- only
+# the packages flagged by the image scan, no full dist-upgrade.
+USER root
+RUN apt-get update \
+ && apt-get install -y --only-upgrade --no-install-recommends \
+        libgnutls30t64 libsystemd0 libudev1 sed \
+ && apt-get -y clean \
+ && rm -rf /var/lib/apt/lists/*
+
 
 ###################
 # BUILD ARGUMENTS #
