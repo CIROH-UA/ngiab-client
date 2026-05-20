@@ -21,14 +21,14 @@ Built on the Tethys Platform [(Swain et al., 2015)](https://doi.org/10.1016/j.en
 
 Like TEEHR, the Data Visualizer can be activated upon execution of the main NGIAB guide script, `guide.sh`. A separate `viewOnTethys.sh` script is also available in the NGIAB-CloudInfra repository.
 
-Once a run is complete, users can launch the Data Visualizer through their web browser when prompted by the guide script. Although TEEHR’s outputs can be displayed within the Data Visualizer, this tool is primarily designed to provide a broad overview of model results. Users seeking TEEHR’s more advanced analysis features can still access them outside the Data Visualizer.
+Once a run is complete, users can launch the Data Visualizer through their web browser when prompted by the guide script. Although TEEHR's outputs can be displayed within the Data Visualizer, this tool is primarily designed to provide a broad overview of model results. Users seeking TEEHR's more advanced analysis features can still access them outside the Data Visualizer.
 
 One of the advantages of the `viewOnTethys.sh` script is that it allows the user to keep multiple outputs for the same hydrofabric. It prompts the user if they want to use the same output directory by renaming it and adding it to the collection of outputs or if they want to overwrite it.
 
 ```bash
   ⚠ ~/ngiab_visualizer is not empty.
   → Keep (K) or Fresh start (F)? [K/F]: k
-ℹ Reclaiming ownership of ~/ngiab_visualizer  (sudo may prompt)…
+ℹ Reclaiming ownership of ~/ngiab_visualizer  (sudo may prompt)...
   ⚠ Directory exists: ~/ngiab_visualizer/gage-10154200
   → Overwrite (O) or Duplicate (D)? [O/D]: o
   ✓ Overwritten ➜ ~/ngiab_visualizer/gage-10154200
@@ -163,7 +163,41 @@ docker ps
 
 Access at: http://localhost:80
 
+### Running with rootless Podman
 
+The image is also compatible with rootless Podman (no `sudo` required). The main differences vs. Docker:
+
+- Use port `8080` (rootless cannot bind privileged ports < 1024). Set `NGINX_PORT=8080`.
+- Pass `--userns=keep-id:uid=1011` so files written by the container's `www` user (UID 1011 in the Tethys base image) appear with the invoking user's UID on the host.
+- Append `:Z` to bind mounts on SELinux-enforcing hosts (RHEL, Fedora, Rocky, etc.).
+- Build with `--format docker` so the `HEALTHCHECK` directive is preserved (Podman's default OCI format strips it).
+- Wrap `ALLOWED_HOSTS` in literal outer double-quotes so the value survives the salt-state shell rendering inside the container.
+
+```bash
+# Build (Docker format so HEALTHCHECK is preserved)
+podman build --format docker -t ngiab-visualizer:latest .
+
+# Run
+podman run --rm -d \
+  --userns=keep-id:uid=1011 \
+  -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer:Z" \
+  -v "$DATASTREAM_DIRECTORY:$TETHYS_PERSIST_PATH/.datastream_ngiab:Z" \
+  -p "8080:8080" \
+  --name "$TETHYS_CONTAINER_NAME" \
+  -e NGINX_PORT="8080" \
+  -e ALLOWED_HOSTS='"[localhost, 127.0.0.1, <your-host-ip>]"' \
+  -e CSRF_TRUSTED_ORIGINS='["http://localhost:8080","http://127.0.0.1:8080","http://<your-host-ip>:8080"]' \
+  -e MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
+  -e MEDIA_URL="/media/" \
+  -e SKIP_DB_SETUP="false" \
+  -e DATASTREAM_CONF="$TETHYS_PERSIST_PATH/.datastream_ngiab" \
+  -e VISUALIZER_CONF="$TETHYS_PERSIST_PATH/ngiab_visualizer/ngiab_visualizer.json" \
+  ngiab-visualizer:latest
+```
+
+> **WSL note:** Windows browsers reach rootless Podman containers via the WSL VM's IP (e.g. `172.x.x.x`), not via `localhost`. Find it with `ip -4 addr show eth0` and use that address in `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS` above.
+
+The `viewOnTethys.sh` launcher in [`NGIAB-CloudInfra`](https://github.com/CIROH-UA/NGIAB-CloudInfra) handles all of this automatically when invoked with `-p`.
 
 ###  Visualization Features 
 
@@ -181,7 +215,7 @@ Access at: http://localhost:80
 
 **TEEHR** evaluation can be visualized when the user hits a point that contains **TEEHR** evaluation output, the user can also look at a **Nexus** point on the dropdown assigned and enter the id of the **Nexus** points that contains **TEEHR** evaluation output.
 
-![Figure 6: A map showing the geospatial visualization using the Data Visualizer within the Tethys framework for a selected outlet nexus point as well as displaying a time series plot between observed (labeled “USGS”; blue line) and simulated (labeled “ngen”; orange line)](static/imgs/fig6-6.png){alt='alt='A screenshot of the  NGIAB and DataStream Visualizer web interface. The left panel contains a "Time Series Menu" where the user can select a Nexus ID, variable (e.g., flow), and TEEHR data source. A map in the center displays a stream reach with a highlighted section representing the drainage basin and a blue point, indicating the selected nexus location. Below the map, a time series plot compares USGS (blue line) and Ngen (orange line) streamflow data from 2017 to 2023.'}
+![Figure 6: A map showing the geospatial visualization using the Data Visualizer within the Tethys framework for a selected outlet nexus point as well as displaying a time series plot between observed (labeled "USGS"; blue line) and simulated (labeled "ngen"; orange line)](static/imgs/fig6-6.png){alt='alt='A screenshot of the  NGIAB and DataStream Visualizer web interface. The left panel contains a "Time Series Menu" where the user can select a Nexus ID, variable (e.g., flow), and TEEHR data source. A map in the center displays a stream reach with a highlighted section representing the drainage basin and a blue point, indicating the selected nexus location. Below the map, a time series plot compares USGS (blue line) and Ngen (orange line) streamflow data from 2017 to 2023.'}
 
 Similarly, a **TEEHR** evaluation metric can be visualized by going to the metrics tab
 
@@ -192,8 +226,8 @@ Similarly, a **TEEHR** evaluation metric can be visualized by going to the metri
 The Visualizer also allows the user to download data as well from an [S3 bucket](https://datastream.ciroh.org/index.html) containing the output of the [NextGen DataStream](https://github.com/CIROH-UA/ngen-datastream). The `ViewOnTethys.sh` script will create a `~/.datastream_ngiab` directory in which it saves all the different outputs downloaded by the visualizer. It will also create a `~/.datastream_ngiab/datastream_ngiab.json` in which metadata will be saved to locate the downloaded output directories. It serves as a cache, so it allows the user to look first at the `~/.datastream_ngiab` before trying to download the data
 
 ```bash
-ℹ Reclaiming ownership of /home/aquagio/.datastream_ngiab  (sudo may prompt)…
-  ℹ No existing Datastream cache found – a fresh download will be used.
+ℹ Reclaiming ownership of /home/aquagio/.datastream_ngiab  (sudo may prompt)...
+  ℹ No existing Datastream cache found - a fresh download will be used.
 ```
 
 The `.datastream_ngiab.json` appends the different downloads with metadata that allows the user to know the file being downloaded. The `prefix` belongs to the path on the s3 bucket. The `label` is created with the following format: `ngen.<date>_<forecast_type>_<cycle>_<VPU>`
