@@ -34,6 +34,13 @@ fi
 echo_status "Enforcing start state... (This might take a bit)"
 salt-call --local state.apply
 
+# salt-call runs as root and creates the SQLite DB + portal_config.yml owned
+# by root. Hand them to www, plus the parent dir so SQLite can create its
+# journal/WAL siblings. Non-recursive: existing root-owned scripts stay root.
+if [ -f "${TETHYS_HOME}/tethys_platform.sqlite" ]; then
+  chown www:www "${TETHYS_HOME}" "${TETHYS_HOME}/tethys_platform.sqlite"* 2>/dev/null || true
+fi
+
 echo_status "Starting supervisor"
 
 # Start Supervisor
