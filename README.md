@@ -197,6 +197,13 @@ podman run --rm -d \
 
 > **WSL note:** Windows browsers reach rootless Podman containers via the WSL VM's IP (e.g. `172.x.x.x`), not via `localhost`. Find it with `ip -4 addr show eth0` and use that address in `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS` above.
 
+> **Apple Silicon (M1/M2/M3) note:** the published image is multi-arch (`linux/amd64` + `linux/arm64`), but Podman pulls whichever variant matches the `podman machine` VM. If the VM is amd64, daphne runs under QEMU and crash-loops on a SIGSEGV inside Python (symptoms: container goes `unhealthy`, nginx returns `502`). Rebuild the VM as arm64:
+> ```bash
+> podman machine stop && podman machine rm && podman machine init && podman machine start
+> podman rmi docker.io/awiciroh/tethys-ngiab:latest 2>/dev/null
+> ./viewOnTethys.sh -p
+> ```
+
 The `viewOnTethys.sh` launcher in [`NGIAB-CloudInfra`](https://github.com/CIROH-UA/NGIAB-CloudInfra) handles all of this automatically when invoked with `-p`.
 
 ###  Visualization Features 
