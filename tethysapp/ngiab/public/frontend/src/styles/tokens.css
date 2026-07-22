@@ -1,0 +1,10 @@
+:root {
+  --bg: #ffffff;
+  --fg: #1b1b1b;
+  --accent: #1f78b4;
+}
+:root[data-theme="dark"] {
+  --bg: #1b1f24;
+  --fg: #e9ecef;
+  --accent: #4f9fd6;
+}

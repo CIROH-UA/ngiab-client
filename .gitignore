@@ -38,7 +38,6 @@ build/*
 
 # Node/React
 node_modules*
-tethysapp/ngiab/public/frontend/
 reactapp/config/production.env
 coverage
 

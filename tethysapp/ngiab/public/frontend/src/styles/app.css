@@ -1,0 +1,4 @@
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; }
+.app-header { padding: 0.5rem 1rem; font-weight: 600; border-bottom: 1px solid var(--accent); }
+.app-main { padding: 1rem; }
