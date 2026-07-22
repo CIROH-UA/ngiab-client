@@ -157,6 +157,9 @@ non-DOM units.) The test runner is a dev-only dependency and does not affect how
 - Searchable-select replacement (native vs minimal build vs vendored Tom Select) - decide in Phase 1.
 - Static base URL under Tethys for module + import-map resolution - proven in Phase 0 before feature work.
 - Vendored ESM deps are updated manually (no npm-driven bumps); record versions in `vendor/`.
+- Vendoring makes the **code** offline-capable, but true air-gapped operation is not yet achieved:
+  the basemap style JSON and `merged.pmtiles` are still fetched from S3 at runtime (`mapgl.js`).
+  Localizing those tiles/styles is a **separate follow-up**, out of scope for this migration.
 - No minification/tree-shaking → larger transferred JS. Acceptable for the local/single-container use
   case; if a bandwidth-sensitive hosted deploy ever needs it, add an optional one-shot minify step
   (the only reason to reintroduce a build).
