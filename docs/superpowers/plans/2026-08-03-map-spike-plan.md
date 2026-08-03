@@ -193,8 +193,6 @@ include.** Omit it and `{% static tethys_app|public:'…' %}` fails or renders e
 
 <div id="map-panel">
   <label><input type="checkbox" id="toggle-theme" /> dark basemap</label>
-  <label><input type="checkbox" id="toggle-cluster" /> cluster nexus points</label>
-  <label><input type="checkbox" id="toggle-nexus" /> hide nexus</label>
   <label><input type="checkbox" id="toggle-catchments" /> hide catchments</label>
   <div id="map-status">loading…</div>
 </div>
@@ -203,8 +201,14 @@ include.** Omit it and `{% static tethys_app|public:'…' %}` fails or renders e
 <script type="module" src="{% static tethys_app|public:'frontend/map.js' %}"></script>
 ```
 
-The four checkboxes exist so you can exercise every branch the React component had — theme swap and
-cluster toggle are precisely the two paths that break if `installLayers` isn't idempotent.
+The two checkboxes exist so you can exercise the paths that would otherwise go untested — the theme
+swap in particular is what breaks if `installLayers` isn't idempotent.
+
+> **Scope change (2026-08-03):** the nexus layers are gone, and so are the cluster/hide-nexus
+> toggles that drove them. `merged.pmtiles` is replaced by two geometry-only archives —
+> `divides.pmtiles` for catchments and `flowpaths.pmtiles` for lines, both under
+> `map/only_geometry/upstream_index/`. Tasks 4–6 below still describe the earlier nexus-bearing
+> version; `public/frontend/map.js` is the current source of truth.
 
 `#map` is absolutely positioned to fill its containing block, so whatever wrapper the parent puts it
 in needs `position: relative` and a real height — Task 3 handles that.

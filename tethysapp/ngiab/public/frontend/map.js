@@ -1,19 +1,35 @@
-// Vanilla MapLibre port of reactapp/features/Map/components/mapgl.js
+// Vanilla MapLibre map for the NGIAB visualizer.
+// Ported from reactapp/features/Map/components/mapgl.js, with the nexus layers removed and
+// the single merged.pmtiles archive replaced by two geometry-only archives.
 //
-// Spike scope: module-local state and plain fetch, so this file depends on nothing from the
-// Phase 0 scaffold. When it becomes <ngiab-map>, `state` turns into store subscriptions and
-// onSelect() turns into store actions; the layer specs, install/refresh, and click handling
-// port across unchanged.
+// Notes carried over from the port (see docs/superpowers/plans/2026-08-03-map-spike-plan.md):
+//   - setStyle() destroys every custom source and layer, so installLayers() is idempotent and
+//     re-runs after each style swap.
+//   - Layer-scoped hover listeners live on the map, not the style, so they attach exactly once.
 //
-// See docs/superpowers/plans/2026-08-03-map-spike-plan.md for what react-map-gl was doing
-// implicitly. The short version:
-//   1. The React layer configs say source:'hydrofabric', but react-map-gl overwrites that with
-//      the parent <Source id="conus">. 'conus' is the real id.
-//   2. setStyle() destroys every custom source and layer, so installLayers() is idempotent and
-//      re-runs after each style swap.
-//   3. `cluster` is a source construction option, so toggling it rebuilds the source.
-//   4. addSource() rejects data:null, so the geojson source is seeded with an empty
-//      FeatureCollection.
+// ---------------------------------------------------------------------------
+// SOURCE DATA — verified against the archives' pmtiles metadata on 2026-08-03
+//
+//   divides.pmtiles    source-layer "divides"    zoom 4-10
+//                      fields: toid, upstream_id, num_upstreams          (all Number)
+//   flowpaths.pmtiles  source-layer "flowpaths"  zoom 1-10
+//                      fields: divide_id, toid, upstream_id, order, num_upstreams  (all Number)
+//
+// Two consequences, both different from the old merged.pmtiles:
+//
+//   1. IDS ARE NUMERIC. The API returns prefixed strings ("cat-1234"); these tiles store bare
+//      numbers. Everything from the API is run through toNumericIds() before it reaches a filter.
+//
+//   2. "divides" HAS NO divide_id PROPERTY. Only toid / upstream_id / num_upstreams. The likely
+//      reason is that divide_id was promoted to the vector-tile feature id (tippecanoe's
+//      --use-attribute-for-id removes the attribute when it promotes it), which also explains why
+//      "flowpaths" still carries divide_id as a property but "divides" does not. So catchments are
+//      filtered and identified by feature id via the ['id'] expression.
+//
+//      ⚠ If catchments render blank, this assumption is wrong. See CATCHMENT_KEY below — it is a
+//      one-line change. To find the truth, click where a catchment should be and read the console:
+//      the click handler logs the raw feature id and properties.
+// ---------------------------------------------------------------------------
 
 import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
@@ -25,74 +41,94 @@ const STYLE_URLS = {
   light: 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/light-style.json',
   dark: 'https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/styles/dark-style.json',
 };
-const PMTILES_URL =
-  'pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/merged.pmtiles';
 
-const SRC_CONUS = 'conus';
-const SRC_NEXUS = 'nexus-points';
+const PMTILES_BASE =
+  'pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/only_geometry/upstream_index/';
+const DIVIDES_URL = `${PMTILES_BASE}divides.pmtiles`;
+const FLOWPATHS_URL = `${PMTILES_BASE}flowpaths.pmtiles`;
 
-const EMPTY_FC = { type: 'FeatureCollection', features: [] };
+// MapLibre source ids (ours) and the source-layer names inside each archive (theirs).
+const SRC_DIVIDES = 'divides';
+const SRC_FLOWPATHS = 'flowpaths';
+const LAYER_DIVIDES = 'divides';
+const LAYER_FLOWPATHS = 'flowpaths';
 
-// Layers this module owns. NEXUS_LAYERS is also the teardown list for the cluster toggle.
-const NEXUS_LAYERS = [
-  'all-points',
-  'clusters',
-  'cluster-count',
-  'unclustered-point',
-  'nexus-highlight',
-];
+// How a catchment is identified in the "divides" layer.
+//   'id'        -> the vector-tile feature id, matched with the ['id'] expression (current guess)
+//   any string  -> a property name, e.g. 'divide_id' or 'upstream_id'
+const CATCHMENT_KEY = 'id';
+
 // Layers whose visibility follows state.catchmentHidden.
 const CATCHMENT_LAYERS = ['catchments-layer', 'catchment-highlight'];
-// Layers that must stay above the CONUS fills, in back-to-front order.
-const TOP_LAYERS = [
-  'clusters',
-  'unclustered-point',
-  'cluster-count',
-  'all-points',
-  'nexus-highlight',
-  'catchment-highlight',
-];
+// Must stay above the catchment fill.
+const TOP_LAYERS = ['flowpaths-layer', 'catchment-highlight'];
 
 // ---------------------------------------------------------------------------
 // State — becomes the global store in <ngiab-map>
 // ---------------------------------------------------------------------------
 const state = {
   theme: 'light',
-  clustered: false,
-  nexusHidden: false,
   catchmentHidden: false,
-  selectedNexusId: null,
-  selectedCatchmentId: null,
-  nexusPoints: EMPTY_FC,
-  catchmentIds: [],
-  flowPathIds: [],
-  nexusIds: [],
+  selectedCatchmentId: null, // numeric, to match the tiles
+  catchmentIds: [], // numeric
 };
 
 const isDark = () => state.theme === 'dark';
 
-// Global, not per-map. The React version registered this inside a useEffect keyed on
-// [theme, base_model_id], so it re-registered on every theme and model-run change.
+// Global, not per-map.
 maplibregl.addProtocol('pmtiles', new Protocol({ metadata: true }).tile);
 
 // ---------------------------------------------------------------------------
-// Layer specs — the useMemo blocks as plain functions of state
+// Filters
 // ---------------------------------------------------------------------------
 
-// Legacy 'in' filter, matching the React version. An empty id list still has to produce a
-// filter that matches nothing, or the layer would render all of CONUS.
-const inFilter = (key, ids) =>
-  ids && ids.length ? ['any', ['in', key, ...ids]] : ['any', ['in', key, '']];
+// "cat-1234" | "1234" | 1234 -> 1234. Anything unparseable is dropped rather than silently
+// becoming NaN, which would never match and would be invisible to debug.
+function toNumericIds(ids) {
+  if (!Array.isArray(ids)) return [];
+  const out = [];
+  for (const raw of ids) {
+    const n = typeof raw === 'number' ? raw : Number(String(raw).replace(/^\D+/, ''));
+    if (Number.isFinite(n)) out.push(n);
+  }
+  return out;
+}
+
+// The left-hand side of a catchment comparison: the feature id, or a property lookup.
+const catchmentRef = () => (CATCHMENT_KEY === 'id' ? ['id'] : ['get', CATCHMENT_KEY]);
+
+// 'in' over a literal array is the modern form and evaluates far faster than the legacy
+// ['any', ['in', key, ...ids]] the React version used with thousands of ids.
+const catchmentSetFilter = () =>
+  state.catchmentIds.length
+    ? ['in', catchmentRef(), ['literal', state.catchmentIds]]
+    : ['==', catchmentRef(), -1]; // match nothing
+
+const catchmentHighlightFilter = () =>
+  state.selectedCatchmentId == null
+    ? ['==', catchmentRef(), -1]
+    : ['==', catchmentRef(), state.selectedCatchmentId];
+
+// Flowpaths carry divide_id as a real property, so they are filtered to the same catchment set.
+// The old flow_paths_ids payload (nexus "toid" values) is no longer used — flowpath and divide
+// are 1:1 in the hydrofabric, so this selects the same lines without a second id list.
+const flowPathsFilter = () =>
+  state.catchmentIds.length
+    ? ['in', ['get', 'divide_id'], ['literal', state.catchmentIds]]
+    : ['==', ['get', 'divide_id'], -1];
 
 const visibility = (hidden) => ({ visibility: hidden ? 'none' : 'visible' });
 
+// ---------------------------------------------------------------------------
+// Layer specs
+// ---------------------------------------------------------------------------
 function catchmentsSpec() {
   return {
     id: 'catchments-layer',
     type: 'fill',
-    source: SRC_CONUS,
-    'source-layer': 'conus_divides',
-    filter: inFilter('divide_id', state.catchmentIds),
+    source: SRC_DIVIDES,
+    'source-layer': LAYER_DIVIDES,
+    filter: catchmentSetFilter(),
     paint: {
       'fill-color': isDark() ? 'rgba(238, 51, 119, 0.316)' : 'rgba(91, 44, 111, 0.316)',
       'fill-outline-color': isDark() ? 'rgba(238, 51, 119, 0.7)' : 'rgba(91, 44, 111, 0.7)',
@@ -102,46 +138,12 @@ function catchmentsSpec() {
   };
 }
 
-function flowPathsSpec() {
-  return {
-    id: 'flowpaths-layer',
-    type: 'line',
-    source: SRC_CONUS,
-    'source-layer': 'conus_flowpaths',
-    filter: inFilter('id', state.flowPathIds),
-    paint: {
-      'line-color': isDark() ? '#0077bb' : '#000000',
-      'line-width': { stops: [[7, 1], [10, 2]] },
-      'line-opacity': { stops: [[7, 0], [11, 1]] },
-    },
-  };
-}
-
-function gaugesSpec() {
-  return {
-    id: 'gauges-layer',
-    type: 'circle',
-    source: SRC_CONUS,
-    'source-layer': 'conus_gages',
-    filter: inFilter('nex_id', state.nexusIds),
-    paint: {
-      'circle-radius': { stops: [[3, 2], [11, 5]] },
-      'circle-color': isDark() ? '#c8c8c8' : '#646464',
-      'circle-opacity': { stops: [[3, 0], [9, 1]] },
-    },
-  };
-}
-
-function catchmentHighlightFilter() {
-  return ['==', ['get', 'divide_id'], state.selectedCatchmentId ?? ''];
-}
-
 function catchmentHighlightSpec() {
   return {
     id: 'catchment-highlight',
     type: 'fill',
-    source: SRC_CONUS,
-    'source-layer': 'conus_divides',
+    source: SRC_DIVIDES,
+    'source-layer': LAYER_DIVIDES,
     filter: catchmentHighlightFilter(),
     paint: {
       'fill-color': '#ff0000',
@@ -152,85 +154,19 @@ function catchmentHighlightSpec() {
   };
 }
 
-function nexusHighlightFilter() {
-  return state.selectedNexusId
-    ? ['all', ['!', ['has', 'point_count']], ['==', ['get', 'id'], state.selectedNexusId]]
-    : ['==', ['get', 'id'], ''];
-}
-
-function nexusHighlightSpec() {
+function flowPathsSpec() {
   return {
-    id: 'nexus-highlight',
-    type: 'circle',
-    source: SRC_NEXUS,
-    filter: nexusHighlightFilter(),
+    id: 'flowpaths-layer',
+    type: 'line',
+    source: SRC_FLOWPATHS,
+    'source-layer': LAYER_FLOWPATHS,
+    filter: flowPathsFilter(),
     paint: {
-      'circle-radius': 10,
-      'circle-stroke-width': 3,
-      'circle-stroke-color': '#ffffff',
-      'circle-color': '#ff0000',
+      'line-color': isDark() ? '#0077bb' : '#000000',
+      'line-width': { stops: [[7, 1], [10, 2]] },
+      'line-opacity': { stops: [[7, 0], [11, 1]] },
     },
   };
-}
-
-// Clustered mode gets three layers, unclustered gets one. Highlight is added in both cases.
-function nexusSpecs() {
-  if (state.clustered) {
-    return [
-      {
-        id: 'clusters',
-        type: 'circle',
-        source: SRC_NEXUS,
-        filter: ['has', 'point_count'],
-        paint: {
-          'circle-color': ['step', ['get', 'point_count'], '#51bbd6', 10, '#6610f2', 50, '#20c997'],
-          'circle-radius': ['step', ['get', 'point_count'], 15, 10, 25, 50, 35],
-        },
-      },
-      {
-        id: 'cluster-count',
-        type: 'symbol',
-        source: SRC_NEXUS,
-        filter: ['has', 'point_count'],
-        layout: {
-          'text-field': '{point_count_abbreviated}',
-          'text-font': ['Noto Sans Regular'],
-          'text-size': 12,
-          'text-anchor': 'center',
-          'text-justify': 'center',
-          'symbol-placement': 'point',
-        },
-        paint: { 'text-color': '#ffffff' },
-      },
-      {
-        id: 'unclustered-point',
-        type: 'circle',
-        source: SRC_NEXUS,
-        filter: ['!', ['has', 'point_count']],
-        paint: {
-          'circle-color': isDark() ? '#4f5b67' : '#1f78b4',
-          'circle-radius': 7,
-          'circle-stroke-width': 2,
-          'circle-stroke-color': isDark() ? '#e9ecef' : '#ffffff',
-        },
-      },
-      nexusHighlightSpec(),
-    ];
-  }
-  return [
-    {
-      id: 'all-points',
-      type: 'circle',
-      source: SRC_NEXUS,
-      paint: {
-        'circle-color': isDark() ? '#4f5b67' : '#1f78b4',
-        'circle-radius': 7,
-        'circle-stroke-width': 1,
-        'circle-stroke-color': isDark() ? '#e9ecef' : '#ffffff',
-      },
-    },
-    nexusHighlightSpec(),
-  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -240,73 +176,37 @@ function addLayerIfMissing(map, spec) {
   if (!map.getLayer(spec.id)) map.addLayer(spec);
 }
 
-function installConus(map) {
-  if (!map.getSource(SRC_CONUS)) {
-    map.addSource(SRC_CONUS, { type: 'vector', url: PMTILES_URL });
+function installLayers(map) {
+  if (!map.getSource(SRC_DIVIDES)) {
+    map.addSource(SRC_DIVIDES, { type: 'vector', url: DIVIDES_URL });
+  }
+  if (!map.getSource(SRC_FLOWPATHS)) {
+    map.addSource(SRC_FLOWPATHS, { type: 'vector', url: FLOWPATHS_URL });
   }
   addLayerIfMissing(map, catchmentsSpec());
   addLayerIfMissing(map, flowPathsSpec());
-  addLayerIfMissing(map, gaugesSpec());
   addLayerIfMissing(map, catchmentHighlightSpec());
-}
 
-function installNexus(map) {
-  if (!map.getSource(SRC_NEXUS)) {
-    map.addSource(SRC_NEXUS, {
-      type: 'geojson',
-      data: state.nexusPoints, // never null — seeded with EMPTY_FC
-      cluster: state.clustered,
-      clusterRadius: 50,
-      clusterMaxZoom: 14,
-    });
-  }
-  // The React nexusLayers memo returned null when hidden, so no layers existed at all.
-  if (state.nexusHidden) return;
-  for (const spec of nexusSpecs()) addLayerIfMissing(map, spec);
-}
-
-function installLayers(map) {
-  installConus(map);
-  installNexus(map);
-  // Keep points and highlights above the fills, as onMapLoad did with moveLayer.
   for (const id of TOP_LAYERS) {
     if (map.getLayer(id)) map.moveLayer(id);
   }
 }
 
-// Layers must come off before the source, or MapLibre errors on the dangling reference.
-function teardownNexus(map) {
-  for (const id of NEXUS_LAYERS) {
-    if (map.getLayer(id)) map.removeLayer(id);
-  }
-  if (map.getSource(SRC_NEXUS)) map.removeSource(SRC_NEXUS);
-}
-
 // ---------------------------------------------------------------------------
-// Refresh — push state onto layers already on the map, without rebuilding them
+// Refresh — push state onto layers already on the map
 // ---------------------------------------------------------------------------
 function setFilterIfPresent(map, id, filter) {
   if (map.getLayer(id)) map.setFilter(id, filter);
 }
 
 function refresh(map) {
-  const nexusSource = map.getSource(SRC_NEXUS);
-  if (nexusSource) nexusSource.setData(state.nexusPoints);
-
-  setFilterIfPresent(map, 'catchments-layer', inFilter('divide_id', state.catchmentIds));
-  setFilterIfPresent(map, 'flowpaths-layer', inFilter('id', state.flowPathIds));
-  setFilterIfPresent(map, 'gauges-layer', inFilter('nex_id', state.nexusIds));
+  setFilterIfPresent(map, 'catchments-layer', catchmentSetFilter());
+  setFilterIfPresent(map, 'flowpaths-layer', flowPathsFilter());
   setFilterIfPresent(map, 'catchment-highlight', catchmentHighlightFilter());
-  setFilterIfPresent(map, 'nexus-highlight', nexusHighlightFilter());
 
   for (const id of CATCHMENT_LAYERS) {
     if (map.getLayer(id)) {
       map.setLayoutProperty(id, 'visibility', state.catchmentHidden ? 'none' : 'visible');
-    }
-  }
-  for (const id of NEXUS_LAYERS) {
-    if (map.getLayer(id)) {
-      map.setLayoutProperty(id, 'visibility', state.nexusHidden ? 'none' : 'visible');
     }
   }
 }
@@ -318,67 +218,34 @@ function refresh(map) {
 // Attach ONCE. Layer-scoped listeners live on the map, not the style, so they survive
 // setStyle() — re-attaching after a style swap would just accumulate duplicates.
 function attachHoverCursor(map) {
-  for (const layer of ['catchments-layer', 'unclustered-point', 'clusters', 'all-points']) {
-    map.on('mouseenter', layer, () => {
-      map.getCanvas().style.cursor = 'pointer';
-    });
-    map.on('mouseleave', layer, () => {
-      map.getCanvas().style.cursor = '';
-    });
-  }
+  map.on('mouseenter', 'catchments-layer', () => {
+    map.getCanvas().style.cursor = 'pointer';
+  });
+  map.on('mouseleave', 'catchments-layer', () => {
+    map.getCanvas().style.cursor = '';
+  });
 }
 
-async function handleClick(map, event) {
-  // Query only what is currently visible, exactly as the React handler did.
-  const wanted = [];
-  if (!state.nexusHidden) {
-    wanted.push(state.clustered ? 'unclustered-point' : 'all-points');
-    if (state.clustered) wanted.push('clusters');
-  }
-  if (!state.catchmentHidden) wanted.push('catchments-layer');
+function handleClick(map, event) {
+  if (state.catchmentHidden || !map.getLayer('catchments-layer')) return;
 
-  const layers = wanted.filter((id) => map.getLayer(id));
-  if (!layers.length) return;
-
-  const features = map.queryRenderedFeatures(event.point, { layers });
+  const features = map.queryRenderedFeatures(event.point, { layers: ['catchments-layer'] });
   if (!features || !features.length) return;
 
-  for (const feature of features) {
-    const layerId = feature.layer.id;
+  const feature = features[0];
+  // Logged unconditionally: this is how you confirm the CATCHMENT_KEY assumption at the top
+  // of the file against real tile data.
+  console.log('[map] catchment feature', { id: feature.id, properties: feature.properties });
 
-    if (layerId === 'all-points' || layerId === 'unclustered-point') {
-      const nexusId = feature.properties.id;
-      state.selectedNexusId = nexusId;
-      state.selectedCatchmentId = null;
-      const ngenUsgs = feature.properties.ngen_usgs;
-      onSelect({
-        type: 'nexus',
-        id: nexusId,
-        trouteId: nexusId,
-        teehrId: ngenUsgs && ngenUsgs !== 'none' ? ngenUsgs : null,
-      });
-      refresh(map);
-      return;
-    }
-
-    if (layerId === 'clusters') {
-      // GeoJSONSource cluster methods return promises in MapLibre GL JS v4.
-      const zoom = await map
-        .getSource(SRC_NEXUS)
-        .getClusterExpansionZoom(feature.properties.cluster_id);
-      map.flyTo({ center: feature.geometry.coordinates, zoom, speed: 1.2 });
-      return;
-    }
-
-    if (layerId === 'catchments-layer') {
-      const divideId = feature.properties.divide_id;
-      state.selectedCatchmentId = divideId;
-      state.selectedNexusId = null;
-      onSelect({ type: 'catchment', id: divideId, trouteId: divideId, teehrId: null });
-      refresh(map);
-      return;
-    }
+  const catchmentId = CATCHMENT_KEY === 'id' ? feature.id : feature.properties[CATCHMENT_KEY];
+  if (catchmentId == null) {
+    console.warn(`[map] no "${CATCHMENT_KEY}" on the clicked feature — check CATCHMENT_KEY`);
+    return;
   }
+
+  state.selectedCatchmentId = catchmentId;
+  onSelect({ type: 'catchment', id: catchmentId, trouteId: catchmentId });
+  refresh(map);
 }
 
 // ---------------------------------------------------------------------------
@@ -410,11 +277,8 @@ async function loadGeoSpatial(map, modelRunId) {
   // enough of a check (tethysapp/ngiab/controllers.py, getGeoSpatialData).
   if (body.error) throw new Error(body.error);
 
-  state.nexusPoints = body.nexus ?? EMPTY_FC;
-  state.catchmentIds = body.catchments ?? [];
-  state.flowPathIds = body.flow_paths_ids ?? [];
-  state.nexusIds = body.nexus_ids ?? [];
-  state.selectedNexusId = null;
+  // "cat-1234" -> 1234, because these archives store ids as numbers.
+  state.catchmentIds = toNumericIds(body.catchments);
   state.selectedCatchmentId = null;
 
   refresh(map);
@@ -422,8 +286,11 @@ async function loadGeoSpatial(map, modelRunId) {
   // bounds is a flat [west, south, east, north] from gdf.total_bounds.tolist().
   if (body.bounds) map.fitBounds(body.bounds, { padding: 20, duration: 1000 });
 
-  const nexusCount = state.nexusPoints.features?.length ?? 0;
-  setStatus(`${modelRunId}: ${nexusCount} nexus, ${state.catchmentIds.length} catchments`);
+  const dropped = (body.catchments?.length ?? 0) - state.catchmentIds.length;
+  setStatus(
+    `${modelRunId}: ${state.catchmentIds.length} catchments` +
+      (dropped > 0 ? ` (${dropped} unparseable ids dropped)` : ''),
+  );
 }
 
 function loadOrReport(map, modelRunId) {
@@ -456,8 +323,12 @@ map.on('load', () => {
   }
 });
 
-map.on('click', (event) => {
-  handleClick(map, event).catch((error) => console.error('[map] click failed', error));
+map.on('click', (event) => handleClick(map, event));
+
+// Surface tile/source failures instead of leaving a silently empty map — the most likely
+// cause of a blank render is a bad pmtiles URL or source-layer name.
+map.on('error', (event) => {
+  console.error('[map] maplibre error', event.error ?? event);
 });
 
 // ---------------------------------------------------------------------------
@@ -475,21 +346,6 @@ function setTheme(theme) {
   });
 }
 
-// `cluster` is a source construction option, so the source has to be rebuilt.
-function setClustered(clustered) {
-  state.clustered = clustered;
-  teardownNexus(map);
-  installLayers(map);
-  refresh(map);
-}
-
-function setNexusHidden(hidden) {
-  state.nexusHidden = hidden;
-  // Unhiding has to re-add layers that installNexus skipped while hidden.
-  if (!hidden) installLayers(map);
-  refresh(map);
-}
-
 function setCatchmentHidden(hidden) {
   state.catchmentHidden = hidden;
   refresh(map);
@@ -501,6 +357,4 @@ function bindToggle(id, handler) {
 }
 
 bindToggle('toggle-theme', (on) => setTheme(on ? 'dark' : 'light'));
-bindToggle('toggle-cluster', setClustered);
-bindToggle('toggle-nexus', setNexusHidden);
 bindToggle('toggle-catchments', setCatchmentHidden);
