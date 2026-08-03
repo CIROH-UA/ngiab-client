@@ -1086,6 +1086,10 @@ There is no test here — `main.js` is untestable glue whose only behavior is pr
 
 ### Task 10: Pass the app root URL into the template context
 
+> **If you did the map spike first** (`docs/superpowers/plans/2026-08-03-map-spike-plan.md`), its
+> Task 3 already made this exact change — skip to Task 12 and verify. Tasks 10 and 11 here are
+> written for the case where Phase 0 lands before the spike.
+
 **Goal:** make `{{ app_root_url }}` available to the template.
 
 **Why:** `getConfig()` needs the real value under whatever portal prefix the app is deployed at.
@@ -1139,6 +1143,11 @@ git commit -m "feat: pass app_root_url into the index template context"
 ---
 
 ### Task 11: The Django template — import map and module script
+
+> **If you did the map spike first,** its Task 3 already replaced this template and removed the React
+> script. Reconcile rather than replace: add `axios` to the existing import map and add the
+> `main.js` module script alongside the map partial's. Do **not** paste the template below over the
+> spike's — you would drop the `maplibre-gl`/`pmtiles` entries and the `{% include %}`.
 
 **Goal:** replace the React-loading template with one that declares the CDN import map, injects
 runtime config, links the stylesheets, and loads `main.js` as a module.

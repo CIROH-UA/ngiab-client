@@ -1,8 +1,16 @@
 # Map Spike — Port `mapgl.js` to Vanilla MapLibre
 
 > **Audience: a human implementer.** Complete code, exact commands, expected output.
-> **Standalone spike.** Depends on nothing from Phase 0 — plain `fetch`, local state, its own page at
-> `/apps/ngiab/map/`. Nothing it touches can break the React app or the Phase 0 scaffold.
+> **No new route.** `map.html` is a Django partial `{% include %}`d into the home template
+> (`templates/ngiab/index.html`, served by the `home` controller). The map renders at
+> `/apps/ngiab/`.
+> **Self-contained JS.** `map.js` uses plain `fetch` and module-local state, so it depends on nothing
+> from the Phase 0 scaffold and folds into `<ngiab-map>` later.
+
+> **⚠ This replaces the React home page.** `index.html` currently loads `react-build/main.js`.
+> Adding the map means removing that script — you cannot have React mounting `#root` and the vanilla
+> map on the same page. So this task list subsumes **Phase 0 Task 11** (the template cutover) and
+> **Task 10** (passing `app_root_url` into the context). `git revert` is the way back.
 
 **Goal:** prove that `reactapp/features/Map/components/mapgl.js` (429 lines, `react-map-gl` +
 `@visx`-era React) reproduces in plain MapLibre with no bundler — full behavior parity: pmtiles
@@ -13,7 +21,7 @@ click-to-select with highlight, hover cursor, theme swap, `fitBounds`.
 port, and Web Component plumbing are mechanical; `react-map-gl` was doing four non-obvious things for
 us that vanilla MapLibre does not. Find that out on a throwaway page, not inside Phase 1.
 
-**Success:** `/apps/ngiab/map/` shows the CONUS basemap, a selected model run's catchments and nexus
+**Success:** `/apps/ngiab/` shows the CONUS basemap, a selected model run's catchments and nexus
 points, clicking a nexus turns it red and logs its ID, clicking a cluster zooms in, and the
 light/dark and cluster/uncluster toggles both work without losing layers.
 
@@ -102,12 +110,26 @@ React passes `data={nexusPoints}` while `nexusPoints` is still `null` on first r
 | # | Task | Files | Verify |
 |---|---|---|---|
 | 1 | Clean up leftovers | `public/frontend/src/` | `find` |
-| 2 | Serve the spike page | `controllers.py` | curl 200 |
-| 3 | The spike template | `templates/ngiab/map.html` | curl for importmap |
+| 2 | The `map.html` partial | `templates/ngiab/map.html` | — |
+| 3 | Include it in the home template | `templates/ngiab/index.html`, `controllers.py` | curl for importmap |
 | 4 | Constants and layer specs | `public/frontend/map.js` | — |
 | 5 | `installLayers` + interactions | `public/frontend/map.js` | — |
 | 6 | Data fetch and boot | `public/frontend/map.js` | browser |
 | 7 | Verify parity against React | — | manual checklist |
+
+**How the two templates split responsibility.** A Django `{% include %}` inlines the partial's text
+into the parent, so the document-level concerns must live in the parent and only the parent:
+
+| Concern | Lives in | Why |
+|---|---|---|
+| `window.__NGIAB__` config | `index.html` `<head>` | Must run before any module |
+| Import map | `index.html` `<head>` | One per document, must precede the first module script |
+| MapLibre + app stylesheets | `index.html` `<head>` | Document-level `<link>`s |
+| Map markup, panel, scoped CSS | `map.html` | The reusable piece |
+| `<script type="module" src="map.js">` | `map.html` | Keeps the partial one-line includable |
+
+The module script can sit inside the partial because the include renders it into `<body>`, after the
+parent's `<head>` import map — which is the only ordering rule that matters.
 
 ---
 
@@ -140,63 +162,95 @@ It stays a zero-byte placeholder until Phase 0 Task 9. This spike does not use i
 
 ---
 
-### Task 2: Serve the spike page
+### Task 2: The `map.html` partial
 
-`map.html` needs a route. `app.py:14` sets `catch_all = "home"`, so without an explicit controller
-`/apps/ngiab/map/` renders the React/Phase-0 page instead — explicit routes win over the catch-all.
+**Files:** `tethysapp/ngiab/templates/ngiab/map.html` (currently empty)
 
-**Files:** Modify `tethysapp/ngiab/controllers.py`
+A **fragment**, not a document — no `<!DOCTYPE>`, `<html>`, `<head>`, or `<body>`. Django's
+`{% include %}` inlines this text verbatim into the parent, so any of those tags would produce
+invalid nested markup.
 
-- [ ] **Step 1: Add the controller**
+It does need its own `{% load static tethys %}`: **template tag loads do not inherit across an
+include.** Omit it and `{% static tethys_app|public:'…' %}` fails or renders empty.
 
-Add after the `home` controller (~line 89). Do **not** name the function `map` — it shadows the
-builtin and reads badly in tracebacks.
+- [ ] **Step 1: Write the partial**
 
-```python
-@controller(url="map")
-def map_spike(request):
-    """Standalone page for the vanilla-MapLibre spike (see docs/superpowers/plans)."""
-    context = {"app_root_url": f"/apps/{App.root_url}/"}
-    return App.render(request, "map.html", context)
+`tethysapp/ngiab/templates/ngiab/map.html`:
+
+```html
+{% load static tethys %}
+
+<style>
+  #map { position: absolute; inset: 0; }
+  #map-panel {
+    position: absolute; z-index: 1; top: 10px; left: 10px;
+    background: rgba(255, 255, 255, .92); padding: 10px 12px; border-radius: 6px;
+    font: 13px/1.5 system-ui, sans-serif; box-shadow: 0 1px 4px rgba(0, 0, 0, .3);
+  }
+  #map-panel label { display: block; }
+  #map-status { margin-top: 6px; color: #555; max-width: 260px; }
+</style>
+
+<div id="map-panel">
+  <label><input type="checkbox" id="toggle-theme" /> dark basemap</label>
+  <label><input type="checkbox" id="toggle-cluster" /> cluster nexus points</label>
+  <label><input type="checkbox" id="toggle-nexus" /> hide nexus</label>
+  <label><input type="checkbox" id="toggle-catchments" /> hide catchments</label>
+  <div id="map-status">loading…</div>
+</div>
+<div id="map"></div>
+
+<script type="module" src="{% static tethys_app|public:'frontend/map.js' %}"></script>
 ```
 
-`App` and `controller` are already imported. The explicit `url="map"` pins the route instead of
-letting Tethys derive `map_spike` from the function name.
+The four checkboxes exist so you can exercise every branch the React component had — theme swap and
+cluster toggle are precisely the two paths that break if `installLayers` isn't idempotent.
 
-- [ ] **Step 2: Verify it parses and routes**
+`#map` is absolutely positioned to fill its containing block, so whatever wrapper the parent puts it
+in needs `position: relative` and a real height — Task 3 handles that.
 
-```bash
-python -c "import ast; ast.parse(open('tethysapp/ngiab/controllers.py').read()); print('OK')"
-```
-
-Then with the server running (`tethys manage start`):
+- [ ] **Step 2: Commit**
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8000/apps/ngiab/map/
-```
-
-Expected: `OK`, then `200`.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add tethysapp/ngiab/controllers.py
-git commit -m "feat: add /map route for the vanilla MapLibre spike"
+git add tethysapp/ngiab/templates/ngiab/map.html
+git commit -m "feat: map.html partial with the map container and dev toggles"
 ```
 
 ---
 
-### Task 3: The spike template
+### Task 3: Include the partial in the home template
 
-**Files:** `tethysapp/ngiab/templates/ngiab/map.html` (currently empty)
+**Files:**
+- Modify: `tethysapp/ngiab/templates/ngiab/index.html` (full replace)
+- Modify: `tethysapp/ngiab/controllers.py` — the `home` controller (~line 84)
 
-Same import-map rules as Phase 0 Task 11 — map before module, absolute URLs, config first. Two
-dependencies here (`maplibre-gl`, `pmtiles`) plus MapLibre's stylesheet, which is a `<link>` and not
-an import-map entry. Both URLs were verified reachable on 2026-08-03.
+The parent owns everything document-level: the config script, the import map, and the stylesheets.
+Same three ordering rules as Phase 0 Task 11 — **import map before the first module script, exactly
+one per document, absolute `{% static %}` URLs** (the page is at `/apps/ngiab/`, the files at
+`/static/ngiab/frontend/`, so a relative specifier 404s).
 
-- [ ] **Step 1: Write the template**
+Both CDN URLs were verified reachable 2026-08-03.
 
-`tethysapp/ngiab/templates/ngiab/map.html`:
+- [ ] **Step 1: Pass `app_root_url` into the context**
+
+This is Phase 0 Task 10. `App.root_url` is `"ngiab"` (`app.py:15`), so this renders `/apps/ngiab/` —
+the same value the old build-time `TETHYS_APP_ROOT_URL` held.
+
+```python
+@controller
+def home(request):
+    """Controller for the app home page."""
+    # index.html loads the build-less vanilla frontend and injects runtime config
+    # into window.__NGIAB__.
+    context = {"app_root_url": f"/apps/{App.root_url}/"}
+    return App.render(request, "index.html", context)
+```
+
+`App` is already imported.
+
+- [ ] **Step 2: Replace the home template**
+
+`tethysapp/ngiab/templates/ngiab/index.html`:
 
 ```html
 {% load static tethys %}
@@ -205,16 +259,22 @@ an import-map entry. Both URLs were verified reachable on 2026-08-03.
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NGIAB Map Spike</title>
+    <meta name="theme-color" content="#2c3e50" />
+    <link rel="shortcut icon" href="{% if site_globals.favicon and 'http' in site_globals.favicon %}{{ site_globals.favicon }}{% elif site_globals.favicon %}{% static site_globals.favicon %}{% else %}{% static 'tethys_portal/images/default_favicon.png' %}{% endif %}" />
+    <title>{{ tethys_app.name }}</title>
 
+    <!-- Runtime config. Classic inline script, so it runs before the deferred modules below. -->
     <script>
       window.__NGIAB__ = {
         APP_ROOT_URL: "{{ app_root_url|escapejs }}",
-        // Set this to a model run that exists locally, or pass ?model_run_id=… in the URL.
+        PORTAL_HOST: "",
+        // Default model run. Override per-request with ?model_run_id=… in the URL.
         MODEL_RUN_ID: ""
       };
     </script>
 
+    <!-- Import map for bare specifiers. MUST precede any module script, and there can be
+         only one per document. Versions pinned in public/frontend/DEPENDENCIES.md. -->
     <script type="importmap">
     {
       "imports": {
@@ -225,52 +285,67 @@ an import-map entry. Both URLs were verified reachable on 2026-08-03.
     </script>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+    <link rel="stylesheet" href="{% static tethys_app|public:'frontend/styles/tokens.css' %}" />
+    <link rel="stylesheet" href="{% static tethys_app|public:'frontend/styles/app.css' %}" />
     <style>
-      html, body { margin: 0; height: 100%; }
-      #map { position: absolute; inset: 0; }
-      #panel {
-        position: absolute; z-index: 1; top: 10px; left: 10px;
-        background: rgba(255,255,255,.92); padding: 10px 12px; border-radius: 6px;
-        font: 13px/1.5 system-ui, sans-serif; box-shadow: 0 1px 4px rgba(0,0,0,.3);
-      }
-      #panel label { display: block; }
-      #status { margin-top: 6px; color: #555; max-width: 260px; }
+      html, body { height: 100%; margin: 0; }
+      /* #map is absolutely positioned, so its container needs a positioning context. */
+      #root { position: relative; height: 100%; }
     </style>
   </head>
   <body>
-    <div id="panel">
-      <label><input type="checkbox" id="toggle-theme" /> dark basemap</label>
-      <label><input type="checkbox" id="toggle-cluster" /> cluster nexus points</label>
-      <label><input type="checkbox" id="toggle-nexus" /> hide nexus</label>
-      <label><input type="checkbox" id="toggle-catchments" /> hide catchments</label>
-      <div id="status">loading…</div>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root">
+      {% include "ngiab/map.html" %}
     </div>
-    <div id="map"></div>
-    <script type="module" src="{% static tethys_app|public:'frontend/map.js' %}"></script>
   </body>
 </html>
 ```
 
-The four checkboxes exist so you can exercise every branch the React component had — theme swap and
-cluster toggle are precisely the two paths that break if `installLayers` isn't idempotent.
+The React `<script src="…react-build/main.js">` is **gone** — that is the cutover. `#root` is kept as
+the mount point so Phase 0's `main.js` can take over later without another template change.
 
-- [ ] **Step 2: Verify the render**
+Note there is no `main.js` script tag yet: `map.js` comes in via the partial. When Phase 0 lands,
+`main.js` becomes the single entry and the partial's script tag goes away in favor of `<ngiab-map>`.
 
-```bash
-curl -s http://localhost:8000/apps/ngiab/map/ | grep -E 'importmap|esm.sh|frontend/map.js|__NGIAB__'
-```
+- [ ] **Step 3: Verify the render**
 
-Expected: the config script, the import map with both `esm.sh` URLs, and
-`<script type="module" src="/static/ngiab/frontend/map.js">`.
-
-If the `<script>`/`<link>` `src` renders empty, `{% load static tethys %}` is missing from line 1.
-
-- [ ] **Step 3: Commit**
+With the server running (`tethys manage start`):
 
 ```bash
-git add tethysapp/ngiab/templates/ngiab/map.html
-git commit -m "feat: spike page template with MapLibre import map"
+curl -s http://localhost:8000/apps/ngiab/ | grep -E 'importmap|esm.sh|frontend/map.js|__NGIAB__|id="map"'
 ```
+
+Expected, all present:
+- `window.__NGIAB__ = {` with `APP_ROOT_URL: "/apps/ngiab/"`
+- the import map with both `esm.sh` URLs
+- `<div id="map"></div>` — proof the include resolved
+- `<script type="module" src="/static/ngiab/frontend/map.js">`
+
+Then confirm the static file is actually served:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8000/static/ngiab/frontend/map.js
+```
+
+Expected `200`. If it 404s, run `tethys manage collectstatic` — this directory did not exist when
+statics were last collected.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add tethysapp/ngiab/templates/ngiab/index.html tethysapp/ngiab/controllers.py
+git commit -m "feat: serve the vanilla map from the home template via include"
+```
+
+**If the include fails:**
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `TemplateDoesNotExist: ngiab/map.html` | Wrong include path | It is app-namespaced — `{% include "ngiab/map.html" %}`, not `"map.html"` |
+| Empty `src=""` on the module script | `{% load static tethys %}` missing from the **partial** | Loads do not inherit across an include; the partial needs its own |
+| Map div present but zero height | `#root` has no height or no `position: relative` | Both are in the Step 2 `<style>` block |
+| Page still renders React | Stale collected template | `tethys manage collectstatic`, then hard-reload |
 
 ---
 
@@ -659,7 +734,7 @@ reports — Task 6 defines it.
 // ---------------------------------------------------------------------------
 const cfg = window.__NGIAB__ || {};
 const APP_ROOT_URL = cfg.APP_ROOT_URL || '/apps/ngiab/';
-const statusEl = document.getElementById('status');
+const statusEl = document.getElementById('map-status');
 const setStatus = (msg) => { if (statusEl) statusEl.textContent = msg; };
 
 function onSelect(selection) {
@@ -767,10 +842,10 @@ curl -s "http://localhost:8000/apps/ngiab/getModelRuns/" | head -c 600
 ```
 
 Use one of the returned ids, then open:
-`http://localhost:8000/apps/ngiab/map/?model_run_id=<id>`
+`http://localhost:8000/apps/ngiab/?model_run_id=<id>`
 
-Putting it in the URL beats editing the template each time; `MODEL_RUN_ID` in `map.html` is just a
-default.
+Putting it in the URL beats editing the template each time; `MODEL_RUN_ID` in `index.html` is just a
+default for when the query param is absent.
 
 - [ ] **Step 3: Commit**
 
@@ -783,7 +858,15 @@ git commit -m "feat: vanilla MapLibre map spike ported from mapgl.js"
 
 ### Task 7: Verify parity
 
-Run the React app side by side (`npm run build`, then `/apps/ngiab/`) and walk both.
+The vanilla map now *is* `/apps/ngiab/`, so React is no longer reachable for a side-by-side
+comparison. Two ways to get one if you want it:
+
+- **Compare against the commit before the cutover** — `git stash` your work, `git checkout 8eaceaf`,
+  `npm run build`, look, then come back. Cleanest.
+- **Or trust the checklist.** It was written from a full read of `mapgl.js`, and every item below maps
+  to a specific line range in it.
+
+Walk the list at `http://localhost:8000/apps/ngiab/?model_run_id=<id>`:
 
 - [ ] Basemap renders; pmtiles vector tiles appear when zoomed past ~7
 - [ ] Catchment fills appear for the selected run and nowhere else
