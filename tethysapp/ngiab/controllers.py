@@ -439,6 +439,75 @@ def getTeehrVariables(request):
     )
 
 
+def _empty_locations_response(status_message, status_severity):
+    return JsonResponse(
+        {
+            "teehr_locations": [],
+            "teehr_status": status_message,
+            "teehr_status_severity": status_severity,
+        }
+    )
+
+
+@controller
+def getTeehrLocations(request):
+    """Return the nexus/USGS pairs that actually have TEEHR results for this run.
+
+    Lets the map colour geometry by TEEHR availability. Distinct from the ``ngen_usgs``
+    column on ``getGeoSpatialData``'s nexus features: that reports the warehouse-wide
+    crosswalk (``list_crosswalks`` with no configuration filter), so it also includes
+    gauges this run never evaluated. This is filtered to the run's configuration.
+    """
+    model_run_id = request.GET.get("model_run_id")
+
+    if _detect_legacy_teehr_layout(model_run_id):
+        return _empty_locations_response(
+            "This run has legacy TEEHR output. Re-run TEEHR with the current image to view results.",
+            "warning",
+        )
+
+    if not _teehr_warehouse_path():
+        return _empty_locations_response(
+            "TEEHR warehouse is not configured. See setup docs.",
+            "info",
+        )
+
+    config_name = _resolve_configuration_name(model_run_id)
+    if config_name is None:
+        return _empty_locations_response(
+            "No TEEHR evaluation found for this run.",
+            "info",
+        )
+
+    try:
+        with _open_warehouse() as reader:
+            pairs = reader.list_location_pairs_for_run(config_name)
+    except TeehrWarehouseError as exc:
+        msg, severity = _teehr_status_for(exc)
+        logger.warning("getTeehrLocations warehouse error: %s", exc)
+        return _empty_locations_response(msg, severity)
+
+    # secondary_location_id is "ngen-XXXXX"; the gpkg/map nexus ids are "nex-XXXXX".
+    locations = [
+        {"nexus_id": ngen_id.replace("ngen-", "nex-", 1), "usgs_id": usgs_id}
+        for usgs_id, ngen_id in pairs
+    ]
+
+    if not locations:
+        return _empty_locations_response(
+            "No TEEHR results for this run's locations.",
+            "info",
+        )
+
+    return JsonResponse(
+        {
+            "teehr_locations": locations,
+            "teehr_status": None,
+            "teehr_status_severity": None,
+        }
+    )
+
+
 @controller
 def makeDatastreamConf(request):
     """

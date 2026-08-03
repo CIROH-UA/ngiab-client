@@ -194,6 +194,7 @@ include.** Omit it and `{% static tethys_app|public:'…' %}` fails or renders e
 <div id="map-panel">
   <label><input type="checkbox" id="toggle-theme" /> dark basemap</label>
   <label><input type="checkbox" id="toggle-catchments" /> hide catchments</label>
+  <label><input type="checkbox" id="toggle-teehr" checked /> highlight TEEHR</label>
   <div id="map-status">loading…</div>
 </div>
 <div id="map"></div>

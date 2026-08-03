@@ -545,7 +545,7 @@ port, both called out below.
 
 **Interface produced:** default export `appAPI` with `getModelRuns`, `getGeoSpatialData`,
 `getNexusTimeSeries`, `getCatchmentTimeSeries`, `getTrouteVariables`, `getTrouteTimeSeries`,
-`getTeehrTimeSeries`, `getTeehrVariables`. Every name matches a `@controller` in
+`getTeehrTimeSeries`, `getTeehrVariables`, `getTeehrLocations`. Every name matches a `@controller` in
 `tethysapp/ngiab/controllers.py` — verify with `grep -n '^def ' tethysapp/ngiab/controllers.py`.
 
 - [ ] **Step 1: Port `utilities.js`**
@@ -672,6 +672,7 @@ const appAPI = {
   getTrouteTimeSeries: (params) => apiClient.get(url('getTrouteTimeSeries'), { params }),
   getTeehrTimeSeries: (params) => apiClient.get(url('getTeehrTimeSeries'), { params }),
   getTeehrVariables: (params) => apiClient.get(url('getTeehrVariables'), { params }),
+  getTeehrLocations: (params) => apiClient.get(url('getTeehrLocations'), { params }),
 };
 
 export default appAPI;
@@ -727,6 +728,7 @@ it('exposes exactly the viewer endpoints and no datastream ones', () => {
     'getGeoSpatialData',
     'getModelRuns',
     'getNexusTimeSeries',
+    'getTeehrLocations',
     'getTeehrTimeSeries',
     'getTeehrVariables',
     'getTrouteTimeSeries',

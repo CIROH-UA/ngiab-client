@@ -69,8 +69,13 @@ const TOP_LAYERS = ['flowpaths-layer', 'catchment-highlight'];
 const state = {
   theme: 'light',
   catchmentHidden: false,
+  showTeehr: true,
   selectedCatchmentId: null, // numeric, to match the tiles
   catchmentIds: [], // numeric
+  // Nexus ids (numeric) that have TEEHR results for this run, and nexus -> USGS gauge id.
+  // Geometry is joined to TEEHR through the downstream nexus: a divide's/flowpath's `toid`.
+  teehrNexusIds: [],
+  teehrUsgsByNexus: new Map(),
 };
 
 const isDark = () => state.theme === 'dark';
@@ -120,6 +125,33 @@ const flowPathsFilter = () =>
 const visibility = (hidden) => ({ visibility: hidden ? 'none' : 'visible' });
 
 // ---------------------------------------------------------------------------
+// TEEHR colouring
+//
+// TEEHR results are keyed to USGS gauges, which crosswalk to *nexus* ids -- there is no
+// direct catchment key. Both archives carry `toid`, which in the hydrofabric is the
+// downstream nexus, so "this geometry drains to a TEEHR-evaluated nexus" is expressible as
+// a data-driven paint expression. No extra layer, no extra draw pass.
+// ---------------------------------------------------------------------------
+const TEEHR_FILL = { light: 'rgba(31, 120, 180, 0.55)', dark: 'rgba(32, 201, 151, 0.55)' };
+const PLAIN_FILL = { light: 'rgba(91, 44, 111, 0.316)', dark: 'rgba(238, 51, 119, 0.316)' };
+const TEEHR_LINE = { light: '#1f78b4', dark: '#20c997' };
+const PLAIN_LINE = { light: '#000000', dark: '#0077bb' };
+
+const themed = (pair) => (isDark() ? pair.dark : pair.light);
+
+const hasTeehrNexus = () => ['in', ['get', 'toid'], ['literal', state.teehrNexusIds]];
+
+// Falls back to a flat colour when there is nothing to highlight, so the expression stays
+// valid and cheap for runs with no TEEHR output.
+const teehrAware = (teehrColor, plainColor) =>
+  state.showTeehr && state.teehrNexusIds.length
+    ? ['case', hasTeehrNexus(), themed(teehrColor), themed(plainColor)]
+    : themed(plainColor);
+
+const catchmentFillColor = () => teehrAware(TEEHR_FILL, PLAIN_FILL);
+const flowPathsLineColor = () => teehrAware(TEEHR_LINE, PLAIN_LINE);
+
+// ---------------------------------------------------------------------------
 // Layer specs
 // ---------------------------------------------------------------------------
 function catchmentsSpec() {
@@ -130,7 +162,7 @@ function catchmentsSpec() {
     'source-layer': LAYER_DIVIDES,
     filter: catchmentSetFilter(),
     paint: {
-      'fill-color': isDark() ? 'rgba(238, 51, 119, 0.316)' : 'rgba(91, 44, 111, 0.316)',
+      'fill-color': catchmentFillColor(),
       'fill-outline-color': isDark() ? 'rgba(238, 51, 119, 0.7)' : 'rgba(91, 44, 111, 0.7)',
       'fill-opacity': { stops: [[7, 0], [11, 1]] },
     },
@@ -162,7 +194,7 @@ function flowPathsSpec() {
     'source-layer': LAYER_FLOWPATHS,
     filter: flowPathsFilter(),
     paint: {
-      'line-color': isDark() ? '#0077bb' : '#000000',
+      'line-color': flowPathsLineColor(),
       'line-width': { stops: [[7, 1], [10, 2]] },
       'line-opacity': { stops: [[7, 0], [11, 1]] },
     },
@@ -199,10 +231,17 @@ function setFilterIfPresent(map, id, filter) {
   if (map.getLayer(id)) map.setFilter(id, filter);
 }
 
+function setPaintIfPresent(map, id, prop, value) {
+  if (map.getLayer(id)) map.setPaintProperty(id, prop, value);
+}
+
 function refresh(map) {
   setFilterIfPresent(map, 'catchments-layer', catchmentSetFilter());
   setFilterIfPresent(map, 'flowpaths-layer', flowPathsFilter());
   setFilterIfPresent(map, 'catchment-highlight', catchmentHighlightFilter());
+
+  setPaintIfPresent(map, 'catchments-layer', 'fill-color', catchmentFillColor());
+  setPaintIfPresent(map, 'flowpaths-layer', 'line-color', flowPathsLineColor());
 
   for (const id of CATCHMENT_LAYERS) {
     if (map.getLayer(id)) {
@@ -244,7 +283,16 @@ function handleClick(map, event) {
   }
 
   state.selectedCatchmentId = catchmentId;
-  onSelect({ type: 'catchment', id: catchmentId, trouteId: catchmentId });
+  // The geometry joins to TEEHR through its downstream nexus, so the gauge for a clicked
+  // catchment is whatever gauge sits on its `toid`.
+  const nexusId = feature.properties.toid;
+  onSelect({
+    type: 'catchment',
+    id: catchmentId,
+    trouteId: catchmentId,
+    nexusId,
+    teehrId: state.teehrUsgsByNexus.get(nexusId) ?? null,
+  });
   refresh(map);
 }
 
@@ -262,7 +310,30 @@ const setStatus = (msg) => {
 // The seam where <ngiab-map> will dispatch store actions instead.
 function onSelect(selection) {
   console.log('[map] selected', selection);
-  setStatus(`${selection.type}: ${selection.id}`);
+  const teehr = selection.teehrId ? ` · TEEHR ${selection.teehrId}` : '';
+  setStatus(`${selection.type}: ${selection.id}${teehr}`);
+}
+
+// Which nexuses have TEEHR results for this run. Deliberately NOT derived from the nexus
+// payload's ngen_usgs column: that reflects the warehouse-wide crosswalk with no
+// configuration filter, so it reports gauges this run never evaluated.
+// A missing/failed warehouse is not an error here -- the map just renders uncoloured.
+async function loadTeehrLocations(modelRunId) {
+  const url = `${APP_ROOT_URL}getTeehrLocations/?model_run_id=${encodeURIComponent(modelRunId)}`;
+  const response = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!response.ok) throw new Error(`HTTP ${response.status} from getTeehrLocations`);
+
+  const body = await response.json();
+  const locations = body.teehr_locations ?? [];
+
+  state.teehrUsgsByNexus = new Map();
+  for (const { nexus_id: nexusId, usgs_id: usgsId } of locations) {
+    const [numeric] = toNumericIds([nexusId]);
+    if (numeric !== undefined) state.teehrUsgsByNexus.set(numeric, usgsId);
+  }
+  state.teehrNexusIds = [...state.teehrUsgsByNexus.keys()];
+
+  return { count: state.teehrNexusIds.length, status: body.teehr_status };
 }
 
 async function loadGeoSpatial(map, modelRunId) {
@@ -287,17 +358,33 @@ async function loadGeoSpatial(map, modelRunId) {
   if (body.bounds) map.fitBounds(body.bounds, { padding: 20, duration: 1000 });
 
   const dropped = (body.catchments?.length ?? 0) - state.catchmentIds.length;
-  setStatus(
-    `${modelRunId}: ${state.catchmentIds.length} catchments` +
-      (dropped > 0 ? ` (${dropped} unparseable ids dropped)` : ''),
-  );
+  return {
+    catchments: state.catchmentIds.length,
+    dropped: dropped > 0 ? dropped : 0,
+  };
 }
 
 function loadOrReport(map, modelRunId) {
-  loadGeoSpatial(map, modelRunId).catch((error) => {
-    console.error('[map] geospatial fetch failed', error);
-    setStatus(`error: ${error.message}`);
-  });
+  // Geometry is required; TEEHR colouring is not. Run both concurrently and let the TEEHR
+  // half fail soft -- an unconfigured or broken warehouse should still give you a map.
+  Promise.all([
+    loadGeoSpatial(map, modelRunId),
+    loadTeehrLocations(modelRunId).catch((error) => {
+      console.warn('[map] TEEHR locations unavailable', error);
+      return { count: 0, status: error.message };
+    }),
+  ])
+    .then(([geo, teehr]) => {
+      refresh(map); // paint the TEEHR colours once both halves have landed
+      const parts = [`${modelRunId}: ${geo.catchments} catchments`];
+      if (geo.dropped) parts.push(`${geo.dropped} unparseable ids dropped`);
+      parts.push(teehr.count ? `${teehr.count} TEEHR nexus` : (teehr.status ?? 'no TEEHR'));
+      setStatus(parts.join(' · '));
+    })
+    .catch((error) => {
+      console.error('[map] geospatial fetch failed', error);
+      setStatus(`error: ${error.message}`);
+    });
 }
 
 // ---------------------------------------------------------------------------
@@ -351,6 +438,11 @@ function setCatchmentHidden(hidden) {
   refresh(map);
 }
 
+function setShowTeehr(show) {
+  state.showTeehr = show;
+  refresh(map);
+}
+
 function bindToggle(id, handler) {
   const el = document.getElementById(id);
   if (el) el.addEventListener('change', (event) => handler(event.target.checked));
@@ -358,3 +450,4 @@ function bindToggle(id, handler) {
 
 bindToggle('toggle-theme', (on) => setTheme(on ? 'dark' : 'light'));
 bindToggle('toggle-catchments', setCatchmentHidden);
+bindToggle('toggle-teehr', setShowTeehr);

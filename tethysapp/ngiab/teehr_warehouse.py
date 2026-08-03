@@ -273,6 +273,30 @@ class WarehouseReader:
         ).fetchall()
         return [r[0] for r in rows]
 
+    def list_location_pairs_for_run(self, config_name: str) -> List[tuple]:
+        """Return (primary_location_id, secondary_location_id) pairs with results for this run.
+
+        Like ``list_usgs_locations_for_run`` but keeps the ngen side too, so a caller can
+        map map-geometry ids to USGS gauge ids. One catalog freeze and one query, so both
+        tables are read from the same Iceberg snapshot -- doing this as two separate reader
+        calls joined in Python would risk a concurrent teehr write bumping one table's
+        snapshot pointer between them.
+        """
+        catalog = self._freeze_catalog()
+        xwalk_loc = catalog.get("location_crosswalks")
+        sec_loc = catalog.get("secondary_timeseries")
+        if xwalk_loc is None or sec_loc is None:
+            return []
+        rows = self._execute(
+            f"SELECT DISTINCT x.primary_location_id, x.secondary_location_id "
+            f"FROM iceberg_scan('{xwalk_loc}') x "
+            f"JOIN iceberg_scan('{sec_loc}') s "
+            f"  ON s.location_id = x.secondary_location_id "
+            f"WHERE s.configuration_name = ?",
+            [config_name],
+        ).fetchall()
+        return list(rows)
+
     def usgs_for_ngen(self, config_name: str, ngen_id: str) -> Optional[str]:
         """Return the USGS id crosswalked to ``ngen_id`` for this run, or None.
 
