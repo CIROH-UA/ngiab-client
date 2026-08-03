@@ -22,18 +22,18 @@ become dead code, to be deleted as a cutover cleanup item (out of scope for the 
 | State | **Single global observable store** (~40-line `get`/`set`/`subscribe`, zero deps) with typed action functions; components subscribe to the slices they use |
 | Charts | **uPlot** (time-series line charts with built-in cursor/tooltip) |
 | UI chrome | **Drop Bootstrap + styled-components.** Minimal custom CSS + hand-built widget elements |
-| Build | **No build step.** Native ES modules served directly, dependencies vendored as local ESM and wired via an `importmap`. No Vite / webpack / CRA. |
-| API layer | `services/api` (axios) + `utilities.js` ported **verbatim** (axios also vendored as ESM) |
+| Build | **No build step.** Native ES modules served directly; dependencies load from a **public CDN** (`esm.sh`) at pinned exact versions, wired via an `importmap`. No Vite / webpack / CRA, no vendored copies. |
+| API layer | `services/api` (axios) + `utilities.js` ported **verbatim** (axios from CDN) |
 | Scope | Core viewer only: `Map`, `ModelRuns`, `hydroFabric`. Single view, no client router beyond a trivial shell |
 
 ## Architecture
 
 A single-page app of custom elements mounted in `index.html`, coordinated by one global store,
 served by Tethys under `root_url="ngiab"` (unchanged). No bundler: the browser loads `main.js` as a
-module and resolves bare imports through an import map that points at vendored, local ESM builds
-(kept in-repo so the app stays fully offline in the single-container/local deployment). The map/tile
-design is untouched: MapLibre in the browser, S3-hosted CONUS PMTiles + style JSON, per-run feature
-IDs from Django. Only the frontend framework changes.
+module and resolves bare imports through an import map pointing at **`esm.sh` CDN URLs at pinned
+exact versions**. Nothing is committed to the repo but our own source. The map/tile design is
+untouched: MapLibre in the browser, S3-hosted CONUS PMTiles + style JSON, per-run feature IDs from
+Django. Only the frontend framework changes.
 
 ### Directory structure (replaces `reactapp/`)
 
@@ -44,9 +44,7 @@ along with `reactapp/`; renaming `app/` → `frontend/` afterwards is optional c
 
 ```
 app/
-  index.html              # <script type="importmap"> + <script type="module" src="src/main.js">
-  vendor/                 # committed ESM builds + their CSS: maplibre-gl, uplot, pmtiles,
-                          #   d3-array, d3-scale, d3-time-format, axios
+  DEPENDENCIES.md         # the pinned CDN URL for every dep — the single source of truth
   src/
     main.js               # build store, mount <ngiab-app>
     store/store.js        # createStore: get / set / subscribe (zero deps)
@@ -66,8 +64,10 @@ app/
     lib/                  # dom.js helpers, time formatting via d3-time-format
 ```
 
-No `node_modules` is required to run the app. A minimal `package.json` may still exist for **dev-only**
-tooling (test runner, linter); it is never needed to serve the app.
+There is no `index.html` here — Tethys serves the Django template at
+`tethysapp/ngiab/templates/ngiab/index.html`, which is where the import map and the module `<script>`
+live. No `node_modules` is required to run the app. A minimal `package.json` may still exist for
+**dev-only** tooling (test runner, linter); it is never needed to serve the app.
 
 ## State & data flow
 
@@ -122,7 +122,7 @@ layout + component styles.
 
 **Open decision:** the searchable/multi-select (`react-select`) is the one widget hard to hand-roll
 well. Use native `<select>` where it suffices; for genuinely searchable cases, either build a minimal
-`ngiab-select` or vendor one tiny ESM dependency (Tom Select). To be settled during Phase 1.
+`ngiab-select` or add one tiny CDN dependency (Tom Select). To be settled during Phase 1.
 
 ## Routing & serving
 
@@ -130,10 +130,11 @@ With DataStream gone there is effectively **one view**, so no real router is nee
 the shell. Tethys `catch_all="home"` continues to serve `index.html`.
 
 No bundler and no manifest: the Django `index.html` template references `src/main.js` as a module and
-declares the import map. Vendored ESM under `vendor/` is served as static files. The one integration
-detail is the **static base URL** under Tethys (the app is served under `/apps/ngiab/…`), so the
-import map and module `src` must resolve against the correct base - injected once into the template
-alongside the existing `TETHYS_APP_ROOT_URL`.
+declares the import map, whose entries are absolute `esm.sh` URLs. The one integration detail is the
+**static base URL** under Tethys (the page is served at `/apps/ngiab/`, our files at
+`/static/ngiab/app/`), so every `{% static %}` URL must be absolute — a relative module specifier
+would resolve against `/apps/ngiab/` and 404. Runtime config replaces the old build-time
+`TETHYS_APP_ROOT_URL` env var: the template injects `window.__NGIAB__`.
 
 ## Testing
 
@@ -148,7 +149,7 @@ non-DOM units.) The test runner is a dev-only dependency and does not affect how
 
 ## Phasing
 
-- **Phase 0 - scaffold:** `index.html` + import map + vendored ESM + store + api port + `ngiab-app`
+- **Phase 0 - scaffold:** template + import map (CDN) + runtime config + store + api port + `ngiab-app`
   shell + Tethys static/template wiring + one trivial element rendering. Proves the (build-less)
   pipeline end-to-end.
 - **Phase 1 - core viewer:** `ngiab-map`, `ngiab-model-runs`, `ngiab-chart`, layer/variable controls,
@@ -159,15 +160,22 @@ non-DOM units.) The test runner is a dev-only dependency and does not affect how
 
 ## Risks / open items
 
-- Searchable-select replacement (native vs minimal build vs vendored Tom Select) - decide in Phase 1.
+- Searchable-select replacement (native `<select>` vs hand-rolled `ngiab-select` vs Tom Select from
+  the CDN) - decide in Phase 1 against a real model-run list.
 - Static base URL under Tethys for module + import-map resolution - proven in Phase 0 before feature work.
-- Vendored ESM deps are updated manually (no npm-driven bumps); record versions in `vendor/`.
-- Vendoring makes the **code** offline-capable, but true air-gapped operation is not yet achieved:
-  the basemap style JSON and `merged.pmtiles` are still fetched from S3 at runtime (`mapgl.js`).
-  Localizing those tiles/styles is a **separate follow-up**, out of scope for this migration.
-- No minification/tree-shaking → larger transferred JS. Acceptable for the local/single-container use
-  case; if a bandwidth-sensitive hosted deploy ever needs it, add an optional one-shot minify step
-  (the only reason to reintroduce a build).
+- **CDN delivery is an accepted tradeoff, not a risk to mitigate.** Dependencies come from `esm.sh` at
+  runtime, so the app requires internet access to load. This does not regress anything real: the
+  basemap style JSON and `merged.pmtiles` were already fetched from S3 at runtime (`mapgl.js`), so the
+  viewer never worked air-gapped. If true air-gapped operation is ever required it is one project —
+  localize tiles/styles **and** vendor the JS together — and out of scope here.
+- CDN specifics: pin **exact** versions (`esm.sh/axios@0.30.2`, never `@latest` or a range) so a
+  publish upstream cannot change behavior under us. Record every URL in `app/DEPENDENCIES.md`.
+  Accept the residual exposure: an `esm.sh` outage takes the app down, and a compromised CDN would
+  serve arbitrary JS. If that becomes unacceptable, the mitigation is a CSP `script-src` allowlist
+  plus import-map `integrity` hashes, or reverting to vendored copies.
+- No minification/tree-shaking on our own source → larger transferred JS (CDN deps do arrive
+  minified). Acceptable for the local/single-container use case; if a bandwidth-sensitive hosted
+  deploy ever needs it, add an optional one-shot minify step (the only reason to reintroduce a build).
 - Import maps require modern evergreen browsers (Chrome/Edge/Firefox, Safari 16.4+) - already implied
   by MapLibre's WebGL2 requirement.
 - Whether any table/list needs virtualization - assess against real data in Phase 1.
