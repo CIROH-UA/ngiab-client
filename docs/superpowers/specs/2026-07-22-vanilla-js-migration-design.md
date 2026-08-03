@@ -37,8 +37,13 @@ IDs from Django. Only the frontend framework changes.
 
 ### Directory structure (replaces `reactapp/`)
 
+Authored at `tethysapp/ngiab/public/app/` — served at `/static/ngiab/app/`. **Not** `public/frontend/`:
+that directory is webpack's output path for the legacy React app (`reactapp/config/webpack.config.js`)
+and must stay gitignored so rebuilds never touch hand-authored source. Phase 2 deletes `public/frontend/`
+along with `reactapp/`; renaming `app/` → `frontend/` afterwards is optional cosmetics.
+
 ```
-frontend/
+app/
   index.html              # <script type="importmap"> + <script type="module" src="src/main.js">
   vendor/                 # committed ESM builds + their CSS: maplibre-gl, uplot, pmtiles,
                           #   d3-array, d3-scale, d3-time-format, axios
@@ -148,9 +153,9 @@ non-DOM units.) The test runner is a dev-only dependency and does not affect how
   pipeline end-to-end.
 - **Phase 1 - core viewer:** `ngiab-map`, `ngiab-model-runs`, `ngiab-chart`, layer/variable controls,
   full linked selection and theming. Ship & validate.
-- **Phase 2 - cutover:** switch Tethys to serve the vanilla `frontend/`; delete `reactapp/` and the
-  React/CRA toolchain (package.json build deps, config); delete the now-unused Django `datastream_*`
-  controllers and `datastream_utils.py`.
+- **Phase 2 - cutover:** switch Tethys to serve the vanilla `public/app/`; delete `reactapp/`, the
+  React/webpack toolchain (package.json build deps, config), and the stale webpack output at
+  `public/frontend/`; delete the now-unused Django `datastream_*` controllers and `datastream_utils.py`.
 
 ## Risks / open items
 
