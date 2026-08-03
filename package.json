@@ -119,7 +119,7 @@
   },
   "size-limit": [
     {
-      "path": "tethysapp/ngiab/public/frontend/main.js",
+      "path": "tethysapp/ngiab/public/react-build/main.js",
       "limit": "10 kB"
     }
   ],

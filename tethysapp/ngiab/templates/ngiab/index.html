@@ -11,6 +11,9 @@
 	<body style="margin: 0;">
 		<noscript>You need to enable JavaScript to run this app.</noscript>
 		<div id="root"></div>
-		<script src="{% static tethys_app|public:'frontend/main.js' %}"></script>
+		<!-- Legacy React bundle. public/frontend/ is now hand-authored vanilla-JS source, so
+		     webpack writes to public/react-build/. Phase 0 Task 11 replaces this whole template
+		     with the vanilla frontend's import map + module script. -->
+		<script src="{% static tethys_app|public:'react-build/main.js' %}"></script>
 	</body>
 </html>

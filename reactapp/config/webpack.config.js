@@ -12,9 +12,12 @@ module.exports = (env, argv) => {
 	return {
 		entry: ['./reactapp'],
 		output: {
-			path: path.resolve(__dirname, '../../tethysapp/ngiab/public/frontend'),
+			// public/frontend/ is now hand-authored vanilla-JS source, so this build writes to
+			// public/react-build/ instead. Both this dir and the legacy React app are deleted at
+			// the Phase 2 cutover of the vanilla-JS migration.
+			path: path.resolve(__dirname, '../../tethysapp/ngiab/public/react-build'),
 			filename: '[name].js',
-			publicPath: '/static/ngiab/frontend/',
+			publicPath: '/static/ngiab/react-build/',
 		},
 		resolve: {
 			modules: [
@@ -85,7 +88,8 @@ module.exports = (env, argv) => {
 		},
 		devServer: {
 			proxy: {
-				'!/static/ngiab/frontend/**': {
+				// Must match output.publicPath — everything except the bundle is proxied to Django.
+				'!/static/ngiab/react-build/**': {
 					target: 'http://127.0.0.1:8000', // points to django dev server
 					changeOrigin: true,
 				},

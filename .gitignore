@@ -38,9 +38,9 @@ build/*
 
 # Node/React
 node_modules*
-# webpack output for the legacy React app (deleted at the Phase 2 cutover);
-# the hand-authored vanilla frontend lives in tethysapp/ngiab/public/app/
-tethysapp/ngiab/public/frontend/
+# webpack output for the legacy React app (deleted at the Phase 2 cutover).
+# NOTE: tethysapp/ngiab/public/frontend/ is hand-authored vanilla-JS source and IS tracked.
+tethysapp/ngiab/public/react-build/
 reactapp/config/production.env
 coverage
 

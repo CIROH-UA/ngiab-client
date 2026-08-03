@@ -13,8 +13,9 @@ when a page at `http://localhost:8000/apps/ngiab/` renders the text `theme=light
 store state with a clean browser console. That single line proves modules resolve, the import map
 works under the Tethys base URL, the store notifies, and custom elements upgrade.
 
-**Architecture:** The app is authored directly under `tethysapp/ngiab/public/app/` — source *is* the
-served static files, no webpack/Vite. The browser loads `src/main.js` as a module; bare imports (e.g.
+**Architecture:** The app is authored directly under `tethysapp/ngiab/public/frontend/` — source *is*
+the served static files, no webpack/Vite, entry point `main.js` (so the served URL
+`/static/ngiab/frontend/main.js` is unchanged from the React app's). The browser loads it as a module; bare imports (e.g.
 `axios`) resolve through an import map declared in the Django template pointing at pinned `esm.sh`
 URLs. Runtime config (the app root URL) is injected by the template into `window.__NGIAB__`. State
 lives in one tiny observable store; UI is native custom elements rendering into light DOM.
@@ -26,14 +27,14 @@ lives in one tiny observable store; UI is native custom elements rendering into 
 
 - **No build step.** No bundler, transpiler, JSX, or TypeScript. Plain ES modules run in the browser
   exactly as authored. If you find yourself wanting a build step, stop and reconsider the design.
-- **App is served from** `tethysapp/ngiab/public/app/` → static URL prefix `/static/ngiab/app/`.
-- **Never author into `tethysapp/ngiab/public/frontend/`.** That is webpack's output path for the
+- **App is served from** `tethysapp/ngiab/public/frontend/` → static URL prefix `/static/ngiab/frontend/`.
+- **Never author into `tethysapp/ngiab/public/react-build/`.** That is webpack's output path for the
   legacy React app (`reactapp/config/webpack.config.js:15`) and stays gitignored until Phase 2
   deletes it. Keeping the two dirs separate is what stops `npm run build` from clobbering source.
 - **Dependencies come from the `esm.sh` CDN** at **pinned exact versions**, wired via the template
   import map. Nothing is vendored into the repo. No `@latest`, no semver ranges in a URL.
 - **Import-map and script URLs must be absolute** (via `{% static %}`). The page is served at
-  `/apps/ngiab/` but our files live at `/static/ngiab/app/` — a relative specifier resolves against
+  `/apps/ngiab/` but our files live at `/static/ngiab/frontend/` — a relative specifier resolves against
   the *document* base and 404s. This is the single most likely thing to break; Task 12 proves it.
 - **Web Components render into light DOM** (no shadow DOM) so the global stylesheets apply.
 - **Single global store.** Components subscribe in `connectedCallback` and **must** unsubscribe in
@@ -59,10 +60,15 @@ whatever this repo already uses — check `run.sh` and the README; typically:
 tethys manage start          # serves http://localhost:8000
 ```
 
-The React app keeps working throughout Phase 0 and 1 — you are building the vanilla app *alongside*
-it. Nothing user-facing changes until Task 11 swaps the template, which is the one reversible-by-git
-moment where the served page becomes the vanilla scaffold. If that bothers you mid-development, do
-Tasks 2–10 and 13 first and leave 11–12 for when you are ready to look at it in a browser.
+The React app can keep working throughout Phase 0 and 1 — you are building the vanilla app
+*alongside* it, in the same directory but under different filenames. Two things to know:
+
+- **The React bundle currently does not exist on disk.** Task 1 repointed webpack to
+  `public/react-build/` and deleted the stale artifacts from `public/frontend/`. Run `npm run build`
+  to regenerate it; the template already points there.
+- **Nothing user-facing changes until Task 11** swaps the template to the vanilla entry. That is the
+  one cutover moment, and `git revert` undoes it. If you would rather not flip the served page
+  mid-development, do Tasks 2–10 and 13 first and leave 11–12 for when you want a browser check.
 
 ---
 
@@ -70,15 +76,15 @@ Tasks 2–10 and 13 first and leave 11–12 for when you are ready to look at it
 
 | # | Task | Touches | Test? |
 |---|---|---|---|
-| 1 | Skeleton dir | `public/app/` | — |
+| 1 | Skeleton dir | `public/frontend/` | — |
 | 2 | Pin CDN dependency URLs | `DEPENDENCIES.md` | curl checks |
-| 3 | Runtime config module | `src/config.js` | yes (TDD) |
-| 4 | Observable store | `src/store/store.js` | yes (TDD) |
-| 5 | Port the API layer | `src/api/*` | yes (TDD) |
-| 6 | App-store singleton + actions | `src/store/app-store.js` | yes (TDD) |
-| 7 | `<ngiab-ping>` element | `src/components/ping/` | yes (TDD) |
-| 8 | `<ngiab-app>` shell | `src/components/ngiab-app.js` | yes |
-| 9 | Entry module | `src/main.js` | — |
+| 3 | Runtime config module | `config.js` | yes (TDD) |
+| 4 | Observable store | `store/store.js` | yes (TDD) |
+| 5 | Port the API layer | `api/*` | yes (TDD) |
+| 6 | App-store singleton + actions | `store/app-store.js` | yes (TDD) |
+| 7 | `<ngiab-ping>` element | `components/ping/` | yes (TDD) |
+| 8 | `<ngiab-app>` shell | `components/ngiab-app.js` | yes |
+| 9 | Entry module | `main.js` | — |
 | 10 | Controller context | `controllers.py` | — |
 | 11 | Django template + import map | `templates/ngiab/index.html` | — |
 | 12 | End-to-end verification | — | manual |
@@ -92,38 +98,56 @@ the whole suite green at Task 13. **Doing Task 13 early is recommended.**
 
 ---
 
-### Task 1: Create the skeleton dir — DONE (with correction)
+### Task 1: Create the skeleton dir and separate the two build outputs — DONE
 
-Already complete; recorded here for context. Originally this task un-ignored
-`tethysapp/ngiab/public/frontend/` and authored the skeleton there. That was wrong: `frontend/` is
-webpack's output path for the React app, so commit `40ec559` tracked seven build artifacts as source
-and any `npm run build` would have overwritten hand-authored files. Corrected in `a2cbe1a` by moving
-the skeleton to `tethysapp/ngiab/public/app/`, restoring the `frontend/` gitignore entry, and
-untracking the artifacts.
+Already complete; recorded here because the resolution shapes every later task.
+
+`public/frontend/` is the hand-authored vanilla source dir, with `main.js` as the entry — the same
+static path the template already loaded, so the served URL never changes. That path was also
+webpack's output path, which is the conflict this task resolved: commit `40ec559` un-ignored the dir
+and thereby tracked seven React build artifacts as source, and any `npm run build` would have
+overwritten hand-authored files.
+
+Resolved by moving the *React* build out of the way rather than the vanilla source:
+
+- `reactapp/config/webpack.config.js:15` now outputs to `public/react-build/`, with `publicPath`
+  `/static/ngiab/react-build/` to match.
+- `.gitignore` ignores `public/react-build/`; `public/frontend/` is tracked source.
+- The seven stale artifacts were deleted from `public/frontend/` — they are regenerable build output.
+- The template's React `<script>` now points at `react-build/main.js`, so React keeps working until
+  Task 11 replaces the template wholesale.
+
+**One consequence to know:** the React bundle is gone from disk until you rebuild it. Run
+`npm run build` if you need the React app served while you work through Phase 0. A rebuild (not just
+a file move) is required because the old `publicPath` is compiled into the bundle's chunk and asset
+URLs.
 
 **Current state on disk:**
 
 ```
-tethysapp/ngiab/public/app/
+tethysapp/ngiab/public/frontend/
   README.md
-  src/styles/tokens.css
-  src/styles/app.css
+  styles/tokens.css
+  styles/app.css
 ```
 
-- [x] `.gitignore` keeps `tethysapp/ngiab/public/frontend/` ignored
-- [x] `public/app/README.md`
-- [x] `public/app/src/styles/tokens.css` — light/dark CSS custom properties
-- [x] `public/app/src/styles/app.css` — base layout styles
+- [x] `reactapp/config/webpack.config.js` outputs to `public/react-build/`
+- [x] `.gitignore` ignores `public/react-build/`, not `public/frontend/`
+- [x] Stale webpack artifacts removed from `public/frontend/`
+- [x] `public/frontend/README.md`
+- [x] `public/frontend/styles/tokens.css` — light/dark CSS custom properties
+- [x] `public/frontend/styles/app.css` — base layout styles
 
 **Verify (do this now, it is your baseline):**
 
 ```bash
-find tethysapp/ngiab/public/app -type f | sort
-git check-ignore -v tethysapp/ngiab/public/frontend/main.js
+find tethysapp/ngiab/public/frontend -type f | sort
+git check-ignore -v tethysapp/ngiab/public/react-build/main.js
+git check-ignore -q tethysapp/ngiab/public/frontend/main.js && echo "BAD: source dir is ignored" || echo "OK: source dir is tracked"
 ```
 
-Expected: the three files above, and the `check-ignore` line
-`.gitignore:43:tethysapp/ngiab/public/frontend/	tethysapp/ngiab/public/frontend/main.js`.
+Expected: exactly the three files above; a `check-ignore` hit on `react-build/`; and `OK: source dir
+is tracked`.
 
 ---
 
@@ -144,7 +168,7 @@ CJS packages the browser cannot import at all. Use jsDelivr only for plain `.css
 module rewriting is needed.
 
 **Files:**
-- Create: `tethysapp/ngiab/public/app/DEPENDENCIES.md`
+- Create: `tethysapp/ngiab/public/frontend/DEPENDENCIES.md`
 
 - [ ] **Step 1: Confirm the versions already used by the React app**
 
@@ -170,7 +194,7 @@ If a version differs, use **your** output — update the URLs in Step 2 to match
 
 - [ ] **Step 2: Write `DEPENDENCIES.md`**
 
-`tethysapp/ngiab/public/app/DEPENDENCIES.md`:
+`tethysapp/ngiab/public/frontend/DEPENDENCIES.md`:
 
 ```markdown
 # Frontend dependencies (CDN, no bundler)
@@ -275,7 +299,7 @@ Expected: `200` on every line — all nine URLs in this task were verified 2026-
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tethysapp/ngiab/public/app/DEPENDENCIES.md
+git add tethysapp/ngiab/public/frontend/DEPENDENCIES.md
 git commit -m "docs: pin CDN dependency URLs for the vanilla frontend"
 ```
 
@@ -295,15 +319,15 @@ newer patch version, and record whatever you chose in `DEPENDENCIES.md`.
 usable in tests, where no template ran.
 
 **Files:**
-- Create: `tethysapp/ngiab/public/app/src/config.js`
-- Create: `tethysapp/ngiab/public/app/src/config.test.js`
+- Create: `tethysapp/ngiab/public/frontend/config.js`
+- Create: `tethysapp/ngiab/public/frontend/config.test.js`
 
 **Interface produced:** `getConfig() -> { APP_ROOT_URL: string, PORTAL_HOST: string }`.
 Consumed by Task 5.
 
 - [ ] **Step 1: Write the failing test**
 
-`tethysapp/ngiab/public/app/src/config.test.js`:
+`tethysapp/ngiab/public/frontend/config.test.js`:
 
 ```js
 import { expect } from '@esm-bundle/chai';
@@ -341,7 +365,7 @@ Expected failure: cannot resolve `./config.js` (module not found). **If the erro
 
 - [ ] **Step 3: Implement**
 
-`tethysapp/ngiab/public/app/src/config.js`:
+`tethysapp/ngiab/public/frontend/config.js`:
 
 ```js
 // Runtime config, injected by the Django template into window.__NGIAB__.
@@ -368,7 +392,7 @@ Expected: 3 passing.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tethysapp/ngiab/public/app/src/config.js tethysapp/ngiab/public/app/src/config.test.js
+git add tethysapp/ngiab/public/frontend/config.js tethysapp/ngiab/public/frontend/config.test.js
 git commit -m "feat: runtime config module reading window.__NGIAB__"
 ```
 
@@ -384,15 +408,15 @@ selectors, middleware, immutability helpers, or path-based subscriptions until a
 needs one.
 
 **Files:**
-- Create: `tethysapp/ngiab/public/app/src/store/store.js`
-- Create: `tethysapp/ngiab/public/app/src/store/store.test.js`
+- Create: `tethysapp/ngiab/public/frontend/store/store.js`
+- Create: `tethysapp/ngiab/public/frontend/store/store.test.js`
 
 **Interface produced:** `createStore(initialState) -> { get, set, subscribe }` where `subscribe`
 returns an unsubscribe function. Consumed by Task 6.
 
 - [ ] **Step 1: Write the failing test**
 
-`tethysapp/ngiab/public/app/src/store/store.test.js`:
+`tethysapp/ngiab/public/frontend/store/store.test.js`:
 
 ```js
 import { expect } from '@esm-bundle/chai';
@@ -457,7 +481,7 @@ Expected: cannot resolve `./store.js`.
 
 - [ ] **Step 3: Implement**
 
-`tethysapp/ngiab/public/app/src/store/store.js`:
+`tethysapp/ngiab/public/frontend/store/store.js`:
 
 ```js
 // Minimal observable store: get / set (shallow merge) / subscribe.
@@ -497,7 +521,7 @@ Expected: 6 passing (plus Task 3's 3).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tethysapp/ngiab/public/app/src/store/
+git add tethysapp/ngiab/public/frontend/store/
 git commit -m "feat: minimal observable store"
 ```
 
@@ -513,11 +537,11 @@ local import becomes an explicit relative path with a `.js` extension. Two real 
 port, both called out below.
 
 **Files:**
-- Create: `tethysapp/ngiab/public/app/src/api/utilities.js`
-- Create: `tethysapp/ngiab/public/app/src/api/tethys.js`
-- Create: `tethysapp/ngiab/public/app/src/api/client.js`
-- Create: `tethysapp/ngiab/public/app/src/api/app.js`
-- Create: `tethysapp/ngiab/public/app/src/api/app.test.js`
+- Create: `tethysapp/ngiab/public/frontend/api/utilities.js`
+- Create: `tethysapp/ngiab/public/frontend/api/tethys.js`
+- Create: `tethysapp/ngiab/public/frontend/api/client.js`
+- Create: `tethysapp/ngiab/public/frontend/api/app.js`
+- Create: `tethysapp/ngiab/public/frontend/api/app.test.js`
 
 **Interface produced:** default export `appAPI` with `getModelRuns`, `getGeoSpatialData`,
 `getNexusTimeSeries`, `getCatchmentTimeSeries`, `getTrouteVariables`, `getTrouteTimeSeries`,
@@ -529,7 +553,7 @@ port, both called out below.
 Source: `reactapp/services/utilities.js`. The only change is the config source —
 `process.env.TETHYS_PORTAL_HOST` does not exist at runtime.
 
-`tethysapp/ngiab/public/app/src/api/utilities.js`:
+`tethysapp/ngiab/public/frontend/api/utilities.js`:
 
 ```js
 import { getConfig } from '../config.js';
@@ -546,7 +570,7 @@ export function getTethysPortalHost() {
 
 Source: `reactapp/services/api/tethys.js`, verbatim except the import specifier.
 
-`tethysapp/ngiab/public/app/src/api/tethys.js`:
+`tethysapp/ngiab/public/frontend/api/tethys.js`:
 
 ```js
 import apiClient from './client.js';
@@ -587,7 +611,7 @@ Two deliberate changes from the React version, both bug fixes:
    `TypeError: Cannot read properties of undefined` on any network-level failure (server down, CORS,
    timeout) — masking the real error with a confusing one.
 
-`tethysapp/ngiab/public/app/src/api/client.js`:
+`tethysapp/ngiab/public/frontend/api/client.js`:
 
 ```js
 import axios from 'axios';
@@ -629,7 +653,7 @@ is wrong.
 
 - [ ] **Step 4: Write `app.js` — viewer endpoints only**
 
-`tethysapp/ngiab/public/app/src/api/app.js`:
+`tethysapp/ngiab/public/frontend/api/app.js`:
 
 ```js
 import apiClient from './client.js';
@@ -661,7 +685,7 @@ exist in `controllers.py` but become dead code, deleted at the Phase 2 cutover.
 
 - [ ] **Step 5: Write the test**
 
-`tethysapp/ngiab/public/app/src/api/app.test.js`:
+`tethysapp/ngiab/public/frontend/api/app.test.js`:
 
 ```js
 import { expect } from '@esm-bundle/chai';
@@ -725,7 +749,7 @@ Expected: 3 passing here. If you see `Failed to resolve module specifier "axios"
 - [ ] **Step 7: Commit**
 
 ```bash
-git add tethysapp/ngiab/public/app/src/api/
+git add tethysapp/ngiab/public/frontend/api/
 git commit -m "feat: port API layer to ES modules (viewer endpoints only)"
 ```
 
@@ -740,14 +764,14 @@ transitions in one readable file and mirrors the React app's reducer action name
 are close to 1:1. Phase 0 needs only two actions; Phase 1 adds the rest.
 
 **Files:**
-- Create: `tethysapp/ngiab/public/app/src/store/app-store.js`
-- Create: `tethysapp/ngiab/public/app/src/store/app-store.test.js`
+- Create: `tethysapp/ngiab/public/frontend/store/app-store.js`
+- Create: `tethysapp/ngiab/public/frontend/store/app-store.test.js`
 
 **Interface produced:** named exports `store` and `actions` (`setTheme(theme)`, `setModelRun(id)`).
 
 - [ ] **Step 1: Write the failing test**
 
-`tethysapp/ngiab/public/app/src/store/app-store.test.js`:
+`tethysapp/ngiab/public/frontend/store/app-store.test.js`:
 
 ```js
 import { expect } from '@esm-bundle/chai';
@@ -788,7 +812,7 @@ npm run test:frontend
 
 - [ ] **Step 3: Implement**
 
-`tethysapp/ngiab/public/app/src/store/app-store.js`:
+`tethysapp/ngiab/public/frontend/store/app-store.js`:
 
 ```js
 import { createStore } from './store.js';
@@ -818,7 +842,7 @@ Expected: 3 passing here.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tethysapp/ngiab/public/app/src/store/app-store.js tethysapp/ngiab/public/app/src/store/app-store.test.js
+git add tethysapp/ngiab/public/frontend/store/app-store.js tethysapp/ngiab/public/frontend/store/app-store.test.js
 git commit -m "feat: app-store singleton with named actions"
 ```
 
@@ -834,12 +858,12 @@ from "does the map work". When Phase 1's map misbehaves you will want to know th
 proven. Delete it once `<ngiab-map>` renders.
 
 **Files:**
-- Create: `tethysapp/ngiab/public/app/src/components/ping/ngiab-ping.js`
-- Create: `tethysapp/ngiab/public/app/src/components/ping/ngiab-ping.test.js`
+- Create: `tethysapp/ngiab/public/frontend/components/ping/ngiab-ping.js`
+- Create: `tethysapp/ngiab/public/frontend/components/ping/ngiab-ping.test.js`
 
 - [ ] **Step 1: Write the failing test**
 
-`tethysapp/ngiab/public/app/src/components/ping/ngiab-ping.test.js`:
+`tethysapp/ngiab/public/frontend/components/ping/ngiab-ping.test.js`:
 
 ```js
 import { expect } from '@esm-bundle/chai';
@@ -905,7 +929,7 @@ npm run test:frontend
 
 - [ ] **Step 3: Implement**
 
-`tethysapp/ngiab/public/app/src/components/ping/ngiab-ping.js`:
+`tethysapp/ngiab/public/frontend/components/ping/ngiab-ping.js`:
 
 ```js
 import { store } from '../../store/app-store.js';
@@ -947,7 +971,7 @@ Expected: 4 passing here.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add tethysapp/ngiab/public/app/src/components/ping/
+git add tethysapp/ngiab/public/frontend/components/ping/
 git commit -m "feat: ngiab-ping element rendering store state"
 ```
 
@@ -958,12 +982,12 @@ git commit -m "feat: ngiab-ping element rendering store state"
 **Goal:** the layout shell that Phase 1 hangs real components off.
 
 **Files:**
-- Create: `tethysapp/ngiab/public/app/src/components/ngiab-app.js`
-- Create: `tethysapp/ngiab/public/app/src/components/ngiab-app.test.js`
+- Create: `tethysapp/ngiab/public/frontend/components/ngiab-app.js`
+- Create: `tethysapp/ngiab/public/frontend/components/ngiab-app.test.js`
 
 - [ ] **Step 1: Write the test**
 
-`tethysapp/ngiab/public/app/src/components/ngiab-app.test.js`:
+`tethysapp/ngiab/public/frontend/components/ngiab-app.test.js`:
 
 ```js
 import { expect } from '@esm-bundle/chai';
@@ -995,7 +1019,7 @@ npm run test:frontend
 
 - [ ] **Step 3: Implement**
 
-`tethysapp/ngiab/public/app/src/components/ngiab-app.js`:
+`tethysapp/ngiab/public/frontend/components/ngiab-app.js`:
 
 ```js
 // Importing for the side effect of customElements.define — the shell owns which
@@ -1018,7 +1042,7 @@ customElements.define('ngiab-app', NgiabApp);
 
 ```bash
 npm run test:frontend
-git add tethysapp/ngiab/public/app/src/components/ngiab-app.js tethysapp/ngiab/public/app/src/components/ngiab-app.test.js
+git add tethysapp/ngiab/public/frontend/components/ngiab-app.js tethysapp/ngiab/public/frontend/components/ngiab-app.test.js
 git commit -m "feat: ngiab-app shell element"
 ```
 
@@ -1029,11 +1053,11 @@ git commit -m "feat: ngiab-app shell element"
 **Goal:** mount the shell into the page's `#root`.
 
 **Files:**
-- Create: `tethysapp/ngiab/public/app/src/main.js`
+- Create: `tethysapp/ngiab/public/frontend/main.js`
 
 - [ ] **Step 1: Write `main.js`**
 
-`tethysapp/ngiab/public/app/src/main.js`:
+`tethysapp/ngiab/public/frontend/main.js`:
 
 ```js
 import './components/ngiab-app.js';
@@ -1052,7 +1076,7 @@ document is parsed by the time this runs.
 - [ ] **Step 2: Commit**
 
 ```bash
-git add tethysapp/ngiab/public/app/src/main.js
+git add tethysapp/ngiab/public/frontend/main.js
 git commit -m "feat: frontend entry module mounts ngiab-app"
 ```
 
@@ -1090,7 +1114,7 @@ with:
 def home(request):
     """Controller for the app home page."""
     # The index.html template loads the build-less vanilla frontend from
-    # public/app/ and injects runtime config into window.__NGIAB__.
+    # public/frontend/ and injects runtime config into window.__NGIAB__.
     context = {"app_root_url": f"/apps/{App.root_url}/"}
     return App.render(request, "index.html", context)
 ```
@@ -1117,7 +1141,7 @@ git commit -m "feat: pass app_root_url into the index template context"
 ### Task 11: The Django template — import map and module script
 
 **Goal:** replace the React-loading template with one that declares the CDN import map, injects
-runtime config, links the stylesheets, and loads `src/main.js` as a module.
+runtime config, links the stylesheets, and loads `main.js` as a module.
 
 **This is the task most likely to bite.** Four ordering/resolution rules, all load-bearing:
 
@@ -1126,7 +1150,7 @@ runtime config, links the stylesheets, and loads `src/main.js` as a module.
 2. **Exactly one import map per document.** Not a problem here, but relevant if a Tethys base
    template ever adds one.
 3. **Every URL must be absolute**, via `{% static %}`. The page is at `/apps/ngiab/` and our files
-   are at `/static/ngiab/app/` — a relative `src="src/main.js"` resolves to `/apps/ngiab/src/main.js`
+   are at `/static/ngiab/frontend/` — a relative `src="main.js"` resolves to `/apps/ngiab/main.js`
    and 404s.
 4. **`window.__NGIAB__` must be set before `main.js` runs.** A classic `<script>` in `<head>`
    satisfies this: module scripts are deferred, classic inline scripts are not.
@@ -1136,15 +1160,21 @@ runtime config, links the stylesheets, and loads `src/main.js` as a module.
 
 - [ ] **Step 1: Note what the current template does**
 
-It is 16 lines that load one webpack bundle:
+It is a short page whose only job is loading one classic webpack bundle:
 
 ```html
-<script src="{% static tethys_app|public:'frontend/main.js' %}"></script>
+<script src="{% static tethys_app|public:'react-build/main.js' %}"></script>
 ```
 
 `tethys_app|public:'…'` is the Tethys filter mapping a path inside the app's `public/` dir to its
-static URL — `frontend/main.js` → `/static/ngiab/frontend/main.js`. Keep the filter, change the
-path to `app/…`. Keep `{% load static tethys %}` on line 1; without it the filter is undefined.
+static URL — `react-build/main.js` → `/static/ngiab/react-build/main.js`. Keep the filter and keep
+`{% load static tethys %}` on line 1; without that load tag the filter is silently undefined and
+renders an empty `href`/`src`.
+
+Three things change in Step 2: the path becomes `frontend/main.js` (the vanilla entry), the script
+gains `type="module"`, and the import map plus runtime-config block appear above it. **This is the
+cutover moment** — after this commit the served page is the vanilla scaffold, not React. `git revert`
+is your undo.
 
 - [ ] **Step 2: Replace the template**
 
@@ -1170,7 +1200,7 @@ path to `app/…`. Keep `{% load static tethys %}` on line 1; without it the fil
     </script>
 
     <!-- Import map for bare specifiers. MUST come before any module script.
-         Versions are pinned and documented in public/app/DEPENDENCIES.md. -->
+         Versions are pinned and documented in public/frontend/DEPENDENCIES.md. -->
     <script type="importmap">
     {
       "imports": {
@@ -1179,13 +1209,13 @@ path to `app/…`. Keep `{% load static tethys %}` on line 1; without it the fil
     }
     </script>
 
-    <link rel="stylesheet" href="{% static tethys_app|public:'app/src/styles/tokens.css' %}" />
-    <link rel="stylesheet" href="{% static tethys_app|public:'app/src/styles/app.css' %}" />
+    <link rel="stylesheet" href="{% static tethys_app|public:'frontend/styles/tokens.css' %}" />
+    <link rel="stylesheet" href="{% static tethys_app|public:'frontend/styles/app.css' %}" />
   </head>
   <body style="margin: 0;">
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-    <script type="module" src="{% static tethys_app|public:'app/src/main.js' %}"></script>
+    <script type="module" src="{% static tethys_app|public:'frontend/main.js' %}"></script>
   </body>
 </html>
 ```
@@ -1230,19 +1260,19 @@ tethys manage start
 - [ ] **Step 3: Check the rendered HTML**
 
 ```bash
-curl -s http://localhost:8000/apps/ngiab/ | grep -E 'importmap|__NGIAB__|APP_ROOT_URL|app/src/main.js|esm.sh'
+curl -s http://localhost:8000/apps/ngiab/ | grep -E 'importmap|__NGIAB__|APP_ROOT_URL|frontend/main.js|esm.sh'
 ```
 
 Expected, all present:
 - `window.__NGIAB__ = {` followed by `APP_ROOT_URL: "/apps/ngiab/"`
 - `<script type="importmap">` containing `https://esm.sh/axios@0.30.2`
-- `<script type="module" src="/static/ngiab/app/src/main.js">`
+- `<script type="module" src="/static/ngiab/frontend/main.js">`
 
 Then confirm the static files are actually served — a rendered URL is not a working URL:
 
 ```bash
-for p in app/src/main.js app/src/styles/app.css app/src/styles/tokens.css \
-         app/src/components/ngiab-app.js app/src/store/app-store.js ; do
+for p in frontend/main.js frontend/styles/app.css frontend/styles/tokens.css \
+         frontend/components/ngiab-app.js frontend/store/app-store.js ; do
   printf '%s  %s\n' "$(curl -sS -o /dev/null -w '%{http_code}' "http://localhost:8000/static/ngiab/$p")" "$p"
 done
 ```
@@ -1270,7 +1300,7 @@ Expected: `"theme=light modelRun=none"`. Phase 0 does not export the store globa
 live update paste this:
 
 ```js
-const { actions } = await import('/static/ngiab/app/src/store/app-store.js');
+const { actions } = await import('/static/ngiab/frontend/store/app-store.js');
 actions.setTheme('dark');
 document.querySelector('ngiab-ping').textContent;   // "theme=dark modelRun=none"
 ```
@@ -1288,7 +1318,8 @@ exactly why mutating it updates the visible element.
 | Symptom | Cause | Fix |
 |---|---|---|
 | Blank page, console: `Failed to resolve module specifier "axios"` | Import map missing, malformed JSON, or placed after a module script | Check Task 11 rules 1–2; view-source and confirm the `importmap` block precedes the module `<script>` |
-| 404 on `/static/ngiab/app/src/main.js` | Static files not collected, or wrong path in the template | Task 12 Step 1; confirm the template says `app/src/main.js`, not `frontend/…` |
+| 404 on `/static/ngiab/frontend/main.js` | Static files not collected, or the template still points at `react-build/main.js` | Task 12 Step 1; confirm Task 11 Step 2 changed the path to `frontend/main.js` and added `type="module"` |
+| The old React app renders instead of the scaffold | Task 11 not applied, or a stale collected copy of the template | Re-run `tethys manage collectstatic`, hard-reload; confirm view-source shows the `importmap` block |
 | Header renders, no `theme=…` text | `ngiab-ping` never registered, or JS threw before mount | Console will show the throw; check that `ngiab-app.js` imports `./ping/ngiab-ping.js` |
 | Console: `#root not found` | Template lost `<div id="root">` | Restore it in Task 11's body |
 | Unstyled page | Stylesheet 404, or `{% load static tethys %}` missing so the filter silently produced nothing | View-source and check the `<link href>` values are non-empty |
@@ -1301,7 +1332,7 @@ exactly why mutating it updates the visible element.
 
 **Do this first if you want real TDD** — it has no dependency on Tasks 2–12.
 
-**Goal:** `npm run test:frontend` runs every `*.test.js` under `public/app/src/` in a real browser.
+**Goal:** `npm run test:frontend` runs every `*.test.js` under `public/frontend/` in a real browser.
 
 **Why `@web/test-runner`:** it serves native ES modules to an actual browser, so the code under test
 is byte-for-byte what production runs. jsdom under jest would need a transform step — reintroducing
@@ -1334,9 +1365,9 @@ These are **dev-only** and never needed to serve the app — the no-build-step r
 ```js
 export default {
   // Resolves bare specifiers (axios) from node_modules. Keep the installed axios version
-  // in sync with the CDN pin in tethysapp/ngiab/public/app/DEPENDENCIES.md.
+  // in sync with the CDN pin in tethysapp/ngiab/public/frontend/DEPENDENCIES.md.
   nodeResolve: true,
-  files: ['tethysapp/ngiab/public/app/src/**/*.test.js'],
+  files: ['tethysapp/ngiab/public/frontend/**/*.test.js'],
 };
 ```
 
@@ -1381,7 +1412,7 @@ git commit -m "test: add @web/test-runner config and frontend test script"
 |---|---|
 | `Could not find a browser` / Chrome launch failure (common in WSL2) | Install the puppeteer launcher: `npm i -D @web/test-runner-puppeteer`, then add to the config: `import { puppeteerLauncher } from '@web/test-runner-puppeteer';` and `browsers: [puppeteerLauncher()]` |
 | `Failed to resolve module specifier "axios"` | `nodeResolve: true` missing, or axios not installed — `npm ls axios` |
-| Zero tests found | The `files` glob is relative to the repo root; run `npm run test:frontend` from the root, not from inside `public/app/` |
+| Zero tests found | The `files` glob is relative to the repo root; run `npm run test:frontend` from the root, not from inside `public/frontend/` |
 | A store test fails only when the full suite runs | Cross-file singleton leakage — have each case set the state it depends on rather than assuming a fresh store |
 
 ---
@@ -1399,7 +1430,7 @@ Plus the Task 12 browser check passing: header, `theme=light modelRun=none`, cle
 
 - [ ] **Step 2: Record the two live coupling points**
 
-Append to `tethysapp/ngiab/public/app/DEPENDENCIES.md`:
+Append to `tethysapp/ngiab/public/frontend/DEPENDENCIES.md`:
 
 ```markdown
 ## Coupling to keep in sync
@@ -1414,7 +1445,7 @@ Append to `tethysapp/ngiab/public/app/DEPENDENCIES.md`:
 - [ ] **Step 3: Commit and push**
 
 ```bash
-git add tethysapp/ngiab/public/app/DEPENDENCIES.md
+git add tethysapp/ngiab/public/frontend/DEPENDENCIES.md
 git commit -m "docs: record CDN/import-map/npm coupling points"
 git push -u origin feature/vanilla-js-migration
 ```
@@ -1430,7 +1461,7 @@ Phase 1 needs its own plan. Its first three decisions, all deferred from the des
 3. **Whether `<ngiab-map>` needs the store or props.** The map is the one component heavy enough that
    a global-store subscription might cause redundant work; measure before adding machinery.
 
-Delete `src/components/ping/` once `<ngiab-map>` renders — it has served its purpose.
+Delete `components/ping/` once `<ngiab-map>` renders — it has served its purpose.
 
 ---
 

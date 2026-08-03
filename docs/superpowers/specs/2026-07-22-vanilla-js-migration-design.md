@@ -37,32 +37,39 @@ Django. Only the frontend framework changes.
 
 ### Directory structure (replaces `reactapp/`)
 
-Authored at `tethysapp/ngiab/public/app/` — served at `/static/ngiab/app/`. **Not** `public/frontend/`:
-that directory is webpack's output path for the legacy React app (`reactapp/config/webpack.config.js`)
-and must stay gitignored so rebuilds never touch hand-authored source. Phase 2 deletes `public/frontend/`
-along with `reactapp/`; renaming `app/` → `frontend/` afterwards is optional cosmetics.
+Authored at `tethysapp/ngiab/public/frontend/` — served at `/static/ngiab/frontend/`, entry point
+`main.js`. That keeps the served URL identical to the React app's, so the Django template's script
+path does not change (only its `type="module"` and the added import map do).
+
+That path was also webpack's output path, which is the conflict this resolves: the *React* build moved
+instead. `reactapp/config/webpack.config.js` now writes to `public/react-build/` with a matching
+`publicPath`, and `.gitignore` ignores `react-build/` while `frontend/` is tracked source. Phase 2
+deletes `react-build/` along with `reactapp/`.
 
 ```
-app/
+frontend/
+  main.js                 # entry: mount <ngiab-app> into #root
+  config.js               # runtime config read from window.__NGIAB__
   DEPENDENCIES.md         # the pinned CDN URL for every dep — the single source of truth
-  src/
-    main.js               # build store, mount <ngiab-app>
-    store/store.js        # createStore: get / set / subscribe (zero deps)
-    store/actions.js      # typed mutators: setModelRun, selectFeature, setVariable,
-                          #   toggleLayer, setTheme, reset, reset_teehr, reset_troute...
-    api/                  # ported verbatim: client.js, app.js, tethys.js, utilities.js
-    components/
-      ngiab-app.js        # layout shell
-      map/ngiab-map.js
-      model-runs/ngiab-model-runs.js
-      hydrofabric/
-        ngiab-chart.js        # uPlot wrapper (nexus / catchment / troute / teehr)
-        ngiab-layer-control.js
-        ngiab-variable-select.js
-      widgets/            # ngiab-select, ngiab-toast, ngiab-modal, ngiab-table, ngiab-switch
-    styles/               # tokens.css (light/dark vars), app.css
-    lib/                  # dom.js helpers, time formatting via d3-time-format
+  store/store.js          # createStore: get / set / subscribe (zero deps)
+  store/app-store.js      # the singleton + typed mutators: setModelRun, selectFeature,
+                          #   setVariable, toggleLayer, setTheme, reset, reset_teehr...
+  api/                    # ported verbatim: client.js, app.js, tethys.js, utilities.js
+  components/
+    ngiab-app.js          # layout shell
+    map/ngiab-map.js
+    model-runs/ngiab-model-runs.js
+    hydrofabric/
+      ngiab-chart.js          # uPlot wrapper (nexus / catchment / troute / teehr)
+      ngiab-layer-control.js
+      ngiab-variable-select.js
+    widgets/              # ngiab-select, ngiab-toast, ngiab-modal, ngiab-table, ngiab-switch
+  styles/                 # tokens.css (light/dark vars), app.css
+  lib/                    # dom.js helpers, time formatting via d3-time-format
 ```
+
+Flat, with no `src/` level, so the entry stays at `frontend/main.js` — the exact static path the
+React bundle occupied.
 
 There is no `index.html` here — Tethys serves the Django template at
 `tethysapp/ngiab/templates/ngiab/index.html`, which is where the import map and the module `<script>`
@@ -129,12 +136,15 @@ well. Use native `<select>` where it suffices; for genuinely searchable cases, e
 With DataStream gone there is effectively **one view**, so no real router is needed - `ngiab-app` is
 the shell. Tethys `catch_all="home"` continues to serve `index.html`.
 
-No bundler and no manifest: the Django `index.html` template references `src/main.js` as a module and
-declares the import map, whose entries are absolute `esm.sh` URLs. The one integration detail is the
-**static base URL** under Tethys (the page is served at `/apps/ngiab/`, our files at
-`/static/ngiab/app/`), so every `{% static %}` URL must be absolute — a relative module specifier
+No bundler and no manifest: the Django `index.html` template references `frontend/main.js` as a module
+and declares the import map, whose entries are absolute `esm.sh` URLs. The one integration detail is
+the **static base URL** under Tethys (the page is served at `/apps/ngiab/`, our files at
+`/static/ngiab/frontend/`), so every `{% static %}` URL must be absolute — a relative module specifier
 would resolve against `/apps/ngiab/` and 404. Runtime config replaces the old build-time
 `TETHYS_APP_ROOT_URL` env var: the template injects `window.__NGIAB__`.
+
+Because the entry path is unchanged from the React app's, the cutover is a one-line change in the
+template — `type="module"` plus the import map — rather than a new URL to wire up.
 
 ## Testing
 
@@ -154,9 +164,10 @@ non-DOM units.) The test runner is a dev-only dependency and does not affect how
   pipeline end-to-end.
 - **Phase 1 - core viewer:** `ngiab-map`, `ngiab-model-runs`, `ngiab-chart`, layer/variable controls,
   full linked selection and theming. Ship & validate.
-- **Phase 2 - cutover:** switch Tethys to serve the vanilla `public/app/`; delete `reactapp/`, the
-  React/webpack toolchain (package.json build deps, config), and the stale webpack output at
-  `public/frontend/`; delete the now-unused Django `datastream_*` controllers and `datastream_utils.py`.
+- **Phase 2 - cutover:** delete `reactapp/`, the React/webpack toolchain (package.json build deps,
+  webpack + babel config), and the `public/react-build/` output dir plus its `.gitignore` entry;
+  delete the now-unused Django `datastream_*` controllers and `datastream_utils.py`. The template
+  already serves the vanilla frontend from Phase 0 Task 11, so no serving change is needed here.
 
 ## Risks / open items
 
@@ -169,7 +180,7 @@ non-DOM units.) The test runner is a dev-only dependency and does not affect how
   viewer never worked air-gapped. If true air-gapped operation is ever required it is one project —
   localize tiles/styles **and** vendor the JS together — and out of scope here.
 - CDN specifics: pin **exact** versions (`esm.sh/axios@0.30.2`, never `@latest` or a range) so a
-  publish upstream cannot change behavior under us. Record every URL in `app/DEPENDENCIES.md`.
+  publish upstream cannot change behavior under us. Record every URL in `frontend/DEPENDENCIES.md`.
   Accept the residual exposure: an `esm.sh` outage takes the app down, and a compromised CDN would
   serve arbitrary JS. If that becomes unacceptable, the mitigation is a CSP `script-src` allowlist
   plus import-map `integrity` hashes, or reverting to vendored copies.
