@@ -72,6 +72,9 @@ const state = {
   showTeehr: true,
   selectedCatchmentId: null, // numeric, to match the tiles
   catchmentIds: [], // numeric
+  // Search index: [{ label: 'cat-1015', numeric: 1015 }]. Built from the same
+  // getGeoSpatialData payload, so searching needs no request per keystroke.
+  catchmentIndex: [],
   // Nexus ids (numeric) that have TEEHR results for this run, and nexus -> USGS gauge id.
   // Geometry is joined to TEEHR through the downstream nexus: a divide's/flowpath's `toid`.
   teehrNexusIds: [],
@@ -282,18 +285,119 @@ function handleClick(map, event) {
     return;
   }
 
-  state.selectedCatchmentId = catchmentId;
   // The geometry joins to TEEHR through its downstream nexus, so the gauge for a clicked
   // catchment is whatever gauge sits on its `toid`.
-  const nexusId = feature.properties.toid;
+  selectCatchment(map, {
+    numeric: catchmentId,
+    label: labelForCatchment(catchmentId),
+    nexusId: feature.properties.toid,
+    fly: false, // the user already clicked where they wanted to be
+  });
+}
+
+// The tiles only carry numbers; the run's payload has the "cat-N" labels.
+function labelForCatchment(numericId) {
+  const entry = state.catchmentIndex.find((candidate) => candidate.numeric === numericId);
+  return entry ? entry.label : String(numericId);
+}
+
+// ---------------------------------------------------------------------------
+// Locating a catchment
+//
+// There is no per-catchment geometry on the client -- getGeoSpatialData returns only the
+// run's overall bounds. So a search hit is located by querying the vector source for the
+// matching feature and unioning its coordinate extent.
+//
+// Caveat: querySourceFeatures only sees tiles that are currently LOADED. After the initial
+// fitBounds to the run that covers the run's own catchments, but a hit can still miss if
+// the tile is not resident. Callers must handle null -- the highlight filter is set either
+// way, so the feature colours in as soon as it is panned into view. The clean fix is a
+// backend lookup returning the catchment's bbox from the geopackage.
+// ---------------------------------------------------------------------------
+function extendBounds(bounds, coords) {
+  // GeoJSON coordinate arrays nest arbitrarily deep (Polygon vs MultiPolygon).
+  if (typeof coords[0] === 'number') {
+    const [lng, lat] = coords;
+    bounds[0] = Math.min(bounds[0], lng);
+    bounds[1] = Math.min(bounds[1], lat);
+    bounds[2] = Math.max(bounds[2], lng);
+    bounds[3] = Math.max(bounds[3], lat);
+    return;
+  }
+  for (const part of coords) extendBounds(bounds, part);
+}
+
+function catchmentBounds(map, numericId) {
+  if (!map.getSource(SRC_DIVIDES)) return null;
+  const features = map.querySourceFeatures(SRC_DIVIDES, {
+    sourceLayer: LAYER_DIVIDES,
+    filter: ['==', catchmentRef(), numericId],
+  });
+  if (!features.length) return null;
+
+  const bounds = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const feature of features) {
+    if (feature.geometry?.coordinates) extendBounds(bounds, feature.geometry.coordinates);
+  }
+  return Number.isFinite(bounds[0]) ? bounds : null;
+}
+
+// Single entry point for "this catchment is now selected", used by both the map click and
+// the search bar so they cannot drift.
+function selectCatchment(map, { numeric, label, nexusId, fly }) {
+  state.selectedCatchmentId = numeric;
+  refresh(map); // highlight applies whether or not we can locate it
+
+  let located = true;
+  if (fly) {
+    const bounds = catchmentBounds(map, numeric);
+    if (bounds) map.fitBounds(bounds, { padding: 80, duration: 800, maxZoom: 12 });
+    else located = false;
+  }
+
+  const teehrId =
+    nexusId !== undefined ? (state.teehrUsgsByNexus.get(nexusId) ?? null) : lookupTeehrId(numeric);
+
   onSelect({
     type: 'catchment',
-    id: catchmentId,
-    trouteId: catchmentId,
+    id: label ?? numeric,
+    numeric,
+    trouteId: label ?? numeric,
     nexusId,
-    teehrId: state.teehrUsgsByNexus.get(nexusId) ?? null,
+    teehrId,
+    located,
   });
-  refresh(map);
+}
+
+// catchment -> downstream nexus, harvested from whatever divide tiles are loaded.
+//
+// Built in ONE pass and cached, rather than a filtered query per lookup: the search list
+// needs this for every visible row on every keystroke, and querySourceFeatures scans all
+// loaded tiles each call. Rebuilt when tile loading settles, since more tiles mean more
+// known catchments.
+const nexusByCatchment = new Map();
+
+function reindexCatchmentNexus(map) {
+  if (!map.getSource(SRC_DIVIDES)) return;
+  let features;
+  try {
+    features = map.querySourceFeatures(SRC_DIVIDES, { sourceLayer: LAYER_DIVIDES });
+  } catch {
+    return; // source not ready yet
+  }
+  for (const feature of features) {
+    const key = CATCHMENT_KEY === 'id' ? feature.id : feature.properties?.[CATCHMENT_KEY];
+    const toid = feature.properties?.toid;
+    if (key !== undefined && toid !== undefined) nexusByCatchment.set(key, toid);
+  }
+}
+
+// null means "no TEEHR gauge, or this catchment's tile has not loaded yet" -- the two are
+// not distinguishable client-side, which is why the search row shows a badge only on a
+// positive match and never a "no TEEHR" marker.
+function lookupTeehrId(numericId) {
+  const nexusId = nexusByCatchment.get(numericId);
+  return nexusId === undefined ? null : (state.teehrUsgsByNexus.get(nexusId) ?? null);
 }
 
 // ---------------------------------------------------------------------------
@@ -307,11 +411,29 @@ const setStatus = (msg) => {
   if (statusEl) statusEl.textContent = msg;
 };
 
-// The seam where <ngiab-map> will dispatch store actions instead.
+const panelEl = document.getElementById('map-panel');
+const panelIdEl = document.getElementById('map-panel-id');
+const panelTeehrEl = document.getElementById('map-panel-teehr');
+const panelNoteEl = document.getElementById('map-panel-note');
+
+// The seam where <ngiab-map> will dispatch store actions instead. Variable / troute /
+// TEEHR-config pickers belong in this panel once the chart component exists.
 function onSelect(selection) {
   console.log('[map] selected', selection);
-  const teehr = selection.teehrId ? ` · TEEHR ${selection.teehrId}` : '';
-  setStatus(`${selection.type}: ${selection.id}${teehr}`);
+  if (!panelEl) return;
+
+  panelEl.hidden = false;
+  panelIdEl.textContent = selection.id;
+  panelTeehrEl.textContent = selection.teehrId
+    ? `TEEHR · ${selection.teehrId}`
+    : 'No TEEHR results for this catchment';
+
+  const missing = selection.located === false;
+  panelNoteEl.hidden = !missing;
+  if (missing) {
+    panelNoteEl.textContent =
+      'Geometry not in the loaded tiles yet — it will highlight once you pan or zoom to it.';
+  }
 }
 
 // Which nexuses have TEEHR results for this run. Deliberately NOT derived from the nexus
@@ -348,8 +470,15 @@ async function loadGeoSpatial(map, modelRunId) {
   // enough of a check (tethysapp/ngiab/controllers.py, getGeoSpatialData).
   if (body.error) throw new Error(body.error);
 
-  // "cat-1234" -> 1234, because these archives store ids as numbers.
-  state.catchmentIds = toNumericIds(body.catchments);
+  // "cat-1234" -> 1234, because these archives store ids as numbers. The original label
+  // is kept for the search index and for anything user-facing.
+  const catchments = Array.isArray(body.catchments) ? body.catchments : [];
+  state.catchmentIndex = [];
+  for (const label of catchments) {
+    const [numeric] = toNumericIds([label]);
+    if (numeric !== undefined) state.catchmentIndex.push({ label: String(label), numeric });
+  }
+  state.catchmentIds = state.catchmentIndex.map((entry) => entry.numeric);
   state.selectedCatchmentId = null;
 
   refresh(map);
@@ -357,7 +486,7 @@ async function loadGeoSpatial(map, modelRunId) {
   // bounds is a flat [west, south, east, north] from gdf.total_bounds.tolist().
   if (body.bounds) map.fitBounds(body.bounds, { padding: 20, duration: 1000 });
 
-  const dropped = (body.catchments?.length ?? 0) - state.catchmentIds.length;
+  const dropped = catchments.length - state.catchmentIds.length;
   return {
     catchments: state.catchmentIds.length,
     dropped: dropped > 0 ? dropped : 0,
@@ -412,6 +541,10 @@ map.on('load', () => {
 
 map.on('click', (event) => handleClick(map, event));
 
+// 'idle' fires once tile loading and rendering have settled, so this is where newly
+// arrived divide tiles get folded into the catchment -> nexus index.
+map.on('idle', () => reindexCatchmentNexus(map));
+
 // Surface tile/source failures instead of leaving a silently empty map — the most likely
 // cause of a blank render is a bad pmtiles URL or source-layer name.
 map.on('error', (event) => {
@@ -446,6 +579,150 @@ function setShowTeehr(show) {
 function bindToggle(id, handler) {
   const el = document.getElementById(id);
   if (el) el.addEventListener('change', (event) => handler(event.target.checked));
+}
+
+// ---------------------------------------------------------------------------
+// Search
+//
+// Replaces the React catchment/nexus id dropdowns. Matching is client-side over the run's
+// own catchment list, so there is no request per keystroke and no need to page through
+// thousands of <option>s. Scoped to catchments because they are the only geometry rendered.
+// ---------------------------------------------------------------------------
+const SEARCH_LIMIT = 25;
+
+const searchInput = document.getElementById('map-search');
+const searchClear = document.getElementById('map-search-clear');
+const resultsEl = document.getElementById('map-search-results');
+const emptyEl = document.getElementById('map-search-empty');
+
+let matches = [];
+let activeIndex = -1;
+
+// Rank exact, then prefix, then substring, so typing a full id puts it first.
+function searchCatchments(query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  // Full scan, no early exit: a few thousand string compares is microseconds, and bailing
+  // early could skip an exact match that happens to sort after SEARCH_LIMIT substring hits.
+  const exact = [];
+  const prefix = [];
+  const contains = [];
+  for (const entry of state.catchmentIndex) {
+    const label = entry.label.toLowerCase();
+    if (label === q) exact.push(entry);
+    else if (label.startsWith(q) || String(entry.numeric).startsWith(q)) prefix.push(entry);
+    else if (label.includes(q)) contains.push(entry);
+  }
+  return [...exact, ...prefix, ...contains].slice(0, SEARCH_LIMIT);
+}
+
+function hasTeehr(numericId) {
+  return lookupTeehrId(numericId) != null;
+}
+
+function renderResults() {
+  resultsEl.textContent = '';
+  for (let i = 0; i < matches.length; i += 1) {
+    const entry = matches[i];
+    const li = document.createElement('li');
+    li.id = `map-search-opt-${i}`;
+    li.setAttribute('role', 'option');
+    li.setAttribute('aria-selected', String(i === activeIndex));
+
+    const id = document.createElement('span');
+    id.className = 'id';
+    id.textContent = entry.label;
+    li.append(id);
+
+    // Positive-only: see lookupTeehrId on why absence is not "no TEEHR".
+    if (hasTeehr(entry.numeric)) {
+      const badge = document.createElement('span');
+      badge.className = 'teehr';
+      badge.textContent = 'TEEHR';
+      li.append(badge);
+    }
+
+    li.addEventListener('mousedown', (event) => {
+      event.preventDefault(); // keep focus in the input
+      choose(i);
+    });
+    resultsEl.append(li);
+  }
+
+  const open = matches.length > 0;
+  resultsEl.hidden = !open;
+  emptyEl.hidden = !(searchInput.value.trim() && !open);
+  searchInput.setAttribute('aria-expanded', String(open));
+  if (activeIndex >= 0) {
+    searchInput.setAttribute('aria-activedescendant', `map-search-opt-${activeIndex}`);
+    resultsEl.children[activeIndex]?.scrollIntoView({ block: 'nearest' });
+  } else {
+    searchInput.removeAttribute('aria-activedescendant');
+  }
+}
+
+function closeResults() {
+  matches = [];
+  activeIndex = -1;
+  renderResults();
+}
+
+function choose(index) {
+  const entry = matches[index];
+  if (!entry) return;
+  searchInput.value = entry.label;
+  closeResults();
+  selectCatchment(map, { numeric: entry.numeric, label: entry.label, fly: true });
+}
+
+function moveActive(delta) {
+  if (!matches.length) return;
+  activeIndex = (activeIndex + delta + matches.length) % matches.length;
+  renderResults();
+}
+
+if (searchInput) {
+  searchInput.addEventListener('input', () => {
+    matches = searchCatchments(searchInput.value);
+    activeIndex = matches.length ? 0 : -1;
+    searchClear.hidden = !searchInput.value;
+    renderResults();
+  });
+
+  searchInput.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveActive(1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveActive(-1);
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      // Enter with one match and no explicit highlight should still pick it.
+      choose(activeIndex >= 0 ? activeIndex : 0);
+    } else if (event.key === 'Escape') {
+      closeResults();
+    }
+  });
+
+  // Re-open the list when returning to a non-empty box.
+  searchInput.addEventListener('focus', () => {
+    if (searchInput.value.trim() && !matches.length) {
+      matches = searchCatchments(searchInput.value);
+      activeIndex = matches.length ? 0 : -1;
+      renderResults();
+    }
+  });
+
+  searchInput.addEventListener('blur', () => closeResults());
+
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    searchClear.hidden = true;
+    closeResults();
+    searchInput.focus();
+  });
 }
 
 bindToggle('toggle-theme', (on) => setTheme(on ? 'dark' : 'light'));
