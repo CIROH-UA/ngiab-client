@@ -8,7 +8,7 @@
 //   - Layer-scoped hover listeners live on the map, not the style, so they attach exactly once.
 //
 // ---------------------------------------------------------------------------
-// SOURCE DATA — verified against the archives' pmtiles metadata on 2026-08-03
+// SOURCE DATA - verified against the archives' pmtiles metadata on 2026-08-03
 //
 //   divides.pmtiles    source-layer "divides"    zoom 4-10
 //                      fields: toid, upstream_id, num_upstreams          (all Number)
@@ -26,7 +26,7 @@
 //      "flowpaths" still carries divide_id as a property but "divides" does not. So catchments are
 //      filtered and identified by feature id via the ['id'] expression.
 //
-//      ⚠ If catchments render blank, this assumption is wrong. See CATCHMENT_KEY below — it is a
+//      ⚠ If catchments render blank, this assumption is wrong. See CATCHMENT_KEY below - it is a
 //      one-line change. To find the truth, click where a catchment should be and read the console:
 //      the click handler logs the raw feature id and properties.
 // ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ const CATCHMENT_LAYERS = ['catchments-layer', 'catchment-highlight'];
 const TOP_LAYERS = ['flowpaths-layer', 'catchment-highlight'];
 
 // ---------------------------------------------------------------------------
-// State — becomes the global store in <ngiab-map>
+// State - becomes the global store in <ngiab-map>
 // ---------------------------------------------------------------------------
 const state = {
   theme: 'light',
@@ -118,7 +118,7 @@ const catchmentHighlightFilter = () =>
     : ['==', catchmentRef(), state.selectedCatchmentId];
 
 // Flowpaths carry divide_id as a real property, so they are filtered to the same catchment set.
-// The old flow_paths_ids payload (nexus "toid" values) is no longer used — flowpath and divide
+// The old flow_paths_ids payload (nexus "toid" values) is no longer used - flowpath and divide
 // are 1:1 in the hydrofabric, so this selects the same lines without a second id list.
 const flowPathsFilter = () =>
   state.catchmentIds.length
@@ -205,7 +205,7 @@ function flowPathsSpec() {
 }
 
 // ---------------------------------------------------------------------------
-// Install — idempotent, so it is safe to re-run after every setStyle()
+// Install - idempotent, so it is safe to re-run after every setStyle()
 // ---------------------------------------------------------------------------
 function addLayerIfMissing(map, spec) {
   if (!map.getLayer(spec.id)) map.addLayer(spec);
@@ -228,7 +228,7 @@ function installLayers(map) {
 }
 
 // ---------------------------------------------------------------------------
-// Refresh — push state onto layers already on the map
+// Refresh - push state onto layers already on the map
 // ---------------------------------------------------------------------------
 function setFilterIfPresent(map, id, filter) {
   if (map.getLayer(id)) map.setFilter(id, filter);
@@ -258,7 +258,7 @@ function refresh(map) {
 // ---------------------------------------------------------------------------
 
 // Attach ONCE. Layer-scoped listeners live on the map, not the style, so they survive
-// setStyle() — re-attaching after a style swap would just accumulate duplicates.
+// setStyle() - re-attaching after a style swap would just accumulate duplicates.
 function attachHoverCursor(map) {
   map.on('mouseenter', 'catchments-layer', () => {
     map.getCanvas().style.cursor = 'pointer';
@@ -281,7 +281,7 @@ function handleClick(map, event) {
 
   const catchmentId = CATCHMENT_KEY === 'id' ? feature.id : feature.properties[CATCHMENT_KEY];
   if (catchmentId == null) {
-    console.warn(`[map] no "${CATCHMENT_KEY}" on the clicked feature — check CATCHMENT_KEY`);
+    console.warn(`[map] no "${CATCHMENT_KEY}" on the clicked feature - check CATCHMENT_KEY`);
     return;
   }
 
@@ -432,7 +432,7 @@ function onSelect(selection) {
   panelNoteEl.hidden = !missing;
   if (missing) {
     panelNoteEl.textContent =
-      'Geometry not in the loaded tiles yet — it will highlight once you pan or zoom to it.';
+      'Geometry not in the loaded tiles yet - it will highlight once you pan or zoom to it.';
   }
 }
 
@@ -459,7 +459,7 @@ async function loadTeehrLocations(modelRunId) {
 }
 
 async function loadGeoSpatial(map, modelRunId) {
-  setStatus(`loading ${modelRunId}…`);
+  setStatus(`loading ${modelRunId}...`);
 
   const url = `${APP_ROOT_URL}getGeoSpatialData/?model_run_id=${encodeURIComponent(modelRunId)}`;
   const response = await fetch(url, { headers: { Accept: 'application/json' } });
@@ -531,11 +531,11 @@ const map = new maplibregl.Map({
 
 map.on('load', () => {
   installLayers(map);
-  attachHoverCursor(map); // once only — see the note on the function
+  attachHoverCursor(map); // once only - see the note on the function
   if (modelRunId) {
     loadOrReport(map, modelRunId);
   } else {
-    setStatus('no model_run_id — append ?model_run_id=… to the URL');
+    setStatus('no model_run_id - append ?model_run_id=... to the URL');
   }
 });
 
@@ -545,7 +545,7 @@ map.on('click', (event) => handleClick(map, event));
 // arrived divide tiles get folded into the catchment -> nexus index.
 map.on('idle', () => reindexCatchmentNexus(map));
 
-// Surface tile/source failures instead of leaving a silently empty map — the most likely
+// Surface tile/source failures instead of leaving a silently empty map - the most likely
 // cause of a blank render is a bad pmtiles URL or source-layer name.
 map.on('error', (event) => {
   console.error('[map] maplibre error', event.error ?? event);

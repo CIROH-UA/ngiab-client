@@ -84,8 +84,11 @@ pyproj.network.set_network_enabled(False)
 @controller
 def home(request):
     """Controller for the app home page."""
-    # The index.html template loads the React frontend
-    return App.render(request, "index.html")
+    # index.html loads the build-less vanilla frontend from public/frontend/ and injects
+    # runtime config into window.__NGIAB__, replacing the React build's compile-time
+    # TETHYS_APP_ROOT_URL substitution.
+    context = {"app_root_url": f"/apps/{App.root_url}/"}
+    return App.render(request, "index.html", context)
 
 
 @controller
