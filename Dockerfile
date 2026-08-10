@@ -126,6 +126,9 @@ COPY --from=builder --chown=1000:1000 /opt/ngiab /opt/ngiab
 
 COPY --chown=1000:1000 conf/portal_config.yml /config/portal_config.yml
 COPY --chown=1000:1000 conf/portal-config.d/ /opt/portal/portal-config.d/
+COPY --chmod=0755 scripts/ngiab-seed-db.sh /usr/local/bin/ngiab-seed-db.sh
+COPY --chmod=0755 scripts/ngiab-entrypoint.sh /usr/local/bin/ngiab-entrypoint.sh
+COPY --chmod=0755 scripts/ngiab-register.sh /usr/local/bin/ngiab-register.sh
 
 # SQLite, not Postgres: the visualizer ships as a single self-contained container.
 # Both paths are outside ${TETHYS_PERSIST} so a user bind mount cannot mask them.
@@ -162,5 +165,11 @@ ENV TETHYS_SECRET_KEY=ngiab-local-default-override-in-any-shared-deployment
 ENV GUNICORN_TIMEOUT=600
 ENV GUNICORN_GRACEFUL_TIMEOUT=60
 
-# No CMD override: provisioning already happened at build time, so the base's serve.sh
-# runs directly and container start is just the server coming up.
+# Where the model-run registry actually lives when a writable volume is mounted. The
+# entrypoint seeds the baked database here on first start and symlinks the image path at it;
+# without the mount the container still runs, just without persistence.
+ENV NGIAB_DB_PATH=/var/lib/tethys_persist/db/portal.sqlite
+
+# Provisioning still happens at build time -- this wrapper only seeds the database onto the
+# host mount, then execs the base's serve.sh. It needs no privileges (see the script).
+CMD ["/usr/local/bin/ngiab-entrypoint.sh"]

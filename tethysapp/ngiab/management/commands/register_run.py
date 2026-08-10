@@ -43,6 +43,16 @@ class Command(BaseCommand):
                 self.stdout.write(f"{run.id}\t{run.label}\t{run.path}")
             return
 
+        # A freshly seeded database must absorb anything still in ngiab_visualizer.json
+        # BEFORE we add to it. Otherwise registering the first new run makes the table
+        # non-empty, the lazy import in _get_list_model_runs never fires, and every
+        # previously registered run silently disappears from the UI -- which is exactly
+        # what viewOnTethys.sh -d <new run> does on an upgraded install.
+        if not ModelRun.objects.exists():
+            from tethysapp.ngiab.utils import _import_runs_from_json_once
+
+            _import_runs_from_json_once()
+
         path = options["path"].rstrip("/")
 
         if options["remove"]:

@@ -56,6 +56,9 @@ TETHYS_CONTAINER_NAME="tethys-ngen-portal"
 TETHYS_REPO="awiciroh/tethys-ngiab"
 
 MODELS_RUNS_DIRECTORY="$HOME/ngiab_visualizer"
+# The portal database lives here so registered model runs survive `docker run --rm`.
+# The image ships a baked database and seeds it into this directory on first start.
+DB_DIRECTORY="$HOME/.ngiab_visualizer_db"
 DATASTREAM_DIRECTORY="$HOME/.datastream_ngiab"
 VISUALIZER_CONF="$MODELS_RUNS_DIRECTORY/ngiab_visualizer.json"
 TETHYS_PERSIST_PATH="/var/lib/tethys_persist"
@@ -450,6 +453,7 @@ wait_container_healthy() {
 run_tethys() {
     ensure_host_dir "$MODELS_RUNS_DIRECTORY"
     ensure_host_dir "$DATASTREAM_DIRECTORY"
+    ensure_host_dir "$DB_DIRECTORY"
     ensure_visualizer_conf_host_file "$VISUALIZER_CONF"
 
     echo -e "${ARROW} ${BWhite}Launching Tethys container...${Color_Off}"
@@ -497,6 +501,7 @@ run_tethys() {
         "${USERNS_ARGS[@]}" \
         -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer${VOLUME_SUFFIX}" \
         -v "$DATASTREAM_DIRECTORY:$TETHYS_PERSIST_PATH/.datastream_ngiab${VOLUME_SUFFIX}" \
+        -v "$DB_DIRECTORY:$TETHYS_PERSIST_PATH/db${VOLUME_SUFFIX}" \
         "${teehr_mount_args[@]}" \
         -p "$nginx_tethys_port:$CONTAINER_PORT" \
         "${NETWORK_ARGS[@]}" \
@@ -670,6 +675,42 @@ copy_models_run() {
     echo "$final_copied_path"
 }
 
+# Register the run in the portal database.
+#
+# The database is the source of truth now; ngiab_visualizer.json is still written above so
+# that an older image, or a fresh database seeded before this run existed, can still pick it
+# up. This runs in a one-shot container because the launcher has no Python environment of
+# its own -- and it mounts the same database directory the serving container uses, so the
+# row lands in the persistent copy rather than the image's baked one.
+register_run_in_database() {
+    local final_path="$1" base_name="$2" run_uuid="$3" teehr_cfg="$4"
+
+    local image="${TETHYS_REPO}:${TETHYS_TAG:-latest}"
+    if ! ${DOCKER_CMD} image inspect "$image" >/dev/null 2>&1; then
+        echo -e "  ${INFO_MARK} Image $image not present locally; skipping database registration."
+        echo -e "  ${INFO_MARK} It will be imported from ngiab_visualizer.json on first start."
+        return 0
+    fi
+
+    local teehr_args=()
+    [ -n "$teehr_cfg" ] && teehr_args=(--teehr-configuration-name "$teehr_cfg")
+
+    if ${DOCKER_CMD} run --rm \
+        "${USERNS_ARGS[@]}" \
+        -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer${VOLUME_SUFFIX}" \
+        -v "$DB_DIRECTORY:$TETHYS_PERSIST_PATH/db${VOLUME_SUFFIX}" \
+        --env TETHYS_SECRET_KEY="${TETHYS_SECRET_KEY:-registration-only}" \
+        --env VISUALIZER_CONF="$TETHYS_PERSIST_PATH/ngiab_visualizer/ngiab_visualizer.json" \
+        --entrypoint /usr/local/bin/ngiab-register.sh \
+        "$image" \
+        --path "$final_path" --label "$base_name" --id "$run_uuid" "${teehr_args[@]}" \
+        >/dev/null 2>&1; then
+        echo -e "  ${CHECK_MARK} ${BCyan}Registered in the database.${Color_Off}"
+    else
+        echo -e "  ${WARNING_MARK} ${BYellow}Could not register in the database; it will be imported from JSON on first start.${Color_Off}"
+    fi
+}
+
 add_model_run() {
     local input_path="$1"
     local json_file="$VISUALIZER_CONF"
@@ -784,6 +825,7 @@ add_model_run() {
        mv -f "${json_file}.tmp" "$json_file"; then
         ## ► success message
         echo -e "  ${CHECK_MARK} ${BCyan}Model run "$base_name" registered (${new_uuid})${Color_Off}"
+        register_run_in_database "$final_path" "$base_name" "$new_uuid" "$teehr_config_name"
     else
         ## ► failure message
         echo -e "  ${CROSS_MARK} ${BRed}Failed to update $json_file with new model run.${Color_Off}"
