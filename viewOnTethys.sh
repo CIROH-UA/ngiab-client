@@ -59,7 +59,6 @@ MODELS_RUNS_DIRECTORY="$HOME/ngiab_visualizer"
 DATASTREAM_DIRECTORY="$HOME/.datastream_ngiab"
 VISUALIZER_CONF="$MODELS_RUNS_DIRECTORY/ngiab_visualizer.json"
 TETHYS_PERSIST_PATH="/var/lib/tethys_persist"
-SKIP_DB_SETUP=false
 
 # TEEHR warehouse (shared across model runs). Persisted in a sibling config file
 # so runTeehr.sh and viewOnTethys.sh agree on the location. Must be mounted at
@@ -75,9 +74,10 @@ USERNS_ARGS=()
 NETWORK_ARGS=()
 VOLUME_SUFFIX=""
 CONTAINER_PORT=8080  # visualizer image listens on 8080 (rootless-Podman safe).
-WWW_UID=1011  # tethys-core base image: useradd -u 1011 -g www www
-ALLOWED_HOSTS=""
+WWW_UID=1000  # tethys-uvx base image: the "tethys" user is uid 1000 (was 1011 on tethys-core)
+PORTAL_ALLOWED_HOSTS=""
 CSRF_TRUSTED_ORIGINS=""
+TETHYS_SECRET_KEY="" # Generated per launch; see select_port(). Override to pin one.
 DATA_FOLDER_PATH="" # If non-empty, gets used as the gage path to import.
 TETHYS_TAG="" # If non-empty, gets used as the image tag.
 IMPORT_GAGE="ask" # "ask"/"yes"/"no"/"done"
@@ -348,25 +348,48 @@ choose_port_to_run_tethys() {
         break
     done
 
-    # Build ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS from localhost + every IPv4 the
-    # host owns (catches the WSL VM address, LAN address, etc.). The outer
-    # literal double-quotes in ALLOWED_HOSTS protect the brackets when the
-    # tethys-core salt state renders them through an unquoted shell command.
+    # Build PORTAL_ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS from localhost + every IPv4 the
+    # host owns (catches the WSL VM address, LAN address, etc.).
+    #
+    # PORTAL_ALLOWED_HOSTS is comma-separated: the tethys-uvx portal-config.sh splits it on
+    # commas and merges the result into ALLOWED_HOSTS. This replaced the old bracketed
+    # "[a, b]" form, which existed only to survive the tethys-core salt state rendering it
+    # through an unquoted shell command -- there is no salt any more.
+    #
+    # CSRF_TRUSTED_ORIGINS still needs building here because portal-config.sh derives it
+    # from ALLOWED_HOSTS but deliberately skips localhost/127.0.0.1/bare IPs (it only
+    # auto-trusts https:// hostnames). The visualizer is plain http on localhost, so
+    # without this every login fails CSRF validation. conf/portal-config.d/10-csrf.sh
+    # applies it inside the container.
     local host_ips
     host_ips=$(hostname -I 2>/dev/null || ip -4 -o addr show 2>/dev/null | awk '{split($4,a,"/"); print a[1]}' | tr '\n' ' ' || echo)
-    local allowed_list="localhost, 127.0.0.1"
+    local allowed_list="localhost,127.0.0.1"
     local csrf_list="\"http://localhost:${nginx_tethys_port}\",\"http://127.0.0.1:${nginx_tethys_port}\""
     for ip in $host_ips; do
         case "$ip" in
             127.*|"") ;;  # skip loopback duplicates and empties
             *)
-                allowed_list="${allowed_list}, $ip"
+                allowed_list="${allowed_list},$ip"
                 csrf_list="${csrf_list},\"http://${ip}:${nginx_tethys_port}\""
                 ;;
         esac
     done
-    ALLOWED_HOSTS="\"[${allowed_list}]\""
+    PORTAL_ALLOWED_HOSTS="${allowed_list}"
     CSRF_TRUSTED_ORIGINS="[${csrf_list}]"
+
+    # portal-config.sh hard-requires TETHYS_SECRET_KEY and reads it only from the
+    # environment. The image ships a placeholder so a bare `docker run` works; generate a
+    # fresh one per launch instead. Sessions do not outlive the container (--rm), so a
+    # per-launch key costs nothing and avoids every install sharing one baked secret.
+    if [ -z "${TETHYS_SECRET_KEY:-}" ]; then
+        TETHYS_SECRET_KEY=$(head -c 32 /dev/urandom | base64 | tr -d '=+/' 2>/dev/null)
+        # /dev/urandom should always exist, but never launch with an empty key: that
+        # reduces to the image placeholder and silently shares a secret across installs.
+        if [ -z "$TETHYS_SECRET_KEY" ]; then
+            TETHYS_SECRET_KEY="ngiab-fallback-$(date +%s)-$$"
+        fi
+    fi
+
     echo -e "  ${CHECK_MARK} ${BGreen}Port $nginx_tethys_port selected${Color_Off}"
 
     return 0
@@ -468,7 +491,7 @@ run_tethys() {
 
     # Launch container with explicit error handling.
     # Container port is fixed at CONTAINER_PORT (image default 8080); the host
-    # port is what the user picked. NGINX_PORT inside matches CONTAINER_PORT.
+    # port is what the user picked. PORT inside matches CONTAINER_PORT.
     echo -e "  ${INFO_MARK} Running ${DOCKER_CMD} command..."
     ${DOCKER_CMD} run --rm -d \
         "${USERNS_ARGS[@]}" \
@@ -480,12 +503,12 @@ run_tethys() {
         --name "$TETHYS_CONTAINER_NAME" \
         --env MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
         --env MEDIA_URL="/media/" \
-        --env SKIP_DB_SETUP="$SKIP_DB_SETUP" \
         --env DATASTREAM_CONF="$TETHYS_PERSIST_PATH/.datastream_ngiab" \
         --env VISUALIZER_CONF="$TETHYS_PERSIST_PATH/ngiab_visualizer/ngiab_visualizer.json" \
-        --env NGINX_PORT="$CONTAINER_PORT" \
-        --env ALLOWED_HOSTS="$ALLOWED_HOSTS" \
+        --env PORT="$CONTAINER_PORT" \
+        --env PORTAL_ALLOWED_HOSTS="$PORTAL_ALLOWED_HOSTS" \
         --env CSRF_TRUSTED_ORIGINS="$CSRF_TRUSTED_ORIGINS" \
+        --env TETHYS_SECRET_KEY="$TETHYS_SECRET_KEY" \
         "${teehr_env_args[@]}" \
         "${TETHYS_REPO}:${TETHYS_TAG}"
 
