@@ -14,6 +14,27 @@ are reused unchanged.
 browser/download feature. The existing Django `datastream_*` controllers and `datastream_utils.py`
 become dead code, to be deleted as a cutover cleanup item (out of scope for the frontend work).
 
+### Scope reductions decided during implementation (2026-08-10)
+
+These are deliberate product decisions, not gaps to be closed later:
+
+1. **Nexus is removed entirely.** No nexus layer, no clustering, no nexus selection or time series.
+   Catchments are the only selectable geometry. The Django `getNexusTimeSeries` controller and the
+   `getNexusIDs` / `getNexusList` helpers join the datastream code as dead-on-cutover.
+
+   Consequence worth acting on: `getGeoSpatialData` still builds and serializes the full nexus
+   FeatureCollection and calls `append_ngen_usgs_column` + `append_nwm_usgs_column` — **two TEEHR
+   warehouse opens per model-run load** — for a payload the frontend now discards. Only `catchments`
+   and `bounds` are consumed. `getTeehrLocations` supplies the gauge crosswalk properly.
+
+2. **No toast library.** react-toastify is not replaced by an `ngiab-toast` widget. Status and
+   errors go inline: the map panel's status line, and per-section messages next to the thing that
+   failed. One less dependency and one less widget to build.
+
+3. **Model-run selection is deferred.** The run comes from `?model_run_id=` in the URL. The React
+   run selector and import forms (`getModelRuns`, `importModelRuns`) are not ported yet;
+   `viewOnTethys.sh` already handles importing at launch.
+
 ## Decisions
 
 | Area | Decision |
@@ -24,7 +45,7 @@ become dead code, to be deleted as a cutover cleanup item (out of scope for the 
 | UI chrome | **Drop Bootstrap + styled-components.** Minimal custom CSS + hand-built widget elements |
 | Build | **No build step.** Native ES modules served directly; dependencies load from a **public CDN** (`esm.sh`) at pinned exact versions, wired via an `importmap`. No Vite / webpack / CRA, no vendored copies. |
 | API layer | `services/api` (axios) + `utilities.js` ported **verbatim** (axios from CDN) |
-| Scope | Core viewer only: `Map`, `ModelRuns`, `hydroFabric`. Single view, no client router beyond a trivial shell |
+| Scope | Core viewer only: `Map` + `hydroFabric` charts. Single view, no client router beyond a trivial shell |
 
 ## Architecture
 
@@ -58,12 +79,11 @@ frontend/
   components/
     ngiab-app.js          # layout shell
     map/ngiab-map.js
-    model-runs/ngiab-model-runs.js
     hydrofabric/
-      ngiab-chart.js          # uPlot wrapper (nexus / catchment / troute / teehr)
+      ngiab-chart.js          # uPlot wrapper (catchment / troute / teehr)
       ngiab-layer-control.js
       ngiab-variable-select.js
-    widgets/              # ngiab-select, ngiab-toast, ngiab-modal, ngiab-table, ngiab-switch
+    widgets/              # ngiab-select, ngiab-modal, ngiab-table, ngiab-switch
   styles/                 # tokens.css (light/dark vars), app.css
   lib/                    # dom.js helpers, time formatting via d3-time-format
 ```
@@ -83,39 +103,41 @@ Store slices:
 ```js
 {
   modelRunId: null,
-  selection: { type: null, id: null },   // 'nexus' | 'catchment'
+  selection: { type: null, id: null },   // 'catchment' (nexus was dropped; see Decisions)
   variable: null,
   trouteId: null,
   teehrId: null,
   theme: 'light',                          // 'light' | 'dark'
-  layers: { nexusHidden: false, nexusClustered: false, catchmentHidden: false },
+  layers: { catchmentHidden: false, showTeehr: true },
 }
 ```
 
-`actions.js` exposes functions mirroring today's `hydroFabric` / `ModelRuns` reducer actions
-(`set_nexus_id`, `set_catchment_id`, `toggle_*`, `reset`, ...) so the port is close to 1:1 in behavior.
+`actions.js` exposes functions mirroring today's `hydroFabric` reducer actions
+(`set_catchment_id`, `set_troute_id`, `set_teehr_id`, `toggle_*`, `reset`, ...).
 
 Flow:
 
-1. `ngiab-model-runs` loads runs (`getModelRuns`); selecting one calls `setModelRun(id)`.
+1. The model run comes from `?model_run_id=` in the URL (a selector is deferred; see Decisions).
 2. `ngiab-map` (subscribed to `modelRunId`) fetches `getGeoSpatialData`, fits bounds, renders layers.
 3. Map click → `queryRenderedFeatures` → `selectFeature({type,id})` (+ `set_troute_id`, teehr id when present).
 4. `ngiab-chart` (subscribed to `selection` + `variable`) fetches the matching time-series endpoint
-   (`getNexusTimeSeries` / `getCatchmentTimeSeries` / `getTrouteTimeSeries` / `getTeehrTimeSeries`)
+   (`getCatchmentTimeSeries` / `getTrouteTimeSeries` / `getTeehrTimeSeries`)
    and renders with uPlot.
 5. Theme toggle → `setTheme` → map swaps the S3 style URL; charts restyle.
 
 ## Components
 
-- **`ngiab-map`** - direct `maplibregl.Map` (drops the `react-map-gl` wrapper), `pmtiles` protocol,
-  S3 styles/tiles unchanged. The current `useMemo` layer configs (`mapgl.js`) become plain functions
-  returning layer specs; ID-list filtering, nexus clustering (geojson `cluster:true`), hover cursor,
-  click hit-test, and highlight-via-`setFilter` port directly. Dead/commented code is dropped.
-- **`ngiab-model-runs`** - run selector; writes `modelRunId`.
+- **`ngiab-map`** - direct `maplibregl.Map` (drops the `react-map-gl` wrapper), `pmtiles` protocol.
+  The `useMemo` layer configs become plain functions returning layer specs; ID-list filtering, hover
+  cursor, click hit-test, and highlight-via-`setFilter` port directly. Two geometry-only archives
+  (`divides.pmtiles`, `flowpaths.pmtiles`) replace `merged.pmtiles`; catchments and flowlines are
+  tinted by TEEHR availability via a data-driven paint expression on `toid`. Delivered.
+- **`ngiab-search`** - client-side catchment finder over the run's own id list, replacing the React
+  catchment/nexus id dropdowns. Delivered.
 - **`ngiab-chart`** - one configurable uPlot element covering all series types; maps the `{x,y}` API
   payloads to uPlot arrays; uses uPlot's built-in cursor/tooltip.
 - **`ngiab-layer-control`**, **`ngiab-variable-select`** - toggles and variable picker bound to store.
-- **Widgets** - `ngiab-switch`, `ngiab-modal`, `ngiab-toast` (replaces react-toastify),
+- **Widgets** - `ngiab-switch`, `ngiab-modal`,
   `ngiab-table` (replaces react-data-table; virtualize only if a list proves large),
   `ngiab-select`.
 
@@ -162,7 +184,7 @@ non-DOM units.) The test runner is a dev-only dependency and does not affect how
 - **Phase 0 - scaffold:** template + import map (CDN) + runtime config + store + api port + `ngiab-app`
   shell + Tethys static/template wiring + one trivial element rendering. Proves the (build-less)
   pipeline end-to-end.
-- **Phase 1 - core viewer:** `ngiab-map`, `ngiab-model-runs`, `ngiab-chart`, layer/variable controls,
+- **Phase 1 - core viewer:** `ngiab-map`, `ngiab-chart`, layer/variable controls,
   full linked selection and theming. Ship & validate.
 - **Phase 2 - cutover:** delete `reactapp/`, the React/webpack toolchain (package.json build deps,
   webpack + babel config), and the `public/react-build/` output dir plus its `.gitignore` entry;
