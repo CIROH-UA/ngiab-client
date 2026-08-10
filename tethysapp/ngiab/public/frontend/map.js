@@ -34,6 +34,10 @@
 import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 
+import appAPI from './api/app.js';
+import { getModelRunId } from './config.js';
+import { store, actions } from './store/app-store.js';
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -58,30 +62,30 @@ const LAYER_FLOWPATHS = 'flowpaths';
 //   any string  -> a property name, e.g. 'divide_id' or 'upstream_id'
 const CATCHMENT_KEY = 'id';
 
-// Layers whose visibility follows state.catchmentHidden.
+// Layers whose visibility follows catchmentHidden().
 const CATCHMENT_LAYERS = ['catchments-layer', 'catchment-highlight'];
 // Must stay above the catchment fill.
 const TOP_LAYERS = ['flowpaths-layer', 'catchment-highlight'];
 
 // ---------------------------------------------------------------------------
-// State - becomes the global store in <ngiab-map>
+// State
+//
+// Shared state (theme, selection, layer flags) lives in the global store so the chart can
+// react to the same selection the map sets. Only map-scoped caches stay here: the search
+// index and the catchment -> nexus map are derived from the run payload and from loaded
+// vector tiles, churn on every pan, and nothing outside the map reads them.
 // ---------------------------------------------------------------------------
-const state = {
-  theme: 'light',
-  catchmentHidden: false,
-  showTeehr: true,
-  selectedCatchmentId: null, // numeric, to match the tiles
-  catchmentIds: [], // numeric
-  // Search index: [{ label: 'cat-1015', numeric: 1015 }]. Built from the same
-  // getGeoSpatialData payload, so searching needs no request per keystroke.
-  catchmentIndex: [],
-  // Nexus ids (numeric) that have TEEHR results for this run, and nexus -> USGS gauge id.
-  // Geometry is joined to TEEHR through the downstream nexus: a divide's/flowpath's `toid`.
-  teehrNexusIds: [],
-  teehrUsgsByNexus: new Map(),
+const local = {
+  catchmentIds: [], // numeric, for the layer filters
+  catchmentIndex: [], // [{ label: 'cat-1015', numeric: 1015 }] for the search bar
+  teehrNexusIds: [], // numeric nexus ids that have TEEHR results
+  teehrUsgsByNexus: new Map(), // nexus id -> USGS gauge id
 };
 
-const isDark = () => state.theme === 'dark';
+const isDark = () => store.get().theme === 'dark';
+const catchmentHidden = () => store.get().layers.catchmentHidden;
+const showTeehr = () => store.get().layers.showTeehr;
+const selectedCatchmentId = () => store.get().selection.id;
 
 // Global, not per-map.
 maplibregl.addProtocol('pmtiles', new Protocol({ metadata: true }).tile);
@@ -108,21 +112,21 @@ const catchmentRef = () => (CATCHMENT_KEY === 'id' ? ['id'] : ['get', CATCHMENT_
 // 'in' over a literal array is the modern form and evaluates far faster than the legacy
 // ['any', ['in', key, ...ids]] the React version used with thousands of ids.
 const catchmentSetFilter = () =>
-  state.catchmentIds.length
-    ? ['in', catchmentRef(), ['literal', state.catchmentIds]]
+  local.catchmentIds.length
+    ? ['in', catchmentRef(), ['literal', local.catchmentIds]]
     : ['==', catchmentRef(), -1]; // match nothing
 
 const catchmentHighlightFilter = () =>
-  state.selectedCatchmentId == null
+  selectedCatchmentId() == null
     ? ['==', catchmentRef(), -1]
-    : ['==', catchmentRef(), state.selectedCatchmentId];
+    : ['==', catchmentRef(), selectedCatchmentId()];
 
 // Flowpaths carry divide_id as a real property, so they are filtered to the same catchment set.
 // The old flow_paths_ids payload (nexus "toid" values) is no longer used - flowpath and divide
 // are 1:1 in the hydrofabric, so this selects the same lines without a second id list.
 const flowPathsFilter = () =>
-  state.catchmentIds.length
-    ? ['in', ['get', 'divide_id'], ['literal', state.catchmentIds]]
+  local.catchmentIds.length
+    ? ['in', ['get', 'divide_id'], ['literal', local.catchmentIds]]
     : ['==', ['get', 'divide_id'], -1];
 
 const visibility = (hidden) => ({ visibility: hidden ? 'none' : 'visible' });
@@ -142,12 +146,12 @@ const PLAIN_LINE = { light: '#000000', dark: '#0077bb' };
 
 const themed = (pair) => (isDark() ? pair.dark : pair.light);
 
-const hasTeehrNexus = () => ['in', ['get', 'toid'], ['literal', state.teehrNexusIds]];
+const hasTeehrNexus = () => ['in', ['get', 'toid'], ['literal', local.teehrNexusIds]];
 
 // Falls back to a flat colour when there is nothing to highlight, so the expression stays
 // valid and cheap for runs with no TEEHR output.
 const teehrAware = (teehrColor, plainColor) =>
-  state.showTeehr && state.teehrNexusIds.length
+  showTeehr() && local.teehrNexusIds.length
     ? ['case', hasTeehrNexus(), themed(teehrColor), themed(plainColor)]
     : themed(plainColor);
 
@@ -169,7 +173,7 @@ function catchmentsSpec() {
       'fill-outline-color': isDark() ? 'rgba(238, 51, 119, 0.7)' : 'rgba(91, 44, 111, 0.7)',
       'fill-opacity': { stops: [[7, 0], [11, 1]] },
     },
-    layout: visibility(state.catchmentHidden),
+    layout: visibility(catchmentHidden()),
   };
 }
 
@@ -185,7 +189,7 @@ function catchmentHighlightSpec() {
       'fill-outline-color': '#ffffff',
       'fill-opacity': 0.5,
     },
-    layout: visibility(state.catchmentHidden),
+    layout: visibility(catchmentHidden()),
   };
 }
 
@@ -248,7 +252,7 @@ function refresh(map) {
 
   for (const id of CATCHMENT_LAYERS) {
     if (map.getLayer(id)) {
-      map.setLayoutProperty(id, 'visibility', state.catchmentHidden ? 'none' : 'visible');
+      map.setLayoutProperty(id, 'visibility', catchmentHidden() ? 'none' : 'visible');
     }
   }
 }
@@ -269,7 +273,7 @@ function attachHoverCursor(map) {
 }
 
 function handleClick(map, event) {
-  if (state.catchmentHidden || !map.getLayer('catchments-layer')) return;
+  if (catchmentHidden() || !map.getLayer('catchments-layer')) return;
 
   const features = map.queryRenderedFeatures(event.point, { layers: ['catchments-layer'] });
   if (!features || !features.length) return;
@@ -297,7 +301,7 @@ function handleClick(map, event) {
 
 // The tiles only carry numbers; the run's payload has the "cat-N" labels.
 function labelForCatchment(numericId) {
-  const entry = state.catchmentIndex.find((candidate) => candidate.numeric === numericId);
+  const entry = local.catchmentIndex.find((candidate) => candidate.numeric === numericId);
   return entry ? entry.label : String(numericId);
 }
 
@@ -345,8 +349,19 @@ function catchmentBounds(map, numericId) {
 // Single entry point for "this catchment is now selected", used by both the map click and
 // the search bar so they cannot drift.
 function selectCatchment(map, { numeric, label, nexusId, fly }) {
-  state.selectedCatchmentId = numeric;
-  refresh(map); // highlight applies whether or not we can locate it
+  const catchmentLabel = label ?? String(numeric);
+  const teehrId =
+    nexusId !== undefined ? (local.teehrUsgsByNexus.get(nexusId) ?? null) : lookupTeehrId(numeric);
+
+  // The store owns the selection; the subscription in the boot section repaints the
+  // highlight. The troute endpoint wants the prefixed label ("cat-1015"), not the bare
+  // numeric tile id.
+  actions.selectCatchment({
+    id: numeric,
+    label: catchmentLabel,
+    trouteId: catchmentLabel,
+    teehrId,
+  });
 
   let located = true;
   if (fly) {
@@ -355,18 +370,7 @@ function selectCatchment(map, { numeric, label, nexusId, fly }) {
     else located = false;
   }
 
-  const teehrId =
-    nexusId !== undefined ? (state.teehrUsgsByNexus.get(nexusId) ?? null) : lookupTeehrId(numeric);
-
-  onSelect({
-    type: 'catchment',
-    id: label ?? numeric,
-    numeric,
-    trouteId: label ?? numeric,
-    nexusId,
-    teehrId,
-    located,
-  });
+  reportSelection({ label: catchmentLabel, teehrId, located });
 }
 
 // catchment -> downstream nexus, harvested from whatever divide tiles are loaded.
@@ -397,15 +401,12 @@ function reindexCatchmentNexus(map) {
 // positive match and never a "no TEEHR" marker.
 function lookupTeehrId(numericId) {
   const nexusId = nexusByCatchment.get(numericId);
-  return nexusId === undefined ? null : (state.teehrUsgsByNexus.get(nexusId) ?? null);
+  return nexusId === undefined ? null : (local.teehrUsgsByNexus.get(nexusId) ?? null);
 }
 
 // ---------------------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------------------
-const cfg = window.__NGIAB__ || {};
-const APP_ROOT_URL = cfg.APP_ROOT_URL || '/apps/ngiab/';
-
 const statusEl = document.getElementById('map-status');
 const setStatus = (msg) => {
   if (statusEl) statusEl.textContent = msg;
@@ -416,19 +417,18 @@ const panelIdEl = document.getElementById('map-panel-id');
 const panelTeehrEl = document.getElementById('map-panel-teehr');
 const panelNoteEl = document.getElementById('map-panel-note');
 
-// The seam where <ngiab-map> will dispatch store actions instead. Variable / troute /
-// TEEHR-config pickers belong in this panel once the chart component exists.
-function onSelect(selection) {
-  console.log('[map] selected', selection);
+// Renders the selected-feature panel. The variable / troute / TEEHR-config pickers belong
+// here once the chart component exists.
+function reportSelection({ label, teehrId, located }) {
   if (!panelEl) return;
 
   panelEl.hidden = false;
-  panelIdEl.textContent = selection.id;
-  panelTeehrEl.textContent = selection.teehrId
-    ? `TEEHR · ${selection.teehrId}`
+  panelIdEl.textContent = label;
+  panelTeehrEl.textContent = teehrId
+    ? `TEEHR · ${teehrId}`
     : 'No TEEHR results for this catchment';
 
-  const missing = selection.located === false;
+  const missing = located === false;
   panelNoteEl.hidden = !missing;
   if (missing) {
     panelNoteEl.textContent =
@@ -441,54 +441,45 @@ function onSelect(selection) {
 // configuration filter, so it reports gauges this run never evaluated.
 // A missing/failed warehouse is not an error here -- the map just renders uncoloured.
 async function loadTeehrLocations(modelRunId) {
-  const url = `${APP_ROOT_URL}getTeehrLocations/?model_run_id=${encodeURIComponent(modelRunId)}`;
-  const response = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!response.ok) throw new Error(`HTTP ${response.status} from getTeehrLocations`);
-
-  const body = await response.json();
+  const body = await appAPI.getTeehrLocations({ model_run_id: modelRunId });
   const locations = body.teehr_locations ?? [];
 
-  state.teehrUsgsByNexus = new Map();
+  local.teehrUsgsByNexus = new Map();
   for (const { nexus_id: nexusId, usgs_id: usgsId } of locations) {
     const [numeric] = toNumericIds([nexusId]);
-    if (numeric !== undefined) state.teehrUsgsByNexus.set(numeric, usgsId);
+    if (numeric !== undefined) local.teehrUsgsByNexus.set(numeric, usgsId);
   }
-  state.teehrNexusIds = [...state.teehrUsgsByNexus.keys()];
+  local.teehrNexusIds = [...local.teehrUsgsByNexus.keys()];
 
-  return { count: state.teehrNexusIds.length, status: body.teehr_status };
+  return { count: local.teehrNexusIds.length, status: body.teehr_status };
 }
 
 async function loadGeoSpatial(map, modelRunId) {
   setStatus(`loading ${modelRunId}...`);
 
-  const url = `${APP_ROOT_URL}getGeoSpatialData/?model_run_id=${encodeURIComponent(modelRunId)}`;
-  const response = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!response.ok) throw new Error(`HTTP ${response.status} from getGeoSpatialData`);
-
-  const body = await response.json();
-  // The controller reports failure with HTTP 200 plus an error key, so response.ok is not
-  // enough of a check (tethysapp/ngiab/controllers.py, getGeoSpatialData).
-  if (body.error) throw new Error(body.error);
+  // getJSON raises on a non-ok status AND on the HTTP-200-plus-error-key shape several
+  // controllers use, so both failure modes arrive here as exceptions.
+  const body = await appAPI.getGeoSpatialData({ model_run_id: modelRunId });
 
   // "cat-1234" -> 1234, because these archives store ids as numbers. The original label
   // is kept for the search index and for anything user-facing.
   const catchments = Array.isArray(body.catchments) ? body.catchments : [];
-  state.catchmentIndex = [];
+  local.catchmentIndex = [];
   for (const label of catchments) {
     const [numeric] = toNumericIds([label]);
-    if (numeric !== undefined) state.catchmentIndex.push({ label: String(label), numeric });
+    if (numeric !== undefined) local.catchmentIndex.push({ label: String(label), numeric });
   }
-  state.catchmentIds = state.catchmentIndex.map((entry) => entry.numeric);
-  state.selectedCatchmentId = null;
+  local.catchmentIds = local.catchmentIndex.map((entry) => entry.numeric);
+  actions.clearSelection();
 
   refresh(map);
 
   // bounds is a flat [west, south, east, north] from gdf.total_bounds.tolist().
   if (body.bounds) map.fitBounds(body.bounds, { padding: 20, duration: 1000 });
 
-  const dropped = catchments.length - state.catchmentIds.length;
+  const dropped = catchments.length - local.catchmentIds.length;
   return {
-    catchments: state.catchmentIds.length,
+    catchments: local.catchmentIds.length,
     dropped: dropped > 0 ? dropped : 0,
   };
 }
@@ -519,12 +510,12 @@ function loadOrReport(map, modelRunId) {
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
-const modelRunId =
-  new URLSearchParams(window.location.search).get('model_run_id') || cfg.MODEL_RUN_ID || '';
+const modelRunId = getModelRunId();
+actions.setModelRun(modelRunId || null);
 
 const map = new maplibregl.Map({
   container: 'map',
-  style: STYLE_URLS[state.theme],
+  style: STYLE_URLS[store.get().theme],
   center: [-96, 40],
   zoom: 4,
 });
@@ -551,6 +542,11 @@ map.on('error', (event) => {
   console.error('[map] maplibre error', event.error ?? event);
 });
 
+// One subscription repaints everything the store owns -- selection highlight, layer
+// visibility, TEEHR tint. Components that change state call an action and let this run,
+// rather than each call site remembering to refresh.
+store.subscribe(() => refresh(map));
+
 // ---------------------------------------------------------------------------
 // Controls
 // ---------------------------------------------------------------------------
@@ -558,7 +554,7 @@ map.on('error', (event) => {
 // setStyle() wipes every custom source and layer, so reinstall afterwards. styledata can fire
 // more than once per swap, but installLayers is idempotent, so that is harmless.
 function setTheme(theme) {
-  state.theme = theme;
+  actions.setTheme(theme);
   map.setStyle(STYLE_URLS[theme]);
   map.once('styledata', () => {
     installLayers(map);
@@ -567,13 +563,11 @@ function setTheme(theme) {
 }
 
 function setCatchmentHidden(hidden) {
-  state.catchmentHidden = hidden;
-  refresh(map);
+  actions.setLayer('catchmentHidden', hidden);
 }
 
 function setShowTeehr(show) {
-  state.showTeehr = show;
-  refresh(map);
+  actions.setLayer('showTeehr', show);
 }
 
 function bindToggle(id, handler) {
@@ -608,7 +602,7 @@ function searchCatchments(query) {
   const exact = [];
   const prefix = [];
   const contains = [];
-  for (const entry of state.catchmentIndex) {
+  for (const entry of local.catchmentIndex) {
     const label = entry.label.toLowerCase();
     if (label === q) exact.push(entry);
     else if (label.startsWith(q) || String(entry.numeric).startsWith(q)) prefix.push(entry);
