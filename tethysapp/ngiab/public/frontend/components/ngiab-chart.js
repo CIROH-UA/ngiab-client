@@ -3,6 +3,7 @@ import uPlot from 'uplot';
 import appAPI from '../api/app.js';
 import { store, actions } from '../store/app-store.js';
 import { toUplotData } from '../lib/series.js';
+import { toMetricsTable } from '../lib/metrics.js';
 
 // <ngiab-chart> -- the time-series panel.
 //
@@ -34,7 +35,10 @@ export class NgiabChart extends HTMLElement {
         </label>
       </div>
       <div class="chart-status" id="chart-status">Select a catchment on the map.</div>
-      <div class="chart-canvas" id="chart-canvas"></div>
+      <div class="chart-body">
+        <div class="chart-canvas" id="chart-canvas"></div>
+        <div class="chart-metrics" id="chart-metrics" hidden></div>
+      </div>
     `;
 
     this._sourcesEl = this.querySelector('.chart-sources');
@@ -42,6 +46,7 @@ export class NgiabChart extends HTMLElement {
     this._variableWrapEl = this.querySelector('.chart-variable');
     this._statusEl = this.querySelector('#chart-status');
     this._canvasEl = this.querySelector('#chart-canvas');
+    this._metricsEl = this.querySelector('#chart-metrics');
 
     this._renderSourceButtons();
 
@@ -79,7 +84,8 @@ export class NgiabChart extends HTMLElement {
 
     if (!selection.id) {
       this._destroyPlot();
-      this._setStatus('Select a catchment on the map.');
+      this._renderMetrics(null);
+      this._setStatus('Select a catchment on the map.', 'info');
       this._variableWrapEl.hidden = true;
       return;
     }
@@ -115,6 +121,7 @@ export class NgiabChart extends HTMLElement {
     if (!selection.id) return;
 
     const seq = (this._requestSeq += 1);
+    this._setBusy(true);
     this._setStatus('Loading…');
 
     try {
@@ -126,7 +133,10 @@ export class NgiabChart extends HTMLElement {
       if (seq !== this._requestSeq) return;
       console.error('[chart] fetch failed', error);
       this._destroyPlot();
-      this._setStatus(`Could not load data: ${error.message}`);
+      this._renderMetrics(null);
+      this._setStatus(`Could not load data: ${error.message}`, 'error');
+    } finally {
+      if (seq === this._requestSeq) this._setBusy(false);
     }
   }
 
@@ -159,20 +169,23 @@ export class NgiabChart extends HTMLElement {
   // -- rendering ------------------------------------------------------------
 
   _renderPayload(payload) {
-    // Endpoints that cannot answer return a status message instead of raising.
+    // The TEEHR endpoints report "cannot answer" as a status message with a severity
+    // rather than raising -- an unconfigured warehouse is a normal state, not an error.
     if (payload.teehr_status) {
       this._destroyPlot();
-      this._setStatus(payload.teehr_status);
+      this._renderMetrics(null);
+      this._setStatus(payload.teehr_status, payload.teehr_status_severity || 'info');
       this._renderVariableOptions(payload);
       return;
     }
 
     const { data, labels, points } = toUplotData(payload.data);
     this._renderVariableOptions(payload);
+    this._renderMetrics(payload.metrics);
 
     if (!points) {
       this._destroyPlot();
-      this._setStatus('No data for this selection.');
+      this._setStatus('No data for this selection.', 'info');
       return;
     }
 
@@ -279,9 +292,57 @@ export class NgiabChart extends HTMLElement {
     }
   }
 
-  _setStatus(message) {
+  // TEEHR skill scores, shown beside the plot. Columns are derived from the payload
+  // because the configuration names are run-specific.
+  _renderMetrics(metrics) {
+    const { columns, rows } = toMetricsTable(metrics);
+    this._metricsEl.textContent = '';
+
+    if (!rows.length) {
+      this._metricsEl.hidden = true;
+      return;
+    }
+
+    const table = document.createElement('table');
+    const head = table.createTHead().insertRow();
+    head.insertCell().textContent = '';
+    for (const col of columns) {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.textContent = col.label;
+      head.append(th);
+    }
+
+    const body = table.createTBody();
+    for (const row of rows) {
+      const tr = body.insertRow();
+      const th = document.createElement('th');
+      th.scope = 'row';
+      th.textContent = row.label;
+      tr.append(th);
+      for (const value of row.values) {
+        tr.insertCell().textContent = value;
+      }
+    }
+
+    this._metricsEl.append(table);
+    this._metricsEl.hidden = false;
+  }
+
+  // Disables the controls while a request is in flight, so a burst of clicks cannot queue
+  // up requests whose responses arrive out of order.
+  _setBusy(busy) {
+    this.classList.toggle('is-busy', busy);
+    this._variableEl.disabled = busy;
+    for (const button of this._sourcesEl.querySelectorAll('button')) {
+      button.disabled = busy || !store.get().selection.id;
+    }
+  }
+
+  _setStatus(message, severity = null) {
     this._statusEl.textContent = message;
     this._statusEl.hidden = !message;
+    this._statusEl.dataset.severity = message && severity ? severity : '';
   }
 }
 

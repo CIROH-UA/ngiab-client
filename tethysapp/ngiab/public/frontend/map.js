@@ -409,8 +409,14 @@ function lookupTeehrId(numericId) {
 // Data
 // ---------------------------------------------------------------------------
 const statusEl = document.getElementById('map-status');
-const setStatus = (msg) => {
-  if (statusEl) statusEl.textContent = msg;
+
+// severity mirrors the backend's own vocabulary ('info' | 'warning' | 'error') so a
+// missing TEEHR warehouse does not get styled like a failure.
+const setStatus = (msg, severity = null) => {
+  if (!statusEl) return;
+  statusEl.textContent = msg;
+  statusEl.dataset.severity = msg && severity ? severity : '';
+  statusEl.classList.toggle('is-busy', severity === 'busy');
 };
 
 const panelEl = document.getElementById('map-panel');
@@ -456,7 +462,7 @@ async function loadTeehrLocations(modelRunId) {
 }
 
 async function loadGeoSpatial(map, modelRunId) {
-  setStatus(`loading ${modelRunId}...`);
+  setStatus(`Loading ${modelRunId}`, 'busy');
 
   // getJSON raises on a non-ok status AND on the HTTP-200-plus-error-key shape several
   // controllers use, so both failure modes arrive here as exceptions.
@@ -497,14 +503,24 @@ function loadOrReport(map, modelRunId) {
   ])
     .then(([geo, teehr]) => {
       refresh(map); // paint the TEEHR colours once both halves have landed
-      const parts = [`${modelRunId}: ${geo.catchments} catchments`];
+      // A run with no catchment outputs renders an empty map, which is indistinguishable
+      // from a broken one unless it is said out loud.
+      if (!geo.catchments) {
+        setStatus(
+          'This model run has no catchment outputs, so nothing is drawn.',
+          'warning',
+        );
+        return;
+      }
+
+      const parts = [`${geo.catchments} catchments`];
       if (geo.dropped) parts.push(`${geo.dropped} unparseable ids dropped`);
       parts.push(teehr.count ? `${teehr.count} TEEHR nexus` : (teehr.status ?? 'no TEEHR'));
       setStatus(parts.join(' · '));
     })
     .catch((error) => {
       console.error('[map] geospatial fetch failed', error);
-      setStatus(`error: ${error.message}`);
+      setStatus(`Could not load this model run: ${error.message}`, 'error');
     });
 }
 
@@ -527,7 +543,7 @@ map.on('load', () => {
   if (modelRunId) {
     loadOrReport(map, modelRunId);
   } else {
-    setStatus('no model_run_id - append ?model_run_id=... to the URL');
+    setStatus('No model run selected \u2014 append ?model_run_id=… to the URL', 'warning');
   }
 });
 

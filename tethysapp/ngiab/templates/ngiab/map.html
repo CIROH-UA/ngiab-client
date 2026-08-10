@@ -109,6 +109,13 @@
   #map-toggles { margin-top: 8px; padding: 9px 11px; }
   #map-toggles label { display: block; }
   #map-status { margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(128,128,128,.25); opacity: 0.75; }
+  #map-status[data-severity="error"] { color: #d9534f; opacity: 1; }
+  #map-status[data-severity="warning"] { color: #b8860b; opacity: 1; }
+  #map-status.is-busy::after {
+    content: ''; display: inline-block; width: 9px; height: 9px; margin-left: 7px;
+    border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+    animation: ngiab-spin .7s linear infinite; vertical-align: -1px;
+  }
 
   /* Chart ------------------------------------------------------------- */
   ngiab-chart { display: flex; flex-direction: column; height: 100%; padding: 8px 12px; box-sizing: border-box;
@@ -125,7 +132,36 @@
   .chart-variable select { font: inherit; padding: 2px 4px; }
   .chart-status { flex: 0 0 auto; padding: 4px 0; opacity: .75; }
   .chart-status[hidden] { display: none; }
-  .chart-canvas { flex: 1 1 auto; min-height: 0; }
+  /* Severity mirrors the backend's teehr_status_severity, so an unconfigured warehouse
+     (info) does not look like a failure (error). */
+  .chart-status[data-severity="error"] { color: #d9534f; opacity: 1; }
+  .chart-status[data-severity="warning"] { color: #b8860b; opacity: 1; }
+
+  .chart-body { flex: 1 1 auto; min-height: 0; display: flex; gap: 14px; }
+  .chart-canvas { flex: 1 1 auto; min-width: 0; min-height: 0; }
+
+  /* Metrics ----------------------------------------------------------- */
+  .chart-metrics { flex: 0 0 auto; overflow: auto; align-self: flex-start; max-height: 100%; }
+  .chart-metrics[hidden] { display: none; }
+  .chart-metrics table { border-collapse: collapse; font-size: 12px; }
+  .chart-metrics th, .chart-metrics td {
+    padding: 3px 10px; text-align: right; border-bottom: 1px solid rgba(128,128,128,.22);
+    font-variant-numeric: tabular-nums;
+  }
+  .chart-metrics thead th { text-align: right; font-weight: 600; white-space: nowrap; }
+  .chart-metrics tbody th { text-align: left; font-weight: 500; white-space: nowrap; }
+
+  /* Busy -------------------------------------------------------------- */
+  ngiab-chart.is-busy .chart-canvas { opacity: .4; transition: opacity .12s ease; }
+  ngiab-chart.is-busy .chart-status::after {
+    content: ''; display: inline-block; width: 9px; height: 9px; margin-left: 7px;
+    border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+    animation: ngiab-spin .7s linear infinite; vertical-align: -1px;
+  }
+  @keyframes ngiab-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    ngiab-chart.is-busy .chart-status::after { animation: none; }
+  }
 </style>
 
 <div id="ngiab-layout">
