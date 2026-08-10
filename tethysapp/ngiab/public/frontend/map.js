@@ -34,6 +34,7 @@
 import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 
+import './components/ngiab-chart.js';
 import appAPI from './api/app.js';
 import { getModelRunId } from './config.js';
 import { store, actions } from './store/app-store.js';
@@ -545,7 +546,20 @@ map.on('error', (event) => {
 // One subscription repaints everything the store owns -- selection highlight, layer
 // visibility, TEEHR tint. Components that change state call an action and let this run,
 // rather than each call site remembering to refresh.
-store.subscribe(() => refresh(map));
+const chartPaneEl = document.getElementById('chart-pane');
+
+store.subscribe(() => {
+  refresh(map);
+
+  // The chart pane only exists while something is selected. Showing or hiding it changes
+  // the map container's height, and MapLibre does not observe that on its own -- without
+  // an explicit resize the canvas keeps the old dimensions and the map appears stretched.
+  if (!chartPaneEl) return;
+  const shouldShow = Boolean(store.get().selection.id);
+  if (chartPaneEl.hidden !== shouldShow) return; // already in the right state
+  chartPaneEl.hidden = !shouldShow;
+  map.resize();
+});
 
 // ---------------------------------------------------------------------------
 // Controls

@@ -4,10 +4,18 @@
    an include, so it is repeated here. #}
 
 <style>
+  /* Map and chart split the page vertically; the chart collapses away when nothing is
+     selected so the map keeps the full height. */
+  #ngiab-layout { position: absolute; inset: 0; display: flex; flex-direction: column; }
+  #map-pane { position: relative; flex: 1 1 auto; min-height: 0; }
+  #chart-pane { flex: 0 0 auto; height: 300px; min-height: 0; border-top: 1px solid rgba(128,128,128,.3); }
+  #chart-pane[hidden] { display: none; }
   #map { position: absolute; inset: 0; }
 
+  /* Anchored to #map-pane, which is position:relative. */
   #map-ui {
     position: absolute;
+    z-index: 10;
     z-index: 1;
     top: 12px;
     left: 12px;
@@ -101,43 +109,66 @@
   #map-toggles { margin-top: 8px; padding: 9px 11px; }
   #map-toggles label { display: block; }
   #map-status { margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(128,128,128,.25); opacity: 0.75; }
+
+  /* Chart ------------------------------------------------------------- */
+  ngiab-chart { display: flex; flex-direction: column; height: 100%; padding: 8px 12px; box-sizing: border-box;
+                background: var(--bg, #fff); color: var(--fg, #1b1b1b);
+                font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .chart-controls { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
+  .chart-sources { display: flex; gap: 4px; }
+  .chart-sources button { border: 1px solid rgba(128,128,128,.35); background: transparent; color: inherit;
+                          border-radius: 5px; padding: 3px 10px; cursor: pointer; font: inherit; }
+  .chart-sources button.is-active { background: var(--accent, #1f78b4); color: #fff; border-color: transparent; }
+  .chart-sources button:disabled { opacity: .45; cursor: default; }
+  .chart-variable { display: flex; align-items: center; gap: 6px; }
+  .chart-variable[hidden] { display: none; }
+  .chart-variable select { font: inherit; padding: 2px 4px; }
+  .chart-status { flex: 0 0 auto; padding: 4px 0; opacity: .75; }
+  .chart-status[hidden] { display: none; }
+  .chart-canvas { flex: 1 1 auto; min-height: 0; }
 </style>
 
-<div id="map-ui">
-  <div class="map-card" id="map-search-box">
-    <!-- Combobox over the run's catchment ids. The list is already in the
-         getGeoSpatialData payload, so matching is client-side. -->
-    <input
-      id="map-search"
-      type="text"
-      role="combobox"
-      autocomplete="off"
-      aria-expanded="false"
-      aria-controls="map-search-results"
-      aria-label="Search catchments"
-      placeholder="Search catchments (e.g. cat-1015)"
-    />
-    <button id="map-search-clear" type="button" aria-label="Clear search" hidden>&times;</button>
+<div id="ngiab-layout">
+  <div id="map-pane">
+    <div id="map-ui">
+      <div class="map-card" id="map-search-box">
+        <!-- Combobox over the run's catchment ids. The list is already in the
+             getGeoSpatialData payload, so matching is client-side. -->
+        <input
+          id="map-search"
+          type="text"
+          role="combobox"
+          autocomplete="off"
+          aria-expanded="false"
+          aria-controls="map-search-results"
+          aria-label="Search catchments"
+          placeholder="Search catchments (e.g. cat-1015)"
+        />
+        <button id="map-search-clear" type="button" aria-label="Clear search" hidden>&times;</button>
+      </div>
+
+      <ul class="map-card" id="map-search-results" role="listbox" aria-label="Search results" hidden></ul>
+      <div class="map-card" id="map-search-empty" hidden>No matching catchment in this run.</div>
+
+      <div class="map-card" id="map-panel" hidden>
+        <div class="panel-id" id="map-panel-id"></div>
+        <div class="panel-row" id="map-panel-teehr"></div>
+        <!-- Variable / troute / TEEHR config pickers land here with the chart. -->
+        <div class="panel-note" id="map-panel-note" hidden></div>
+      </div>
+
+      <div class="map-card" id="map-toggles">
+        <label><input type="checkbox" id="toggle-theme" /> dark basemap</label>
+        <label><input type="checkbox" id="toggle-catchments" /> hide catchments</label>
+        <label><input type="checkbox" id="toggle-teehr" checked /> highlight TEEHR</label>
+        <div id="map-status">loading…</div>
+      </div>
+    </div>
+    <div id="map"></div>
   </div>
-
-  <ul class="map-card" id="map-search-results" role="listbox" aria-label="Search results" hidden></ul>
-  <div class="map-card" id="map-search-empty" hidden>No matching catchment in this run.</div>
-
-  <div class="map-card" id="map-panel" hidden>
-    <div class="panel-id" id="map-panel-id"></div>
-    <div class="panel-row" id="map-panel-teehr"></div>
-    <!-- Variable / troute / TEEHR config pickers land here with the chart. -->
-    <div class="panel-note" id="map-panel-note" hidden></div>
-  </div>
-
-  <div class="map-card" id="map-toggles">
-    <label><input type="checkbox" id="toggle-theme" /> dark basemap</label>
-    <label><input type="checkbox" id="toggle-catchments" /> hide catchments</label>
-    <label><input type="checkbox" id="toggle-teehr" checked /> highlight TEEHR</label>
-    <div id="map-status">loading…</div>
+  <div id="chart-pane" hidden>
+    <ngiab-chart></ngiab-chart>
   </div>
 </div>
-
-<div id="map"></div>
 
 <script type="module" src="{% static tethys_app|public:'frontend/map.js' %}"></script>
