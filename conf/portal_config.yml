@@ -15,7 +15,27 @@ name: NGIAB Visualizer
 apps: {}
 
 settings:
-  DEBUG: false
+  # NOTE: this is what makes static files work, and it is a deliberate trade.
+  #
+  # serve.sh branches on this: false runs uvicorn, true runs Django's dev server. The old
+  # image ran DEBUG false and let nginx serve /static/. There is no nginx under
+  # tethys-uvx, and with DEBUG false nothing serves static at all -- upstream expects a CDN
+  # (STORAGES.staticfiles -> S3) or a reverse proxy, neither of which exists in a
+  # single-container desktop launch.
+  #
+  # The visualizer binds to localhost for one user, so the dev server is adequate and
+  # tracebacks are arguably useful. For any hosted/multi-user deployment this should be
+  # false with whitenoise added (see docs) or a proxy in front.
+  DEBUG: true
+
+  # Declared explicitly rather than left to TETHYS_DB_NAME: the settings module does not
+  # read that env var, so without this block Tethys falls back to its sqlite default at
+  # ${TETHYS_HOME}/tethys_platform.sqlite -- which is inside the image's writable layer,
+  # not the baked location the runtime stage copies.
+  DATABASES:
+    default:
+      ENGINE: django.db.backends.sqlite3
+      NAME: /opt/ngiab/tethys_platform.sqlite
 
   # Merged with PORTAL_ALLOWED_HOSTS by portal-config.sh. Localhost entries are the
   # default single-container case; viewOnTethys.sh adds the host's own IPv4 addresses so
@@ -30,10 +50,10 @@ settings:
 
   SESSION_EXPIRE_AT_BROWSER_CLOSE: false
 
-  # The visualizer is a local, single-user tool; the sign-up flow is not wanted.
-  ENABLE_OPEN_SIGNUP: false
-  ENABLE_OPEN_PORTAL: false
+  # Baked at build time, deliberately outside ${TETHYS_PERSIST} -- that path is a declared
+  # VOLUME in the base image, so anything written there can be masked by a user bind mount.
+  STATIC_ROOT: /opt/ngiab/static
 
+  # The visualizer is a local, single-user tool; the sign-up flow is not wanted.
   TETHYS_PORTAL_CONFIG:
     ENABLE_OPEN_SIGNUP: false
-    STATIC_ROOT: /var/lib/tethys_persist/static

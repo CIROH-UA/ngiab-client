@@ -1,22 +1,28 @@
 #!/usr/bin/env bash
 #
-# Inject CSRF_TRUSTED_ORIGINS into the rendered portal config.
+# Set CSRF_TRUSTED_ORIGINS for local HTTP access.
 #
-# Replaces the PATCH_Portal_Settings_TethysCore state in salt/patches.sls, which ran
-# `tethys settings --set CSRF_TRUSTED_ORIGINS` at container start. The value cannot be
-# baked into the image: it depends on the host port viewOnTethys.sh picks and on the host's
-# own IP addresses, both known only at launch.
+# Replaces the PATCH_Portal_Settings_TethysCore state in salt/patches.sls, and works the
+# same way: by calling `tethys settings` directly.
 #
-# Without this, logging in fails with "CSRF verification failed. Request aborted." on any
-# origin other than the one Django infers.
+# Two reasons this cannot be done by exporting a variable:
 #
-# Sourced by portal-config.sh in both the provision and web containers. Must be idempotent.
-
-# viewOnTethys.sh exports this as a JSON-ish list, e.g.
+#   1. portal-config.sh sources these hooks AFTER it has written the settings, so an
+#      exported value arrives too late to be picked up.
+#   2. portal-config.sh derives CSRF_TRUSTED_ORIGINS from ALLOWED_HOSTS but deliberately
+#      skips localhost, 127.0.0.1, and bare IPs (it only auto-trusts https:// hostnames).
+#      The visualizer is served over plain http on localhost, so the derived list is empty
+#      and every login fails with "CSRF verification failed. Request aborted."
+#
+# viewOnTethys.sh exports the value as a YAML/JSON list, e.g.
 #   ["http://localhost:8080","http://127.0.0.1:8080"]
+#
+# Runs in both the provision and web containers. Idempotent: setting the same value twice
+# is a no-op.
+
 if [ -n "${CSRF_TRUSTED_ORIGINS:-}" ]; then
-    export CSRF_TRUSTED_ORIGINS
-    echo "[portal-config] CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}"
+    echo "[portal-config] setting CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}"
+    tethys settings --set CSRF_TRUSTED_ORIGINS "${CSRF_TRUSTED_ORIGINS}"
 else
-    echo "[portal-config] CSRF_TRUSTED_ORIGINS unset; only the inferred origin will be trusted"
+    echo "[portal-config] CSRF_TRUSTED_ORIGINS unset; logins over plain http will fail" >&2
 fi
