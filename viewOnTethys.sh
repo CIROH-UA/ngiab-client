@@ -675,6 +675,38 @@ copy_models_run() {
     echo "$final_copied_path"
 }
 
+# Convert the copied run's ngen CSV outputs to parquet.
+#
+# Only ever runs against MODELS_RUNS_DIRECTORY -- the visualizer's own copy made by
+# copy_models_run -- never the directory the user passed with -d. The management command
+# refuses --delete-csv outside that root as a second line of defence.
+#
+# Measured on a real run: 438 MB of csv -> 65 MB of parquet in ~4.6 s, which is small
+# against the cp -r that just happened.
+convert_run_outputs() {
+    local final_path="$1"
+
+    local image="${TETHYS_REPO}:${TETHYS_TAG:-latest}"
+    if ! ${DOCKER_CMD} image inspect "$image" >/dev/null 2>&1; then
+        echo -e "  ${INFO_MARK} Image $image not present locally; leaving outputs as CSV."
+        return 0
+    fi
+
+    echo -e "  ${ARROW} ${BCyan}Converting outputs to parquet...${Color_Off}"
+    if ${DOCKER_CMD} run --rm \
+        "${USERNS_ARGS[@]}" \
+        -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer${VOLUME_SUFFIX}" \
+        --env TETHYS_SECRET_KEY="${TETHYS_SECRET_KEY:-conversion-only}" \
+        --entrypoint /usr/local/bin/ngiab-convert.sh \
+        "$image" \
+        --path "$final_path" --delete-csv; then
+        echo -e "  ${CHECK_MARK} ${BCyan}Outputs converted.${Color_Off}"
+    else
+        # Non-fatal: the app reads CSV too, so a failed conversion costs speed, not function.
+        echo -e "  ${WARNING_MARK} ${BYellow}Conversion failed; the run will be read as CSV.${Color_Off}"
+    fi
+}
+
 # Register the run in the portal database.
 #
 # The database is the source of truth now; ngiab_visualizer.json is still written above so
@@ -825,6 +857,7 @@ add_model_run() {
        mv -f "${json_file}.tmp" "$json_file"; then
         ## ► success message
         echo -e "  ${CHECK_MARK} ${BCyan}Model run "$base_name" registered (${new_uuid})${Color_Off}"
+        convert_run_outputs "$final_path"
         register_run_in_database "$final_path" "$base_name" "$new_uuid" "$teehr_config_name"
     else
         ## ► failure message

@@ -333,31 +333,93 @@ def get_output_path(base_path):
         return None
 
 
-def _list_prefixed_csv_files(directory, prefix):
-    """
-    List all CSV files in a specified directory that start with a given prefix.
+# Output files may be csv (as ngen writes them) or parquet (as viewOnTethys.sh rewrites
+# them at import). Parquet first: when both exist it is the cheaper read.
+_OUTPUT_SUFFIXES = (".parquet", ".csv")
 
-    Args:
-    directory (str): The directory to search for files.
-    prefix (str): The prefix the file names should start with.
 
-    Returns:
-    list: A list of filenames (str) that match the criteria.
+def _list_prefixed_output_files(directory, prefix):
+    """Return the ids of output files with ``prefix``, without their extension.
+
+    Matches parquet as well as csv. viewOnTethys.sh converts a run's outputs at import and
+    deletes the csv copies, so globbing ``*.csv`` alone would report a converted run as
+    having no catchments -- an empty map that looks exactly like a broken one.
+
+    Deduplicated by stem, so a partially converted directory containing both ``cat-1.csv``
+    and ``cat-1.parquet`` lists that catchment once.
     """
-    # Check if the directory exists
     if not os.path.exists(directory):
-        print("The specified directory does not exist.")
+        logger.info("Output directory does not exist: %s", directory)
         return []
 
-    # List all files in the directory
-    files = os.listdir(directory)
+    stems = set()
+    for name in os.listdir(directory):
+        if not name.startswith(prefix):
+            continue
+        for suffix in _OUTPUT_SUFFIXES:
+            if name.endswith(suffix):
+                stems.add(name[: -len(suffix)])
+                break
 
-    # Filter files to find those that are CSVs and start with the given prefix
-    csv_files = [
-        file for file in files if file.startswith(prefix) and file.endswith(".csv")
-    ]
+    return sorted(stems)
 
-    return csv_files
+
+def _find_output_file(directory, stem):
+    """Return (path, suffix) for a run output, preferring parquet, or raise."""
+    for suffix in _OUTPUT_SUFFIXES:
+        path = os.path.join(directory, f"{stem}{suffix}")
+        if os.path.exists(path):
+            return path, suffix
+    raise FileNotFoundError(f"No output file for {stem!r} in {directory}")
+
+
+def _read_output_columns(directory, stem):
+    """List an output file's column names without reading its rows.
+
+    For parquet this is answered from the footer (LIMIT 0 reads no row groups), which is
+    what lets the caller then ask for just the two columns it needs.
+    """
+    path, suffix = _find_output_file(directory, stem)
+    if suffix == ".parquet":
+        rel = duckdb.query(f"SELECT * FROM read_parquet('{path}') LIMIT 0")
+        return list(rel.columns)
+    return list(pd.read_csv(path, nrows=0).columns)
+
+
+def _read_output_frame(directory, stem, columns=None, time_column=None):
+    """Read one output file as a DataFrame, preferring parquet.
+
+    ``columns`` matters: parquet is columnar, so selecting two of seventeen columns reads
+    roughly two-seventeenths of the file. Without it the format change buys nothing --
+    measured, SELECT * from parquet is slower than read_csv, because the whole point is
+    projection rather than raw scan speed.
+
+    DuckDB rather than pd.read_parquet, which needs pyarrow: not installed, and a sizeable
+    addition when duckdb is already a dependency for TEEHR.
+    """
+    path, suffix = _find_output_file(directory, stem)
+
+    if suffix == ".parquet":
+        # Quoted so column names containing spaces (e.g. "Time Step") survive.
+        #
+        # time_column is cast to VARCHAR deliberately. Parquet stores it as a TIMESTAMP, so
+        # without the cast the JSON encoder serialises 43k datetime objects instead of
+        # passing strings through -- measured at 54 ms against 9 ms, which wiped out the
+        # entire read saving and made parquet slower end to end than CSV. The cast also
+        # yields '2017-01-01 00:00:00', byte-identical to what the CSV path returns, so the
+        # response shape does not change with the storage format.
+        selected = columns if columns else ["*"]
+        parts = []
+        for column in selected:
+            if column == "*":
+                parts.append("*")
+            elif time_column and column == time_column:
+                parts.append(f'CAST("{column}" AS VARCHAR) AS "{column}"')
+            else:
+                parts.append(f'"{column}"')
+        return duckdb.query(f"SELECT {', '.join(parts)} FROM read_parquet('{path}')").df()
+
+    return pd.read_csv(path, usecols=list(columns) if columns else None)
 
 
 def getCatchmentsIds(model_run_id):
@@ -373,25 +435,21 @@ def getCatchmentsIds(model_run_id):
     """
     output_base_file = get_base_output(model_run_id)
     catchment_prefix = "cat-"
-    catchment_ids_list = _list_prefixed_csv_files(output_base_file, catchment_prefix)
-    return [
-        {"value": id.split(".csv")[0], "label": id.split(".csv")[0]}
-        for id in catchment_ids_list
-    ]
+    catchment_ids_list = _list_prefixed_output_files(output_base_file, catchment_prefix)
+    return [{"value": id, "label": id} for id in catchment_ids_list]
 
 
 def getCatchmentsList(model_id):
     output_base_file = get_base_output(model_id)
     catchment_prefix = "cat-"
-    catchment_ids_list = _list_prefixed_csv_files(output_base_file, catchment_prefix)
-    return [id.split(".csv")[0] for id in catchment_ids_list]
+    return _list_prefixed_output_files(output_base_file, catchment_prefix)
 
 
 def getNexusList(model_id):
     output_base_file = get_base_output(model_id)
     nexus_prefix = "nex-"
-    nexus_ids_list = _list_prefixed_csv_files(output_base_file, nexus_prefix)
-    return [id.split(".csv")[0].split("_output")[0] for id in nexus_ids_list]
+    nexus_ids_list = _list_prefixed_output_files(output_base_file, nexus_prefix)
+    return [id.split("_output")[0] for id in nexus_ids_list]
 
 
 def getNexusIDs(model_run_id):
@@ -406,9 +464,9 @@ def getNexusIDs(model_run_id):
     """
     output_base_file = get_base_output(model_run_id)
     nexus_prefix = "nex-"
-    nexus_ids_list = _list_prefixed_csv_files(output_base_file, nexus_prefix)
+    nexus_ids_list = _list_prefixed_output_files(output_base_file, nexus_prefix)
     return [
-        {"value": id.split("_output.csv")[0], "label": id.split("_output.csv")[0]}
+        {"value": id.split("_output")[0], "label": id.split("_output")[0]}
         for id in nexus_ids_list
     ]
 

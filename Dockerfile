@@ -129,6 +129,7 @@ COPY --chown=1000:1000 conf/portal-config.d/ /opt/portal/portal-config.d/
 COPY --chmod=0755 scripts/ngiab-seed-db.sh /usr/local/bin/ngiab-seed-db.sh
 COPY --chmod=0755 scripts/ngiab-entrypoint.sh /usr/local/bin/ngiab-entrypoint.sh
 COPY --chmod=0755 scripts/ngiab-register.sh /usr/local/bin/ngiab-register.sh
+COPY --chmod=0755 scripts/ngiab-convert.sh /usr/local/bin/ngiab-convert.sh
 
 # SQLite, not Postgres: the visualizer ships as a single self-contained container.
 # Both paths are outside ${TETHYS_PERSIST} so a user bind mount cannot mask them.

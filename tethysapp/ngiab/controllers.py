@@ -8,6 +8,8 @@ import geopandas as gpd
 from tethys_sdk.routing import controller
 from .utils import (
     get_base_output,
+    _read_output_frame,
+    _read_output_columns,
     getCatchmentsIds,
     getNexusIDs,
     getNexusList,
@@ -142,18 +144,22 @@ def getCatchmentTimeSeries(request):
     variable_column = request.GET.get("variable_column")
     base_output_path = get_base_output(model_run_id)
 
-    catchment_output_file_path = os.path.join(
-        base_output_path,
-        "{}.csv".format(catchment_id),
-    )
+    # Prefers parquet, falls back to csv: viewOnTethys.sh converts a run's outputs at
+    # import, but runs registered before that still have csv only.
+    #
+    # The column list comes from metadata, then only the two columns actually plotted are
+    # read. On parquet that is the difference between scanning seventeen columns and two.
+    all_columns = _read_output_columns(base_output_path, catchment_id)
+    time_name = all_columns[1]
+    list_variables = all_columns[2:]  # drop time step and time
 
-    df = pd.read_csv(catchment_output_file_path)
-    list_variables = df.columns.tolist()[2:]  # remove time and timestep
-    time_col = df.iloc[:, 1]
-    if variable_column is None:
-        second_col = df.iloc[:, 2]
-    else:
-        second_col = df[variable_column]
+    selected = variable_column if variable_column in list_variables else list_variables[0]
+
+    df = _read_output_frame(
+        base_output_path, catchment_id, columns=[time_name, selected], time_column=time_name
+    )
+    time_col = df[time_name]
+    second_col = df[selected]
 
     data = [
         {"x": time, "y": val}
@@ -164,7 +170,7 @@ def getCatchmentTimeSeries(request):
         {
             "data": [
                 {
-                    "label": f"{catchment_id}-{variable_column if variable_column else list_variables[0]}",
+                    "label": f"{catchment_id}-{selected}",
                     "data": data,
                 }
             ],
@@ -172,14 +178,9 @@ def getCatchmentTimeSeries(request):
                 {"value": variable, "label": variable.lower().replace("_", " ")}
                 for variable in list_variables
             ],
-            "variable": (
-                # {"value": variable_column, "label": variable_column.lower()}
-                variable_column
-                if variable_column
-                else list_variables[0]
-            ),
+            "variable": selected,
             "layout": {
-                "yaxis": variable_column,
+                "yaxis": selected,
                 "xaxis": "",
                 "title": "",
             },
