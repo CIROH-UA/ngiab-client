@@ -11,6 +11,9 @@
   #chart-pane { flex: 0 0 auto; height: 300px; min-height: 0; border-top: 1px solid rgba(128,128,128,.3); }
   #chart-pane[hidden] { display: none; }
   #map { position: absolute; inset: 0; }
+  /* Behaviour-only elements; the markup they drive lives in the cards above. */
+  ngiab-map { display: none; }
+  ngiab-search { display: block; }
 
   /* Anchored to #map-pane, which is position:relative. */
   #map-ui {
@@ -188,6 +191,7 @@
         <ngiab-model-runs></ngiab-model-runs>
       </div>
 
+      <ngiab-search>
       <div class="map-card" id="map-search-box">
         <!-- Combobox over the run's catchment ids. The list is already in the
              getGeoSpatialData payload, so matching is client-side. -->
@@ -206,6 +210,7 @@
 
       <ul class="map-card" id="map-search-results" role="listbox" aria-label="Search results" hidden></ul>
       <div class="map-card" id="map-search-empty" hidden>No matching catchment in this run.</div>
+      </ngiab-search>
 
       <div class="map-card" id="map-panel" hidden>
         <div class="panel-id" id="map-panel-id"></div>
@@ -222,6 +227,7 @@
       </div>
     </div>
     <div id="map"></div>
+    <ngiab-map></ngiab-map>
   </div>
   <div id="chart-pane" hidden>
     <ngiab-chart></ngiab-chart>
