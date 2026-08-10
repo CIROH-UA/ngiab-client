@@ -1,0 +1,39 @@
+# Portal configuration for the NGIAB Visualizer image.
+#
+# Replaces the config the old image generated at runtime via salt. tethys-uvx copies this
+# to /config/portal_config.yml and portal-config.sh renders it at container start, merging
+# in deploy-time values (PORTAL_ALLOWED_HOSTS, and anything exported by the hooks in
+# /opt/portal/portal-config.d/).
+#
+# DEBUG drives serving mode in serve.sh: true runs the Django dev server with local static
+# serving, false runs uvicorn and requires publish-static.sh to have run (the entrypoint's
+# provision.sh does that).
+
+version: 2.0
+name: NGIAB Visualizer
+
+apps: {}
+
+settings:
+  DEBUG: false
+
+  # Merged with PORTAL_ALLOWED_HOSTS by portal-config.sh. Localhost entries are the
+  # default single-container case; viewOnTethys.sh adds the host's own IPv4 addresses so
+  # the portal is reachable from the LAN / the WSL host.
+  ALLOWED_HOSTS:
+    - localhost
+    - 127.0.0.1
+
+  # CSRF_TRUSTED_ORIGINS is injected by conf/portal-config.d/10-csrf.sh from the
+  # CSRF_TRUSTED_ORIGINS environment variable, because the value depends on the host port
+  # chosen at launch time and cannot be baked into the image.
+
+  SESSION_EXPIRE_AT_BROWSER_CLOSE: false
+
+  # The visualizer is a local, single-user tool; the sign-up flow is not wanted.
+  ENABLE_OPEN_SIGNUP: false
+  ENABLE_OPEN_PORTAL: false
+
+  TETHYS_PORTAL_CONFIG:
+    ENABLE_OPEN_SIGNUP: false
+    STATIC_ROOT: /var/lib/tethys_persist/static
