@@ -54,7 +54,7 @@ node --version                 # expect: v18+ (v20+ preferred)
 ```
 
 You will need, at Task 12, a running Tethys dev server and a browser. Starting the server is
-whatever this repo already uses — check `run.sh` and the README; typically:
+whatever this repo already uses — check `viewOnTethys.sh` and the README; typically:
 
 ```bash
 tethys manage start          # serves http://localhost:8000
