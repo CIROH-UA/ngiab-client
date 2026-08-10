@@ -8,6 +8,8 @@ import duckdb
 import xarray as xr
 from collections import defaultdict
 
+from django.core.exceptions import ValidationError
+
 from .teehr_warehouse import (
     ConfigurationNotFound,
     TeehrWarehouseError,
@@ -97,28 +99,64 @@ def _get_conf_file():
     print(conf_base_path)
     return conf_base_path
 
-def _get_list_model_runs():
+def _import_runs_from_json_once():
+    """Copy any runs still living in ngiab_visualizer.json into the database.
+
+    Existing installs have their runs in that file, written by viewOnTethys.sh. Importing
+    lazily -- only when the table is empty -- means an upgrade keeps every registered run
+    without a migration step the user has to remember, and re-running is a no-op.
+
+    The file stays on disk untouched: it is still what the launcher writes when importing a
+    run into a container that is not running yet.
     """
-        {
-            "model_runs": [
-                {
-                    "label": "run1",
-                    "path": "/home/aquagio/tethysdev/ciroh/ngen/ngen-data/AWI_16_2863657_007",
-                    "date": "2021-01-01:00:00:00",
-                    "id": "AWI_16_2863657_007",
-                    "subset": "cat-2863657_subset", #to_implement
-                    "tags": ["tag1", "tag2"], #to_implement
-                },
-                ....
-            ]
-        }
-    """
-    print("get_list_model_runs")
+    from .models import ModelRun
+
     conf_file = _get_conf_file()
-    
-    with open(conf_file, "r") as f:
-        data = json.load(f)
-    return data
+    if not os.path.exists(conf_file):
+        return
+
+    try:
+        with open(conf_file, "r") as f:
+            data = json.load(f)
+    except (OSError, ValueError) as exc:
+        logger.warning("Could not read %s for import: %s", conf_file, exc)
+        return
+
+    for entry in data.get("model_runs", []):
+        run_id = entry.get("id")
+        if not run_id:
+            continue
+        # Preserve the existing id so links of the form ?model_run_id=<uuid> keep working.
+        try:
+            ModelRun.objects.get_or_create(
+                id=run_id,
+                defaults={
+                    "label": entry.get("label", ""),
+                    "path": entry.get("path", ""),
+                    "subset": entry.get("subset", "") or "",
+                    "tags": entry.get("tags", []) or [],
+                    "teehr_configuration_name": entry.get("teehr_configuration_name", "") or "",
+                },
+            )
+        except (ValueError, ValidationError) as exc:
+            # A non-UUID id in a hand-edited file must not take the whole import down.
+            logger.warning("Skipping model run %r during import: %s", run_id, exc)
+
+
+def _get_list_model_runs():
+    """Return the registered model runs, in the shape callers already expect.
+
+    The database is now the source of truth. This keeps returning
+    ``{"model_runs": [...]}`` so every existing caller -- _get_model_run_path_by_id,
+    _resolve_configuration_name, get_model_runs_selectable -- works unchanged.
+    """
+    from .models import ModelRun
+
+    if not ModelRun.objects.exists():
+        _import_runs_from_json_once()
+
+    return {"model_runs": [run.as_dict() for run in ModelRun.objects.all()]}
+
 
 def get_model_runs_selectable():
     

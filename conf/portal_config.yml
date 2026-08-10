@@ -15,6 +15,14 @@ name: NGIAB Visualizer
 apps: {}
 
 settings:
+  # Registers the app as a real Django app so it can own models and migrations.
+  # tethys_portal merges this with its own list rather than replacing it
+  # (tethys_portal/settings.py: INSTALLED_APPS + portal_config INSTALLED_APPS), and Tethys's
+  # normal app discovery does NOT put apps here -- it loads them dynamically for routing
+  # only, which is why models would otherwise be invisible to Django.
+  INSTALLED_APPS:
+    - tethysapp.ngiab
+
   # NOTE: this is what makes static files work, and it is a deliberate trade.
   #
   # serve.sh branches on this: false runs uvicorn, true runs Django's dev server. The old
