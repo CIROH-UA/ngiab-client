@@ -118,10 +118,12 @@ it('exposes exactly the in-scope viewer endpoints', () => {
   expect(Object.keys(appAPI).sort()).to.deep.equal([
     'getCatchmentTimeSeries',
     'getGeoSpatialData',
+    'getModelRuns',
     'getTeehrLocations',
     'getTeehrTimeSeries',
     'getTeehrVariables',
     'getTrouteTimeSeries',
     'getTrouteVariables',
+    'removeModelRun',
   ]);
 });

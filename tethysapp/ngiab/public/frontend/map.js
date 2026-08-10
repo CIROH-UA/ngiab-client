@@ -35,6 +35,7 @@ import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 
 import './components/ngiab-chart.js';
+import './components/ngiab-model-runs.js';
 import appAPI from './api/app.js';
 import { getModelRunId } from './config.js';
 import { store, actions } from './store/app-store.js';
@@ -527,8 +528,30 @@ function loadOrReport(map, modelRunId) {
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
-const modelRunId = getModelRunId();
-actions.setModelRun(modelRunId || null);
+// Seed from the URL so a shared link still opens the right run; <ngiab-model-runs> takes
+// over from there and keeps the URL in step.
+actions.setModelRun(getModelRunId() || null);
+
+// Which run's geometry is currently drawn. Compared against the store so a run change
+// reloads exactly once, whether it came from the URL, the selector, or an unregister.
+let loadedRunId = null;
+
+function syncModelRun(map) {
+  const runId = store.get().modelRunId;
+  if (runId === loadedRunId) return;
+  loadedRunId = runId;
+
+  if (!runId) {
+    local.catchmentIds = [];
+    local.catchmentIndex = [];
+    local.teehrNexusIds = [];
+    local.teehrUsgsByNexus = new Map();
+    refresh(map);
+    setStatus('No model run selected.', 'warning');
+    return;
+  }
+  loadOrReport(map, runId);
+}
 
 const map = new maplibregl.Map({
   container: 'map',
@@ -540,11 +563,7 @@ const map = new maplibregl.Map({
 map.on('load', () => {
   installLayers(map);
   attachHoverCursor(map); // once only - see the note on the function
-  if (modelRunId) {
-    loadOrReport(map, modelRunId);
-  } else {
-    setStatus('No model run selected \u2014 append ?model_run_id=… to the URL', 'warning');
-  }
+  syncModelRun(map);
 });
 
 map.on('click', (event) => handleClick(map, event));
@@ -566,6 +585,7 @@ const chartPaneEl = document.getElementById('chart-pane');
 
 store.subscribe(() => {
   refresh(map);
+  if (map.isStyleLoaded()) syncModelRun(map);
 
   // The chart pane only exists while something is selected. Showing or hiding it changes
   // the map container's height, and MapLibre does not observe that on its own -- without

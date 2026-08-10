@@ -31,6 +31,23 @@
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
   }
 
+  /* Model runs -------------------------------------------------------- */
+  #map-runs { margin-bottom: 8px; padding: 9px 11px; }
+  .runs-label { display: block; font-size: 12px; opacity: .7; margin-bottom: 3px; }
+  .runs-row { display: flex; gap: 6px; align-items: center; }
+  .runs-row select { flex: 1 1 auto; min-width: 0; font: inherit; padding: 3px 4px; }
+  #model-run-remove {
+    flex: 0 0 auto; border: 1px solid rgba(128,128,128,.35); background: transparent;
+    color: inherit; border-radius: 5px; cursor: pointer; font-size: 15px; line-height: 1;
+    padding: 3px 8px;
+  }
+  #model-run-remove:hover:not(:disabled) { color: #d9534f; border-color: #d9534f; }
+  #model-run-remove:disabled { opacity: .4; cursor: default; }
+  .runs-status { margin-top: 5px; font-size: 12px; opacity: .75; }
+  .runs-status[hidden] { display: none; }
+  .runs-status[data-severity="error"] { color: #d9534f; opacity: 1; }
+  .runs-status[data-severity="warning"] { color: #b8860b; opacity: 1; }
+
   /* Search ------------------------------------------------------------ */
   #map-search-box { position: relative; }
 
@@ -167,6 +184,10 @@
 <div id="ngiab-layout">
   <div id="map-pane">
     <div id="map-ui">
+      <div class="map-card" id="map-runs">
+        <ngiab-model-runs></ngiab-model-runs>
+      </div>
+
       <div class="map-card" id="map-search-box">
         <!-- Combobox over the run's catchment ids. The list is already in the
              getGeoSpatialData payload, so matching is client-side. -->

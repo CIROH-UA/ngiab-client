@@ -9,11 +9,13 @@ const url = (name) => `${getConfig().APP_ROOT_URL}${name}/`;
 //
 // Deliberately absent, and not oversights:
 //   - getNexusTimeSeries  -- nexus was dropped from the product entirely.
-//   - getModelRuns / importModelRuns -- run selection is deferred; the run comes from
-//     ?model_run_id= for now.
+//   - importModelRuns -- the S3 import flow belongs to DataStream, which was removed.
 //   - every datastream_* endpoint -- DataStream was removed.
 // See the scope decisions in the design spec.
 const appAPI = {
+  getModelRuns: () => getJSON(url('getModelRuns')),
+  removeModelRun: (params) => getJSON(url('removeModelRun'), params),
+
   getGeoSpatialData: (params) => getJSON(url('getGeoSpatialData'), params),
 
   getCatchmentTimeSeries: (params) => getJSON(url('getCatchmentTimeSeries'), params),

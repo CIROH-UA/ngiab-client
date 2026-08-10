@@ -1,4 +1,5 @@
 from django.http import JsonResponse
+from django.core.exceptions import ValidationError
 import logging
 import pandas as pd
 import os
@@ -104,11 +105,34 @@ def importModelRuns(request):
 
 @controller
 def getModelRuns(request):
-    print("Getting model runs...")
-    model_run_select =  get_model_runs_selectable()
-    return JsonResponse({
-        "model_runs": model_run_select
-    })
+    model_run_select = get_model_runs_selectable()
+    return JsonResponse({"model_runs": model_run_select})
+
+
+@controller
+def removeModelRun(request):
+    """Unregister a model run.
+
+    Only removes the database row -- the run directory on disk is left alone. Deleting a
+    user's model output because they tidied up a list would be a surprising amount of
+    destruction for an unregister action.
+    """
+    from .models import ModelRun
+
+    model_run_id = request.GET.get("model_run_id")
+    if not model_run_id:
+        return JsonResponse({"error": "model_run_id is required."}, status=400)
+
+    try:
+        deleted, _ = ModelRun.objects.filter(id=model_run_id).delete()
+    except (ValueError, ValidationError):
+        # A malformed uuid is a bad request, not a server error.
+        return JsonResponse({"error": f"Not a valid model run id: {model_run_id}"}, status=400)
+
+    if not deleted:
+        return JsonResponse({"error": "No such model run."}, status=404)
+
+    return JsonResponse({"removed": model_run_id})
 
 
 @controller
