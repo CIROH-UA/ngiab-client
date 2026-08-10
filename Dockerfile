@@ -24,6 +24,25 @@
 # is a declared VOLUME in the base image, and anything written into a volume path can be
 # masked by a user's own bind mount.
 #
+# ---------------------------------------------------------------------------
+# INVARIANT: THE CONTAINER MUST NEVER NEED ROOT AT RUN TIME.
+#
+# It runs as the base image's unprivileged `tethys` user (uid 1000) and must stay that way
+# -- rootless Podman is a supported deployment. That holds only because every path the app
+# writes is chowned to 1000:1000 at BUILD time (build-time root is fine; run-time root is
+# not):
+#
+#   /opt/ngiab/tethys_platform.sqlite   Django writes sessions here
+#   /opt/ngiab/static                   collectstatic output
+#
+# ${TETHYS_PERSIST} is root-owned and read-only to the app, which is harmless precisely
+# because nothing the app writes lives there any more. The conda image had to `chown` the
+# sqlite DB in run.sh on every start, which forced the container to begin life as root.
+#
+# So: do NOT move STATIC_ROOT or the database back under ${TETHYS_PERSIST}, and do NOT add
+# a runtime chown. Either change reintroduces the need for root.
+# ---------------------------------------------------------------------------
+#
 # Upstream publishes only commit tags, so pin one and bump deliberately.
 
 ARG TETHYS_UVX_TAG=a3148d5
