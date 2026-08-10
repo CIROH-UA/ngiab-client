@@ -581,16 +581,28 @@ store.subscribe(() => {
 // Controls
 // ---------------------------------------------------------------------------
 
-// setStyle() wipes every custom source and layer, so reinstall afterwards. styledata can fire
-// more than once per swap, but installLayers is idempotent, so that is harmless.
+// setStyle() wipes every custom source and layer.
+//
+// Reinstalling on `map.once('styledata')` is not enough: styledata fires several times
+// during a swap and the FIRST one can arrive before the new style is ready, so the layers
+// get added and then thrown away when the style finishes loading. That is why the dark
+// basemap rendered no catchments -- everything visible was the basemap's own data.
+//
+// Watching every styledata and reinstalling whenever our source has gone missing is
+// self-healing, and cheap because the guard is a single getSource() lookup.
 function setTheme(theme) {
   actions.setTheme(theme);
   map.setStyle(STYLE_URLS[theme]);
-  map.once('styledata', () => {
-    installLayers(map);
-    refresh(map);
-  });
 }
+
+map.on('styledata', () => {
+  // addSource throws while the style is still loading, and this event also fires during
+  // the initial load, so both guards are load-bearing.
+  if (!map.isStyleLoaded()) return;
+  if (map.getSource(SRC_DIVIDES)) return; // still installed, nothing to do
+  installLayers(map);
+  refresh(map);
+});
 
 function setCatchmentHidden(hidden) {
   actions.setLayer('catchmentHidden', hidden);
@@ -621,6 +633,10 @@ const emptyEl = document.getElementById('map-search-empty');
 
 let matches = [];
 let activeIndex = -1;
+// Tracks whether a search actually came back empty. Without this, closing the list after
+// picking a result -- which leaves the chosen label in the input -- renders as
+// "No matching catchment in this run."
+let noMatches = false;
 
 // Rank exact, then prefix, then substring, so typing a full id puts it first.
 function searchCatchments(query) {
@@ -676,7 +692,7 @@ function renderResults() {
 
   const open = matches.length > 0;
   resultsEl.hidden = !open;
-  emptyEl.hidden = !(searchInput.value.trim() && !open);
+  emptyEl.hidden = !noMatches;
   searchInput.setAttribute('aria-expanded', String(open));
   if (activeIndex >= 0) {
     searchInput.setAttribute('aria-activedescendant', `map-search-opt-${activeIndex}`);
@@ -689,6 +705,7 @@ function renderResults() {
 function closeResults() {
   matches = [];
   activeIndex = -1;
+  noMatches = false;
   renderResults();
 }
 
@@ -710,6 +727,7 @@ if (searchInput) {
   searchInput.addEventListener('input', () => {
     matches = searchCatchments(searchInput.value);
     activeIndex = matches.length ? 0 : -1;
+    noMatches = Boolean(searchInput.value.trim()) && matches.length === 0;
     searchClear.hidden = !searchInput.value;
     renderResults();
   });
@@ -735,6 +753,7 @@ if (searchInput) {
     if (searchInput.value.trim() && !matches.length) {
       matches = searchCatchments(searchInput.value);
       activeIndex = matches.length ? 0 : -1;
+      noMatches = matches.length === 0;
       renderResults();
     }
   });
