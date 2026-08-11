@@ -387,11 +387,14 @@ def getTrouteTimeSeries(request):
     )
 
 
-def _empty_ts_response(variable, status_message, status_severity):
+def _empty_ts_response(variable, status_message, status_severity, variables=None):
     return JsonResponse(
         {
             "metrics": [],
             "data": [],
+            # Always carried, so the picker can populate even when there is nothing to plot.
+            "teehr_variables": variables or [],
+            "variable": variable,
             "layout": {
                 "yaxis": (variable or "").title(),
                 "xaxis": "",
@@ -403,6 +406,21 @@ def _empty_ts_response(variable, status_message, status_severity):
     )
 
 
+def _teehr_variables_for(model_run_id):
+    """The '<config>-<variable>' options for this run, or [] if none are readable."""
+    if _detect_legacy_teehr_layout(model_run_id) or not _teehr_warehouse_path():
+        return []
+    config_name = _resolve_configuration_name(model_run_id)
+    if config_name is None:
+        return []
+    try:
+        with _open_warehouse() as reader:
+            return reader.list_configurations_for_run(config_name) or []
+    except TeehrWarehouseError as exc:
+        logger.warning("Could not list TEEHR variables: %s", exc)
+        return []
+
+
 @controller
 def getTeehrTimeSeries(request):
     # Inputs: model_run_id (the registered run), teehr_id (USGS gauge like
@@ -411,21 +429,27 @@ def getTeehrTimeSeries(request):
     # dropdown is authoritative -- we don't re-derive it here.
     teehr_id = request.GET.get("teehr_id")
     model_run_id = request.GET.get("model_run_id")
-    teehr_config_variable = request.GET.get("teehr_variable") or ""
-    parts = teehr_config_variable.split("-", 1)
-    teehr_configuration = parts[0] if parts and parts[0] else None
-    teehr_variable = parts[1] if len(parts) > 1 else None
+
+    if not _teehr_warehouse_path():
+        return _empty_ts_response(None, "TEEHR warehouse is not configured. See setup docs.", "info")
+
+    # The client omits a null variable on the first load, so the server picks one. Requiring
+    # the dropdown to be authoritative meant nothing ever plotted until the user chose, and
+    # the dropdown had nothing in it to choose from.
+    available = _teehr_variables_for(model_run_id)
+    options = [entry["value"] for entry in available]
+    requested = request.GET.get("teehr_variable")
+    selected = requested if requested in options else (options[0] if options else None)
+
+    if selected is None:
+        return _empty_ts_response(
+            None, "No TEEHR evaluation found for this run.", "info", available
+        )
+
+    teehr_configuration, _, teehr_variable = selected.partition("-")
     if not teehr_configuration or not teehr_variable:
         return _empty_ts_response(
-            teehr_variable,
-            "No TEEHR configuration selected.",
-            "info",
-        )
-    if not _teehr_warehouse_path():
-        return _empty_ts_response(
-            teehr_variable,
-            "TEEHR warehouse is not configured. See setup docs.",
-            "info",
+            selected, "That TEEHR configuration is not readable.", "warning", available
         )
     try:
         with _open_warehouse() as reader:
@@ -436,18 +460,21 @@ def getTeehrTimeSeries(request):
     except TeehrWarehouseError as exc:
         msg, severity = _teehr_status_for(exc)
         logger.warning("getTeehrTimeSeries warehouse error: %s", exc)
-        return _empty_ts_response(teehr_variable, msg, severity)
+        return _empty_ts_response(selected, msg, severity, available)
 
     if not data:
         return _empty_ts_response(
-            teehr_variable,
+            selected,
             "No TEEHR data for this location in the configured warehouse.",
             "info",
+            available,
         )
     return JsonResponse(
         {
             "metrics": metrics,
             "data": data,
+            "teehr_variables": available,
+            "variable": selected,
             "layout": {"yaxis": teehr_variable.title(), "xaxis": "", "title": ""},
             "teehr_status": None,
             "teehr_status_severity": None,
