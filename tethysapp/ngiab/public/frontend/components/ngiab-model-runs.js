@@ -1,5 +1,6 @@
 import appAPI from '../api/app.js';
 import { store, actions } from '../store/app-store.js';
+import { userMessage } from '../lib/errors.js';
 
 // <ngiab-model-runs> -- pick which model run to view.
 export class NgiabModelRuns extends HTMLElement {
@@ -30,7 +31,7 @@ export class NgiabModelRuns extends HTMLElement {
     } catch (error) {
       console.error('[model-runs] could not load', error);
       this._runs = [];
-      this._setStatus(`Could not load model runs: ${error.message}`, 'error');
+      this._setStatus(`Could not load model runs. ${userMessage(error)}`, 'error');
       return;
     }
 
@@ -90,7 +91,7 @@ export class NgiabModelRuns extends HTMLElement {
       await appAPI.removeModelRun({ model_run_id: modelRunId });
     } catch (error) {
       console.error('[model-runs] remove failed', error);
-      this._setStatus(`Could not unregister: ${error.message}`, 'error');
+      this._setStatus(`Could not unregister that run. ${userMessage(error)}`, 'error');
       this._removeEl.disabled = false;
       return;
     }

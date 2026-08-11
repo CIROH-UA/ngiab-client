@@ -21,6 +21,7 @@ import {
 } from './interactions.js';
 import { ChoroplethState } from './choropleth-layer.js';
 import { legendEntries, legendLabel } from '../../lib/choropleth.js';
+import { userMessage } from '../../lib/errors.js';
 
 const escapeHtml = (value) =>
   String(value).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -59,10 +60,15 @@ export class NgiabMap extends HTMLElement {
     this._bindControls();
 
     this._unsubscribe = store.subscribe(() => this._onStoreChange());
+
+    // The chart pane is resizable, and MapLibre does not observe container size changes.
+    this._onPaneResize = () => this._map?.resize();
+    window.addEventListener('ngiab-pane-resize', this._onPaneResize);
   }
 
   disconnectedCallback() {
     this._unsubscribe?.();
+    window.removeEventListener('ngiab-pane-resize', this._onPaneResize);
     this._map?.remove();
   }
 
@@ -185,7 +191,7 @@ export class NgiabMap extends HTMLElement {
       console.error('[map] value matrix failed', error);
       this._choropleth.clear();
       this._timelineEl?.setTimes([]);
-      this._setStatus(`Could not shade by ${variable}: ${error.message}`, 'error');
+      this._setStatus(`Could not shade by ${variable}. ${userMessage(error)}`, 'error');
     }
   }
 
@@ -314,11 +320,11 @@ export class NgiabMap extends HTMLElement {
       this._loadGeoSpatial(runId),
       this._loadTeehrLocations(runId).catch((error) => {
         console.warn('[map] TEEHR locations unavailable', error);
-        return { count: 0, status: error.message };
+        return { count: 0, status: userMessage(error) };
       }),
     ]).catch((error) => {
       console.error('[map] geospatial fetch failed', error);
-      this._setStatus(`Could not load this model run: ${error.message}`, 'error');
+      this._setStatus(`Could not load this model run. ${userMessage(error)}`, 'error');
       return [null, null];
     });
 

@@ -4,6 +4,10 @@ import appAPI from '../api/app.js';
 import { store, actions } from '../store/app-store.js';
 import { toUplotData } from '../lib/series.js';
 import { toMetricsTable } from '../lib/metrics.js';
+import { userMessage } from '../lib/errors.js';
+
+// First-draw estimate for uPlot's legend row, before it exists to measure.
+const LEGEND_ROW = 22;
 
 // <ngiab-chart> -- the time-series panel.
 
@@ -124,7 +128,7 @@ export class NgiabChart extends HTMLElement {
       console.error('[chart] fetch failed', error);
       this._destroyPlot();
       this._renderMetrics(null);
-      this._setStatus(`Could not load data: ${error.message}`, 'error');
+      this._setStatus(userMessage(error), 'error');
     } finally {
       if (seq === this._requestSeq) this._setBusy(false);
     }
@@ -240,7 +244,7 @@ export class NgiabChart extends HTMLElement {
     this._plot = new uPlot(
       {
         width: this._canvasEl.clientWidth || 600,
-        height: this._canvasEl.clientHeight || 260,
+        height: Math.max((this._canvasEl.clientHeight || 260) - LEGEND_ROW, 80),
         // uPlot's built-in cursor replaces the separate @visx tooltip component.
         cursor: { drag: { x: true, y: false } },
         axes: [
@@ -261,13 +265,25 @@ export class NgiabChart extends HTMLElement {
       data,
       this._canvasEl,
     );
+
+    // Now that the legend exists, size the plot to what it actually left behind.
+    this._resizePlot();
+  }
+
+  // uPlot renders its legend as a sibling of the canvas but sizes only the canvas, so asking
+  // for the container's full height pushes the legend out of view. The legend is worth keeping
+  // -- TEEHR plots two series -- so the plot gets the height that is left after it.
+  _plotHeight() {
+    const total = this._canvasEl.clientHeight || 260;
+    const legend = this._plot?.root?.querySelector('.u-legend')?.offsetHeight ?? 0;
+    return Math.max(total - legend, 80);
   }
 
   _resizePlot() {
     if (!this._plot) return;
     this._plot.setSize({
       width: this._canvasEl.clientWidth || 600,
-      height: this._canvasEl.clientHeight || 260,
+      height: this._plotHeight(),
     });
   }
 

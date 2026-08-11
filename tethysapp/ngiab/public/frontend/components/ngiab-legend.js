@@ -31,21 +31,30 @@ export class NgiabLegend extends HTMLElement {
     this.render();
   }
 
+  // A continuous strip rather than one row per class: eight stacked rows pushed the whole
+  // card stack past the height of the map. Each segment keeps its own tooltip, so the exact
+  // range of any class is still one hover away.
   _renderGraduated(theme) {
     const entries = legendEntries(this._breaks, theme);
-    const swatches = entries
+    const segments = entries
       .map(
         (entry) =>
-          `<li><span class="swatch" style="background:${entry.color}"></span>` +
-          `<span class="label">${legendLabel(entry)}</span></li>`,
+          `<span class="seg" style="background:${entry.color}" title="${legendLabel(entry)}"></span>`,
       )
       .join('');
 
+    const low = entries.length ? legendLabel(entries[0]) : '';
+    const high = entries.length > 1 ? legendLabel(entries[entries.length - 1]) : '';
+
     // No units: nothing in the run's config declares them, so inventing one would be a lie.
     this.innerHTML = `
-      <div class="legend-title">${this._variable}</div>
-      <ul class="legend-scale">${swatches}</ul>
-      <div class="legend-note">quantile classes, this run only</div>
+      <div class="legend-title" title="${this._variable}">${this._variable}</div>
+      <div class="legend-ramp">${segments}</div>
+      <div class="legend-ends">
+        <span>${low}</span>
+        <span>${high}</span>
+      </div>
+      <div class="legend-note">${entries.length} quantile classes, this run only</div>
     `;
   }
 

@@ -5,23 +5,56 @@
   /* The chart collapses away when nothing is selected, so the map keeps the full height. */
   #ngiab-layout { position: absolute; inset: 0; display: flex; flex-direction: column; }
   #map-pane { position: relative; flex: 1 1 auto; min-height: 0; }
-  #chart-pane { flex: 0 0 auto; height: 300px; min-height: 0; border-top: 1px solid rgba(128,128,128,.3); }
+  /* Smaller by default and resizable; see public/frontend/lib/pane-resize.js. */
+  #chart-pane {
+    flex: 0 0 auto; height: 220px; min-height: 0;
+    display: flex; flex-direction: column;
+    border-top: 1px solid rgba(128,128,128,.3);
+    background: var(--bg, #fff);
+  }
   #chart-pane[hidden] { display: none; }
+  #chart-pane.is-collapsed { height: auto !important; }
+  #chart-pane.is-collapsed ngiab-chart { display: none; }
+
+  #chart-resize {
+    flex: 0 0 auto; position: relative; height: 14px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: ns-resize; touch-action: none;
+    background: var(--bg, #fff);
+  }
+  #chart-resize:hover .grip, #chart-resize.is-dragging .grip { opacity: .55; }
+  #chart-resize:focus-visible { outline: 2px solid var(--accent, #1f78b4); outline-offset: -2px; }
+  #chart-resize .grip {
+    width: 38px; height: 4px; border-radius: 2px;
+    background: currentColor; opacity: .25; transition: opacity .12s ease;
+  }
+  #chart-collapse {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    border: 0; background: transparent; color: inherit; opacity: .6;
+    cursor: pointer; font-size: 12px; line-height: 1; padding: 2px 6px;
+  }
+  #chart-collapse:hover { opacity: 1; }
   #map { position: absolute; inset: 0; }
   /* Behaviour-only elements; the markup they drive lives in the cards above. */
   ngiab-map { display: none; }
   ngiab-search { display: block; }
 
-  /* Anchored to #map-pane, which is position:relative. */
+  /* Anchored to #map-pane. Bounded top and bottom so the cards scroll inside the map
+     instead of growing past it and overlapping the chart. */
   #map-ui {
     position: absolute;
-    z-index: 10;
     z-index: 1;
     top: 12px;
     left: 12px;
+    bottom: 12px;
     width: 300px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
     font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
   }
+  /* The stack is only as tall as its cards; the column must not stretch them. */
+  #map-ui > * { flex: 0 0 auto; }
 
   .map-card {
     background: var(--bg, #fff);
@@ -127,7 +160,8 @@
   .shading-label { display: block; font-size: 12px; opacity: .7; margin-bottom: 3px; }
   #map-variable { width: 100%; font: inherit; padding: 3px 4px; }
   ngiab-legend { display: block; margin-top: 8px; }
-  .legend-title { font-weight: 600; margin-bottom: 4px; word-break: break-all; }
+  .legend-title { font-weight: 600; margin-bottom: 4px;
+                  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .legend-scale { list-style: none; margin: 0; padding: 0; }
   .legend-scale li { display: flex; align-items: center; gap: 7px; padding: 1px 0; }
   .legend-scale .swatch {
@@ -136,7 +170,12 @@
   }
   .legend-scale .swatch-selected { background: #ff0000; opacity: .5; border-color: #fff; }
   .legend-scale .label { font-variant-numeric: tabular-nums; font-size: 12px; }
-  .legend-note { margin-top: 5px; font-size: 11px; opacity: .6; }
+  .legend-note { margin-top: 4px; font-size: 11px; opacity: .6; }
+  .legend-ramp { display: flex; height: 12px; border-radius: 3px; overflow: hidden;
+                 border: 1px solid rgba(128,128,128,.35); }
+  .legend-ramp .seg { flex: 1 1 0; min-width: 0; }
+  .legend-ends { display: flex; justify-content: space-between; gap: 8px; margin-top: 3px;
+                 font-size: 11px; opacity: .75; font-variant-numeric: tabular-nums; }
 
   /* Timeline ---------------------------------------------------------- */
   #map-timeline {
@@ -202,7 +241,8 @@
   }
 
   /* Chart ------------------------------------------------------------- */
-  ngiab-chart { display: flex; flex-direction: column; height: 100%; padding: 8px 12px; box-sizing: border-box;
+  ngiab-chart { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0;
+                padding: 4px 12px 8px; box-sizing: border-box;
                 background: var(--bg, #fff); color: var(--fg, #1b1b1b);
                 font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
   .chart-controls { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
@@ -343,6 +383,11 @@
     <ngiab-map></ngiab-map>
   </div>
   <div id="chart-pane" hidden>
+    <div id="chart-resize" role="separator" aria-orientation="horizontal" tabindex="0"
+         aria-label="Resize chart. Arrow keys resize, Enter collapses." title="Drag to resize">
+      <span class="grip" aria-hidden="true"></span>
+      <button id="chart-collapse" type="button" aria-label="Collapse chart" aria-expanded="true">▾</button>
+    </div>
     <ngiab-chart></ngiab-chart>
   </div>
 </div>

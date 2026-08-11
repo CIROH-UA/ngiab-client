@@ -126,3 +126,84 @@ it('exposes exactly the in-scope viewer endpoints', () => {
     'removeModelRun',
   ]);
 });
+
+// What the user is shown must never contain a status code, a URL, or a traceback.
+const noTechnicalDetail = (text) => {
+  expect(text).to.be.a('string').and.not.equal('');
+  expect(text).to.not.match(/HTTP \d|[45]\d\d|\/apps\/|Traceback|<html/i);
+};
+
+describe('user-facing error messages', () => {
+  it('does not leak the status code or path on a 500', () =>
+    withStubbedFetch(
+      () => new Response('<!DOCTYPE html><html>Django debug page</html>', {
+        status: 500, headers: { 'Content-Type': 'text/html' },
+      }),
+      async () => {
+        let caught = null;
+        try { await appAPI.getCatchmentValueMatrix({ model_run_id: 'r' }); } catch (e) { caught = e; }
+        noTechnicalDetail(caught.userMessage);
+        // The technical detail still exists for the console.
+        expect(caught.message).to.contain('500');
+        expect(caught.status).to.equal(500);
+      },
+    ));
+
+  it('gives each status its own sentence', async () => {
+    const seen = new Map();
+    for (const status of [400, 403, 404, 500, 503]) {
+      await withStubbedFetch(
+        () => jsonResponse({}, status),
+        async () => {
+          try { await getJSON('/apps/ngiab/x/'); } catch (e) { seen.set(status, e.userMessage); }
+        },
+      );
+    }
+    for (const [, message] of seen) noTechnicalDetail(message);
+    expect(seen.get(404)).to.not.equal(seen.get(500));
+  });
+
+  it('passes a server error string through when it reads like a sentence', () =>
+    withStubbedFetch(
+      () => jsonResponse({ error: 'This model run has no plottable troute variables.' }),
+      async () => {
+        let caught = null;
+        try { await appAPI.getTrouteTimeSeries({ troute_id: 'cat-1' }); } catch (e) { caught = e; }
+        expect(caught.userMessage).to.equal('This model run has no plottable troute variables.');
+      },
+    ));
+
+  // A traceback is a sentence-shaped trap: it would sail through a length check alone.
+  it('refuses a traceback or HTML as a user message', () =>
+    withStubbedFetch(
+      () => jsonResponse({ error: 'Traceback (most recent call last):\n  File "x.py"' }),
+      async () => {
+        let caught = null;
+        try { await appAPI.getGeoSpatialData({ model_run_id: 'r' }); } catch (e) { caught = e; }
+        noTechnicalDetail(caught.userMessage);
+        expect(caught.userMessage).to.not.contain('Traceback');
+      },
+    ));
+
+  it('explains a network failure without jargon', () => {
+    const original = window.fetch;
+    window.fetch = () => Promise.reject(new TypeError('Failed to fetch'));
+    return (async () => {
+      let caught = null;
+      try { await getJSON('/apps/ngiab/getModelRuns/'); } catch (e) { caught = e; }
+      noTechnicalDetail(caught.userMessage);
+      expect(caught.userMessage).to.match(/reach the server/i);
+    })().finally(() => { window.fetch = original; });
+  });
+
+  it('reports a 200 carrying HTML instead of failing to parse', () =>
+    withStubbedFetch(
+      () => new Response('<html>login</html>', { status: 200, headers: { 'Content-Type': 'text/html' } }),
+      async () => {
+        let caught = null;
+        try { await getJSON('/apps/ngiab/getModelRuns/'); } catch (e) { caught = e; }
+        expect(caught).to.be.instanceOf(ApiError);
+        noTechnicalDetail(caught.userMessage);
+      },
+    ));
+});
