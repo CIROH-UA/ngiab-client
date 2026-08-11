@@ -5,9 +5,10 @@
 # tethys-uvx tag, the DuckDB extension list and the provisioning steps are duplicated here
 # because a def file has no ARG and no way to include another build.
 #
-# Build (needs root or --fakeroot; run from the repository root so %files paths resolve):
+# Build from the repository root, so the %files paths resolve. --fakeroot needs a subuid
+# range for your user; nothing in %post wants real root. Verified on apptainer 1.5.3:
 #
-#     apptainer build ngiab.sif apptainer/ngiab.def
+#     apptainer build --fakeroot ngiab.sif apptainer/ngiab.def
 #
 # Run:
 #
