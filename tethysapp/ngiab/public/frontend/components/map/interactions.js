@@ -1,21 +1,5 @@
-/**
- * Map interactions: hover, hit-testing, locating a catchment, and the tile-derived
- * catchment → nexus index.
- *
- * Everything here needs a live MapLibre instance, which is why it is separate from
- * layers.js — that module is pure and unit-tested, this one is only exercised in a browser.
- */
-
 import { SRC_DIVIDES, LAYER_DIVIDES, CATCHMENT_KEY, catchmentRef } from './layers.js';
 
-/**
- * Attach the pointer cursor. Call ONCE.
- *
- * Layer-scoped listeners live on the map, not the style, so they survive setStyle();
- * re-attaching after a basemap swap would silently accumulate duplicates.
- *
- * @param {import('maplibre-gl').Map} map
- */
 export function attachHoverCursor(map) {
   map.on('mouseenter', 'catchments-layer', () => {
     map.getCanvas().style.cursor = 'pointer';
@@ -25,16 +9,6 @@ export function attachHoverCursor(map) {
   });
 }
 
-/**
- * Identify the catchment under a click, or null.
- *
- * Logs the raw feature unconditionally: that is how the CATCHMENT_KEY assumption in
- * layers.js gets confirmed against real tile data.
- *
- * @param {import('maplibre-gl').Map} map
- * @param {{point: import('maplibre-gl').Point}} event
- * @returns {{numeric: number, nexusId: number|undefined}|null}
- */
 export function catchmentAtPoint(map, event) {
   if (!map.getLayer('catchments-layer')) return null;
 
@@ -53,13 +27,6 @@ export function catchmentAtPoint(map, event) {
   return { numeric, nexusId: feature.properties?.toid };
 }
 
-/**
- * Grow a [w, s, e, n] box to include a GeoJSON coordinate array.
- * Coordinates nest arbitrarily deep (Polygon vs MultiPolygon), hence the recursion.
- *
- * @param {number[]} bounds mutated in place
- * @param {unknown} coords
- */
 function extendBounds(bounds, coords) {
   if (typeof coords[0] === 'number') {
     const [lng, lat] = coords;
@@ -72,22 +39,6 @@ function extendBounds(bounds, coords) {
   for (const part of coords) extendBounds(bounds, part);
 }
 
-/**
- * Bounding box of a catchment, or null when it cannot be located.
- *
- * There is no per-catchment geometry on the client — getGeoSpatialData returns only the
- * run's overall bounds — so this queries the vector source and unions the matching
- * features' extent.
- *
- * Caveat: querySourceFeatures only sees tiles that are currently LOADED, so a search hit
- * outside them returns null. Callers must handle that; the highlight filter is applied
- * either way, so the feature colours in as soon as it is panned into view. The exact fix
- * would be a backend lookup returning the bbox from the geopackage.
- *
- * @param {import('maplibre-gl').Map} map
- * @param {number} numericId
- * @returns {number[]|null} [west, south, east, north]
- */
 export function catchmentBounds(map, numericId) {
   if (!map.getSource(SRC_DIVIDES)) return null;
 
@@ -104,21 +55,11 @@ export function catchmentBounds(map, numericId) {
   return Number.isFinite(bounds[0]) ? bounds : null;
 }
 
-/**
- * catchment → downstream nexus, harvested from whatever divide tiles are loaded.
- *
- * Built in ONE pass and cached rather than a filtered query per lookup: the search list
- * needs this for every visible row on every keystroke, and querySourceFeatures scans all
- * loaded tiles on each call. Rebuild when tile loading settles — more tiles mean more known
- * catchments.
- */
 export class CatchmentNexusIndex {
   constructor() {
-    /** @type {Map<number, number>} */
     this._byCatchment = new Map();
   }
 
-  /** @param {import('maplibre-gl').Map} map */
   reindex(map) {
     if (!map.getSource(SRC_DIVIDES)) return;
 
@@ -136,7 +77,6 @@ export class CatchmentNexusIndex {
     }
   }
 
-  /** @param {number} numericId @returns {number|undefined} */
   nexusFor(numericId) {
     return this._byCatchment.get(numericId);
   }

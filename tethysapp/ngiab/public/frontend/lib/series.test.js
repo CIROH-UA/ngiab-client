@@ -1,8 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { toEpochSeconds, toUplotData } from './series.js';
 
-// Local-time epoch seconds for a given wall-clock reading, so these assertions hold in any
-// timezone the test happens to run in.
+// Local-time epoch seconds, so assertions hold in any timezone.
 const localSeconds = (y, mo, d, h = 0, mi = 0, s = 0) =>
   new Date(y, mo - 1, d, h, mi, s).getTime() / 1000;
 
@@ -59,9 +58,7 @@ describe('toUplotData', () => {
     expect(out.data[0][0]).to.be.lessThan(out.data[0][1]);
   });
 
-  // The endpoints return each series with its own point list; TEEHR's two series can
-  // legitimately cover different spans. Misaligning them would plot values at the wrong
-  // times rather than showing a gap.
+  // Series can cover different spans, so misaligning them plots wrong times.
   it('aligns series with differing timestamps, leaving gaps null', () => {
     const out = toUplotData([
       { label: 'a', data: [{ x: '2024-01-01 00:00:00', y: 1 }] },
@@ -106,8 +103,7 @@ describe('toUplotData', () => {
   });
 });
 
-// Number(null), Number('') and Number([]) are all 0, so these would each have plotted a
-// missing observation as zero flow.
+// Number(null), Number('') and Number([]) are all 0: each would plot as zero flow.
 describe('toUplotData zero-coercion guards', () => {
   it('never turns a gap into zero', () => {
     const out = toUplotData([

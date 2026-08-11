@@ -19,21 +19,11 @@ import {
   CatchmentNexusIndex,
 } from './interactions.js';
 
-// pmtiles protocol registration is global, not per-map. The React version did this inside a
-// useEffect keyed on [theme, model run], so it re-registered on every change.
+// Global, not per-map: registering per render would re-register on every change.
 maplibregl.addProtocol('pmtiles', new Protocol({ metadata: true }).tile);
 
-/**
- * `<ngiab-map>` — the hydrofabric map and its controls.
- *
- * Owns the MapLibre instance and the run's geometry. Shared state (theme, selection, layer
- * flags) lives in the global store so the chart reacts to the same selection; only
- * tile-derived caches — the search index and the catchment → nexus map — stay local, since
- * nothing else reads them and they churn on every pan.
- */
 export class NgiabMap extends HTMLElement {
   connectedCallback() {
-    /** Run-scoped data the layers filter on. */
     this._local = {
       catchmentIds: [],
       catchmentIndex: [],
@@ -41,7 +31,6 @@ export class NgiabMap extends HTMLElement {
       teehrUsgsByNexus: new Map(),
     };
     this._nexusIndex = new CatchmentNexusIndex();
-    /** Which run's geometry is currently drawn, so a change reloads exactly once. */
     this._loadedRunId = null;
 
     this._statusEl = document.getElementById('map-status');
@@ -52,7 +41,7 @@ export class NgiabMap extends HTMLElement {
     this._chartPaneEl = document.getElementById('chart-pane');
     this._searchEl = document.querySelector('ngiab-search');
 
-    // Seed from the URL so a shared link opens the right run; <ngiab-model-runs> takes over.
+    // Seed from the URL so a shared link opens the right run.
     actions.setModelRun(getModelRunId() || null);
 
     this._createMap();
@@ -66,7 +55,6 @@ export class NgiabMap extends HTMLElement {
     this._map?.remove();
   }
 
-  /** The explicit view object layers.js renders from. */
   get _view() {
     const state = store.get();
     return {
@@ -79,7 +67,6 @@ export class NgiabMap extends HTMLElement {
     };
   }
 
-  // -- map lifecycle --------------------------------------------------------
 
   _createMap() {
     const map = new maplibregl.Map({
@@ -98,14 +85,10 @@ export class NgiabMap extends HTMLElement {
 
     map.on('click', (event) => this._handleClick(event));
 
-    // 'idle' fires once tile loading and rendering settle: where newly arrived divide tiles
-    // get folded into the catchment → nexus index.
+    // 'idle' means tiles have settled, so this is when new divides join the nexus index.
     map.on('idle', () => this._nexusIndex.reindex(map));
 
-    // setStyle() wipes every custom source and layer. Reinstalling on `once('styledata')` is
-    // not enough — styledata fires several times per swap and the first can arrive before
-    // the style is ready, so the layers get added and then thrown away. Watching every
-    // styledata and reinstalling when the source has gone missing is self-healing.
+    // setStyle() wipes our sources/layers; styledata can fire before the style is ready.
     map.on('styledata', () => {
       if (!map.isStyleLoaded()) return; // addSource throws while a style is loading
       if (map.getSource(SRC_DIVIDES)) return;
@@ -126,7 +109,6 @@ export class NgiabMap extends HTMLElement {
     this._syncChartPane();
   }
 
-  /** Show the chart pane only while something is selected, resizing the map to match. */
   _syncChartPane() {
     if (!this._chartPaneEl) return;
 
@@ -134,12 +116,10 @@ export class NgiabMap extends HTMLElement {
     if (this._chartPaneEl.hidden !== shouldShow) return; // already correct
 
     this._chartPaneEl.hidden = !shouldShow;
-    // The map container's height just changed and MapLibre does not observe that on its
-    // own; without this the canvas keeps its old dimensions and the map looks stretched.
+    // MapLibre does not observe container resizes, so tell it explicitly.
     this._map.resize();
   }
 
-  // -- selection ------------------------------------------------------------
 
   _handleClick(event) {
     if (store.get().layers.catchmentHidden) return;
@@ -147,8 +127,7 @@ export class NgiabMap extends HTMLElement {
     const hit = catchmentAtPoint(this._map, event);
     if (!hit) return;
 
-    // Geometry joins to TEEHR through its downstream nexus, so the gauge for a clicked
-    // catchment is whichever gauge sits on its `toid`.
+    // The gauge for a catchment is whichever one sits on its downstream `toid`.
     this._select({
       numeric: hit.numeric,
       label: this._labelFor(hit.numeric),
@@ -157,10 +136,6 @@ export class NgiabMap extends HTMLElement {
     });
   }
 
-  /**
-   * Single entry point for "this catchment is now selected", shared by the map click and the
-   * search bar so the two cannot drift.
-   */
   _select({ numeric, label, nexusId, fly }) {
     const catchmentLabel = label ?? String(numeric);
     const teehrId =
@@ -168,8 +143,7 @@ export class NgiabMap extends HTMLElement {
         ? (this._local.teehrUsgsByNexus.get(nexusId) ?? null)
         : this._lookupTeehrId(numeric);
 
-    // The store owns the selection; the subscription repaints the highlight. The troute
-    // endpoint wants the prefixed label ("cat-1015"), not the bare numeric tile id.
+    // troute wants the prefixed label ('cat-1015'), not the bare numeric tile id.
     actions.selectCatchment({
       id: numeric,
       label: catchmentLabel,
@@ -187,7 +161,6 @@ export class NgiabMap extends HTMLElement {
     this._reportSelection({ label: catchmentLabel, teehrId, located });
   }
 
-  /** The tiles carry only numbers; the run's payload has the "cat-N" labels. */
   _labelFor(numeric) {
     return (
       this._local.catchmentIndex.find((entry) => entry.numeric === numeric)?.label ??
@@ -195,16 +168,11 @@ export class NgiabMap extends HTMLElement {
     );
   }
 
-  /**
-   * null means "no TEEHR gauge, OR this catchment's tile has not loaded yet" — the two are
-   * not distinguishable client-side, which is why the search badge is positive-only.
-   */
   _lookupTeehrId(numeric) {
     const nexusId = this._nexusIndex.nexusFor(numeric);
     return nexusId === undefined ? null : (this._local.teehrUsgsByNexus.get(nexusId) ?? null);
   }
 
-  // -- data -----------------------------------------------------------------
 
   _syncModelRun() {
     const runId = store.get().modelRunId;
@@ -226,12 +194,6 @@ export class NgiabMap extends HTMLElement {
     this._load(runId);
   }
 
-  /**
-   * Geometry is required; TEEHR colouring is not. Both are fetched together and the TEEHR
-   * half fails soft, so an unconfigured or broken warehouse still yields a working map.
-   *
-   * @param {string} runId
-   */
   async _load(runId) {
     this._setStatus(`Loading ${runId}`, 'busy');
 
@@ -252,8 +214,7 @@ export class NgiabMap extends HTMLElement {
     refresh(this._map, this._view); // paint the TEEHR colours once both halves have landed
     this._searchEl?.setIndex(this._local.catchmentIndex, (n) => this._lookupTeehrId(n) != null);
 
-    // A run with no catchment outputs renders an empty map, indistinguishable from a broken
-    // one unless it is said out loud.
+    // Say this out loud: an empty run looks identical to a broken map otherwise.
     if (!geo.catchments) {
       this._setStatus('This model run has no catchment outputs, so nothing is drawn.', 'warning');
       return;
@@ -266,8 +227,7 @@ export class NgiabMap extends HTMLElement {
   }
 
   async _loadGeoSpatial(runId) {
-    // getJSON raises on a non-ok status AND on the HTTP-200-plus-error-key shape several
-    // controllers use, so both failure modes arrive as exceptions.
+    // getJSON raises on a bad status and on the HTTP-200-plus-error-key shape.
     const body = await appAPI.getGeoSpatialData({ model_run_id: runId });
 
     const catchments = Array.isArray(body.catchments) ? body.catchments : [];
@@ -284,11 +244,6 @@ export class NgiabMap extends HTMLElement {
     return { catchments: this._local.catchmentIds.length, dropped: Math.max(dropped, 0) };
   }
 
-  /**
-   * Which nexuses have TEEHR results for this run. Deliberately NOT derived from the nexus
-   * payload's ngen_usgs column: that reflects the warehouse-wide crosswalk with no
-   * configuration filter, so it reports gauges this run never evaluated.
-   */
   async _loadTeehrLocations(runId) {
     const body = await appAPI.getTeehrLocations({ model_run_id: runId });
     const locations = body.teehr_locations ?? [];
@@ -303,9 +258,7 @@ export class NgiabMap extends HTMLElement {
     return { count: this._local.teehrNexusIds.length, status: body.teehr_status };
   }
 
-  // -- chrome ---------------------------------------------------------------
 
-  /** severity mirrors the backend's vocabulary so a missing warehouse is not styled as a failure. */
   _setStatus(message, severity = null) {
     if (!this._statusEl) return;
     this._statusEl.textContent = message;

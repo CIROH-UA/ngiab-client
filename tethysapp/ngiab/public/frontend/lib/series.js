@@ -1,19 +1,5 @@
 // Converts the API's time-series payloads into the column-oriented arrays uPlot wants.
-//
-// Every series endpoint returns the same envelope:
-//   { data: [ { label, data: [ {x, y}, ... ] }, ... ], layout: { yaxis, ... } }
-// but the `x` values are NOT uniform:
-//   - getTrouteTimeSeries  -> "2024-01-01 00:00:00"   (strftime, space separated)
-//   - getTeehrTimeSeries   -> "2024-01-01T00:00:00"   (Django serializing a datetime)
-//   - getCatchmentTimeSeries -> whatever the output CSV's time column held
-// A space-separated timestamp is not valid ISO 8601, so parsing is normalised here rather
-// than trusted to Date.
 
-/**
- * Best-effort conversion of an API `x` value to epoch SECONDS (uPlot's unit).
- * Returns null when the value cannot be interpreted, so callers can drop the point
- * instead of plotting NaN (which silently blanks a whole series).
- */
 export function toEpochSeconds(x) {
   if (x === null || x === undefined) return null;
 
@@ -27,8 +13,7 @@ export function toEpochSeconds(x) {
   const trimmed = x.trim();
   if (!trimmed) return null;
 
-  // "2024-01-01 00:00:00" -> "2024-01-01T00:00:00". Both are treated as local time,
-  // matching how the old chart rendered them.
+  // A space-separated timestamp is not valid ISO 8601; normalise it to local time.
   const iso = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(trimmed)
     ? trimmed.replace(' ', 'T')
     : trimmed;
@@ -37,9 +22,7 @@ export function toEpochSeconds(x) {
   return Number.isNaN(ms) ? null : ms / 1000;
 }
 
-// A missing observation must become null (uPlot draws a break), never 0. Number() is
-// treacherous here: Number(null), Number('') and Number([]) are all 0, so a gap in the
-// record would silently plot as zero flow.
+// A gap must become null, never 0: Number(null), Number('') and Number([]) are all 0.
 const toFiniteNumber = (y) => {
   if (typeof y === 'number') return Number.isFinite(y) ? y : null;
   if (typeof y !== 'string') return null;
@@ -49,16 +32,6 @@ const toFiniteNumber = (y) => {
   return Number.isFinite(n) ? n : null;
 };
 
-/**
- * Turn one API series list into uPlot's [xs, ...ys] column arrays.
- *
- * uPlot requires every y column to be the same length as x and aligned by index. The
- * endpoints return each series with its own point list, so this unions the timestamps and
- * places each series' values against them, leaving gaps as null (uPlot renders a break).
- *
- * @param {Array<{label: string, data: Array<{x: *, y: *}>}>} apiSeries
- * @returns {{ data: Array<Array<number|null>>, labels: string[], points: number }}
- */
 export function toUplotData(apiSeries) {
   const series = Array.isArray(apiSeries) ? apiSeries.filter((s) => s && Array.isArray(s.data)) : [];
   if (!series.length) return { data: [[]], labels: [], points: 0 };

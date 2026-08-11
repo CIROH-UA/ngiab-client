@@ -1,29 +1,13 @@
 import { searchCatchments } from '../lib/ids.js';
 
-/**
- * `<ngiab-search>` — a combobox over the run's catchment ids.
- *
- * Replaces the React catchment/nexus id dropdowns. Matching is client-side over the list
- * already present in the getGeoSpatialData payload, so there is no request per keystroke and
- * no paging through thousands of `<option>`s.
- *
- * Deliberately decoupled from the map: it emits a `catchment-selected` CustomEvent and knows
- * nothing about MapLibre. The map feeds it an index and a TEEHR predicate.
- *
- * @fires NgiabSearch#catchment-selected — detail `{ numeric: number, label: string }`
- */
 export class NgiabSearch extends HTMLElement {
   connectedCallback() {
-    /** @type {Array<{label: string, numeric: number}>} */
     this._index = this._index ?? [];
-    /** @type {(numeric: number) => boolean} */
     this._hasTeehr = this._hasTeehr ?? (() => false);
 
     this._matches = [];
     this._activeIndex = -1;
-    // Whether a search actually came back empty. Without this, closing the list after
-    // picking a result — which leaves the chosen label in the input — renders as
-    // "No matching catchment in this run."
+    // True only when a search really matched nothing, not when a result was picked.
     this._noMatches = false;
 
     this._input = this.querySelector('#map-search');
@@ -91,12 +75,6 @@ export class NgiabSearch extends HTMLElement {
     this._clear?.removeEventListener('click', this._onClear);
   }
 
-  /**
-   * Replace the searchable set. Called when a model run loads.
-   *
-   * @param {Array<{label: string, numeric: number}>} index
-   * @param {(numeric: number) => boolean} [hasTeehr] positive-only TEEHR predicate
-   */
   setIndex(index, hasTeehr) {
     this._index = index ?? [];
     if (hasTeehr) this._hasTeehr = hasTeehr;
@@ -119,8 +97,7 @@ export class NgiabSearch extends HTMLElement {
       id.textContent = entry.label;
       li.append(id);
 
-      // Positive-only: absence means "no gauge OR the tile has not loaded", and the two are
-      // not distinguishable client-side, so there is deliberately no "no TEEHR" marker.
+      // Positive-only: absence could mean 'no gauge' or 'tile not loaded'.
       if (this._hasTeehr(entry.numeric)) {
         const badge = document.createElement('span');
         badge.className = 'teehr';

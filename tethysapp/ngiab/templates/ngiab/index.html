@@ -8,8 +8,7 @@
     <link rel="shortcut icon" href="{% if site_globals.favicon and 'http' in site_globals.favicon %}{{ site_globals.favicon }}{% elif site_globals.favicon %}{% static site_globals.favicon %}{% else %}{% static 'tethys_portal/images/default_favicon.png' %}{% endif %}" />
     <title>{{ tethys_app.name }}</title>
 
-    <!-- Runtime config. A classic inline script, so it runs before the deferred modules
-         below. Replaces the React build's compile-time env substitution. -->
+    <!-- Runtime config; a classic inline script so it runs before the deferred modules below. -->
     <script>
       window.__NGIAB__ = {
         APP_ROOT_URL: "{{ app_root_url|escapejs }}",
@@ -19,8 +18,7 @@
       };
     </script>
 
-    <!-- Import map for bare specifiers. MUST precede the first module script, and there can
-         be only one per document. Versions are pinned; see public/frontend/DEPENDENCIES.md. -->
+    <!-- One import map per document, before the first module script; see public/frontend/README.md. -->
     <script type="importmap">
     {
       "imports": {

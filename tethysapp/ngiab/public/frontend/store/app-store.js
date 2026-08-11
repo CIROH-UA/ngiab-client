@@ -1,16 +1,10 @@
 import { createStore } from './store.js';
 
 // The single app-wide store.
-//
-// It holds only what crosses component boundaries. Tile-derived caches (the catchment
-// search index, the catchment -> nexus map harvested from loaded vector tiles) stay local
-// to the map, because nothing else reads them and they churn on every pan.
 export const store = createStore({
   modelRunId: null,
 
-  // The selected feature. `type` is always 'catchment' -- nexus was dropped from the
-  // product (see the design spec's scope decisions), so this exists to keep the shape
-  // stable if another geometry type is ever added.
+  // `type` is always 'catchment'; kept for shape stability if another type is added.
   selection: { type: null, id: null, label: null },
 
   // Ids for the time-series endpoints, derived from the selection.
@@ -26,8 +20,7 @@ export const store = createStore({
   layers: { catchmentHidden: false, showTeehr: true },
 });
 
-// Named mutators, so the set of legal transitions lives in one readable place rather than
-// being spread across components calling store.set() directly.
+// Named mutators keep the legal state transitions in one readable place.
 export const actions = {
   setModelRun(modelRunId) {
     store.set({
@@ -41,8 +34,7 @@ export const actions = {
     });
   },
 
-  // A catchment click or search hit. Clears the previously selected variables: they belong
-  // to the old feature's endpoint and may not exist on the new one.
+  // Clears the chosen variables: they may not exist on the new feature's endpoint.
   selectCatchment({ id, label, trouteId, teehrId }) {
     store.set({
       selection: { type: 'catchment', id, label: label ?? String(id) },

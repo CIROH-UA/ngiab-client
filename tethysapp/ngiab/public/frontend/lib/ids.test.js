@@ -10,8 +10,7 @@ describe('toNumericIds', () => {
     expect(toNumericIds([1015, 42])).to.deep.equal([1015, 42]);
   });
 
-  // NaN in a MapLibre filter matches nothing and raises no error, so a bad id must be
-  // dropped rather than silently poisoning the layer.
+  // NaN in a filter matches nothing and raises no error, so bad ids must be dropped.
   it('drops unparseable entries instead of producing NaN', () => {
     expect(toNumericIds(['cat-1015', 'nonsense', null, undefined, {}])).to.deep.equal([1015]);
   });
@@ -73,8 +72,7 @@ describe('searchCatchments', () => {
     expect(searchCatchments(index, 'cat-', 2)).to.have.lengthOf(2);
   });
 
-  // Bailing out early once the limit is reached would skip an exact match that happens to
-  // sort after a limit's worth of substring hits.
+  // Early exit at the limit would skip an exact match sorted after substring hits.
   it('finds an exact match beyond the limit position', () => {
     const many = toCatchmentIndex([
       ...Array.from({ length: 60 }, (_, i) => `cat-${1000 + i}0`),

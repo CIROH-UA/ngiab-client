@@ -6,12 +6,6 @@ import { toUplotData } from '../lib/series.js';
 import { toMetricsTable } from '../lib/metrics.js';
 
 // <ngiab-chart> -- the time-series panel.
-//
-// Replaces the React chart.js (@visx) plus the catchment / troute / teehr select
-// components. One element covers all three sources because they share an envelope:
-//   { data: [ { label, data: [{x, y}] } ], layout: { yaxis } }
-//
-// Renders into light DOM so the app stylesheet applies, per the design spec.
 
 const SOURCES = [
   { key: 'catchment', label: 'Catchment' },
@@ -69,13 +63,11 @@ export class NgiabChart extends HTMLElement {
     this._destroyPlot();
   }
 
-  // -- store ----------------------------------------------------------------
 
   _onStoreChange() {
     const { selection, teehrId } = store.get();
 
-    // Only refetch when the selected feature actually changed; the store also fires for
-    // theme and layer toggles, and refetching on those would hammer the endpoints.
+    // Refetch only on a real feature change; the store also fires for theme and layers.
     const key = `${selection.type}:${selection.id}:${teehrId}`;
     if (key === this._lastSelectionKey) return;
     this._lastSelectionKey = key;
@@ -101,8 +93,7 @@ export class NgiabChart extends HTMLElement {
     if (this._source === 'teehr') actions.setTeehrVariable(v);
     else if (this._source === 'troute') actions.setTrouteVariable(v);
     else actions.setVariable(v);
-    // Keep the selection key in step so the store notification this triggers is not
-    // mistaken for a new feature.
+    // Keep the key in step so our own notification is not read as a new feature.
     const { selection, teehrId } = store.get();
     this._lastSelectionKey = `${selection.type}:${selection.id}:${teehrId}`;
   }
@@ -114,7 +105,6 @@ export class NgiabChart extends HTMLElement {
     return s.variable;
   }
 
-  // -- fetching -------------------------------------------------------------
 
   async load() {
     const { selection, modelRunId, trouteId, teehrId } = store.get();
@@ -166,11 +156,9 @@ export class NgiabChart extends HTMLElement {
     });
   }
 
-  // -- rendering ------------------------------------------------------------
 
   _renderPayload(payload) {
-    // The TEEHR endpoints report "cannot answer" as a status message with a severity
-    // rather than raising -- an unconfigured warehouse is a normal state, not an error.
+    // TEEHR reports 'cannot answer' as a status with a severity, not as an error.
     if (payload.teehr_status) {
       this._destroyPlot();
       this._renderMetrics(null);
@@ -194,8 +182,7 @@ export class NgiabChart extends HTMLElement {
   }
 
   _renderVariableOptions(payload) {
-    // Shapes differ: catchment returns {variables, variable}, troute returns
-    // {troute_variables}, teehr returns {teehr_variables}.
+    // Each endpoint names its variable list differently.
     const raw =
       payload.variables ?? payload.troute_variables ?? payload.teehr_variables ?? null;
 
@@ -254,8 +241,7 @@ export class NgiabChart extends HTMLElement {
       {
         width: this._canvasEl.clientWidth || 600,
         height: this._canvasEl.clientHeight || 260,
-        // uPlot's built-in cursor gives the hover readout the React version used a
-        // separate @visx tooltip component for.
+        // uPlot's built-in cursor replaces the separate @visx tooltip component.
         cursor: { drag: { x: true, y: false } },
         axes: [
           { stroke, grid: { show: true, stroke: dark ? '#333' : '#eee' } },
@@ -292,8 +278,7 @@ export class NgiabChart extends HTMLElement {
     }
   }
 
-  // TEEHR skill scores, shown beside the plot. Columns are derived from the payload
-  // because the configuration names are run-specific.
+  // Columns come from the payload: configuration names are run-specific.
   _renderMetrics(metrics) {
     const { columns, rows } = toMetricsTable(metrics);
     this._metricsEl.textContent = '';
@@ -329,8 +314,7 @@ export class NgiabChart extends HTMLElement {
     this._metricsEl.hidden = false;
   }
 
-  // Disables the controls while a request is in flight, so a burst of clicks cannot queue
-  // up requests whose responses arrive out of order.
+  // Disable controls in flight so clicks cannot queue out-of-order requests.
   _setBusy(busy) {
     this.classList.toggle('is-busy', busy);
     this._variableEl.disabled = busy;

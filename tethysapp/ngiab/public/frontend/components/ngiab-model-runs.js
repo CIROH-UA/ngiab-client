@@ -2,13 +2,6 @@ import appAPI from '../api/app.js';
 import { store, actions } from '../store/app-store.js';
 
 // <ngiab-model-runs> -- pick which model run to view.
-//
-// Replaces the React ModelRuns select and the ?model_run_id= URL parameter as the only way
-// in. The registry lives in the database now, so this also offers unregistering; that
-// removes the row only, never the run directory on disk.
-//
-// The URL is kept in sync via history.replaceState so a run stays shareable as a link,
-// which was the one genuinely good property of the query-parameter approach.
 export class NgiabModelRuns extends HTMLElement {
   connectedCallback() {
     this.innerHTML = `
@@ -53,8 +46,7 @@ export class NgiabModelRuns extends HTMLElement {
     this._removeEl.disabled = false;
     this._setStatus('');
 
-    // Labels are frequently identical (the same gage registered repeatedly), so the id
-    // fragment is appended to keep the options distinguishable.
+    // Labels repeat across runs, so the id fragment keeps options distinguishable.
     this._selectEl.replaceChildren(
       ...this._runs.map((run) => {
         const option = document.createElement('option');
@@ -64,8 +56,7 @@ export class NgiabModelRuns extends HTMLElement {
       }),
     );
 
-    // Prefer whatever is already selected (the URL, on first load); otherwise take the
-    // first run so the app is never sitting on an empty map with runs available.
+    // Keep the current selection if still valid, else fall back to the first run.
     const current = store.get().modelRunId;
     const known = this._runs.some((r) => r.value === current);
     const chosen = known ? current : this._runs[0].value;
@@ -89,8 +80,7 @@ export class NgiabModelRuns extends HTMLElement {
 
     const run = this._runs.find((r) => r.value === modelRunId);
     const label = run ? run.label : modelRunId;
-    // Native confirm rather than a modal widget: unregistering is destructive enough to
-    // deserve a prompt, and not frequent enough to deserve a component.
+    // Native confirm: destructive enough to prompt, too rare to justify a widget.
     if (!window.confirm(`Unregister "${label}"?\n\nThe run directory on disk is not deleted.`)) {
       return;
     }

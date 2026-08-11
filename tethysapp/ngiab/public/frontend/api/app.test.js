@@ -2,8 +2,7 @@ import { expect } from '@esm-bundle/chai';
 import appAPI from './app.js';
 import { getJSON, ApiError } from './client.js';
 
-// Stub fetch rather than the client, so the URL building and the response handling in
-// client.js are both exercised.
+// Stub fetch, not the client, so URL building and response handling both run.
 function withStubbedFetch(handler, run) {
   const original = window.fetch;
   const calls = [];
@@ -62,8 +61,7 @@ it('omits empty params rather than sending blanks', () =>
     },
   ));
 
-// Several controllers report failure with HTTP 200 plus an "error" key, so response.ok
-// alone would let a failure through as data.
+// Some controllers report failure as HTTP 200 plus an 'error' key.
 it('raises on an error key returned with HTTP 200', () =>
   withStubbedFetch(
     () => jsonResponse({ error: 'Failed to read GeoPackage file.' }),
@@ -94,8 +92,7 @@ it('raises on a non-ok status', () =>
     },
   ));
 
-// A network-level failure has no response at all. The React client dereferenced
-// error.response here and threw a misleading TypeError.
+// A network-level failure has no response object to inspect.
 it('raises a useful error when the request never completes', () => {
   const original = window.fetch;
   window.fetch = () => Promise.reject(new TypeError('Failed to fetch'));

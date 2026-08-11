@@ -1,8 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { store, actions } from './app-store.js';
 
-// The store is a module-level singleton shared across cases, so each test sets what it
-// depends on rather than assuming a fresh instance.
+// The store is a shared singleton, so each case sets what it depends on.
 beforeEach(() => {
   actions.setModelRun('run-1');
   actions.setTheme('light');
@@ -31,8 +30,7 @@ it('selectCatchment defaults the label and clears teehr when absent', () => {
   expect(s.teehrId).to.equal(null);
 });
 
-// The old feature's variable may not exist on the new one, so selecting must reset it --
-// otherwise the chart requests a variable the endpoint will not return.
+// The old variable may not exist on the new feature, so selecting must reset it.
 it('selecting a new catchment clears the chosen variables', () => {
   actions.selectCatchment({ id: 1 });
   actions.setVariable('streamflow');

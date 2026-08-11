@@ -13,7 +13,6 @@ import {
   LAYER_DIVIDES,
 } from './layers.js';
 
-/** @returns {import('./layers.js').MapView} */
 const view = (over = {}) => ({
   theme: 'light',
   catchmentHidden: false,
@@ -29,8 +28,7 @@ describe('filters', () => {
     expect(catchmentSetFilter(view())).to.deep.equal(['in', ['id'], ['literal', [1, 2, 3]]]);
   });
 
-  // An empty set must match NOTHING. A filter that matches everything would draw the whole
-  // of CONUS, which is the opposite of an empty run.
+  // An empty set must match nothing: matching everything would draw all of CONUS.
   it('matches nothing when the run has no catchments', () => {
     expect(catchmentSetFilter(view({ catchmentIds: [] }))).to.deep.equal(['==', ['id'], -1]);
     expect(flowPathsFilter(view({ catchmentIds: [] }))).to.deep.equal([
@@ -86,8 +84,7 @@ describe('TEEHR colouring', () => {
 });
 
 describe('layer specs', () => {
-  // The React configs named a source ('hydrofabric') that react-map-gl silently overwrote;
-  // copied literally into addLayer it throws 'Source not found'.
+  // The React configs named a source react-map-gl silently overwrote at runtime.
   it('bind to the real source ids', () => {
     expect(catchmentsSpec(view()).source).to.equal(SRC_DIVIDES);
     expect(catchmentHighlightSpec(view()).source).to.equal(SRC_DIVIDES);

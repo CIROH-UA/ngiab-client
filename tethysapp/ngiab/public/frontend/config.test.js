@@ -18,8 +18,7 @@ describe('getConfig', () => {
     expect(getConfig().PORTAL_HOST).to.equal('https://h');
   });
 
-  // Django renders "" for a missing context key, so empty must behave as absent rather
-  // than becoming the app root URL.
+  // Django renders '' for a missing key, so empty must behave as absent.
   it('treats an empty string as absent', () => {
     window.__NGIAB__ = { APP_ROOT_URL: '', PORTAL_HOST: '' };
     expect(getConfig().APP_ROOT_URL).to.equal('/apps/ngiab/');

@@ -1,11 +1,8 @@
 {% load static tethys %}
-{# Map partial. Included by templates/ngiab/index.html, which owns the import map, the
-   runtime config, and the document-level stylesheets. {% load %} does not inherit across
-   an include, so it is repeated here. #}
+{# Map partial included by index.html; {% load %} is repeated because it does not cross an include. #}
 
 <style>
-  /* Map and chart split the page vertically; the chart collapses away when nothing is
-     selected so the map keeps the full height. */
+  /* The chart collapses away when nothing is selected, so the map keeps the full height. */
   #ngiab-layout { position: absolute; inset: 0; display: flex; flex-direction: column; }
   #map-pane { position: relative; flex: 1 1 auto; min-height: 0; }
   #chart-pane { flex: 0 0 auto; height: 300px; min-height: 0; border-top: 1px solid rgba(128,128,128,.3); }
@@ -152,8 +149,7 @@
   .chart-variable select { font: inherit; padding: 2px 4px; }
   .chart-status { flex: 0 0 auto; padding: 4px 0; opacity: .75; }
   .chart-status[hidden] { display: none; }
-  /* Severity mirrors the backend's teehr_status_severity, so an unconfigured warehouse
-     (info) does not look like a failure (error). */
+  /* Severity mirrors teehr_status_severity, so an unconfigured warehouse does not read as a failure. */
   .chart-status[data-severity="error"] { color: #d9534f; opacity: 1; }
   .chart-status[data-severity="warning"] { color: #b8860b; opacity: 1; }
 
@@ -193,8 +189,7 @@
 
       <ngiab-search>
       <div class="map-card" id="map-search-box">
-        <!-- Combobox over the run's catchment ids. The list is already in the
-             getGeoSpatialData payload, so matching is client-side. -->
+        <!-- Combobox over the run's catchment ids; the payload is already local, so matching is client-side. -->
         <input
           id="map-search"
           type="text"
