@@ -55,10 +55,10 @@ DOCKER_NETWORK="tethys-network"
 TETHYS_CONTAINER_NAME="tethys-ngen-portal"
 TETHYS_REPO="awiciroh/tethys-ngiab"
 
-MODELS_RUNS_DIRECTORY="$HOME/ngiab_visualizer"
+MODELS_RUNS_DIRECTORY="${MODELS_RUNS_DIRECTORY:-$HOME/ngiab_visualizer}"
 # The portal database lives here so registered model runs survive `docker run --rm`.
 # The image ships a baked database and seeds it into this directory on first start.
-DB_DIRECTORY="$HOME/.ngiab_visualizer_db"
+DB_DIRECTORY="${DB_DIRECTORY:-$HOME/.ngiab_visualizer_db}"
 VISUALIZER_CONF="$MODELS_RUNS_DIRECTORY/ngiab_visualizer.json"
 TETHYS_PERSIST_PATH="/var/lib/tethys_persist"
 
@@ -195,8 +195,11 @@ ensure_host_dir() {
         :  # BSD stat (macOS, Git-Bash)
     fi
 
-    # If the directory is not owned by the current user, try to chown it
-    if [[ -n "$owner_uid" && "$owner_uid" != "$(id -u)" ]]; then
+    # Escalate on writability, not ownership. A directory owned by another uid that the user
+    # can already write to needs nothing -- and asking for sudo anyway is how a launcher that
+    # deliberately needs no privileges ends up prompting for a password on every run. This
+    # bites anyone upgrading from the tethys-core image, whose files are owned by uid 1011.
+    if [[ -n "$owner_uid" && "$owner_uid" != "$(id -u)" ]] && [ ! -w "$dir" ]; then
         if command -v chown >/dev/null 2>&1; then
             # 1) \n guarantees its own line
             # 2) >&2 sends it to stderr (same stream as sudo prompt)
@@ -204,8 +207,15 @@ ensure_host_dir() {
             echo -e "${INFO_MARK} ${BYellow}Reclaiming ownership of $dir " \
                     "(sudo may prompt)...${Color_Off}" >&2
             sleep 0.1
-            sudo chown -R "$(id -u):$(id -g)" "$dir" \
-            || echo -e "${WARNING_MARK} Could not change directory ownership."
+            if ! sudo chown -R "$(id -u):$(id -g)" "$dir"; then
+                echo -e "${WARNING_MARK} ${BRed}Could not take ownership of $dir${Color_Off}" >&2
+                echo -e "  It is owned by uid $owner_uid and you cannot write to it." >&2
+                echo -e "  Fix it once with:" >&2
+                echo -e "    ${BWhite}sudo chown -R $(id -u):$(id -g) $dir${Color_Off}" >&2
+                echo -e "  or point the launcher elsewhere:" >&2
+                echo -e "    ${BWhite}MODELS_RUNS_DIRECTORY=~/my_runs $0${Color_Off}" >&2
+                return 1
+            fi
         fi
     fi
 
@@ -321,6 +331,25 @@ check_for_existing_tethys_image() {
     fi
 }
 
+# True if anything is listening on the port.
+#
+# ss first, because lsof only reports sockets the calling user owns: a port held by another
+# user reads as free, the launcher accepts it, and the failure surfaces much later as
+# "pasta failed ... Address already in use", which says nothing about what to do. A
+# /dev/tcp connect probe is not a substitute -- a listener can accept the bind while
+# refusing our connection.
+port_in_use() {
+    local port="$1"
+    if command -v ss >/dev/null 2>&1; then
+        ss -ltn "sport = :${port}" 2>/dev/null | grep -q LISTEN && return 0
+        return 1
+    fi
+    if command -v lsof >/dev/null 2>&1; then
+        lsof -i:"${port}" >/dev/null 2>&1 && return 0
+    fi
+    return 1
+}
+
 choose_port_to_run_tethys() {
     # Default 8080 so rootless Podman can bind without privileged-port hacks.
     # Existing Docker users on port 80 must pass it explicitly.
@@ -341,8 +370,7 @@ choose_port_to_run_tethys() {
             continue
         fi
 
-        # Check if the port is already in use (skip check if lsof not present)
-        if command -v lsof >/dev/null && lsof -i:"$nginx_tethys_port" >/dev/null 2>&1; then
+        if port_in_use "$nginx_tethys_port"; then
             echo -e "${BRed}Port $nginx_tethys_port is already in use. Choose another.${Color_Off}"
             continue
         fi
@@ -537,9 +565,16 @@ select_tethys_image_source() {
     # Does the image already exist locally?
     if ${DOCKER_CMD} image inspect "$image_ref" >/dev/null 2>&1; then
         echo -e "  ${INFO_MARK} Found local image ${BCyan}$image_ref${Color_Off}"
+        if [ ! -r /dev/tty ]; then
+            echo -e "  ${INFO_MARK} No terminal to prompt on; using the local image."
+            return 0
+        fi
         while true; do
             echo -ne "  ${ARROW} Use local copy (L) or Pull latest from registry (P)? [L/P]: "
-            read -r decision < /dev/tty
+            read -r decision < /dev/tty || {
+                echo -e "\n  ${INFO_MARK} Could not read a choice; using the local image."
+                return 0
+            }
             case "$decision" in
                 [Ll]* )
                     echo -e "  ${CHECK_MARK} Using local image" ; return 0 ;;
@@ -1065,9 +1100,9 @@ print_section_header "VISUALIZATION READY"
 
 echo -e "${BG_Green}${BWhite} Your model outputs are now available for visualization! ${Color_Off}\n"
 print_visualization_urls
-echo -e "${INFO_MARK} Login credentials:"
-echo -e "  ${ARROW} ${BWhite}Username:${Color_Off} admin"
-echo -e "  ${ARROW} ${BWhite}Password:${Color_Off} pass"
+# The portal runs open (ENABLE_OPEN_PORTAL), so the map needs no sign-in. The admin
+# account still exists for /admin/, which is why it is worth mentioning at all.
+echo -e "${INFO_MARK} No sign-in needed. The Django admin at ${BWhite}/admin/${Color_Off} uses admin / pass."
 echo -e "\n${INFO_MARK} Source code: ${UBlue}https://github.com/CIROH-UA/ngiab-client${Color_Off}"
 
 # Keep the script running
