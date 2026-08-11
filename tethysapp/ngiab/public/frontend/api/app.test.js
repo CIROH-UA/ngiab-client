@@ -114,6 +114,8 @@ it('raises a useful error when the request never completes', () => {
 it('exposes exactly the in-scope viewer endpoints', () => {
   expect(Object.keys(appAPI).sort()).to.deep.equal([
     'getCatchmentTimeSeries',
+    'getCatchmentValueMatrix',
+    'getCatchmentVariables',
     'getGeoSpatialData',
     'getModelRuns',
     'getTeehrLocations',

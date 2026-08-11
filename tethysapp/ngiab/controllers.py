@@ -5,6 +5,7 @@ import pandas as pd
 import os
 import json
 import geopandas as gpd
+import duckdb
 from tethys_sdk.routing import controller
 from .utils import (
     get_base_output,
@@ -22,6 +23,8 @@ from .utils import (
     append_ngen_usgs_column,
     append_nwm_usgs_column,
     get_model_runs_selectable,
+    get_catchment_variables,
+    get_catchment_value_matrix,
     _resolve_configuration_name,
     _detect_legacy_teehr_layout,
     _open_warehouse,
@@ -187,6 +190,29 @@ def getCatchmentTimeSeries(request):
             "catchment_ids": getCatchmentsIds(model_run_id),
         }
     )
+
+
+@controller
+def getCatchmentVariables(request):
+    """Variables available to shade the map, for this run only."""
+    model_run_id = request.GET.get("model_run_id")
+    if not model_run_id:
+        return JsonResponse({"error": "model_run_id is required"})
+    return JsonResponse(get_catchment_variables(model_run_id))
+
+
+@controller
+def getCatchmentValueMatrix(request):
+    """Quantised per-catchment values over time, for the choropleth and timeline."""
+    model_run_id = request.GET.get("model_run_id")
+    if not model_run_id:
+        return JsonResponse({"error": "model_run_id is required"})
+
+    try:
+        return JsonResponse(get_catchment_value_matrix(model_run_id, request.GET.get("variable")))
+    except (OSError, ValueError, duckdb.Error) as exc:
+        logger.exception("Could not build the value matrix for %s", model_run_id)
+        return JsonResponse({"error": f"Could not read this run's outputs: {exc}"})
 
 
 @controller

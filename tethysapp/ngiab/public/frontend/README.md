@@ -23,12 +23,17 @@ Run the tests with `npm run test:frontend` (real Chromium via `@web/test-runner`
 | `lib/ids.js` | Id coercion and search ranking. Pure. |
 | `lib/series.js` | Time-series payload → uPlot column arrays. Pure. |
 | `lib/metrics.js` | TEEHR metrics payload → table rows. Pure. |
+| `lib/choropleth.js` | Bin matrix decoding, frame diffing, colour ramp, legend labels. Pure. |
+| `lib/theme.js` | Mirrors the store's theme onto `<html data-theme>`. |
 | `components/map/layers.js` | Sources, filters, paint expressions, layer specs. Pure. |
 | `components/map/interactions.js` | Hover, hit-testing, bounds, tile-derived nexus index. |
+| `components/map/choropleth-layer.js` | Applies the value matrix as MapLibre feature-state. |
 | `components/map/ngiab-map.js` | The map element: lifecycle, selection, data loading. |
 | `components/ngiab-search.js` | Catchment combobox. Emits `catchment-selected`. |
 | `components/ngiab-chart.js` | uPlot time-series panel and TEEHR metrics table. |
 | `components/ngiab-model-runs.js` | Model-run selector. |
+| `components/ngiab-legend.js` | What the catchment colours currently mean. |
+| `components/ngiab-timeline.js` | Timestep scrubber and playback. |
 
 The `lib/` and `layers.js` modules take explicit arguments rather than reading module state,
 which is what makes them unit-testable without a browser or a live map. That matters: they
@@ -46,6 +51,35 @@ would wake every subscriber on every pan.
 
 `<ngiab-search>` knows nothing about MapLibre. It emits a `catchment-selected` CustomEvent
 and the map decides what that means, so the two can be reasoned about separately.
+
+## Choropleth and timeline
+
+`getCatchmentValueMatrix` returns one variable's values for every catchment at every timestep,
+quantised to class indices and sent as base64 `uint8` — roughly 130 KB for a 55-catchment,
+1828-frame run, against about 7 MB for the same numbers as JSON.
+
+**Everything about the matrix is per-run.** Runs differ in which variables they wrote, over
+what period, at what step, and across what range of values. The variable list, the time axis,
+the class breaks and the decimation step are all derived from the run being asked about, and
+none of them may be cached across runs or shared between variables. Selecting a different run
+clears the matrix, the timeline and every feature-state.
+
+Breaks are **quantiles over that run's own distribution**, not equal intervals. The data is
+heavily zero-weighted and spans orders of magnitude — `Q_OUT` peaks near 1e-4 in the AWI_16
+run and could be in the hundreds elsewhere — so a fixed scale puts every catchment in one
+class. Breaks are deduplicated, so a variable that is zero most of the time honestly draws
+three classes rather than eight, most of them impossible.
+
+Colours are applied with **feature-state**, not by rebuilding a filter or a `match` expression
+per frame, and only the catchments whose class actually changed between adjacent frames are
+written. Tiles that load later start with no feature-state, so the current frame is reapplied
+on `idle`.
+
+Bin `0` means no data and paints transparent. It must never collapse into the lowest class —
+that is the `Number(null)` trap one step further downstream.
+
+There are **no units**: nothing in a run's `realization.json` declares them, so the legend
+shows the variable name and the numeric breaks and nothing more.
 
 ## Source data
 
@@ -102,6 +136,18 @@ located; the highlight filter is applied anyway so it colours in once panned int
 
 **TEEHR absence is not knowable client-side.** A missing badge means "no gauge *or* the tile
 has not loaded", so the badge is positive-only and there is deliberately no "no TEEHR" marker.
+
+**Model timestamps carry no timezone.** They are model time, so `new Date(stamp)` parses them
+as local and `toISOString()` then shifts every frame label by the viewer's offset. A run
+stepping at 06:00 displayed as 13:00. `formatFrameTime` reads the string directly and never
+constructs a `Date`.
+
+**`tokens.css` keys dark values off `:root[data-theme="dark"]`.** Swapping the MapLibre style
+alone left every panel card light-on-dark, because nothing set the attribute. The store's
+theme has to be mirrored onto the document — that is all `lib/theme.js` does.
+
+**MapLibre adds no zoom control unless asked.** `NavigationControl` and `ScaleControl` are
+opt-in; only `AttributionControl` is on by default. The map had no zoom buttons at all.
 
 ## Conventions
 

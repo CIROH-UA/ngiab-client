@@ -30,6 +30,60 @@ it('selectCatchment defaults the label and clears teehr when absent', () => {
   expect(s.teehrId).to.equal(null);
 });
 
+describe('choropleth state', () => {
+  beforeEach(() => {
+    actions.setMapVariable('Q_OUT');
+    actions.setFrameCount(10);
+  });
+
+  it('clamps a frame request to the available range', () => {
+    actions.setFrame(99);
+    expect(store.get().frameIndex).to.equal(9);
+    actions.setFrame(-5);
+    expect(store.get().frameIndex).to.equal(0);
+  });
+
+  it('wraps when stepping past either end so playback loops', () => {
+    actions.setFrame(9);
+    actions.stepFrame(1);
+    expect(store.get().frameIndex).to.equal(0);
+    actions.stepFrame(-1);
+    expect(store.get().frameIndex).to.equal(9);
+  });
+
+  // A shorter run must not leave the slider parked past its own last frame.
+  it('pulls the frame back when a new run has fewer frames', () => {
+    actions.setFrame(9);
+    actions.setFrameCount(3);
+    expect(store.get().frameIndex).to.equal(2);
+  });
+
+  it('refuses to play a run with nothing to animate', () => {
+    actions.setFrameCount(1);
+    actions.setPlaying(true);
+    expect(store.get().playing).to.equal(false);
+  });
+
+  // Runs differ in variables, time axis and value range, so none of it may carry over.
+  it('drops the choropleth entirely when the run changes', () => {
+    actions.setFrame(5);
+    actions.setPlaying(true);
+    actions.setModelRun('run-2');
+    const s = store.get();
+    expect(s.mapVariable).to.equal(null);
+    expect(s.frameIndex).to.equal(0);
+    expect(s.frameCount).to.equal(0);
+    expect(s.playing).to.equal(false);
+  });
+
+  it('resets the timeline when the variable changes', () => {
+    actions.setFrame(7);
+    actions.setMapVariable('RAIN_RATE');
+    expect(store.get().frameIndex).to.equal(0);
+    expect(store.get().playing).to.equal(false);
+  });
+});
+
 // The old variable may not exist on the new feature, so selecting must reset it.
 it('selecting a new catchment clears the chosen variables', () => {
   actions.selectCatchment({ id: 1 });

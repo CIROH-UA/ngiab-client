@@ -18,6 +18,7 @@ import {
   catchmentBounds,
   CatchmentNexusIndex,
 } from './interactions.js';
+import { ChoroplethState } from './choropleth-layer.js';
 
 // Global, not per-map: registering per render would re-register on every change.
 maplibregl.addProtocol('pmtiles', new Protocol({ metadata: true }).tile);
@@ -40,6 +41,10 @@ export class NgiabMap extends HTMLElement {
     this._panelNoteEl = document.getElementById('map-panel-note');
     this._chartPaneEl = document.getElementById('chart-pane');
     this._searchEl = document.querySelector('ngiab-search');
+    this._legendEl = document.querySelector('ngiab-legend');
+    this._timelineEl = document.querySelector('ngiab-timeline');
+    this._mapVariableEl = document.getElementById('map-variable');
+    this._loadedVariableKey = null;
 
     // Seed from the URL so a shared link opens the right run.
     actions.setModelRun(getModelRunId() || null);
@@ -64,6 +69,7 @@ export class NgiabMap extends HTMLElement {
       selectedCatchmentId: state.selection.id,
       catchmentIds: this._local.catchmentIds,
       teehrNexusIds: this._local.teehrNexusIds,
+      choropleth: Boolean(state.mapVariable) && Boolean(this._choropleth?.isLoaded),
     };
   }
 
@@ -76,6 +82,10 @@ export class NgiabMap extends HTMLElement {
       zoom: 4,
     });
     this._map = map;
+    this._choropleth = new ChoroplethState(map);
+
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right');
+    map.addControl(new maplibregl.ScaleControl({ maxWidth: 120 }), 'bottom-right');
 
     map.on('load', () => {
       installLayers(map, this._view);
@@ -85,8 +95,12 @@ export class NgiabMap extends HTMLElement {
 
     map.on('click', (event) => this._handleClick(event));
 
-    // 'idle' means tiles have settled, so this is when new divides join the nexus index.
-    map.on('idle', () => this._nexusIndex.reindex(map));
+    // 'idle' means tiles have settled, so this is when new divides join the nexus index and
+    // when features that arrived with those tiles need their frame's colour written.
+    map.on('idle', () => {
+      this._nexusIndex.reindex(map);
+      this._choropleth.reapply();
+    });
 
     // setStyle() wipes our sources/layers; styledata can fire before the style is ready.
     map.on('styledata', () => {
@@ -106,7 +120,64 @@ export class NgiabMap extends HTMLElement {
 
     refresh(map, this._view);
     if (map.isStyleLoaded()) this._syncModelRun();
+    this._syncMapVariable();
+    this._syncFrame();
     this._syncChartPane();
+  }
+
+  // Reloads only when the run or the chosen variable changes; scrubbing must not refetch.
+  _syncMapVariable() {
+    const { modelRunId, mapVariable } = store.get();
+    const key = `${modelRunId}::${mapVariable ?? ''}`;
+    if (key === this._loadedVariableKey) return;
+    this._loadedVariableKey = key;
+
+    if (!modelRunId || !mapVariable) {
+      this._choropleth.clear();
+      this._timelineEl?.setTimes([]);
+      this._legendEl?.setScale({ variable: null, breaks: [] });
+      refresh(this._map, this._view);
+      return;
+    }
+
+    this._loadMatrix(modelRunId, mapVariable);
+  }
+
+  async _loadMatrix(runId, variable) {
+    this._setStatus(`Loading ${variable}`, 'busy');
+    try {
+      const matrix = await appAPI.getCatchmentValueMatrix({
+        model_run_id: runId,
+        variable,
+      });
+
+      // A slow response for a variable the user already moved on from must not paint.
+      if (this._loadedVariableKey !== `${runId}::${variable}`) return;
+
+      this._choropleth.load(matrix);
+      this._timelineEl?.setTimes(matrix.times);
+      this._legendEl?.setScale({ variable: matrix.variable, breaks: matrix.breaks });
+
+      refresh(this._map, this._view);
+      this._applied = null;
+      this._syncFrame(true);
+
+      const step = matrix.step_hours ? ` · ${matrix.step_hours}h steps` : '';
+      this._setStatus(`${matrix.variable} · ${matrix.times.length} frames${step}`);
+    } catch (error) {
+      console.error('[map] value matrix failed', error);
+      this._choropleth.clear();
+      this._timelineEl?.setTimes([]);
+      this._setStatus(`Could not shade by ${variable}: ${error.message}`, 'error');
+    }
+  }
+
+  _syncFrame(force = false) {
+    if (!this._choropleth?.isLoaded) return;
+    const { frameIndex } = store.get();
+    if (!force && frameIndex === this._shownFrame) return;
+    this._shownFrame = frameIndex;
+    this._choropleth.show(frameIndex);
   }
 
   _syncChartPane() {
@@ -184,13 +255,17 @@ export class NgiabMap extends HTMLElement {
       this._local.catchmentIndex = [];
       this._local.teehrNexusIds = [];
       this._local.teehrUsgsByNexus = new Map();
+      this._local.bounds = null;
       this._nexusIndex.clear();
+      this._choropleth.clear();
       this._searchEl?.setIndex([], () => false);
+      this._timelineEl?.setTimes([]);
       refresh(this._map, this._view);
       this._setStatus('No model run selected.', 'warning');
       return;
     }
 
+    this._loadVariables(runId);
     this._load(runId);
   }
 
@@ -213,6 +288,7 @@ export class NgiabMap extends HTMLElement {
 
     refresh(this._map, this._view); // paint the TEEHR colours once both halves have landed
     this._searchEl?.setIndex(this._local.catchmentIndex, (n) => this._lookupTeehrId(n) != null);
+    this._legendEl?.setTeehrCount(teehr?.count ?? 0);
 
     // Say this out loud: an empty run looks identical to a broken map otherwise.
     if (!geo.catchments) {
@@ -238,6 +314,7 @@ export class NgiabMap extends HTMLElement {
     refresh(this._map, this._view);
 
     // bounds is a flat [west, south, east, north] from gdf.total_bounds.tolist().
+    this._local.bounds = body.bounds ?? null;
     if (body.bounds) this._map.fitBounds(body.bounds, { padding: 20, duration: 1000 });
 
     const dropped = catchments.length - this._local.catchmentIds.length;
@@ -295,13 +372,43 @@ export class NgiabMap extends HTMLElement {
       // The styledata handler reinstalls the layers once the new style is ready.
       this._map.setStyle(STYLE_URLS[on ? 'dark' : 'light']);
     });
-    bind('toggle-catchments', (hidden) => actions.setLayer('catchmentHidden', hidden));
+    // Phrased positively, like the others; the store still stores the negation.
+    bind('toggle-catchments', (shown) => actions.setLayer('catchmentHidden', !shown));
     bind('toggle-teehr', (show) => actions.setLayer('showTeehr', show));
+
+    this._mapVariableEl?.addEventListener('change', (event) => {
+      actions.setMapVariable(event.target.value || null);
+    });
+
+    document.getElementById('map-reset-view')?.addEventListener('click', () => {
+      this._fitRunExtent();
+    });
 
     this._searchEl?.addEventListener('catchment-selected', (event) => {
       const { numeric, label } = event.detail;
       this._select({ numeric, label, fly: true });
     });
+  }
+
+  _fitRunExtent() {
+    if (this._local.bounds) this._map.fitBounds(this._local.bounds, { padding: 20, duration: 800 });
+  }
+
+  // Populated per run: a different run wrote different variables.
+  async _loadVariables(runId) {
+    if (!this._mapVariableEl) return;
+    try {
+      const body = await appAPI.getCatchmentVariables({ model_run_id: runId });
+      const options = ['<option value="">no shading</option>'].concat(
+        (body.variables ?? []).map((name) => `<option value="${name}">${name}</option>`),
+      );
+      this._mapVariableEl.innerHTML = options.join('');
+      this._mapVariableEl.disabled = !(body.variables ?? []).length;
+    } catch (error) {
+      console.warn('[map] variable list unavailable', error);
+      this._mapVariableEl.innerHTML = '<option value="">no shading</option>';
+      this._mapVariableEl.disabled = true;
+    }
   }
 }
 

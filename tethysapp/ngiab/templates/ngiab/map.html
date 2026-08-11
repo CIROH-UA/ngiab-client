@@ -122,9 +122,50 @@
   #map-panel .panel-note { margin-top: 6px; font-size: 12px; color: #b8860b; }
   #map-panel .panel-note[hidden] { display: none; }
 
+  /* Shading and legend ------------------------------------------------ */
+  #map-shading { margin-top: 8px; padding: 9px 11px; }
+  .shading-label { display: block; font-size: 12px; opacity: .7; margin-bottom: 3px; }
+  #map-variable { width: 100%; font: inherit; padding: 3px 4px; }
+  ngiab-legend { display: block; margin-top: 8px; }
+  .legend-title { font-weight: 600; margin-bottom: 4px; word-break: break-all; }
+  .legend-scale { list-style: none; margin: 0; padding: 0; }
+  .legend-scale li { display: flex; align-items: center; gap: 7px; padding: 1px 0; }
+  .legend-scale .swatch {
+    flex: 0 0 auto; width: 15px; height: 12px; border-radius: 2px;
+    border: 1px solid rgba(128,128,128,.35);
+  }
+  .legend-scale .swatch-selected { background: #ff0000; opacity: .5; border-color: #fff; }
+  .legend-scale .label { font-variant-numeric: tabular-nums; font-size: 12px; }
+  .legend-note { margin-top: 5px; font-size: 11px; opacity: .6; }
+
+  /* Timeline ---------------------------------------------------------- */
+  #map-timeline {
+    position: absolute; z-index: 1; left: 50%; transform: translateX(-50%); bottom: 28px;
+    display: flex; align-items: center; gap: 10px;
+    width: min(560px, calc(100% - 360px));
+    padding: 7px 12px;
+    background: var(--bg, #fff); color: var(--fg, #1b1b1b);
+    border: 1px solid rgba(128,128,128,.28); border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.18);
+    font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  #map-timeline[hidden] { display: none; }
+  #timeline-play {
+    flex: 0 0 auto; border: 1px solid rgba(128,128,128,.35); background: transparent;
+    color: inherit; border-radius: 5px; cursor: pointer; font-size: 13px; padding: 2px 9px;
+  }
+  #timeline-range { flex: 1 1 auto; min-width: 0; accent-color: var(--accent, #1f78b4); }
+  #timeline-stamp { flex: 0 0 auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
   /* Layer toggles ----------------------------------------------------- */
   #map-toggles { margin-top: 8px; padding: 9px 11px; }
   #map-toggles label { display: block; }
+  #map-reset-view {
+    margin-top: 7px; width: 100%; border: 1px solid rgba(128,128,128,.35);
+    background: transparent; color: inherit; border-radius: 5px; cursor: pointer;
+    font: inherit; padding: 4px 8px;
+  }
+  #map-reset-view:hover { border-color: var(--accent, #1f78b4); }
   #map-status { margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(128,128,128,.25); opacity: 0.75; }
   #map-status[data-severity="error"] { color: #d9534f; opacity: 1; }
   #map-status[data-severity="warning"] { color: #b8860b; opacity: 1; }
@@ -214,14 +255,24 @@
         <div class="panel-note" id="map-panel-note" hidden></div>
       </div>
 
+      <div class="map-card" id="map-shading">
+        <label class="shading-label" for="map-variable">Shade catchments by</label>
+        <select id="map-variable" disabled>
+          <option value="">no shading</option>
+        </select>
+        <ngiab-legend id="map-legend"></ngiab-legend>
+      </div>
+
       <div class="map-card" id="map-toggles">
         <label><input type="checkbox" id="toggle-theme" /> dark basemap</label>
-        <label><input type="checkbox" id="toggle-catchments" /> hide catchments</label>
+        <label><input type="checkbox" id="toggle-catchments" checked /> catchments</label>
         <label><input type="checkbox" id="toggle-teehr" checked /> highlight TEEHR</label>
+        <button id="map-reset-view" type="button">Zoom to run extent</button>
         <div id="map-status">loading…</div>
       </div>
     </div>
     <div id="map"></div>
+    <ngiab-timeline id="map-timeline" hidden></ngiab-timeline>
     <ngiab-map></ngiab-map>
   </div>
   <div id="chart-pane" hidden>

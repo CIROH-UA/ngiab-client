@@ -1,3 +1,5 @@
+import { RAMP, NO_DATA_BIN } from '../../lib/choropleth.js';
+
 const PMTILES_BASE =
   'pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/only_geometry/upstream_index/';
 
@@ -53,8 +55,28 @@ const teehrAware = (view, teehrColor, plainColor) =>
     ? ['case', hasTeehrNexus(view), themed(view, teehrColor), themed(view, plainColor)]
     : themed(view, plainColor);
 
-export const catchmentFillColor = (view) => teehrAware(view, TEEHR_FILL, PLAIN_FILL);
+// Feature-state rather than a filter: the bin changes every frame, and rebuilding a filter
+// over every catchment per frame is the expensive way to do this.
+export const choroplethFillColor = (view) => {
+  const ramp = RAMP[view.theme === 'dark' ? 'dark' : 'light'];
+  const cases = [];
+  for (let bin = 1; bin < ramp.length; bin += 1) cases.push(bin, ramp[bin]);
+  return ['match', ['coalesce', ['feature-state', 'bin'], NO_DATA_BIN], ...cases, ramp[0]];
+};
+
+export const catchmentFillColor = (view) =>
+  view.choropleth ? choroplethFillColor(view) : teehrAware(view, TEEHR_FILL, PLAIN_FILL);
 export const flowPathsLineColor = (view) => teehrAware(view, TEEHR_LINE, PLAIN_LINE);
+
+// The default ramp fades catchments out below zoom 11, which would hide the animation at the
+// extent most runs open at. Choropleth mode keeps them visible much further out.
+export const catchmentFillOpacity = (view) =>
+  view.choropleth ? { stops: [[4, 0.85], [9, 0.9]] } : { stops: [[7, 0], [11, 1]] };
+
+export const catchmentOutlineColor = (view) => {
+  if (view.choropleth) return isDark(view) ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)';
+  return isDark(view) ? 'rgba(238, 51, 119, 0.7)' : 'rgba(91, 44, 111, 0.7)';
+};
 
 export function catchmentsSpec(view) {
   return {
@@ -65,10 +87,8 @@ export function catchmentsSpec(view) {
     filter: catchmentSetFilter(view),
     paint: {
       'fill-color': catchmentFillColor(view),
-      'fill-outline-color': isDark(view)
-        ? 'rgba(238, 51, 119, 0.7)'
-        : 'rgba(91, 44, 111, 0.7)',
-      'fill-opacity': { stops: [[7, 0], [11, 1]] },
+      'fill-outline-color': catchmentOutlineColor(view),
+      'fill-opacity': catchmentFillOpacity(view),
     },
     layout: visibility(view.catchmentHidden),
   };
@@ -135,6 +155,8 @@ export function refresh(map, view) {
   setFilter('catchment-highlight', catchmentHighlightFilter(view));
 
   setPaint('catchments-layer', 'fill-color', catchmentFillColor(view));
+  setPaint('catchments-layer', 'fill-outline-color', catchmentOutlineColor(view));
+  setPaint('catchments-layer', 'fill-opacity', catchmentFillOpacity(view));
   setPaint('flowpaths-layer', 'line-color', flowPathsLineColor(view));
 
   for (const id of CATCHMENT_LAYERS) {

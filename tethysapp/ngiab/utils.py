@@ -1,7 +1,11 @@
 import os
 import json
 import re
+import math
+import functools
+import base64
 import logging
+import numpy as np
 import pandas as pd
 import glob
 import duckdb
@@ -420,6 +424,233 @@ def _read_output_frame(directory, stem, columns=None, time_column=None):
         return duckdb.query(f"SELECT {', '.join(parts)} FROM read_parquet('{path}')").df()
 
     return pd.read_csv(path, usecols=list(columns) if columns else None)
+
+
+# Frames the map animation may hold, and cells the response may carry. Both are ceilings on
+# the payload, not on the data: exceeding either coarsens the time step, it never truncates.
+_MAX_FRAMES = 2000
+_MAX_CELLS = 4_000_000
+
+# Coarsening ladder in hours, ending at roughly a month.
+_BUCKET_HOURS = (1, 3, 6, 12, 24, 48, 168, 720)
+
+# Bin 0 is reserved for no-data, so a missing value never renders as the lowest class.
+_NO_DATA_BIN = 0
+_CLASS_COUNT = 8
+
+
+def _output_glob(directory, prefix="cat-"):
+    """Return a DuckDB table expression reading every prefixed output at once."""
+    for suffix in _OUTPUT_SUFFIXES:
+        pattern = os.path.join(directory, f"{prefix}*{suffix}")
+        if glob.glob(pattern):
+            reader = "read_parquet" if suffix == ".parquet" else "read_csv"
+            escaped = pattern.replace("'", "''")
+            return f"{reader}('{escaped}', filename=true, union_by_name=true)", suffix
+    return None, None
+
+
+def _union_columns(table):
+    """Column names across every file in the glob, not just the first.
+
+    union_by_name means a run whose catchments were produced by different formulations still
+    reports the full set. LIMIT 0 answers this from parquet footers without reading rows.
+
+    'filename' is dropped: it is synthesised by filename=true, not something the run wrote,
+    and leaving it in offers it to the user as a plottable variable.
+    """
+    columns = list(duckdb.query(f"SELECT * FROM {table} LIMIT 0").columns)
+    return [name for name in columns if name != "filename"]
+
+
+def _choose_bucket_hours(distinct_times, span_hours, catchment_count):
+    """Pick the finest step that keeps the response under both ceilings.
+
+    Returns None to mean "keep the run's native step", which is the common case for a short
+    forecast run; only a long retrospective run gets coarsened.
+    """
+    if distinct_times <= 1:
+        return None
+
+    native = max(span_hours / (distinct_times - 1), 1e-9)
+
+    def frames_at(hours):
+        return math.ceil(span_hours / hours) + 1
+
+    budget = _MAX_FRAMES
+    if catchment_count:
+        budget = min(budget, max(_MAX_CELLS // catchment_count, 1))
+
+    if distinct_times <= budget:
+        return None
+
+    for hours in _BUCKET_HOURS:
+        if hours >= native and frames_at(hours) <= budget:
+            return hours
+    return _BUCKET_HOURS[-1]
+
+
+def _class_breaks(values):
+    """Quantile breaks over the run's own distribution, deduplicated.
+
+    Equal-interval breaks are useless here: this data is heavily zero-weighted and spans
+    orders of magnitude between variables and between runs, so a fixed scale puts everything
+    in one class. Deduplicating means a variable that is zero most of the time simply gets
+    fewer classes rather than several identical ones.
+    """
+    finite = values[np.isfinite(values)]
+    if finite.size == 0:
+        return []
+
+    quantiles = np.linspace(0, 1, _CLASS_COUNT + 1)[1:-1]
+    breaks = np.quantile(finite, quantiles)
+    lowest = float(finite.min())
+
+    # A break at the minimum would leave the first class unreachable, since every value sorts
+    # above it. Dropping those keeps every class the legend draws a class that can occur.
+    unique = []
+    for value in breaks:
+        value = float(value)
+        if value <= lowest:
+            continue
+        if not unique or value > unique[-1]:
+            unique.append(value)
+    return unique
+
+
+def get_catchment_variables(model_run_id):
+    """Variables this run actually wrote, in the order the output files declare them."""
+    directory = get_base_output(model_run_id)
+    table, _ = _output_glob(directory)
+    if table is None:
+        return {"variables": [], "time_column": None}
+
+    columns = _union_columns(table)
+    if len(columns) < 3:
+        return {"variables": [], "time_column": None}
+
+    # Same positional contract as getCatchmentTimeSeries: 0 is the step, 1 is the timestamp.
+    return {"variables": list(columns[2:]), "time_column": columns[1]}
+
+
+def _output_fingerprint(directory):
+    """Cheap change detector for a run's output directory."""
+    try:
+        stat = os.stat(directory)
+    except OSError:
+        return None
+    return (stat.st_mtime_ns, stat.st_size)
+
+
+@functools.lru_cache(maxsize=8)
+def _cached_value_matrix(directory, variable, fingerprint):
+    return _build_value_matrix(directory, variable)
+
+
+def get_catchment_value_matrix(model_run_id, variable=None):
+    """Per-catchment values over time for one variable, quantised for a choropleth.
+
+    Cached because scrubbing the timeline must not re-scan the outputs, and a full read costs
+    seconds on csv. The fingerprint makes a converted or re-run directory miss the cache.
+
+    The cached dict is handed straight to JsonResponse and must not be mutated by callers.
+    """
+    directory = get_base_output(model_run_id)
+    return _cached_value_matrix(directory, variable, _output_fingerprint(directory))
+
+
+def _build_value_matrix(directory, variable=None):
+    """Everything here is derived from the run being asked about.
+
+    Runs differ in which variables they wrote, over what period, at what step, and across what
+    range of values, so none of those may be assumed or shared between runs.
+    """
+    table, _ = _output_glob(directory)
+
+    empty = {
+        "variable": None,
+        "variables": [],
+        "catchment_ids": [],
+        "times": [],
+        "breaks": [],
+        "bins": "",
+        "step_hours": None,
+        "no_data_bin": _NO_DATA_BIN,
+    }
+    if table is None:
+        return empty
+
+    columns = _union_columns(table)
+    if len(columns) < 3:
+        return empty
+
+    time_name = columns[1]
+    variables = list(columns[2:])
+    selected = variable if variable in variables else variables[0]
+
+    time_expr = f'CAST("{time_name}" AS TIMESTAMP)'
+    extent = duckdb.query(
+        f"SELECT min({time_expr}), max({time_expr}), count(DISTINCT {time_expr}) FROM {table}"
+    ).fetchone()
+    start, end, distinct_times = extent
+    if not distinct_times:
+        return {**empty, "variable": selected, "variables": variables}
+
+    catchment_count = len(_list_prefixed_output_files(directory, "cat-"))
+    span_hours = max((end - start).total_seconds() / 3600.0, 0.0)
+    bucket_hours = _choose_bucket_hours(distinct_times, span_hours, catchment_count)
+
+    bucket_expr = (
+        time_expr
+        if bucket_hours is None
+        else f"time_bucket(INTERVAL '{bucket_hours} hours', {time_expr})"
+    )
+
+    # The catchment id comes from the filename because the rows themselves do not carry it.
+    frame = duckdb.query(
+        f"""
+        SELECT
+            CAST(regexp_extract(filename, 'cat-(\\d+)', 1) AS BIGINT) AS catchment,
+            {bucket_expr} AS bucket,
+            avg("{selected}") AS value
+        FROM {table}
+        WHERE regexp_extract(filename, 'cat-(\\d+)', 1) <> ''
+        GROUP BY 1, 2
+        ORDER BY 2, 1
+        """
+    ).df()
+
+    if frame.empty:
+        return {**empty, "variable": selected, "variables": variables}
+
+    catchments = np.sort(frame["catchment"].unique())
+    buckets = np.sort(frame["bucket"].unique())
+
+    catchment_pos = {value: index for index, value in enumerate(catchments)}
+    bucket_pos = {value: index for index, value in enumerate(buckets)}
+
+    grid = np.full((len(buckets), len(catchments)), np.nan, dtype=np.float64)
+    grid[
+        frame["bucket"].map(bucket_pos).to_numpy(),
+        frame["catchment"].map(catchment_pos).to_numpy(),
+    ] = frame["value"].to_numpy()
+
+    breaks = _class_breaks(grid)
+
+    # searchsorted gives the class index; +1 keeps 0 free for no-data.
+    bins = np.searchsorted(np.asarray(breaks), grid, side="right").astype(np.uint8) + 1
+    bins[~np.isfinite(grid)] = _NO_DATA_BIN
+
+    return {
+        "variable": selected,
+        "variables": variables,
+        "catchment_ids": [int(value) for value in catchments],
+        "times": [pd.Timestamp(value).isoformat() for value in buckets],
+        "breaks": breaks,
+        "bins": base64.b64encode(bins.tobytes()).decode("ascii"),
+        "step_hours": bucket_hours,
+        "no_data_bin": _NO_DATA_BIN,
+    }
 
 
 def getCatchmentsIds(model_run_id):

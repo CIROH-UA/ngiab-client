@@ -12,6 +12,8 @@ const appAPI = {
   getGeoSpatialData: (params) => getJSON(url('getGeoSpatialData'), params),
 
   getCatchmentTimeSeries: (params) => getJSON(url('getCatchmentTimeSeries'), params),
+  getCatchmentVariables: (params) => getJSON(url('getCatchmentVariables'), params),
+  getCatchmentValueMatrix: (params) => getJSON(url('getCatchmentValueMatrix'), params),
 
   getTrouteVariables: (params) => getJSON(url('getTrouteVariables'), params),
   getTrouteTimeSeries: (params) => getJSON(url('getTrouteTimeSeries'), params),
