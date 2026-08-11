@@ -1,8 +1,8 @@
 # NGIAB Visualizer image, built on tethys-uvx.
 #
 # Replaced the conda/pdm/nginx/salt image, whose Dockerfile, run.sh, and salt/ states were
-# removed once this was verified end to end. (The Singularity build under singularity/ is
-# unrelated and keeps its own salt states.)
+# removed once this was verified end to end. apptainer/ngiab.def mirrors this build for
+# HPC; keep the two in step.
 #
 #   - Base is ghcr.io/aquaveo/tethys-uvx: debian-slim + uv, no conda, no nginx, no salt,
 #     no supervisor. VIRTUAL_ENV is still /opt/conda/envs/tethys upstream, so bind-mount
