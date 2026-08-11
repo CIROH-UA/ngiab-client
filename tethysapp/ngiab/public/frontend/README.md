@@ -54,6 +54,22 @@ would wake every subscriber on every pan.
 `<ngiab-search>` knows nothing about MapLibre. It emits a `catchment-selected` CustomEvent
 and the map decides what that means, so the two can be reasoned about separately.
 
+## getGeoSpatialData
+
+Returns two things: the run's catchment ids and the extent to frame the map on. That is all
+the frontend has ever read from it. The map draws its geometry from the hydrofabric pmtiles,
+so the response carries no geometry at all.
+
+It used to read the whole nexus layer into a GeoDataFrame, crosswalk every feature against the
+TEEHR warehouse twice, and serialise the result as GeoJSON, none of which was used — 10,013
+bytes and 152 ms for the 55-catchment run against 933 bytes and 14 ms now, and the saving
+grows with the nexus count. The extent comes from `pyogrio.read_info`, which reads the layer
+header rather than its features, and is reprojected with `Transformer.transform_bounds` so a
+box in a projected crs does not shrink when the projection curves it.
+
+The extent is taken from `divides`, not `nexus`: the map draws catchment polygons, and framing
+on nexus points clipped the catchments at the edges of the basin.
+
 ## Choropleth and timeline
 
 `getCatchmentValueMatrix` returns one variable's values for every catchment at every timestep,

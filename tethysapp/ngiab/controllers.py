@@ -3,9 +3,7 @@ from django.core.exceptions import ValidationError
 from django.urls import reverse
 import logging
 import pandas as pd
-import json
 import re
-import geopandas as gpd
 import duckdb
 from tethys_sdk.routing import controller
 from .utils import (
@@ -13,14 +11,12 @@ from .utils import (
     _read_output_frame,
     _read_output_columns,
     getCatchmentsIds,
-    getNexusList,
     check_troute_id,
     get_troute_vars,
     get_troute_df,
     getCatchmentsList,
     find_gpkg_file_path,
-    append_ngen_usgs_column,
-    append_nwm_usgs_column,
+    gpkg_layer_bounds_4326,
     get_model_runs_selectable,
     get_catchment_variables,
     get_catchment_value_matrix,
@@ -196,34 +192,30 @@ def getCatchmentValueMatrix(request):
 
 @controller
 def getGeoSpatialData(request):
-    response_object = {}
+    """The catchment ids in this run, and the extent to frame the map on.
+
+    Nothing else: the map draws its geometry from the hydrofabric pmtiles, not from this
+    response. It used to read the whole nexus layer into a GeoDataFrame, crosswalk every
+    feature against the TEEHR warehouse twice, and serialise the result as GeoJSON -- all of
+    which the frontend threw away.
+    """
     model_run_id = request.GET.get("model_run_id")
 
-    # gepackage_file_name = find_gpkg_file(model_run_id)
     try:
-        gepackage_file_path = find_gpkg_file_path(model_run_id)
-    except Exception as e:
+        gpkg_path = find_gpkg_file_path(model_run_id)
+    except Exception:
+        logger.exception("Could not locate a GeoPackage for %s", model_run_id)
         return JsonResponse({"error": "Failed to read GeoPackage file."})
-    # Append ngen_usgs and nwm_usgs columns
-    gdf = gpd.read_file(gepackage_file_path, layer="nexus")
-    gdf = append_ngen_usgs_column(gdf, model_run_id)
-    gdf = append_nwm_usgs_column(gdf, model_run_id)
 
-    # Load the GeoJSON file into a GeoPandas DataFrame
-    gdf = gdf.to_crs("EPSG:4326")
+    if not gpkg_path:
+        return JsonResponse({"error": "Failed to read GeoPackage file."})
 
-    flow_paths_ids = gdf["toid"].tolist()
-    bounds = gdf.total_bounds.tolist()
-
-    data = json.loads(gdf.to_json())
-
-    response_object["nexus"] = data
-    response_object["nexus_ids"] = getNexusList(model_run_id)
-    response_object["bounds"] = bounds
-    # response_object["teerh"] = teerh_data
-    response_object["catchments"] = getCatchmentsList(model_run_id)
-    response_object["flow_paths_ids"] = flow_paths_ids
-    return JsonResponse(response_object)
+    return JsonResponse(
+        {
+            "catchments": getCatchmentsList(model_run_id),
+            "bounds": gpkg_layer_bounds_4326(gpkg_path),
+        }
+    )
 
 
 @controller
@@ -480,10 +472,8 @@ def _empty_locations_response(status_message, status_severity):
 def getTeehrLocations(request):
     """Return the nexus/USGS pairs that actually have TEEHR results for this run.
 
-    Lets the map colour geometry by TEEHR availability. Distinct from the ``ngen_usgs``
-    column on ``getGeoSpatialData``'s nexus features: that reports the warehouse-wide
-    crosswalk (``list_crosswalks`` with no configuration filter), so it also includes
-    gauges this run never evaluated. This is filtered to the run's configuration.
+    Lets the map colour geometry by TEEHR availability, filtered to this run's
+    configuration and to gauges that have something to compare against.
     """
     model_run_id = request.GET.get("model_run_id")
 

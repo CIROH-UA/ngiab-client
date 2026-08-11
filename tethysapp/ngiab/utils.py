@@ -10,18 +10,14 @@ import pandas as pd
 import glob
 import duckdb
 import xarray as xr
-from collections import defaultdict
+import pyogrio
+from pyproj import Transformer
 
 from django.core.exceptions import ValidationError
 
 from .teehr_warehouse import (
-    ConfigurationNotFound,
     TeehrWarehouseError,
-    UnsupportedWarehouseVersion,
-    WarehouseCatalogLocked,
-    WarehouseMountMirrorBroken,
     WarehouseReader,
-    WarehouseUnreachable,
 )
 
 logger = logging.getLogger(__name__)
@@ -203,54 +199,8 @@ def find_gpkg_file_path(model_run_id):
 
 
 
-def append_ngen_usgs_column(gdf, model_id):
-    """Add ``ngen_usgs`` column mapping nexus IDs on the map to USGS gauge IDs.
-
-    Reads the warehouse's ``location_crosswalks`` table filtered to ngen entries.
-    Rows with no matching USGS gauge get ``"none"``. Warehouse unreachable or
-    absent → every row gets ``"none"``.
-    """
-    try:
-        reader = _open_warehouse()
-        if reader is None:
-            gdf["ngen_usgs"] = "none"
-            return gdf
-        with reader:
-            crosswalks = reader.list_crosswalks(secondary_prefix="ngen")
-    except TeehrWarehouseError as exc:
-        logger.info("append_ngen_usgs_column: warehouse unavailable (%s)", exc)
-        gdf["ngen_usgs"] = "none"
-        return gdf
-    # secondary is "ngen-XXXXX"; the gpkg nexus IDs are "nex-XXXXX". Map accordingly.
-    nex_to_usgs = {
-        secondary.replace("ngen-", "nex-", 1): primary
-        for primary, secondary in crosswalks
-    }
-    gdf["ngen_usgs"] = gdf["id"].apply(lambda x: nex_to_usgs.get(x, "none"))
-    return gdf
 
 
-def append_nwm_usgs_column(gdf, model_id):
-    """Add ``nwm_usgs`` column mapping USGS gauge IDs to NWM reach IDs.
-
-    Depends on ``ngen_usgs`` already being present on the GeoDataFrame (call
-    ``append_ngen_usgs_column`` first). Reads the warehouse's
-    ``location_crosswalks`` filtered to ``nwm30`` entries.
-    """
-    try:
-        reader = _open_warehouse()
-        if reader is None:
-            gdf["nwm_usgs"] = "none"
-            return gdf
-        with reader:
-            crosswalks = reader.list_crosswalks(secondary_prefix="nwm30")
-    except TeehrWarehouseError as exc:
-        logger.info("append_nwm_usgs_column: warehouse unavailable (%s)", exc)
-        gdf["nwm_usgs"] = "none"
-        return gdf
-    usgs_to_nwm = {primary: secondary for primary, secondary in crosswalks}
-    gdf["nwm_usgs"] = gdf["ngen_usgs"].apply(lambda x: usgs_to_nwm.get(x, "none"))
-    return gdf
 
 
 def _get_base_troute_output(model_id):
@@ -653,6 +603,40 @@ def _build_value_matrix(directory, variable=None):
     }
 
 
+def gpkg_layer_bounds_4326(gpkg_path, layers=("divides", "nexus")):
+    """Return [west, south, east, north] for the first readable layer, in EPSG:4326.
+
+    read_info reads the layer header, not its features: the extent of a 55-catchment run
+    costs about 2 ms this way against reading every geometry into a GeoDataFrame to call
+    total_bounds on it. The map only ever used this to frame the run.
+
+    transform_bounds rather than transforming two corner points: it densifies the edges, so
+    a box in a projected crs does not shrink when the projection curves it.
+    """
+    for layer in layers:
+        try:
+            info = pyogrio.read_info(gpkg_path, layer=layer)
+        except Exception:
+            continue
+
+        bounds = info.get("total_bounds")
+        if bounds is None or not len(bounds):
+            continue
+
+        crs = info.get("crs")
+        if not crs:
+            return [float(value) for value in bounds]
+        try:
+            transformer = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
+            return [float(value) for value in transformer.transform_bounds(*bounds)]
+        except Exception:
+            logger.warning("Could not reproject %s bounds from %s", layer, crs)
+            continue
+
+    logger.info("No usable layer extent in %s", gpkg_path)
+    return None
+
+
 def getCatchmentsIds(model_run_id):
     """
     Get a list of catchment IDs.
@@ -676,11 +660,6 @@ def getCatchmentsList(model_id):
     return _list_prefixed_output_files(output_base_file, catchment_prefix)
 
 
-def getNexusList(model_id):
-    output_base_file = get_base_output(model_id)
-    nexus_prefix = "nex-"
-    nexus_ids_list = _list_prefixed_output_files(output_base_file, nexus_prefix)
-    return [id.split("_output")[0] for id in nexus_ids_list]
 
 
 

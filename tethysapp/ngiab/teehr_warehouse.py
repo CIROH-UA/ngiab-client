@@ -253,25 +253,6 @@ class WarehouseReader:
             for cfg, var in rows
         ]
 
-    def list_usgs_locations_for_run(self, config_name: str) -> List[str]:
-        """Return the USGS primary_location_ids in the crosswalk for this run.
-
-        Replaces ``append_ngen_usgs_column`` in the legacy reader.
-        """
-        catalog = self._freeze_catalog()
-        xwalk_loc = catalog.get("location_crosswalks")
-        sec_loc = catalog.get("secondary_timeseries")
-        if xwalk_loc is None or sec_loc is None:
-            return []
-        rows = self._execute(
-            f"SELECT DISTINCT x.primary_location_id "
-            f"FROM iceberg_scan('{xwalk_loc}') x "
-            f"JOIN iceberg_scan('{sec_loc}') s "
-            f"  ON s.location_id = x.secondary_location_id "
-            f"WHERE s.configuration_name = ?",
-            [config_name],
-        ).fetchall()
-        return [r[0] for r in rows]
 
     def list_location_pairs_for_run(self, config_name: str) -> List[tuple]:
         """Return (primary_location_id, secondary_location_id) pairs that can be compared.
@@ -380,31 +361,6 @@ class WarehouseReader:
             out.append(row)
         return out
 
-    def list_crosswalks(
-        self, secondary_prefix: Optional[str] = None
-    ) -> List[tuple]:
-        """Return (primary_location_id, secondary_location_id) pairs from the crosswalk.
-
-        Optionally filter by ``secondary_location_id`` prefix (e.g. ``"ngen"`` or
-        ``"nwm30"``). Crosswalks are warehouse-scoped, not run-scoped.
-        """
-        catalog = self._freeze_catalog()
-        xwalk_loc = catalog.get("location_crosswalks")
-        if xwalk_loc is None:
-            return []
-        if secondary_prefix is None:
-            rows = self._execute(
-                f"SELECT primary_location_id, secondary_location_id "
-                f"FROM iceberg_scan('{xwalk_loc}')"
-            ).fetchall()
-        else:
-            rows = self._execute(
-                f"SELECT primary_location_id, secondary_location_id "
-                f"FROM iceberg_scan('{xwalk_loc}') "
-                f"WHERE secondary_location_id LIKE ? || '-%'",
-                [secondary_prefix],
-            ).fetchall()
-        return list(rows)
 
     def get_joined_timeseries(
         self,
