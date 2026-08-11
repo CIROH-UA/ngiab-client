@@ -912,7 +912,9 @@ manage_datastream_cache() {
 # route `127.0.0.1` either (depends on whether WSL2 localhostForwarding is
 # enabled on the Windows host). The host's non-loopback IPv4 always works.
 print_visualization_urls() {
-    local app_path="/apps/ngiab"
+    # Single-app mode (MULTIPLE_APP_MODE false in conf/portal_config.yml) serves the app at
+    # the root; there is no /apps/<name>/ prefix to print.
+    local app_path=""
     local is_wsl=false
     grep -qi microsoft /proc/version 2>/dev/null && is_wsl=true
 

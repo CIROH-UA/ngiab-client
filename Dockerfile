@@ -98,12 +98,24 @@ ENV PORTAL_SUPERUSER_PASSWORD=pass
 # place the same file directly so the build-time commands see identical settings.
 COPY conf/portal_config.yml ${TETHYS_HOME}/portal_config.yml
 
+# Single-app mode is commented out for the migrate and restored straight after. Tethys
+# resolves STANDALONE_APP while importing the URLConf, which Django loads for the system
+# checks that run before migrate -- so it queries tethys_apps_tethysapp on a database where
+# that table does not exist yet. Upstream guards this with `except ProgrammingError`, which
+# is what psycopg raises for a missing table; sqlite raises OperationalError and sails
+# straight through. Everything after the migrate sees the real single-app settings, and the
+# baked database carries the app row, so the runtime lookup succeeds.
 RUN mkdir -p /opt/ngiab/static \
+    && sed -i -E 's/^([[:space:]]*)(MULTIPLE_APP_MODE|STANDALONE_APP):/\1# BUILD-DISABLED \2:/' \
+        "${TETHYS_HOME}/portal_config.yml" \
     && "${VIRTUAL_ENV}/bin/tethys" db migrate \
     && "${VIRTUAL_ENV}/bin/tethys" db createsuperuser \
         --pn "${PORTAL_SUPERUSER_NAME}" \
         --pp "${PORTAL_SUPERUSER_PASSWORD}" \
         --pe "" \
+    && sed -i -E 's/^([[:space:]]*)# BUILD-DISABLED (MULTIPLE_APP_MODE|STANDALONE_APP):/\1\2:/' \
+        "${TETHYS_HOME}/portal_config.yml" \
+    && grep -q '^[[:space:]]*MULTIPLE_APP_MODE:' "${TETHYS_HOME}/portal_config.yml" \
     && "${VIRTUAL_ENV}/bin/tethys" site -f \
     && "${VIRTUAL_ENV}/bin/tethys" manage collectstatic --noinput \
     && chown -R 1000:1000 /opt/ngiab \

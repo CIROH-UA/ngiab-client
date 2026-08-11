@@ -1,5 +1,6 @@
 from django.http import JsonResponse
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 import logging
 import pandas as pd
 import os
@@ -94,7 +95,9 @@ def home(request):
     # index.html loads the build-less vanilla frontend from public/frontend/ and injects
     # runtime config into window.__NGIAB__, replacing the React build's compile-time
     # TETHYS_APP_ROOT_URL substitution.
-    context = {"app_root_url": f"/apps/{App.root_url}/"}
+    # reverse(), not a hardcoded "/apps/<root>/": under MULTIPLE_APP_MODE false the app is
+    # mounted at "/" instead, and every frontend endpoint is built from this value.
+    context = {"app_root_url": reverse(f"{App.package}:{App.index}")}
     return App.render(request, "index.html", context)
 
 

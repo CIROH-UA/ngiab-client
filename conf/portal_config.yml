@@ -65,3 +65,9 @@ settings:
   # The visualizer is a local, single-user tool; the sign-up flow is not wanted.
   TETHYS_PORTAL_CONFIG:
     ENABLE_OPEN_SIGNUP: false
+    # Single-app mode: this image ships exactly one app, so the portal's app library and the
+    # /apps/<name>/ prefix are pure overhead. The app is served at /, and Tethys sets
+    # BYPASS_TETHYS_HOME_PAGE itself. The frontend reads its root from the template, which
+    # reverses the url rather than assuming a prefix, so both modes work.
+    MULTIPLE_APP_MODE: false
+    STANDALONE_APP: ngiab

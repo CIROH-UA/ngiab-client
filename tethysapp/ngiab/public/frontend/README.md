@@ -167,6 +167,24 @@ bar and controls are positioned against the canvas, so a sheet drawn over the ca
 them — and the attribution is a licence requirement, not decoration. The narrow-screen rules
 shorten `#map` instead, so the canvas ends where the sheet begins.
 
+## App root URL
+
+The portal runs in **single-app mode** (`MULTIPLE_APP_MODE: false` in `conf/portal_config.yml`),
+so the app is served at `/`, not `/apps/ngiab/`. Nothing in the frontend may assume either
+shape: `APP_ROOT_URL` is injected by the template from `reverse()`, and every endpoint in
+`api/app.js` is built from it at call time. The `/apps/ngiab/` default in `config.js` is a
+last-resort fallback for a page that somehow rendered without the injection.
+
+Old `/apps/ngiab/...` links still load, because `App.catch_all` routes anything under the app
+root to `home` — and since the injected root comes from `reverse()`, the page served there
+still calls the correct endpoints.
+
+Tethys resolves `STANDALONE_APP` while importing the URLConf, which Django loads for the
+system checks that run before `db migrate`. On a database where `tethys_apps_tethysapp` does
+not exist yet that is a hard failure: upstream catches `ProgrammingError`, which is what
+psycopg raises for a missing table, while sqlite raises `OperationalError`. The Dockerfile
+comments the two settings out for the migrate and restores them immediately after.
+
 ## Errors
 
 Every failure has two audiences. `ApiError.message` carries the status and the path and goes to
