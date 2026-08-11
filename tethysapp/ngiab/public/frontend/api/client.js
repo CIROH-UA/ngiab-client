@@ -2,9 +2,7 @@ import { getPortalHost } from '../config.js';
 
 // A thin fetch wrapper standing in for the React app's axios client.
 
-// Two audiences per failure: `message` carries the status and path for the console, and
-// `userMessage` is what a panel is allowed to show. Status codes and URLs are not answers to
-// "what went wrong", so they never reach the interface.
+// `message` is for the console; only `userMessage` may reach the interface.
 export class ApiError extends Error {
   constructor(message, { status = null, body = null, userMessage = null } = {}) {
     super(message);
@@ -31,8 +29,7 @@ const STATUS_MESSAGES = {
 
 const messageForStatus = (status) => STATUS_MESSAGES[status] ?? GENERIC_MESSAGE;
 
-// A tethys traceback, a Django debug page or a bare exception repr is not a user-facing
-// sentence. Only short single-line text is passed through.
+// Only short single-line text is a user-facing sentence; tracebacks and HTML are not.
 function usableServerMessage(text) {
   if (typeof text !== 'string') return null;
   const trimmed = text.trim();
@@ -41,8 +38,7 @@ function usableServerMessage(text) {
   return trimmed;
 }
 
-// A failed response may be JSON with an error key, or Django's HTML debug page. Reading it
-// must never throw, or the real failure is replaced by a parse error.
+// Must never throw, or a parse error would replace the real failure.
 async function readErrorDetail(response) {
   try {
     const text = await response.text();
@@ -112,8 +108,7 @@ export async function getJSON(path, params = {}) {
     });
   }
 
-  // Some controllers report failure as HTTP 200 plus an 'error' key. That text is written for
-  // the user, so it is shown as-is when it reads like a sentence.
+  // Some controllers report failure as HTTP 200 plus an 'error' key, written for the user.
   if (body && body.error) {
     throw new ApiError(body.error, {
       status: response.status,

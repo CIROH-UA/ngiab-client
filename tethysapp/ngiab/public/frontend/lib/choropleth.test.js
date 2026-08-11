@@ -69,8 +69,7 @@ describe('binColor', () => {
 });
 
 describe('legendEntries', () => {
-  // A zero-heavy variable collapses to few classes; drawing eight would invent classes
-  // that can never occur.
+  // A zero-heavy variable collapses to few classes; eight would invent impossible ones.
   it('draws one swatch per class the backend actually produced', () => {
     expect(legendEntries([1, 2], 'light')).to.have.length(3);
     expect(legendEntries([1, 2, 3, 4, 5, 6, 7], 'light')).to.have.length(8);
@@ -93,8 +92,7 @@ describe('legendLabel', () => {
 });
 
 describe('formatBreak', () => {
-  // Values differ by orders of magnitude between runs, so neither fixed decimals nor
-  // plain toString is readable across both.
+  // Values differ by orders of magnitude, so fixed decimals are unreadable at one end.
   it('uses exponential notation for very small values', () => {
     expect(formatBreak(0.0000287)).to.equal('2.87e-5');
   });
@@ -123,8 +121,7 @@ describe('formatFrameTime', () => {
     expect(formatFrameTime('2017-01-01 06:00:00')).to.equal('2017-01-01 06:00');
   });
 
-  // Model time carries no zone, so parsing it as a Date would relabel every frame by the
-  // viewer's offset. The displayed hour must match the string byte for byte.
+  // The displayed hour must match the string byte for byte, whatever the viewer's zone.
   it('does not shift the stamp into the viewer timezone', () => {
     expect(formatFrameTime('2017-06-15T06:00:00')).to.contain('06:00');
     expect(formatFrameTime('2017-06-15T23:00:00')).to.equal('2017-06-15 23:00');

@@ -67,8 +67,7 @@ export const actions = {
     });
   },
 
-  // A different run has its own variables, time axis and value range, so nothing about the
-  // previous run's choropleth may carry over.
+  // A different run has its own variables, axis and range: nothing may carry over.
   setMapVariable: (mapVariable) =>
     store.set({ mapVariable, frameIndex: 0, frameCount: 0, playing: false }),
 

@@ -55,8 +55,7 @@ const teehrAware = (view, teehrColor, plainColor) =>
     ? ['case', hasTeehrNexus(view), themed(view, teehrColor), themed(view, plainColor)]
     : themed(view, plainColor);
 
-// Feature-state rather than a filter: the bin changes every frame, and rebuilding a filter
-// over every catchment per frame is the expensive way to do this.
+// Feature-state, not a filter: the bin changes every frame. See README.
 export const choroplethFillColor = (view) => {
   const ramp = RAMP[view.theme === 'dark' ? 'dark' : 'light'];
   const cases = [];
@@ -68,8 +67,7 @@ export const catchmentFillColor = (view) =>
   view.choropleth ? choroplethFillColor(view) : teehrAware(view, TEEHR_FILL, PLAIN_FILL);
 export const flowPathsLineColor = (view) => teehrAware(view, TEEHR_LINE, PLAIN_LINE);
 
-// The default ramp fades catchments out below zoom 11, which would hide the animation at the
-// extent most runs open at. Choropleth mode keeps them visible much further out.
+// Choropleth mode stays visible far below zoom 11, where the default ramp fades out.
 export const catchmentFillOpacity = (view) =>
   view.choropleth ? { stops: [[4, 0.85], [9, 0.9]] } : { stops: [[7, 0], [11, 1]] };
 

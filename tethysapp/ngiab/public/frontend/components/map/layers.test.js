@@ -148,9 +148,7 @@ describe('installLayers', () => {
     expect(map.layers.get('catchments-layer')).to.equal(first);
   });
 
-  // The dark-mode regression: setStyle wipes everything, and the reinstall has to put it
-  // back. Guarding the reinstall on an event that never reports a loaded style left the map
-  // permanently empty after a theme swap.
+  // The dark-mode regression: setStyle wipes everything and the reinstall must restore it.
   it('restores everything after a style swap wipes it', () => {
     const map = fakeMap();
     installLayers(map, view());

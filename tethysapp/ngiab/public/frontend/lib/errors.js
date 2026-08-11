@@ -2,8 +2,7 @@
 
 const FALLBACK = 'Something went wrong. Please try again.';
 
-// ApiError carries a userMessage; anything else reaching here is a programming fault, and its
-// text is for the console, not the panel.
+// Anything without a userMessage is a programming fault; its text is not for the panel.
 export function userMessage(error) {
   return error?.userMessage ?? FALLBACK;
 }

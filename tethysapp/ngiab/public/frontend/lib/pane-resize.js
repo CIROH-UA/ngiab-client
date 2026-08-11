@@ -1,7 +1,6 @@
 // Drag-to-resize and collapse for the chart pane.
 
-// Picking a better fixed height only moves the argument. Different questions want different
-// amounts of chart, so the height is the user's to set.
+// Different questions want different amounts of chart, so the height is the user's.
 const MIN_HEIGHT = 120;
 const KEYBOARD_STEP = 24;
 
@@ -10,8 +9,7 @@ const maxHeight = () => Math.max(MIN_HEIGHT, Math.round(window.innerHeight * 0.7
 
 const clamp = (value) => Math.min(Math.max(value, MIN_HEIGHT), maxHeight());
 
-// MapLibre does not observe container resizes and uPlot watches its own canvas, so the pane
-// announces the change and whoever cares reacts.
+// MapLibre does not observe container resizes, so the pane announces the change.
 const announce = () => window.dispatchEvent(new Event('ngiab-pane-resize'));
 
 export function attachPaneResize({ paneEl, handleEl, collapseEl }) {

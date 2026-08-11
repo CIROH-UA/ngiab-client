@@ -55,8 +55,7 @@ export class ChoroplethState {
     return frame.length ? frame[column] : null;
   }
 
-  // Only the catchments whose class changed are written, so scrubbing costs a handful of
-  // updates rather than one per catchment per frame.
+  // Only changed classes are written, so scrubbing costs a handful of updates.
   show(frameIndex) {
     if (!this.isLoaded) return;
     const frame = frameAt(this._bins, this.frameCount, this._ids.length, frameIndex);
@@ -70,8 +69,7 @@ export class ChoroplethState {
     this._applied = Uint8Array.from(frame);
   }
 
-  // Tiles that load later start with no feature-state, so the current frame has to be
-  // written again for the features that just arrived.
+  // Late tiles arrive with no feature-state, so the current frame is written again.
   reapply() {
     if (!this.isLoaded || this._frame < 0) return;
     const frame = frameAt(this._bins, this.frameCount, this._ids.length, this._frame);

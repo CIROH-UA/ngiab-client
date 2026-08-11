@@ -1,5 +1,4 @@
-// tokens.css keys its dark values off :root[data-theme="dark"], so the attribute has to be
-// set for the panel cards to follow the basemap.
+// tokens.css keys dark off :root[data-theme="dark"], so the attribute must be set.
 
 export function applyTheme(theme) {
   if (typeof document === 'undefined') return;

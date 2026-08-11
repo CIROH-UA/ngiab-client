@@ -25,6 +25,8 @@ Run the tests with `npm run test:frontend` (real Chromium via `@web/test-runner`
 | `lib/metrics.js` | TEEHR metrics payload → table rows. Pure. |
 | `lib/choropleth.js` | Bin matrix decoding, frame diffing, colour ramp, legend labels. Pure. |
 | `lib/theme.js` | Mirrors the store's theme onto `<html data-theme>`. |
+| `lib/errors.js` | The one message a panel may show when a request fails. |
+| `lib/pane-resize.js` | Drag, keyboard and collapse for the chart pane. |
 | `components/map/layers.js` | Sources, filters, paint expressions, layer specs. Pure. |
 | `components/map/interactions.js` | Hover, hit-testing, bounds, tile-derived nexus index. |
 | `components/map/choropleth-layer.js` | Applies the value matrix as MapLibre feature-state. |
@@ -153,6 +155,34 @@ opt-in; only `AttributionControl` is on by default. The map had no zoom buttons 
 bar and controls are positioned against the canvas, so a sheet drawn over the canvas covers
 them — and the attribution is a licence requirement, not decoration. The narrow-screen rules
 shorten `#map` instead, so the canvas ends where the sheet begins.
+
+## Errors
+
+Every failure has two audiences. `ApiError.message` carries the status and the path and goes to
+the console; `ApiError.userMessage` is the only thing a panel may show, and it never contains a
+status code, a URL or a traceback. Panels read it through `userMessage()` in `lib/errors.js`,
+which falls back to a generic sentence for anything that is not an `ApiError` — a non-`ApiError`
+reaching a catch block is a programming fault, and its text is not an explanation.
+
+A server `error` string is passed through when it reads like a sentence, because our controllers
+write those for the user. It is rejected when it is multi-line, over 200 characters, or contains
+a traceback or HTML — with `DEBUG: true` a 500 returns Django's debug page, and a length check
+alone would have let a one-line exception repr through.
+
+## Chart pane
+
+Fixed at 300px it took a third of the screen; the fix is not a smaller fixed number but a pane
+the user controls. 220px by default, draggable between 120px and 70% of the window, collapsible,
+with arrow keys resizing and Enter collapsing. Resizing dispatches `ngiab-pane-resize`, because
+MapLibre does not observe container size changes and has to be told to re-measure.
+
+uPlot renders its legend as a sibling of the canvas but sizes only the canvas, so asking for the
+container's full height pushes the legend out of sight. The plot takes the height left after it.
+
+The card stack is bounded top and bottom and scrolls inside the map. Unbounded, it grew past the
+map pane as cards accumulated and overlapped the chart — which read as the chart being covered.
+The graduated legend is a single strip rather than one row per class for the same reason: eight
+rows was most of that height.
 
 ## UI patterns
 

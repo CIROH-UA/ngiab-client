@@ -1,12 +1,10 @@
 import { store, actions } from '../store/app-store.js';
 import { formatFrameTime } from '../lib/choropleth.js';
 
-// Frames per second at 1x. Slow enough that each step is legible, and slow enough that the
-// feature-state writes for a step land well inside one interval.
+// Frames per second at 1x, slow enough that a step's writes land inside one interval.
 const BASE_FPS = 6;
 
-// Capped at 8x: past roughly 50 fps the feature-state writes for one frame stop finishing
-// before the next tick, so the map lags the slider instead of animating faster.
+// Capped at 8x: past roughly 50 fps the map lags the slider instead of going faster.
 const SPEEDS = [0.5, 1, 2, 4, 8];
 
 export class NgiabTimeline extends HTMLElement {

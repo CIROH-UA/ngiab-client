@@ -270,9 +270,7 @@ export class NgiabChart extends HTMLElement {
     this._resizePlot();
   }
 
-  // uPlot renders its legend as a sibling of the canvas but sizes only the canvas, so asking
-  // for the container's full height pushes the legend out of view. The legend is worth keeping
-  // -- TEEHR plots two series -- so the plot gets the height that is left after it.
+  // uPlot sizes only the canvas, so the plot takes the height left after its legend.
   _plotHeight() {
     const total = this._canvasEl.clientHeight || 260;
     const legend = this._plot?.root?.querySelector('.u-legend')?.offsetHeight ?? 0;

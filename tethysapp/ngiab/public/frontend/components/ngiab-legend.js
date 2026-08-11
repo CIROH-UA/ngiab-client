@@ -31,9 +31,7 @@ export class NgiabLegend extends HTMLElement {
     this.render();
   }
 
-  // A continuous strip rather than one row per class: eight stacked rows pushed the whole
-  // card stack past the height of the map. Each segment keeps its own tooltip, so the exact
-  // range of any class is still one hover away.
+  // A strip, not a row per class: eight rows pushed the card stack past the map height.
   _renderGraduated(theme) {
     const entries = legendEntries(this._breaks, theme);
     const segments = entries

@@ -1,7 +1,6 @@
 // Pure helpers for the value matrix the backend sends. No map, no DOM.
 
-// Bin 0 means the run wrote no value for that catchment at that time. It must never be drawn
-// as the lowest class -- that is the Number(null) trap again, one step further downstream.
+// Bin 0 is no data, and must never draw as the lowest class: the Number(null) trap.
 export const NO_DATA_BIN = 0;
 
 // Sequential ramp, index 1..8 matching the bin values. Index 0 is the no-data colour.
@@ -33,8 +32,7 @@ export function frameAt(bins, frameCount, catchmentCount, index) {
   return bins.subarray(start, start + catchmentCount);
 }
 
-// Only the catchments whose class actually changed, so scrubbing does not touch every
-// feature on every frame. Adjacent hydrograph timesteps mostly share a class.
+// Adjacent timesteps mostly share a class, so only the changed ones need writing.
 export function diffFrames(previous, next) {
   const changed = [];
   if (!next) return changed;
@@ -50,8 +48,7 @@ export function binColor(bin, theme) {
   return ramp[bin];
 }
 
-// One legend entry per class the backend actually produced, so a variable that collapsed to
-// three classes draws three swatches rather than eight, most of them impossible.
+// One entry per class the backend produced, never a class that cannot occur.
 export function legendEntries(breaks, theme) {
   const count = (Array.isArray(breaks) ? breaks.length : 0) + 1;
   const entries = [];
@@ -61,8 +58,7 @@ export function legendEntries(breaks, theme) {
   return entries;
 }
 
-// Significant figures, because these values span orders of magnitude between variables and
-// runs: Q_OUT peaks near 1e-4 in one run and could be in the hundreds in another.
+// Significant figures: these values span orders of magnitude between runs.
 export function formatBreak(value) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '';
   if (value === 0) return '0';
@@ -79,8 +75,7 @@ export function legendLabel(entry) {
   return `${formatBreak(lower)} – ${formatBreak(upper)}`;
 }
 
-// Read off the string rather than via Date. These stamps are model time with no zone, so
-// parsing them shifts them into the viewer's timezone and silently relabels every frame.
+// Read off the string: model time has no zone, so Date would shift every frame.
 export function formatFrameTime(stamp) {
   if (typeof stamp !== 'string' || !stamp) return '';
   const match = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/.exec(stamp);
