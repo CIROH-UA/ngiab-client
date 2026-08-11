@@ -157,6 +157,31 @@
   #timeline-range { flex: 1 1 auto; min-width: 0; accent-color: var(--accent, #1f78b4); }
   #timeline-stamp { flex: 0 0 auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+  /* MapTip ------------------------------------------------------------ */
+  .map-tip .maplibregl-popup-content {
+    background: var(--bg, #fff); color: var(--fg, #1b1b1b);
+    border: 1px solid rgba(128,128,128,.28); border-radius: 7px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.2);
+    padding: 6px 9px; font: 12px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .map-tip .maplibregl-popup-tip { display: none; }
+  .map-tip .tip-teehr, .map-tip .tip-value { opacity: .8; }
+
+  /* Empty state ------------------------------------------------------- */
+  #map-empty {
+    position: absolute; z-index: 2; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  #map-empty[hidden] { display: none; }
+  .empty-card {
+    pointer-events: auto; max-width: 380px; padding: 16px 18px; text-align: center;
+    font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .empty-title { font-weight: 600; margin-bottom: 6px; }
+  .empty-card p { margin: 0; opacity: .8; }
+  .empty-card code { font-size: 12px; }
+
   /* Layer toggles ----------------------------------------------------- */
   #map-toggles { margin-top: 8px; padding: 9px 11px; }
   #map-toggles label { display: block; }
@@ -219,6 +244,39 @@
   @media (prefers-reduced-motion: reduce) {
     ngiab-chart.is-busy .chart-status::after { animation: none; }
   }
+
+  /* Narrow screens ---------------------------------------------------- */
+  /* Below this width the 300px stack becomes a bottom sheet; see public/frontend/README.md. */
+  @media (max-width: 640px) {
+    /* The canvas is shortened rather than covered, so MapLibre's own controls and the
+       attribution stay inside the visible map instead of drawing over the sheet. */
+    #map { bottom: 58%; }
+
+    #map-ui {
+      top: 42%; bottom: 0; left: 0; right: 0; width: auto;
+      overflow-y: auto;
+      padding: 8px 8px 10px;
+      background: var(--bg, #fff);
+      border-top: 1px solid rgba(128,128,128,.3);
+      box-shadow: 0 -2px 12px rgba(0,0,0,.18);
+    }
+    #map-ui::before {
+      content: ''; display: block; width: 36px; height: 4px; margin: 0 auto 8px;
+      border-radius: 2px; background: currentColor; opacity: .25;
+    }
+    .map-card { box-shadow: none; }
+    #map-search-results { max-height: 180px; }
+
+    /* Right margin clears the zoom control stack. */
+    #map-timeline {
+      left: 8px; right: 52px; bottom: auto; top: 8px;
+      width: auto; transform: none;
+    }
+    #map-empty { bottom: 58%; }
+    #chart-pane { height: 230px; }
+    .chart-body { flex-direction: column; gap: 8px; }
+    .chart-metrics { max-height: 40%; align-self: stretch; }
+  }
 </style>
 
 <div id="ngiab-layout">
@@ -272,6 +330,15 @@
       </div>
     </div>
     <div id="map"></div>
+
+    <div id="map-empty" hidden>
+      <div class="map-card empty-card">
+        <div class="empty-title">Nothing to draw for this model run</div>
+        <p>Its <code>outputs/ngen</code> directory has no catchment files, so the map is empty
+           rather than broken. Pick a different run, or check that the run finished writing.</p>
+      </div>
+    </div>
+
     <ngiab-timeline id="map-timeline" hidden></ngiab-timeline>
     <ngiab-map></ngiab-map>
   </div>

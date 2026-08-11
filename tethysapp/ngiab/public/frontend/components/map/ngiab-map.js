@@ -14,11 +14,16 @@ import {
 } from './layers.js';
 import {
   attachHoverCursor,
+  attachMapTip,
   catchmentAtPoint,
   catchmentBounds,
   CatchmentNexusIndex,
 } from './interactions.js';
 import { ChoroplethState } from './choropleth-layer.js';
+import { legendEntries, legendLabel } from '../../lib/choropleth.js';
+
+const escapeHtml = (value) =>
+  String(value).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 // Global, not per-map: registering per render would re-register on every change.
 maplibregl.addProtocol('pmtiles', new Protocol({ metadata: true }).tile);
@@ -44,6 +49,7 @@ export class NgiabMap extends HTMLElement {
     this._legendEl = document.querySelector('ngiab-legend');
     this._timelineEl = document.querySelector('ngiab-timeline');
     this._mapVariableEl = document.getElementById('map-variable');
+    this._emptyEl = document.getElementById('map-empty');
     this._loadedVariableKey = null;
 
     // Seed from the URL so a shared link opens the right run.
@@ -90,6 +96,7 @@ export class NgiabMap extends HTMLElement {
     map.on('load', () => {
       installLayers(map, this._view);
       attachHoverCursor(map); // once only — see the note on the function
+      attachMapTip(map, (numeric) => this._describeCatchment(numeric));
       this._syncModelRun();
     });
 
@@ -232,6 +239,27 @@ export class NgiabMap extends HTMLElement {
     this._reportSelection({ label: catchmentLabel, teehrId, located });
   }
 
+  // Only catchments in this run get a tip; the tile layer covers all of CONUS.
+  _describeCatchment(numeric) {
+    if (!this._local.catchmentIds.includes(numeric)) return '';
+
+    const rows = [`<strong>${escapeHtml(this._labelFor(numeric))}</strong>`];
+
+    const teehrId = this._lookupTeehrId(numeric);
+    if (teehrId) rows.push(`<span class="tip-teehr">TEEHR · ${escapeHtml(teehrId)}</span>`);
+
+    const { mapVariable, frameIndex } = store.get();
+    if (mapVariable && this._choropleth.isLoaded) {
+      const bin = this._choropleth.binAt(numeric, frameIndex);
+      // Bin 0 is no-data, which is a different statement from "the lowest class".
+      const entry = legendEntries(this._choropleth.breaks, store.get().theme)[bin - 1];
+      const value = bin && entry ? legendLabel(entry) : 'no value at this timestep';
+      rows.push(`<span class="tip-value">${escapeHtml(mapVariable)}: ${escapeHtml(value)}</span>`);
+    }
+
+    return rows.join('<br />');
+  }
+
   _labelFor(numeric) {
     return (
       this._local.catchmentIndex.find((entry) => entry.numeric === numeric)?.label ??
@@ -291,6 +319,7 @@ export class NgiabMap extends HTMLElement {
     this._legendEl?.setTeehrCount(teehr?.count ?? 0);
 
     // Say this out loud: an empty run looks identical to a broken map otherwise.
+    this._setEmptyState(!geo.catchments);
     if (!geo.catchments) {
       this._setStatus('This model run has no catchment outputs, so nothing is drawn.', 'warning');
       return;
@@ -335,6 +364,10 @@ export class NgiabMap extends HTMLElement {
     return { count: this._local.teehrNexusIds.length, status: body.teehr_status };
   }
 
+
+  _setEmptyState(isEmpty) {
+    if (this._emptyEl) this._emptyEl.hidden = !isEmpty;
+  }
 
   _setStatus(message, severity = null) {
     if (!this._statusEl) return;

@@ -149,6 +149,21 @@ theme has to be mirrored onto the document — that is all `lib/theme.js` does.
 **MapLibre adds no zoom control unless asked.** `NavigationControl` and `ScaleControl` are
 opt-in; only `AttributionControl` is on by default. The map had no zoom buttons at all.
 
+**Overlaying the bottom sheet on the map hides MapLibre's own furniture.** The attribution
+bar and controls are positioned against the canvas, so a sheet drawn over the canvas covers
+them — and the attribution is a licence requirement, not decoration. The narrow-screen rules
+shorten `#map` instead, so the canvas ends where the sheet begins.
+
+## UI patterns
+
+The interface was audited against the catalogue at <https://mapuipatterns.com/>. Implemented:
+Full map, Search, Info panel, Feature selection, Layer list, Theme toggle, Legend, MapTip,
+Zoom control, Choropleth, Timeline slider, Empty state, Home button (zoom to run extent).
+
+Deliberately not implemented: Cluster marker and Heat map (catchments are polygons, not
+points), Locate me and Blue dot (the user's position is unrelated to a model run's extent),
+Basemap gallery (light and dark are the only two styles published for this hydrofabric).
+
 ## Conventions
 
 - ES2023+, ESM only. No `var`, no `require`, no callback-style async.

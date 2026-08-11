@@ -1,3 +1,5 @@
+import maplibregl from 'maplibre-gl';
+
 import { SRC_DIVIDES, LAYER_DIVIDES, CATCHMENT_KEY, catchmentRef } from './layers.js';
 
 export function attachHoverCursor(map) {
@@ -7,6 +9,35 @@ export function attachHoverCursor(map) {
   map.on('mouseleave', 'catchments-layer', () => {
     map.getCanvas().style.cursor = '';
   });
+}
+
+export const featureCatchmentId = (feature) =>
+  (CATCHMENT_KEY === 'id' ? feature?.id : feature?.properties?.[CATCHMENT_KEY]);
+
+// Without this you have to click a catchment to learn anything about it, including its id.
+// Attach once: layer-scoped listeners outlive setStyle, so re-attaching duplicates them.
+export function attachMapTip(map, describe) {
+  const popup = new maplibregl.Popup({
+    closeButton: false,
+    closeOnClick: false,
+    offset: 10,
+    className: 'map-tip',
+  });
+
+  map.on('mousemove', 'catchments-layer', (event) => {
+    const numeric = featureCatchmentId(event.features?.[0]);
+    if (numeric == null) return;
+
+    const html = describe(numeric);
+    if (!html) {
+      popup.remove();
+      return;
+    }
+    popup.setLngLat(event.lngLat).setHTML(html).addTo(map);
+  });
+
+  map.on('mouseleave', 'catchments-layer', () => popup.remove());
+  return popup;
 }
 
 export function catchmentAtPoint(map, event) {
