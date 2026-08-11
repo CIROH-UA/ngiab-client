@@ -17,7 +17,12 @@ permissions:
   security-events: write
 
 jobs:
+  # Nothing published without the tests passing.
+  test:
+    uses: ./.github/workflows/tests.yml
+
   build:
+    needs: [test]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -34,6 +39,14 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+
+        with:
+
+          # setuptools-scm reads the version from git tags; the default
+
+          # shallow checkout fetches none.
+
+          fetch-depth: 0
 
       - name: Docker meta
         id: meta
@@ -89,6 +102,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # setuptools-scm reads the version from git tags; the default
+          # shallow checkout fetches none.
+          fetch-depth: 0
             
       - name: Download amd64 digest
         uses: actions/download-artifact@v4

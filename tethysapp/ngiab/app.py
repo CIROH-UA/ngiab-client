@@ -11,9 +11,9 @@ class App(TethysAppBase):
     package = "ngiab"  # WARNING: Do not change this value
     index = "home"
     icon = f"{package}/images/icon.png"
-    catch_all = "home"  # Catch all url mapped to home controller, required for react browser routing
+    catch_all = "home"  # Any unmatched path under the app root renders the map page
     root_url = "ngiab"
-    color = ""  # Don't set color here, set it in reactapp/custom-bootstrap.scss
+    color = ""  # Theme colours come from public/frontend/styles/tokens.css
     tags = ""
     enable_feedback = False
     feedback_emails = []

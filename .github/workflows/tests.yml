@@ -1,0 +1,89 @@
+name: tests
+
+# Callable, so the image builds can gate on it rather than duplicating it.
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # No lockfile is committed, and the only dev dependencies are the test runner itself.
+      - name: Install test dependencies
+        run: npm install --no-audit --no-fund
+
+      # @web/test-runner drives a real Chromium through the puppeteer launcher, which is
+      # what the tests are written against -- the DOM behaviour they pin down (feature-state,
+      # ResizeObserver, custom elements) is not reproducible under jsdom.
+      - name: Run the frontend test suite
+        run: npm run test:frontend
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # No Django test suite yet, so this is a syntax and import-shape gate: it catches the
+      # dangling import or stray reference that a refactor leaves behind, which is exactly
+      # what broke during the DataStream removal.
+      - name: Byte-compile the app
+        run: python -m compileall -q tethysapp/
+
+      - name: Check for imports of removed modules
+        run: |
+          set -e
+          for gone in datastream_utils reactapp; do
+            if grep -rn "\b${gone}\b" --include='*.py' tethysapp/; then
+              echo "::error::tethysapp still references removed module: ${gone}"
+              exit 1
+            fi
+          done
+          echo "no references to removed modules"
+
+  comment-style:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The project rule is single-line comments only, with anything longer living in
+      # public/frontend/README.md. This drifted back twice by hand, so it is checked here.
+      - name: No multi-line comments in the frontend
+        run: |
+          python - <<'PY'
+          import re, pathlib, sys
+          root = pathlib.Path('tethysapp/ngiab')
+          bad = []
+          targets = list((root / 'public/frontend').rglob('*.js'))
+          targets += list((root / 'public/frontend').rglob('*.css'))
+          targets += list((root / 'templates').rglob('*.html'))
+          for path in targets:
+              text = path.read_text()
+              for match in re.finditer(r'/\*.*?\*/|<!--.*?-->|\{#.*?#\}', text, re.S):
+                  if '\n' in match.group(0):
+                      bad.append(f"{path}:{text[:match.start()].count(chr(10)) + 1} block comment")
+              run = 0
+              for number, line in enumerate(text.splitlines(), 1):
+                  if line.strip().startswith('//'):
+                      run += 1
+                      continue
+                  if run > 1:
+                      bad.append(f"{path}:{number - 1} {run} consecutive // lines")
+                  run = 0
+          for entry in bad:
+              print(f"::error::{entry}")
+          sys.exit(1 if bad else 0)
+          PY
