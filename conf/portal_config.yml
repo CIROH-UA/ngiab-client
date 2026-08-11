@@ -65,6 +65,14 @@ settings:
   # The visualizer is a local, single-user tool; the sign-up flow is not wanted.
   TETHYS_PORTAL_CONFIG:
     ENABLE_OPEN_SIGNUP: false
+    # Open portal: Tethys's login_required decorator passes straight through, so the viewer
+    # and its endpoints are reachable without signing in. This is a local, single-purpose
+    # viewer of model output the user already has on disk, and a login screen in front of it
+    # is friction rather than protection. Django's own admin stays authenticated.
+    # Whoever can reach the port can also call removeModelRun, which unregisters a run --
+    # a database row only, never the run directory. Do not expose this port to a network
+    # you do not trust.
+    ENABLE_OPEN_PORTAL: true
     # Single-app mode: this image ships exactly one app, so the portal's app library and the
     # /apps/<name>/ prefix are pure overhead. The app is served at /, and Tethys sets
     # BYPASS_TETHYS_HOME_PAGE itself. The frontend reads its root from the template, which
