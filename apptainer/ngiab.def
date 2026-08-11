@@ -130,9 +130,11 @@ Stage: final
     chmod -R a+rX /opt/ngiab /opt/duckdb_extensions /config /opt/portal
 
     # The base image ships /home/tethys as 0700, which is right for a container that always
-    # runs as uid 1000 and wrong for an image that runs as whoever invoked it: Django's
-    # autoreloader globs a locale path under it and dies with EACCES before serving. The
-    # runscript keeps all writes out of here, so read access is all that is needed.
+    # runs as uid 1000 and wrong for an image that runs as whoever invoked it. This was
+    # load-bearing while DEBUG was true: Django's autoreloader globbed a locale path under
+    # here and died with EACCES before serving anything. DEBUG is false now, so it is
+    # defence in depth rather than a fix -- any other read under /home/tethys by an
+    # arbitrary uid would fail the same way. The runscript keeps all writes out of here.
     chmod -R a+rX /home/tethys
 
 %environment

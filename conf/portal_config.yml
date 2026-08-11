@@ -5,9 +5,8 @@
 # in deploy-time values (PORTAL_ALLOWED_HOSTS, and anything exported by the hooks in
 # /opt/portal/portal-config.d/).
 #
-# DEBUG drives serving mode in serve.sh: true runs the Django dev server with local static
-# serving, false runs uvicorn and requires publish-static.sh to have run (the entrypoint's
-# provision.sh does that).
+# DEBUG drives serving mode in serve.sh: false runs uvicorn, which is what ships. Static is
+# served by tethysapp.ngiab.static_urls, wired in through ADDITIONAL_URLPATTERNS below.
 
 version: 2.0
 name: NGIAB Visualizer
@@ -23,18 +22,13 @@ settings:
   INSTALLED_APPS:
     - tethysapp.ngiab
 
-  # NOTE: this is what makes static files work, and it is a deliberate trade.
-  #
-  # serve.sh branches on this: false runs uvicorn, true runs Django's dev server. The old
-  # image ran DEBUG false and let nginx serve /static/. There is no nginx under
-  # tethys-uvx, and with DEBUG false nothing serves static at all -- upstream expects a CDN
-  # (STORAGES.staticfiles -> S3) or a reverse proxy, neither of which exists in a
-  # single-container desktop launch.
-  #
-  # The visualizer binds to localhost for one user, so the dev server is adequate and
-  # tracebacks are arguably useful. For any hosted/multi-user deployment this should be
-  # false with whitenoise added (see docs) or a proxy in front.
-  DEBUG: true
+  # serve.sh branches on this: false runs uvicorn, true runs Django's dev server. False was
+  # not previously possible, because there is no nginx under tethys-uvx and upstream expects
+  # a CDN, so nothing answered /static/. tethysapp.ngiab.static_urls now does, which buys
+  # three things at once: `docker stop` no longer takes ten seconds waiting on the dev
+  # server's autoreloader, the server no longer restarts whenever a file is touched, and the
+  # Apptainer image no longer trips over the autoreloader globbing an unreadable path.
+  DEBUG: false
 
   # Declared explicitly rather than left to TETHYS_DB_NAME: the settings module does not
   # read that env var, so without this block Tethys falls back to its sqlite default at
@@ -79,3 +73,7 @@ settings:
     # reverses the url rather than assuming a prefix, so both modes work.
     MULTIPLE_APP_MODE: false
     STANDALONE_APP: ngiab
+    # Serves STATIC_ROOT now that DEBUG is false; see tethysapp/ngiab/static_urls.py for
+    # why this rather than whitenoise, and when to switch.
+    ADDITIONAL_URLPATTERNS:
+      - tethysapp.ngiab.static_urls.urlpatterns
