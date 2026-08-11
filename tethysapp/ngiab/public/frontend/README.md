@@ -5,8 +5,8 @@ Vanilla JS + native Web Components. No bundler, no build step. Served as-is by T
 pinned versions — see `DEPENDENCIES.md` — wired through the import map in
 `tethysapp/ngiab/templates/ngiab/index.html`.
 
-**This directory is hand-authored source and is tracked in git.** The legacy React app's
-webpack bundle goes to `../react-build/`, which stays gitignored until Phase 2 deletes it.
+**This directory is hand-authored source and is tracked in git.** The React app it replaced is
+gone; `git log -- reactapp` still has it if you ever need the reference implementation.
 
 Run the tests with `npm run test:frontend` (real Chromium via `@web/test-runner`).
 

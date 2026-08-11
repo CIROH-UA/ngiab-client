@@ -683,50 +683,8 @@ def getNexusList(model_id):
     return [id.split("_output")[0] for id in nexus_ids_list]
 
 
-def getNexusIDs(model_run_id):
-    """
-    Get a list of Nexus IDs.
-
-    Parameters:
-        app_workspace (str): The path to the application workspace.
-
-    Returns:
-        list: A list of dictionaries containing the Nexus IDs. Each dictionary has a 'value' and 'label' key.
-    """
-    output_base_file = get_base_output(model_run_id)
-    nexus_prefix = "nex-"
-    nexus_ids_list = _list_prefixed_output_files(output_base_file, nexus_prefix)
-    return [
-        {"value": id.split("_output")[0], "label": id.split("_output")[0]}
-        for id in nexus_ids_list
-    ]
 
 
-def get_usgs_from_ngen_id(model_run_id, nexus_id):
-    """Return the USGS gauge id for a map nexus id (e.g. ``nex-485431``), or None.
-
-    Reads the warehouse's ``location_crosswalks`` table. Warehouse unreachable →
-    returns None.
-    """
-    corrected = nexus_id.replace("nex-", "ngen-", 1) if nexus_id.startswith("nex-") else nexus_id
-    try:
-        reader = _open_warehouse()
-        if reader is None:
-            return None
-        with reader:
-            crosswalks = reader.list_crosswalks(secondary_prefix="ngen")
-    except TeehrWarehouseError as exc:
-        logger.info("get_usgs_from_ngen_id: warehouse unavailable (%s)", exc)
-        return None
-    for primary, secondary in crosswalks:
-        if secondary == corrected:
-            return primary
-    return None
-
-
-# Identity and time columns, not series anyone would plot. Matched case-insensitively because
-# troute writes 'Type' on a flat index and 'type' under a MultiIndex.
-_TROUTE_NON_VARIABLES = {"featureid", "type", "time", "current_time"}
 
 
 def get_troute_vars(df):

@@ -59,7 +59,6 @@ MODELS_RUNS_DIRECTORY="$HOME/ngiab_visualizer"
 # The portal database lives here so registered model runs survive `docker run --rm`.
 # The image ships a baked database and seeds it into this directory on first start.
 DB_DIRECTORY="$HOME/.ngiab_visualizer_db"
-DATASTREAM_DIRECTORY="$HOME/.datastream_ngiab"
 VISUALIZER_CONF="$MODELS_RUNS_DIRECTORY/ngiab_visualizer.json"
 TETHYS_PERSIST_PATH="/var/lib/tethys_persist"
 
@@ -452,7 +451,6 @@ wait_container_healthy() {
 
 run_tethys() {
     ensure_host_dir "$MODELS_RUNS_DIRECTORY"
-    ensure_host_dir "$DATASTREAM_DIRECTORY"
     ensure_host_dir "$DB_DIRECTORY"
     ensure_visualizer_conf_host_file "$VISUALIZER_CONF"
 
@@ -500,7 +498,6 @@ run_tethys() {
     ${DOCKER_CMD} run --rm -d \
         "${USERNS_ARGS[@]}" \
         -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer${VOLUME_SUFFIX}" \
-        -v "$DATASTREAM_DIRECTORY:$TETHYS_PERSIST_PATH/.datastream_ngiab${VOLUME_SUFFIX}" \
         -v "$DB_DIRECTORY:$TETHYS_PERSIST_PATH/db${VOLUME_SUFFIX}" \
         "${teehr_mount_args[@]}" \
         -p "$nginx_tethys_port:$CONTAINER_PORT" \
@@ -508,7 +505,6 @@ run_tethys() {
         --name "$TETHYS_CONTAINER_NAME" \
         --env MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
         --env MEDIA_URL="/media/" \
-        --env DATASTREAM_CONF="$TETHYS_PERSIST_PATH/.datastream_ngiab" \
         --env VISUALIZER_CONF="$TETHYS_PERSIST_PATH/ngiab_visualizer/ngiab_visualizer.json" \
         --env PORT="$CONTAINER_PORT" \
         --env PORTAL_ALLOWED_HOSTS="$PORTAL_ALLOWED_HOSTS" \
@@ -866,45 +862,6 @@ add_model_run() {
     fi
 }
 
-
-manage_datastream_cache() {
-    local cache_dir="$DATASTREAM_DIRECTORY"
-
-    # Make (or fix) the directory first
-    ensure_host_dir "$cache_dir" || {
-        echo -e "  ${CROSS_MARK} ${BRed}Cannot ready $cache_dir${Color_Off}"
-        return 1
-    }
-
-    # ─── Nothing inside?  Tell the user and bail out ───────────────────
-    if [ -z "$(ls -A "$cache_dir" 2>/dev/null)" ]; then
-        echo -e "  ${INFO_MARK} ${LGREEN}No existing Datastream cache found -" \
-                "a fresh download will be used.${Color_Off}"
-        return 0
-    fi
-
-    # ─── Cache exists → ask what to do ─────────────────────────────────
-    echo -e "  ${INFO_MARK} ${BYellow}Existing Datastream cache detected:${Color_Off} $cache_dir"
-    echo -e "  ${LBLUE}Keeping it avoids re-downloading archives, but a large cache"
-    echo -e "  can slow the first container start-up depending on your system.${Color_Off}\n"
-
-    while true; do
-        echo -ne "  ${ARROW} Keep cache (K) or Fresh start (F)? [K/F]: "
-        read -r answer < /dev/tty
-        case "$answer" in
-            [Kk]* )
-                echo -e "  ${CHECK_MARK} Keeping existing cache"
-                break ;;
-            [Ff]* )
-                echo -e "  ${INFO_MARK} ${BYellow}Clearing Datastream cache " \
-                        "(sudo may be required)...${Color_Off}"
-                rm -rf "${cache_dir:?}/"* 2>/dev/null || sudo rm -rf "${cache_dir:?}/"*
-                break ;;
-            * )
-                echo -e "  ${CROSS_MARK} ${BRed}Invalid choice. Please enter 'K' or 'F'.${Color_Off}" ;;
-        esac
-    done
-}
 # Print URLs ordered by reliability for the current engine.
 #
 # Under rootless Podman on WSL the Windows browser doesn't reliably route
@@ -958,7 +915,6 @@ pause_script_execution() {
     done
 }
 
-
 print_usage() {
     echo -e "${BYellow}Usage: ${BCyan}viewOnTethys.sh [arg ...]${Color_Off}"
     echo -e "${BYellow}Options:${Color_Off}"
@@ -971,7 +927,6 @@ print_usage() {
     echo -e "${BCyan}  -t [tag]:${Color_Off} Specifies which container image tag of the visualizer to run."
     echo -e "${BCyan}  -y:${Color_Off} Immediately requests to import a data directory."
 }
-
 
 # Pre-script execution
 while getopts 'd:hi:nprt:y' flag; do
@@ -1005,7 +960,6 @@ configure_container_engine
 if [ "$FLAGS_USED" == false ] && [ -n "$1" ]; then
     DATA_FOLDER_PATH="$1"
 fi
-
 
 # Main script execution
 $CLEAR_CONSOLE && clear
@@ -1079,9 +1033,6 @@ if [ -n "$DATA_FOLDER_PATH" ]; then
         exit 1
     }
 fi
-
-# Ask what to do with ~/.datastream_ngiab
-manage_datastream_cache
 
 print_section_header "LAUNCHING TETHYS VISUALIZATION"
 

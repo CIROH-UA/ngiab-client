@@ -6,8 +6,8 @@ class App(TethysAppBase):
     Tethys app class for Next Gen in a Box Visualizer.
     """
 
-    name = "NGIAB and DataStream Visualizer"
-    description = "This application helps to visualize the outputs of the model runs created by Next gen in a box and the DataStream"
+    name = "NGIAB Visualizer"
+    description = "Visualize the outputs of model runs created by NextGen In A Box"
     package = "ngiab"  # WARNING: Do not change this value
     index = "home"
     icon = f"{package}/images/icon.png"
