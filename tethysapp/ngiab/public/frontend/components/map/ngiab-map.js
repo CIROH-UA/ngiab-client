@@ -103,22 +103,32 @@ export class NgiabMap extends HTMLElement {
     map.on('click', (event) => this._handleClick(event));
 
     // 'idle' means tiles have settled, so this is when new divides join the nexus index and
-    // when features that arrived with those tiles need their frame's colour written.
+    // when features that arrived with those tiles need their frame's colour written. It is
+    // also the only event that fires with the style actually ready — see _ensureLayers.
     map.on('idle', () => {
+      this._ensureLayers();
       this._nexusIndex.reindex(map);
       this._choropleth.reapply();
     });
 
-    // setStyle() wipes our sources/layers; styledata can fire before the style is ready.
-    map.on('styledata', () => {
-      if (!map.isStyleLoaded()) return; // addSource throws while a style is loading
-      if (map.getSource(SRC_DIVIDES)) return;
-      installLayers(map, this._view);
-      refresh(map, this._view);
-    });
+    // Harmless today, but reinstalls sooner if a future version fires this when loaded.
+    map.on('styledata', () => this._ensureLayers());
 
     // Surface tile/source failures rather than leaving a silently empty map.
     map.on('error', (event) => console.error('[map] maplibre error', event.error ?? event));
+  }
+
+  // setStyle() wipes our sources and layers. Measured on maplibre 4.7.1: styledata fires
+  // three times per swap, every time with isStyleLoaded() false, and never again once the
+  // style is ready — so guarding a styledata handler on isStyleLoaded() never reinstalls
+  // anything. 'idle' is the event that fires with the style loaded. installLayers is
+  // idempotent, so calling this on every idle is cheap.
+  _ensureLayers() {
+    const map = this._map;
+    if (!map?.isStyleLoaded()) return; // addSource throws while a style is loading
+    if (map.getSource(SRC_DIVIDES)) return;
+    installLayers(map, this._view);
+    refresh(map, this._view);
   }
 
   _onStoreChange() {

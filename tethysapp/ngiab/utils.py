@@ -724,20 +724,23 @@ def get_usgs_from_ngen_id(model_run_id, nexus_id):
     return None
 
 
-def get_troute_vars(df):
-    # Check if the DataFrame has a MultiIndex
-    if isinstance(df.index, pd.MultiIndex):
-        # For multi-indexed DataFrame
-        list_variables = df.columns.tolist()  # All columns are variables
-    else:
-        # For flat-indexed DataFrame
-        list_variables = df.columns.tolist()[
-            3:
-        ]  # Skip the first three columns (featureID, Type, time)
+# Identity and time columns, not series anyone would plot. Matched case-insensitively because
+# troute writes 'Type' on a flat index and 'type' under a MultiIndex.
+_TROUTE_NON_VARIABLES = {"featureid", "type", "time", "current_time"}
 
-    # Format the variables for display
+
+def get_troute_vars(df):
+    """List the troute columns worth plotting.
+
+    Numeric dtype and an explicit name blocklist, rather than dropping the first three columns
+    positionally: that only worked on a flat index, so a MultiIndexed frame offered 'type' as
+    a variable and plotting it returned the string 'wb' at every timestep.
+    """
     variables = [
-        {"value": variable, "label": variable.lower()} for variable in list_variables
+        {"value": name, "label": str(name).lower()}
+        for name in df.columns.tolist()
+        if str(name).lower() not in _TROUTE_NON_VARIABLES
+        and pd.api.types.is_numeric_dtype(df[name])
     ]
     return variables
 

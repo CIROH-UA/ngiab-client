@@ -11,6 +11,7 @@ import {
   SRC_DIVIDES,
   SRC_FLOWPATHS,
   LAYER_DIVIDES,
+  installLayers,
 } from './layers.js';
 
 const view = (over = {}) => ({
@@ -102,5 +103,62 @@ describe('layer specs', () => {
     const hidden = view({ catchmentHidden: true });
     expect(catchmentsSpec(hidden).layout.visibility).to.equal('none');
     expect(catchmentHighlightSpec(hidden).layout.visibility).to.equal('none');
+  });
+});
+
+// Minimal stand-in for a MapLibre map: enough to observe what installLayers adds.
+function fakeMap() {
+  const sources = new Map();
+  const layers = new Map();
+  return {
+    sources,
+    layers,
+    addSource: (id, spec) => sources.set(id, spec),
+    getSource: (id) => sources.get(id),
+    addLayer: (spec) => layers.set(spec.id, spec),
+    getLayer: (id) => layers.get(id),
+    moveLayer: () => {},
+    setFilter: () => {},
+    setPaintProperty: () => {},
+    setLayoutProperty: () => {},
+    // What setStyle() does to everything we added.
+    wipeStyle() {
+      sources.clear();
+      layers.clear();
+    },
+  };
+}
+
+describe('installLayers', () => {
+  it('adds both sources and all three layers', () => {
+    const map = fakeMap();
+    installLayers(map, view());
+    expect([...map.sources.keys()].sort()).to.deep.equal([SRC_DIVIDES, SRC_FLOWPATHS].sort());
+    expect([...map.layers.keys()].sort()).to.deep.equal(
+      ['catchment-highlight', 'catchments-layer', 'flowpaths-layer'],
+    );
+  });
+
+  it('is idempotent, so calling it on every idle is safe', () => {
+    const map = fakeMap();
+    installLayers(map, view());
+    const first = map.layers.get('catchments-layer');
+    installLayers(map, view());
+    expect(map.layers.size).to.equal(3);
+    expect(map.layers.get('catchments-layer')).to.equal(first);
+  });
+
+  // The dark-mode regression: setStyle wipes everything, and the reinstall has to put it
+  // back. Guarding the reinstall on an event that never reports a loaded style left the map
+  // permanently empty after a theme swap.
+  it('restores everything after a style swap wipes it', () => {
+    const map = fakeMap();
+    installLayers(map, view());
+    map.wipeStyle();
+    expect(map.getSource(SRC_DIVIDES)).to.equal(undefined);
+
+    installLayers(map, view({ theme: 'dark' }));
+    expect(map.getSource(SRC_DIVIDES)).to.not.equal(undefined);
+    expect(map.layers.size).to.equal(3);
   });
 });

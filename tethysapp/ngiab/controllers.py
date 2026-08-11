@@ -4,6 +4,7 @@ import logging
 import pandas as pd
 import os
 import json
+import re
 import geopandas as gpd
 import duckdb
 from tethys_sdk.routing import controller
@@ -322,9 +323,23 @@ def getTrouteVariables(request):
 def getTrouteTimeSeries(request):
     model_run_id = request.GET.get("model_run_id")
     troute_id = request.GET.get("troute_id")
-    clean_troute_id = troute_id.split("-")[1]
-    variable_column = request.GET.get("troute_variable")
+
+    # Any digit run in the id: a bare '2863626' used to raise IndexError on split('-')[1].
+    match = re.search(r"\d+", troute_id or "")
+    if match is None:
+        return JsonResponse({"error": f"Not a usable troute id: {troute_id!r}"})
+    clean_troute_id = match.group()
+
     df = get_troute_df(model_run_id)
+
+    # The client omits a null variable on the first load, so the server picks one -- the same
+    # thing getCatchmentTimeSeries already does. Without this, variable_column stayed None and
+    # .title() below raised outside the try, turning a missing parameter into a 500.
+    available = [variable["value"] for variable in get_troute_vars(df)]
+    requested = request.GET.get("troute_variable")
+    variable_column = requested if requested in available else (available[0] if available else None)
+    if variable_column is None:
+        return JsonResponse({"error": "This model run has no plottable troute variables."})
 
     try:
         if isinstance(df.index, pd.MultiIndex):
@@ -361,6 +376,8 @@ def getTrouteTimeSeries(request):
                     "data": data,
                 }
             ],
+            "variable": variable_column,
+            "troute_variables": get_troute_vars(df),
             "layout": {
                 "yaxis": variable_column.title(),
                 "xaxis": "",
