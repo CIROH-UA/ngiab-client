@@ -274,25 +274,42 @@ class WarehouseReader:
         return [r[0] for r in rows]
 
     def list_location_pairs_for_run(self, config_name: str) -> List[tuple]:
-        """Return (primary_location_id, secondary_location_id) pairs with results for this run.
+        """Return (primary_location_id, secondary_location_id) pairs that can be compared.
+
+        Both sides are required. A simulation with no observation to compare against yields
+        no joined timeseries and no metrics, so reporting it as having TEEHR results sends
+        the user to a chart that can only say there is nothing here. Observed in the
+        gage-10154200 warehouse: three nexus have secondary timeseries, one gauge has
+        primary, so two of the three highlighted catchments were dead ends.
 
         Like ``list_usgs_locations_for_run`` but keeps the ngen side too, so a caller can
-        map map-geometry ids to USGS gauge ids. One catalog freeze and one query, so both
-        tables are read from the same Iceberg snapshot -- doing this as two separate reader
-        calls joined in Python would risk a concurrent teehr write bumping one table's
-        snapshot pointer between them.
+        map map-geometry ids to USGS gauge ids. One catalog freeze and one query, so every
+        table is read from the same Iceberg snapshot -- doing this as separate reader calls
+        joined in Python would risk a concurrent teehr write bumping one table's snapshot
+        pointer between them.
         """
         catalog = self._freeze_catalog()
         xwalk_loc = catalog.get("location_crosswalks")
         sec_loc = catalog.get("secondary_timeseries")
         if xwalk_loc is None or sec_loc is None:
             return []
+
+        prim_loc = catalog.get("primary_timeseries")
+        # Semi-joins rather than a join plus DISTINCT: these tables carry tens of thousands
+        # of rows per location, and the crosswalk only needs to know whether any exist.
+        observed = (
+            f" AND EXISTS (SELECT 1 FROM iceberg_scan('{prim_loc}') p "
+            f"             WHERE p.location_id = x.primary_location_id)"
+            if prim_loc
+            else ""
+        )
         rows = self._execute(
             f"SELECT DISTINCT x.primary_location_id, x.secondary_location_id "
             f"FROM iceberg_scan('{xwalk_loc}') x "
-            f"JOIN iceberg_scan('{sec_loc}') s "
-            f"  ON s.location_id = x.secondary_location_id "
-            f"WHERE s.configuration_name = ?",
+            f"WHERE EXISTS (SELECT 1 FROM iceberg_scan('{sec_loc}') s "
+            f"              WHERE s.location_id = x.secondary_location_id "
+            f"                AND s.configuration_name = ?)"
+            f"{observed}",
             [config_name],
         ).fetchall()
         return list(rows)
