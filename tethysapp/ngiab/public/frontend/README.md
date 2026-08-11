@@ -107,11 +107,22 @@ extra draw pass.
 
 Each of these produced a silently wrong result rather than an error.
 
-**`setStyle()` destroys every custom source and layer.** Reinstalling on
-`map.once('styledata')` is not enough: styledata fires several times per swap and the first
-can arrive before the style is ready, so the layers get added and then thrown away. The dark
-basemap rendered no catchments for exactly this reason. Watch every `styledata`, guard on
-`isStyleLoaded()` and a missing source, and reinstall — `installLayers` is idempotent.
+**`setStyle()` destroys every custom source and layer, and `styledata` is the wrong hook for
+putting them back.** Measured on maplibre 4.7.1 after a `setStyle`: `styledata` fires three
+times, **every one with `isStyleLoaded()` false**, and never again once the style is ready.
+`style.load` is not a public event in this build. So a `styledata` handler guarded on
+`isStyleLoaded()` returns early every single time and nothing is ever reinstalled — the map is
+permanently empty after a theme toggle. This broke dark mode twice: first by reinstalling too
+early on `once('styledata')`, then by adding the `isStyleLoaded()` guard that never passes.
+
+Reinstall from **`idle`**, which does fire with the style loaded. `installLayers` is
+idempotent, so calling it on every idle costs a couple of map lookups. Anything that depends on
+our sources existing — the nexus reindex, reapplying choropleth feature-state — belongs in the
+same handler, after the reinstall.
+
+A screenshot is not a verification of this. Assert on `getSource`, `getLayer` and
+`queryRenderedFeatures` before and after the swap; the tests in `layers.test.js` cover the
+install-after-wipe contract, and the event timing needs a real browser.
 
 **Layer-scoped listeners live on the map, not the style.** They survive `setStyle()`, so
 re-attaching after a swap silently accumulates duplicates. Attach hover once.
