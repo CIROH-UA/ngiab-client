@@ -248,8 +248,7 @@
   /* Narrow screens ---------------------------------------------------- */
   /* Below this width the 300px stack becomes a bottom sheet; see public/frontend/README.md. */
   @media (max-width: 640px) {
-    /* The canvas is shortened rather than covered, so MapLibre's own controls and the
-       attribution stay inside the visible map instead of drawing over the sheet. */
+    /* Shortened, not covered, so the attribution stays inside the visible map. */
     #map { bottom: 58%; }
 
     #map-ui {
