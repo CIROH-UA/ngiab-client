@@ -43,17 +43,13 @@ class Command(BaseCommand):
 
         delete_csv = options["delete_csv"]
         if delete_csv and not self._is_managed(run_path):
-            # Refuse rather than warn: this is the one irreversible step, and the whole
-            # safety property is that only the visualizer's own copy is ever modified.
+            # Refuse, not warn: only the visualizer's own copy may ever be modified.
             raise CommandError(
                 f"Refusing --delete-csv outside {MANAGED_ROOT}: {run_path} looks like an "
                 "original run directory, not the visualizer's copy."
             )
 
-        # Only catchment outputs. Nexus files are headerless (DuckDB names their columns
-        # column0/1/2), and nexus was dropped from the product, so converting them would
-        # produce parquet nothing reads while making the leftover data less legible. They
-        # are ~23 MB in total; not worth the risk for the saving.
+        # Catchment outputs only: nexus files are headerless and nothing reads them now.
         csvs = sorted(
             f for f in os.listdir(outputs) if f.startswith("cat-") and f.endswith(".csv")
         )
@@ -74,9 +70,7 @@ class Command(BaseCommand):
                 skipped += 1
             else:
                 try:
-                    # DuckDB rather than pandas.to_parquet: it is already a dependency (the
-                    # TEEHR reader uses it) and needs no pyarrow, which is not installed and
-                    # would be a sizeable addition for one conversion step.
+                    # DuckDB, not pandas.to_parquet: already a dependency, and no pyarrow.
                     con.execute(
                         f"COPY (SELECT * FROM read_csv_auto('{src}')) "
                         f"TO '{dst}' (FORMAT PARQUET, COMPRESSION {compression})"
@@ -87,18 +81,13 @@ class Command(BaseCommand):
                 converted += 1
 
             if delete_csv:
-                # Verify the parquet is readable and has the same row count before removing
-                # the only other copy. A truncated write that still "succeeded" would
-                # otherwise take the CSV with it.
+                # Prove it reads and matches before removing the only other copy.
                 try:
-                    # count(*) over parquet is answered from the footer statistics, so this
-                    # does not materialise 43k rows just to count them.
+                    # count(*) comes from the parquet footer; no rows are materialised.
                     rows_pq = con.execute(
                         f"SELECT count(*) FROM read_parquet('{dst}')"
                     ).fetchone()[0]
-                    # Counted with the SAME reader that wrote the parquet. A raw line
-                    # count is wrong for headerless files -- it subtracts a header that is
-                    # not there, and the mismatch silently blocks the delete.
+                    # Same reader that wrote it: a raw line count is wrong here.
                     rows_csv = con.execute(
                         f"SELECT count(*) FROM read_csv_auto('{src}')"
                     ).fetchone()[0]

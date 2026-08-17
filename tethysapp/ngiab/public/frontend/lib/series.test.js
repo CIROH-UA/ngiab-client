@@ -153,8 +153,7 @@ describe('toColumns', () => {
 });
 
 describe('toUplotData with mixed shapes', () => {
-  // troute and teehr still send {x, y}; the catchment endpoint sends columnar. Both must be
-  // unionable on time in one chart.
+  // troute and teehr still send {x, y} while the catchment endpoint sends columnar.
   it('unions a columnar series with an {x, y} series', () => {
     const { data, points } = toUplotData([
       { label: 'columnar', t0: 0, dt: 100, v: [1, 2] },

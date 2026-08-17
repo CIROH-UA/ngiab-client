@@ -73,12 +73,13 @@ pyproj.network.set_network_enabled(False)
 
 @controller
 def home(request):
-    """Controller for the app home page."""
-    # index.html loads the build-less vanilla frontend from public/frontend/ and injects
-    # runtime config into window.__NGIAB__, replacing the React build's compile-time
-    # TETHYS_APP_ROOT_URL substitution.
-    # reverse(), not a hardcoded "/apps/<root>/": under MULTIPLE_APP_MODE false the app is
-    # mounted at "/" instead, and every frontend endpoint is built from this value.
+    """Render the map page.
+
+    index.html loads the build-less vanilla frontend from public/frontend/ and injects the
+    runtime config into window.__NGIAB__, which replaces the React build's compile-time
+    TETHYS_APP_ROOT_URL substitution.
+    """
+    # reverse(), not "/apps/<root>/": MULTIPLE_APP_MODE false mounts the app at "/".
     context = {"app_root_url": reverse(f"{App.package}:{App.index}")}
     return App.render(request, "index.html", context)
 
@@ -125,11 +126,7 @@ def getCatchmentTimeSeries(request):
     variable_column = request.GET.get("variable_column")
     base_output_path = get_base_output(model_run_id)
 
-    # Prefers parquet, falls back to csv: viewOnTethys.sh converts a run's outputs at
-    # import, but runs registered before that still have csv only.
-    #
-    # The column list comes from metadata, then only the two columns actually plotted are
-    # read. On parquet that is the difference between scanning seventeen columns and two.
+    # Metadata first, so only the two columns actually plotted are read.
     all_columns = _read_output_columns(base_output_path, catchment_id)
     time_name = all_columns[1]
     list_variables = all_columns[2:]  # drop time step and time
@@ -140,10 +137,7 @@ def getCatchmentTimeSeries(request):
         base_output_path, catchment_id, columns=[time_name, selected], time_column=time_name
     )
 
-    # Columnar and thinned rather than one {x, y} object per timestep. A run here is 43849
-    # hourly points drawn on a canvas about a thousand pixels wide, so the object keys cost
-    # more than the numbers and most of the points cannot be told apart on screen.
-    # ?max_points=0 asks for the full series.
+    # Columnar and thinned; ?max_points=0 asks for the full series. See the frontend README.
     try:
         max_points = int(request.GET.get("max_points", _DEFAULT_MAX_POINTS))
     except (TypeError, ValueError):
@@ -260,9 +254,7 @@ def getTrouteTimeSeries(request):
 
     df = get_troute_df(model_run_id)
 
-    # The client omits a null variable on the first load, so the server picks one -- the same
-    # thing getCatchmentTimeSeries already does. Without this, variable_column stayed None and
-    # .title() below raised outside the try, turning a missing parameter into a 500.
+    # The client omits a null variable on first load, so the server picks one.
     available = [variable["value"] for variable in get_troute_vars(df)]
     requested = request.GET.get("troute_variable")
     variable_column = requested if requested in available else (available[0] if available else None)
@@ -351,19 +343,19 @@ def _teehr_variables_for(model_run_id):
 
 @controller
 def getTeehrTimeSeries(request):
-    # Inputs: model_run_id (the registered run), teehr_id (USGS gauge like
-    # "usgs-02464000"), teehr_variable ("<config>-<variable>" e.g.
-    # "ngen_ngiab-streamflow_hourly_inst"). The config coming from the
-    # dropdown is authoritative -- we don't re-derive it here.
+    """Observed and simulated series for one gauge, plus its metrics.
+
+    Takes model_run_id (the registered run), teehr_id (a USGS gauge such as
+    "usgs-02464000") and teehr_variable, which is "<configuration>-<variable>", for example
+    "ngen_ngiab-streamflow_hourly_inst".
+    """
     teehr_id = request.GET.get("teehr_id")
     model_run_id = request.GET.get("model_run_id")
 
     if not _teehr_warehouse_path():
         return _empty_ts_response(None, "TEEHR warehouse is not configured. See setup docs.", "info")
 
-    # The client omits a null variable on the first load, so the server picks one. Requiring
-    # the dropdown to be authoritative meant nothing ever plotted until the user chose, and
-    # the dropdown had nothing in it to choose from.
+    # The client omits a null variable on first load, so the server picks one.
     available = _teehr_variables_for(model_run_id)
     options = [entry["value"] for entry in available]
     requested = request.GET.get("teehr_variable")

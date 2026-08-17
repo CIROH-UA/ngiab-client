@@ -124,10 +124,7 @@ class NgiabTestCase(TethysTestCase):
         with context variables.
         """
 
-        # If all test functions were testing controllers or required a test client for another reason, the following
-        # 3 lines of code could be placed once in the set_up function. Note that in that case, each variable should be
-        # prepended with "self." (i.e. self.c = ...) to make those variables "global" to this test class and able to be
-        # used in each separate test function.
+        # Shared client setup could move to set_up if every test needed it.
         c = self.get_test_client()
         user = self.create_test_user(username="joe", password="secret", email="joe@some_site.com")
         c.force_login(user)

@@ -59,31 +59,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The project rule is single-line comments only, with anything longer living in
-      # public/frontend/README.md. This drifted back twice by hand, so it is checked here.
-      - name: No multi-line comments in the frontend
-        run: |
-          python - <<'PY'
-          import re, pathlib, sys
-          root = pathlib.Path('tethysapp/ngiab')
-          bad = []
-          targets = list((root / 'public/frontend').rglob('*.js'))
-          targets += list((root / 'public/frontend').rglob('*.css'))
-          targets += list((root / 'templates').rglob('*.html'))
-          for path in targets:
-              text = path.read_text()
-              for match in re.finditer(r'/\*.*?\*/|<!--.*?-->|\{#.*?#\}', text, re.S):
-                  if '\n' in match.group(0):
-                      bad.append(f"{path}:{text[:match.start()].count(chr(10)) + 1} block comment")
-              run = 0
-              for number, line in enumerate(text.splitlines(), 1):
-                  if line.strip().startswith('//'):
-                      run += 1
-                      continue
-                  if run > 1:
-                      bad.append(f"{path}:{number - 1} {run} consecutive // lines")
-                  run = 0
-          for entry in bad:
-              print(f"::error::{entry}")
-          sys.exit(1 if bad else 0)
-          PY
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Docstrings may be any length; an aside inside a function body may not. Enforced
+      # because it drifted back by hand twice.
+      - name: Comment style
+        run: python scripts/check-comment-style.py

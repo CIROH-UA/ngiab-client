@@ -193,8 +193,6 @@ def find_gpkg_file_path(model_run_id):
     model_path = _get_model_run_path_by_id(model_run_id)
     if model_path is not None:
         gpkg_model_run_path = _find_gpkg_file_path(model_path)
-        # breakpoint()
-        # gpkg_model_run_path = f'{model_path}/config/{file_name}'
     return gpkg_model_run_path
 
 
@@ -350,18 +348,17 @@ def _read_output_frame(directory, stem, columns=None, time_column=None):
 
     DuckDB rather than pd.read_parquet, which needs pyarrow: not installed, and a sizeable
     addition when duckdb is already a dependency for TEEHR.
+
+    ``time_column`` is cast to VARCHAR deliberately. Parquet stores it as a TIMESTAMP, and
+    without the cast the JSON encoder serialised 43k datetime objects rather than passing
+    strings through -- 54 ms against 9 ms, which wiped out the entire read saving and made
+    parquet slower end to end than csv. The cast also yields '2017-01-01 00:00:00', which is
+    byte-identical to the csv path, so the response shape does not change with the format.
     """
     path, suffix = _find_output_file(directory, stem)
 
     if suffix == ".parquet":
         # Quoted so column names containing spaces (e.g. "Time Step") survive.
-        #
-        # time_column is cast to VARCHAR deliberately. Parquet stores it as a TIMESTAMP, so
-        # without the cast the JSON encoder serialises 43k datetime objects instead of
-        # passing strings through -- measured at 54 ms against 9 ms, which wiped out the
-        # entire read saving and made parquet slower end to end than CSV. The cast also
-        # yields '2017-01-01 00:00:00', byte-identical to what the CSV path returns, so the
-        # response shape does not change with the storage format.
         selected = columns if columns else ["*"]
         parts = []
         for column in selected:
@@ -456,8 +453,7 @@ def _class_breaks(values):
     breaks = np.quantile(finite, quantiles)
     lowest = float(finite.min())
 
-    # A break at the minimum would leave the first class unreachable, since every value sorts
-    # above it. Dropping those keeps every class the legend draws a class that can occur.
+    # A break at the minimum leaves the first class unreachable, so drop those.
     unique = []
     for value in breaks:
         value = float(value)

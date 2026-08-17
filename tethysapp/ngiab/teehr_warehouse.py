@@ -117,9 +117,7 @@ class WarehouseReader:
         self._check_version()
         try:
             self._conn = duckdb.connect(":memory:")
-            # Point DuckDB at a shared, writable extension directory so LOAD
-            # does not try to create ~/.duckdb/ under an unwritable HOME.
-            # See DEFAULT_DUCKDB_HOME comment near the top of this module.
+            # A shared writable extension dir; see DEFAULT_DUCKDB_HOME above.
             duckdb_home = os.environ.get("DUCKDB_HOME", DEFAULT_DUCKDB_HOME)
             self._conn.execute(f"SET home_directory='{duckdb_home}'")
             self._conn.execute(f"SET extension_directory='{duckdb_home}'")
@@ -240,9 +238,7 @@ class WarehouseReader:
             f"ORDER BY configuration_name, variable_name",
             [config_name, "nwm30_retrospective"],
         ).fetchall()
-        # If the run's own configuration is absent, return [] so the frontend
-        # surfaces a "no evaluation for this run" hint rather than showing
-        # nwm30_retrospective alone (which has no simulation to compare against).
+        # Absent configuration returns [], so the frontend says "no evaluation".
         if not any(cfg == config_name for cfg, _ in rows):
             return []
         return [
@@ -276,8 +272,7 @@ class WarehouseReader:
             return []
 
         prim_loc = catalog.get("primary_timeseries")
-        # Semi-joins rather than a join plus DISTINCT: these tables carry tens of thousands
-        # of rows per location, and the crosswalk only needs to know whether any exist.
+        # Semi-joins, not a join plus DISTINCT: only existence matters here.
         observed = (
             f" AND EXISTS (SELECT 1 FROM iceberg_scan('{prim_loc}') p "
             f"             WHERE p.location_id = x.primary_location_id)"
@@ -385,14 +380,10 @@ class WarehouseReader:
         xwalk_loc = catalog.get("location_crosswalks")
         if pri_loc is None or sec_loc is None or xwalk_loc is None:
             return []
-        # Re-implementation of teehr/evaluation/views/joined_timeseries_view.py
-        # based on teehr 0.6.2. Tracked by the drift integration test.
+        # Re-implements teehr 0.6.2's joined_timeseries_view; the drift test tracks it.
         sql = (
             f"SELECT "
-            # strftime produces 'YYYY-MM-DD HH:MM:SS' that Plotly parses cleanly.
-            # CAST(TIMESTAMPTZ AS VARCHAR) appends a truncated tz offset like
-            # '-07' (not '-07:00'), which Plotly cannot parse and collapses
-            # the x-axis to today's date.
+            # strftime, not CAST AS VARCHAR: that appends an unparseable '-07' offset.
             f"  strftime(p.value_time, '%Y-%m-%d %H:%M:%S') AS value_time, "
             f"  p.value AS primary_value, "
             f"  s.value AS secondary_value "
