@@ -32,22 +32,66 @@ const toFiniteNumber = (y) => {
   return Number.isFinite(n) ? n : null;
 };
 
+// Three wire shapes reach this function, so they are flattened to (times, values) first:
+//   {data: [{x, y}]}      one object per point, from troute and teehr
+//   {t: [...], v: [...]}  columnar, when the time axis is irregular
+//   {t0, dt, n, v: [...]} columnar with the time axis implied, when it is regular
+// The last two exist because a run's chart is tens of thousands of points and the keys cost
+// more than the numbers; see the frontend README.
+export function toColumns(s) {
+  if (!s) return { times: [], values: [] };
+
+  if (Array.isArray(s.data)) {
+    const times = [];
+    const values = [];
+    for (const point of s.data) {
+      const t = toEpochSeconds(point?.x);
+      if (t === null) continue;
+      times.push(t);
+      values.push(toFiniteNumber(point?.y));
+    }
+    return { times, values };
+  }
+
+  const values = Array.isArray(s.v) ? s.v.map(toFiniteNumber) : [];
+  if (!values.length) return { times: [], values: [] };
+
+  if (Array.isArray(s.t)) {
+    const times = [];
+    const kept = [];
+    for (let i = 0; i < values.length && i < s.t.length; i += 1) {
+      const t = toEpochSeconds(s.t[i]);
+      if (t === null) continue;
+      times.push(t);
+      kept.push(values[i]);
+    }
+    return { times, values: kept };
+  }
+
+  const t0 = toEpochSeconds(s.t0);
+  const dt = Number(s.dt);
+  if (t0 === null || !Number.isFinite(dt) || dt <= 0) return { times: [], values: [] };
+  return { times: values.map((_, i) => t0 + i * dt), values };
+}
+
+const hasSeriesData = (s) => s && (Array.isArray(s.data) || Array.isArray(s.v));
+
 export function toUplotData(apiSeries) {
-  const series = Array.isArray(apiSeries) ? apiSeries.filter((s) => s && Array.isArray(s.data)) : [];
+  const series = Array.isArray(apiSeries) ? apiSeries.filter(hasSeriesData) : [];
   if (!series.length) return { data: [[]], labels: [], points: 0 };
 
   // Map of epoch-second -> per-series value, built in one pass.
   const byTime = new Map();
   series.forEach((s, seriesIndex) => {
-    for (const point of s.data) {
-      const t = toEpochSeconds(point?.x);
-      if (t === null) continue;
+    const { times, values } = toColumns(s);
+    for (let i = 0; i < times.length; i += 1) {
+      const t = times[i];
       let row = byTime.get(t);
       if (!row) {
         row = new Array(series.length).fill(null);
         byTime.set(t, row);
       }
-      row[seriesIndex] = toFiniteNumber(point?.y);
+      row[seriesIndex] = values[i];
     }
   });
 

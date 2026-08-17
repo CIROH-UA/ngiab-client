@@ -20,6 +20,9 @@ from .utils import (
     get_model_runs_selectable,
     get_catchment_variables,
     get_catchment_value_matrix,
+    build_series_payload,
+    to_epoch_seconds,
+    _DEFAULT_MAX_POINTS,
     _resolve_configuration_name,
     _detect_legacy_teehr_layout,
     _open_warehouse,
@@ -136,22 +139,26 @@ def getCatchmentTimeSeries(request):
     df = _read_output_frame(
         base_output_path, catchment_id, columns=[time_name, selected], time_column=time_name
     )
-    time_col = df[time_name]
-    second_col = df[selected]
 
-    data = [
-        {"x": time, "y": val}
-        for time, val in zip(time_col.tolist(), second_col.tolist())
-    ]
+    # Columnar and thinned rather than one {x, y} object per timestep. A run here is 43849
+    # hourly points drawn on a canvas about a thousand pixels wide, so the object keys cost
+    # more than the numbers and most of the points cannot be told apart on screen.
+    # ?max_points=0 asks for the full series.
+    try:
+        max_points = int(request.GET.get("max_points", _DEFAULT_MAX_POINTS))
+    except (TypeError, ValueError):
+        max_points = _DEFAULT_MAX_POINTS
+
+    series = build_series_payload(
+        to_epoch_seconds(df[time_name].tolist()),
+        df[selected].tolist(),
+        max_points=max_points,
+    )
+    series["label"] = f"{catchment_id}-{selected}"
 
     return JsonResponse(
         {
-            "data": [
-                {
-                    "label": f"{catchment_id}-{selected}",
-                    "data": data,
-                }
-            ],
+            "data": [series],
             "variables": [
                 {"value": variable, "label": variable.lower().replace("_", " ")}
                 for variable in list_variables

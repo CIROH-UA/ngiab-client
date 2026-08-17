@@ -603,6 +603,107 @@ def _build_value_matrix(directory, variable=None):
     }
 
 
+# A chart canvas is about a thousand pixels wide, so sending one point per model timestep
+# means roughly forty points per pixel. This is the default ceiling; ?max_points=0 asks for
+# the full series.
+_DEFAULT_MAX_POINTS = 2000
+
+
+def to_epoch_seconds(time_values):
+    """Parse a time column into a list of integer epoch seconds.
+
+    Cast to datetime64[s] rather than dividing the int64 by a hardcoded 10**9. The integer
+    a datetime64 casts to counts whatever unit the dtype happens to carry, and that is not
+    stable across versions: pandas 2 gave datetime64[ns] here, pandas 3 -- which is what the
+    image ships -- gives datetime64[us], so the same divisor produced timestamps a thousand
+    times too small and every chart plotted in January 1970.
+    """
+    parsed = pd.to_datetime(pd.Series(list(time_values)), errors="coerce")
+    seconds = parsed.astype("datetime64[s]").astype("int64")
+    return [None if pd.isna(v) else int(s) for v, s in zip(parsed, seconds)]
+
+
+def decimate_min_max(times, values, max_points=_DEFAULT_MAX_POINTS):
+    """Thin a series to at most ``max_points``, keeping each bucket's extremes.
+
+    Min/max per bucket rather than every nth point: dropping points at a fixed stride walks
+    straight past flood peaks, which on a hydrograph is the one feature nobody wants smoothed
+    away. Two points per bucket preserves the envelope the eye actually reads.
+
+    A bucket holding only gaps emits a single null, so a gap stays a gap rather than being
+    bridged by the line either side of it.
+    """
+    total = len(values)
+    if max_points <= 0 or total <= max_points:
+        return list(times), list(values), False
+
+    buckets = max(max_points // 2, 1)
+    out_times = []
+    out_values = []
+
+    for bucket in range(buckets):
+        low = bucket * total // buckets
+        high = (bucket + 1) * total // buckets
+        if low >= high:
+            continue
+
+        lowest = highest = None
+        for index in range(low, high):
+            value = values[index]
+            if value is None or value != value:  # None or NaN
+                continue
+            if lowest is None or value < values[lowest]:
+                lowest = index
+            if highest is None or value > values[highest]:
+                highest = index
+
+        if lowest is None:
+            out_times.append(times[low])
+            out_values.append(None)
+            continue
+
+        first, second = sorted((lowest, highest))
+        out_times.append(times[first])
+        out_values.append(values[first])
+        if second != first:
+            out_times.append(times[second])
+            out_values.append(values[second])
+
+    return out_times, out_values, True
+
+
+def implied_time_axis(times):
+    """Return {t0, dt, n} when the timestamps are evenly spaced, else None.
+
+    Model output is written on a fixed step, so the whole time column is usually derivable
+    from three numbers. Sending it as three numbers rather than tens of thousands of
+    timestamps is most of the payload.
+    """
+    if len(times) < 2 or any(t is None for t in times):
+        return None
+    step = times[1] - times[0]
+    if step <= 0:
+        return None
+    for index in range(2, len(times)):
+        if times[index] - times[index - 1] != step:
+            return None
+    return {"t0": times[0], "dt": step, "n": len(times)}
+
+
+def build_series_payload(times, values, max_points=_DEFAULT_MAX_POINTS):
+    """Shape one series for the wire: columnar, and with the time axis implied when it can be."""
+    times, values, decimated = decimate_min_max(times, values, max_points)
+    clean = [None if v is None or v != v else float(v) for v in values]
+
+    payload = {"v": clean, "decimated": decimated, "points": len(clean)}
+    axis = None if decimated else implied_time_axis(times)
+    if axis:
+        payload.update(axis)
+    else:
+        payload["t"] = times
+    return payload
+
+
 def gpkg_layer_bounds_4326(gpkg_path, layers=("divides", "nexus")):
     """Return [west, south, east, north] for the first readable layer, in EPSG:4326.
 

@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { toEpochSeconds, toUplotData } from './series.js';
+import { toEpochSeconds, toUplotData, toColumns } from './series.js';
 
 // Local-time epoch seconds, so assertions hold in any timezone.
 const localSeconds = (y, mo, d, h = 0, mi = 0, s = 0) =>
@@ -117,5 +117,52 @@ describe('toUplotData zero-coercion guards', () => {
     ]);
     // Only the genuine zero survives as zero.
     expect(out.data[1]).to.deep.equal([null, null, null, null, 0]);
+  });
+});
+
+describe('toColumns', () => {
+  it('reads the legacy {x, y} shape', () => {
+    const { times, values } = toColumns({ data: [{ x: '2017-01-01 00:00:00', y: 1.5 }] });
+    expect(values).to.deep.equal([1.5]);
+    expect(times).to.have.length(1);
+  });
+
+  it('reads explicit columnar arrays', () => {
+    const { times, values } = toColumns({ t: [100, 200, 300], v: [1, 2, 3] });
+    expect(times).to.deep.equal([100, 200, 300]);
+    expect(values).to.deep.equal([1, 2, 3]);
+  });
+
+  // Three numbers instead of a timestamp per point is most of the payload saving.
+  it('expands an implied time axis', () => {
+    const { times, values } = toColumns({ t0: 1000, dt: 60, v: [1, 2, 3] });
+    expect(times).to.deep.equal([1000, 1060, 1120]);
+    expect(values).to.deep.equal([1, 2, 3]);
+  });
+
+  // The Number(null) trap, one shape further along: a gap must survive as a gap.
+  it('keeps nulls as nulls rather than zero', () => {
+    const { values } = toColumns({ t0: 0, dt: 1, v: [1, null, 3] });
+    expect(values).to.deep.equal([1, null, 3]);
+  });
+
+  it('refuses a nonsensical implied axis instead of inventing times', () => {
+    expect(toColumns({ t0: 0, dt: 0, v: [1, 2] }).times).to.deep.equal([]);
+    expect(toColumns({ t0: 'nope', dt: 60, v: [1] }).times).to.deep.equal([]);
+  });
+});
+
+describe('toUplotData with mixed shapes', () => {
+  // troute and teehr still send {x, y}; the catchment endpoint sends columnar. Both must be
+  // unionable on time in one chart.
+  it('unions a columnar series with an {x, y} series', () => {
+    const { data, points } = toUplotData([
+      { label: 'columnar', t0: 0, dt: 100, v: [1, 2] },
+      { label: 'objects', data: [{ x: 100, y: 9 }] },
+    ]);
+    expect(points).to.equal(2);
+    expect(data[0]).to.deep.equal([0, 100]);
+    expect(data[1]).to.deep.equal([1, 2]);
+    expect(data[2]).to.deep.equal([null, 9]);
   });
 });
