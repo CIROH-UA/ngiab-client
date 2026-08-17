@@ -70,6 +70,25 @@ box in a projected crs does not shrink when the projection curves it.
 The extent is taken from `divides`, not `nexus`: the map draws catchment polygons, and framing
 on nexus points clipped the catchments at the edges of the basin.
 
+## getCatchmentTimeSeries
+
+A run here is 43,849 hourly points drawn on a canvas about a thousand pixels wide, so roughly
+forty points land on each pixel. The response is shaped for that:
+
+| | Size |
+|---|---|
+| One `{"x": "...", "y": n}` object per point | 1.71 MB |
+| Columnar, with `t0`/`dt`/`n` for a regular axis | 258 KB |
+| Decimated to ~2,000 points (the default) | 29.9 KB |
+
+`toColumns` in `lib/series.js` accepts all three shapes — `{data: [{x, y}]}`, `{t, v}` and
+`{t0, dt, n, v}` — so troute and TEEHR still send objects and everything unions onto one chart.
+
+Decimation is **min/max per bucket**, not every nth point: stride sampling walks straight past
+flood peaks, which on a hydrograph is the one feature nobody wants smoothed away. A bucket
+holding only gaps emits a single null, so a gap stays a gap. `?max_points=0` returns the full
+series; a decimated series carries explicit `t`, because its spacing is no longer regular.
+
 ## Choropleth and timeline
 
 `getCatchmentValueMatrix` returns one variable's values for every catchment at every timestep,
@@ -139,6 +158,13 @@ same handler, after the reinstall.
 A screenshot is not a verification of this. Assert on `getSource`, `getLayer` and
 `queryRenderedFeatures` before and after the swap; the tests in `layers.test.js` cover the
 install-after-wipe contract, and the event timing needs a real browser.
+
+**A datetime64 casts to whatever unit its dtype carries, and that changes between versions.**
+`to_epoch_seconds` divided the int64 by a hardcoded `10**9`, which assumes `datetime64[ns]`.
+The image ships pandas 3, which gives `datetime64[us]` here, so every timestamp came out a
+thousand times too small and the chart plotted January 1970. Local pandas 2 gave `[ns]` and
+hid it entirely — the container is the only place it reproduced. Cast to `datetime64[s]` and
+the unit stops mattering.
 
 **Layer-scoped listeners live on the map, not the style.** They survive `setStyle()`, so
 re-attaching after a swap silently accumulates duplicates. Attach hover once.
