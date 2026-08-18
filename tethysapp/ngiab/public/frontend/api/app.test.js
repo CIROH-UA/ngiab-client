@@ -173,6 +173,20 @@ describe('user-facing error messages', () => {
       },
     ));
 
+  // A shared ?model_run_id= link outlives the run it names; the panel has to say so rather
+  // than offer the retry that a generic 404 message implies.
+  it('shows the server sentence on a 404, not the generic status text', () =>
+    withStubbedFetch(
+      () => jsonResponse({ error: 'No such model run.' }, 404),
+      async () => {
+        let caught = null;
+        try { await appAPI.getGeoSpatialData({ model_run_id: 'gone' }); } catch (e) { caught = e; }
+        expect(caught).to.be.instanceOf(ApiError);
+        expect(caught.status).to.equal(404);
+        expect(caught.userMessage).to.equal('No such model run.');
+      },
+    ));
+
   // A traceback is a sentence-shaped trap: it would sail through a length check alone.
   it('refuses a traceback or HTML as a user message', () =>
     withStubbedFetch(

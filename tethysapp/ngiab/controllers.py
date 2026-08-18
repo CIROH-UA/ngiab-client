@@ -1,11 +1,14 @@
 from django.http import JsonResponse
 from django.core.exceptions import ValidationError
 from django.urls import reverse
+import functools
 import logging
 import pandas as pd
 import duckdb
 from tethys_sdk.routing import controller
 from .utils import (
+    UnknownModelRun,
+    model_run_exists,
     get_base_output,
     _read_output_frame,
     _read_output_columns,
@@ -74,6 +77,31 @@ import pyproj
 pyproj.network.set_network_enabled(False)
 
 
+def json_errors(view):
+    """Answer for a run that is not registered, rather than letting a path build from None.
+
+    A shared link outlives the run it names, and every data endpoint would otherwise raise
+    inside os.path.join and return a 500 the client can only describe as 'try again'.
+    """
+
+    @functools.wraps(view)
+    def wrapped(request, *args, **kwargs):
+        model_run_id = request.GET.get("model_run_id")
+
+        # Up front, so the warehouse-backed TEEHR endpoints answer like the rest.
+        if model_run_id and not model_run_exists(model_run_id):
+            logger.info("Request for unregistered model run: %s", model_run_id)
+            return JsonResponse({"error": "No such model run."}, status=404)
+
+        try:
+            return view(request, *args, **kwargs)
+        except UnknownModelRun:
+            logger.info("Model run went missing mid-request: %s", model_run_id)
+            return JsonResponse({"error": "No such model run."}, status=404)
+
+    return wrapped
+
+
 @controller
 def home(request):
     """Render the map page.
@@ -123,6 +151,7 @@ def removeModelRun(request):
 
 
 @controller
+@json_errors
 def getCatchmentTimeSeries(request):
     model_run_id = request.GET.get("model_run_id")
     catchment_id = request.GET.get("catchment_id")
@@ -172,6 +201,7 @@ def getCatchmentTimeSeries(request):
 
 
 @controller
+@json_errors
 def getCatchmentVariables(request):
     """Variables available to shade the map, for this run only."""
     model_run_id = request.GET.get("model_run_id")
@@ -181,6 +211,7 @@ def getCatchmentVariables(request):
 
 
 @controller
+@json_errors
 def getCatchmentValueMatrix(request):
     """Quantised per-catchment values over time, for the choropleth and timeline."""
     model_run_id = request.GET.get("model_run_id")
@@ -195,6 +226,7 @@ def getCatchmentValueMatrix(request):
 
 
 @controller
+@json_errors
 def getGeoSpatialData(request):
     """The catchment ids in this run, and the extent to frame the map on.
 
@@ -207,6 +239,8 @@ def getGeoSpatialData(request):
 
     try:
         gpkg_path = find_gpkg_file_path(model_run_id)
+    except UnknownModelRun:
+        raise
     except Exception:
         logger.exception("Could not locate a GeoPackage for %s", model_run_id)
         return JsonResponse({"error": "Failed to read GeoPackage file."})
@@ -236,6 +270,7 @@ def _troute_note(flowpath_id, divide_id, feature_id, variable):
 
 
 @controller
+@json_errors
 def getTrouteVariables(request):
     model_run_id = request.GET.get("model_run_id")
     feature_id = parse_troute_feature_id(request.GET.get("troute_id"))
@@ -254,6 +289,7 @@ def getTrouteVariables(request):
 
 
 @controller
+@json_errors
 def getTrouteTimeSeries(request):
     model_run_id = request.GET.get("model_run_id")
     troute_id = request.GET.get("troute_id")
@@ -362,6 +398,7 @@ def _teehr_variables_for(model_run_id):
 
 
 @controller
+@json_errors
 def getTeehrTimeSeries(request):
     """Observed and simulated series for one gauge, plus its metrics.
 
@@ -433,6 +470,7 @@ def _empty_variables_response(status_message, status_severity):
 
 
 @controller
+@json_errors
 def getTeehrVariables(request):
     model_run_id = request.GET.get("model_run_id")
 
@@ -488,6 +526,7 @@ def _empty_locations_response(status_message, status_severity):
 
 
 @controller
+@json_errors
 def getTeehrLocations(request):
     """Return the nexus/USGS pairs that actually have TEEHR results for this run.
 

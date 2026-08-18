@@ -179,7 +179,29 @@ def _find_gpkg_file_path(model_path):
             if file.endswith(".gpkg"):
                 gpkg_files.append(os.path.join(root, file))
 
-    return gpkg_files[0]
+    # A valid run whose config directory holds no gpkg is a real case, not an IndexError.
+    return gpkg_files[0] if gpkg_files else None
+
+class UnknownModelRun(Exception):
+    """Raised when a request names a model run that is not registered.
+
+    Kept separate from _get_model_run_path_by_id, which returns None on purpose: callers
+    like _detect_legacy_teehr_layout want 'not applicable', not a failure.
+    """
+
+
+def _require_model_run_path(model_run_id):
+    """The run's directory, or raise. Every path built from a run id goes through here."""
+    path = _get_model_run_path_by_id(model_run_id)
+    if path is None:
+        raise UnknownModelRun(model_run_id)
+    return path
+
+
+def model_run_exists(model_run_id):
+    """Whether a run id is registered. False for None, so a missing parameter is not a match."""
+    return model_run_id is not None and _get_model_run_path_by_id(model_run_id) is not None
+
 
 def _get_model_run_path_by_id(id):
     model_runs = _get_list_model_runs()
@@ -190,11 +212,7 @@ def _get_model_run_path_by_id(id):
     return None
 
 def find_gpkg_file_path(model_run_id):
-    gpkg_model_run_path = None
-    model_path = _get_model_run_path_by_id(model_run_id)
-    if model_path is not None:
-        gpkg_model_run_path = _find_gpkg_file_path(model_path)
-    return gpkg_model_run_path
+    return _find_gpkg_file_path(_require_model_run_path(model_run_id))
 
 
 
@@ -207,11 +225,8 @@ TROUTE_MISSING = -9999
 
 
 def _get_base_troute_output(model_id):
-    base_path = _get_model_run_path_by_id(model_id)    
-    base_output_path = os.path.join(
-        base_path, "outputs", "troute"
-    )
-    return base_output_path
+    base_path = _require_model_run_path(model_id)
+    return os.path.join(base_path, "outputs", "troute")
 
 
 def get_troute_df(model_id):
@@ -255,8 +270,7 @@ def get_troute_df(model_id):
 
 
 def get_base_output(model_id):
-    base_path = _get_model_run_path_by_id(model_id)
-    # print(base_path)
+    base_path = _require_model_run_path(model_id)
     output_relative_path = get_output_path(base_path).split("outputs")[-1]
     base_output_path = os.path.join(
         base_path, "outputs", output_relative_path.strip("/")
