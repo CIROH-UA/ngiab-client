@@ -14,7 +14,6 @@ import xarray as xr
 import pyogrio
 from pyproj import Transformer
 
-from django.core.exceptions import ValidationError
 
 from .teehr_warehouse import (
     TeehrWarehouseError,
@@ -43,9 +42,8 @@ def _resolve_configuration_name(model_run_id):
     """Resolve the teehr ``ngen_<stem>`` configuration name for this run.
 
     Precedence (see plan FR2):
-      1. ``teehr_configuration_name`` field in ``ngiab_visualizer.json`` (written by
-         ``viewOnTethys.sh`` from the producer's manifest). Authoritative - never
-         overruled by derivation.
+      1. The run's ``teehr_configuration_name`` column, captured at registration from
+         the producer's manifest. Authoritative - never overruled by derivation.
       2. Fallback: derive from the run's ``path`` basename using the same
          sanitization teehr applies, and validate against the warehouse
          ``configurations`` table.
@@ -94,67 +92,14 @@ def _open_warehouse():
         return None
     return WarehouseReader(path)
 
-def _get_conf_file():
-    home_path = os.environ.get("HOME", "/tmp")
-    conf_base_path = os.environ.get("VISUALIZER_CONF", f"{home_path}/ngiab_visualizer/ngiab_visualizer.json")
-    print(conf_base_path)
-    return conf_base_path
-
-def _import_runs_from_json_once():
-    """Copy any runs still living in ngiab_visualizer.json into the database.
-
-    Existing installs have their runs in that file, written by viewOnTethys.sh. Importing
-    lazily -- only when the table is empty -- means an upgrade keeps every registered run
-    without a migration step the user has to remember, and re-running is a no-op.
-
-    The file stays on disk untouched: it is still what the launcher writes when importing a
-    run into a container that is not running yet.
-    """
-    from .models import ModelRun
-
-    conf_file = _get_conf_file()
-    if not os.path.exists(conf_file):
-        return
-
-    try:
-        with open(conf_file, "r") as f:
-            data = json.load(f)
-    except (OSError, ValueError) as exc:
-        logger.warning("Could not read %s for import: %s", conf_file, exc)
-        return
-
-    for entry in data.get("model_runs", []):
-        run_id = entry.get("id")
-        if not run_id:
-            continue
-        # Preserve the existing id so links of the form ?model_run_id=<uuid> keep working.
-        try:
-            ModelRun.objects.get_or_create(
-                id=run_id,
-                defaults={
-                    "label": entry.get("label", ""),
-                    "path": entry.get("path", ""),
-                    "subset": entry.get("subset", "") or "",
-                    "tags": entry.get("tags", []) or [],
-                    "teehr_configuration_name": entry.get("teehr_configuration_name", "") or "",
-                },
-            )
-        except (ValueError, ValidationError) as exc:
-            # A non-UUID id in a hand-edited file must not take the whole import down.
-            logger.warning("Skipping model run %r during import: %s", run_id, exc)
-
-
 def _get_list_model_runs():
     """Return the registered model runs, in the shape callers already expect.
 
-    The database is now the source of truth. This keeps returning
-    ``{"model_runs": [...]}`` so every existing caller -- _get_model_run_path_by_id,
-    _resolve_configuration_name, get_model_runs_selectable -- works unchanged.
+    The database is the only registry. Keeps returning ``{"model_runs": [...]}`` so every
+    caller -- _get_model_run_path_by_id, _resolve_configuration_name,
+    get_model_runs_selectable -- works unchanged.
     """
     from .models import ModelRun
-
-    if not ModelRun.objects.exists():
-        _import_runs_from_json_once()
 
     return {"model_runs": [run.as_dict() for run in ModelRun.objects.all()]}
 

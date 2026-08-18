@@ -59,7 +59,6 @@ MODELS_RUNS_DIRECTORY="${MODELS_RUNS_DIRECTORY:-$HOME/ngiab_visualizer}"
 # The portal database lives here so registered model runs survive `docker run --rm`.
 # The image ships a baked database and seeds it into this directory on first start.
 DB_DIRECTORY="${DB_DIRECTORY:-$HOME/.ngiab_visualizer_db}"
-VISUALIZER_CONF="$MODELS_RUNS_DIRECTORY/ngiab_visualizer.json"
 TETHYS_PERSIST_PATH="/var/lib/tethys_persist"
 
 # TEEHR warehouse (shared across model runs). Persisted in a sibling config file
@@ -221,28 +220,6 @@ ensure_host_dir() {
 
     # Ensure the current user has rwx on the directory
     chmod u+rwx "$dir" || { echo "Could not set directory permissions on $dir"; return 1; }
-    return 0
-}
-
-ensure_visualizer_conf_host_file() {
-    local file="$1"
-    local dir
-    dir=$(dirname "$file")
-
-    # Make sure the directory exists and is writable by the user
-    if ! ensure_host_dir "$dir"; then
-        echo "Failed to ensure directory for config file"
-        return 1
-    fi
-
-    # Create the file if it doesn't exist, and initialize it
-    if [ ! -f "$file" ]; then
-        echo -e "${INFO_MARK} Creating configuration file ${BWhite}$file${Color_Off}..."
-        echo '{"model_runs":[]}' > "$file" || { echo "Could not create file $file"; return 1; }
-    fi
-
-    # Ensure the user can read/write the file
-    chmod u+rw "$file" || { echo "Could not set file permissions on $file"; return 1; }
     return 0
 }
 
@@ -480,7 +457,6 @@ wait_container_healthy() {
 run_tethys() {
     ensure_host_dir "$MODELS_RUNS_DIRECTORY"
     ensure_host_dir "$DB_DIRECTORY"
-    ensure_visualizer_conf_host_file "$VISUALIZER_CONF"
 
     echo -e "${ARROW} ${BWhite}Launching Tethys container...${Color_Off}"
 
@@ -533,7 +509,6 @@ run_tethys() {
         --name "$TETHYS_CONTAINER_NAME" \
         --env MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
         --env MEDIA_URL="/media/" \
-        --env VISUALIZER_CONF="$TETHYS_PERSIST_PATH/ngiab_visualizer/ngiab_visualizer.json" \
         --env PORT="$CONTAINER_PORT" \
         --env PORTAL_ALLOWED_HOSTS="$PORTAL_ALLOWED_HOSTS" \
         --env CSRF_TRUSTED_ORIGINS="$CSRF_TRUSTED_ORIGINS" \
@@ -665,7 +640,6 @@ copy_models_run() {
     local final_copied_path="$model_run_path"
 
     # 3. Copy / overwrite / duplicate - user-driven
-    overwrite_used=false # Message-passing for add_model_run()
     if [ ! -e "$model_run_path" ]; then
         cp -r "$input_path" "$models_dir/" || {
             echo -e "  ${CROSS_MARK} ${BRed}Copy failed${Color_Off}" >&2 ; return 1 ; }
@@ -681,7 +655,6 @@ copy_models_run() {
                     cp -r "$input_path" "$models_dir/" || {
                         echo -e "  ${CROSS_MARK} ${BRed}Overwrite failed${Color_Off}" >&2 ; return 1 ; }
                     echo -e "  ${CHECK_MARK} ${BCyan}Overwritten${Color_Off} ➜ $model_run_path" >&2
-                    overwrite_used=true
                     break ;;
                 [Dd]* )
                     echo -ne "  ${ARROW} ${BBlue}New directory name:${Color_Off} " >&2
@@ -738,21 +711,22 @@ convert_run_outputs() {
     fi
 }
 
-# Register the run in the portal database.
+# Register the run in the portal database, which is the only registry.
 #
-# The database is the source of truth now; ngiab_visualizer.json is still written above so
-# that an older image, or a fresh database seeded before this run existed, can still pick it
-# up. This runs in a one-shot container because the launcher has no Python environment of
-# its own -- and it mounts the same database directory the serving container uses, so the
-# row lands in the persistent copy rather than the image's baked one.
+# Runs in a one-shot container because the launcher has no Python environment of its own,
+# mounting the same database directory the serving container uses so the row lands in the
+# persistent copy rather than the image's baked one.
+#
+# A failure here is fatal: there is no file for the app to fall back to, so a run that does
+# not reach the database is a run the visualizer will never show.
 register_run_in_database() {
     local final_path="$1" base_name="$2" run_uuid="$3" teehr_cfg="$4"
 
     local image="${TETHYS_REPO}:${TETHYS_TAG:-latest}"
     if ! ${DOCKER_CMD} image inspect "$image" >/dev/null 2>&1; then
-        echo -e "  ${INFO_MARK} Image $image not present locally; skipping database registration."
-        echo -e "  ${INFO_MARK} It will be imported from ngiab_visualizer.json on first start."
-        return 0
+        echo -e "  ${CROSS_MARK} ${BRed}Image $image is not present locally, so the run cannot be registered.${Color_Off}"
+        echo -e "    ${INFO_MARK} ${BCyan}Pull it first, then re-run with -d to add this run.${Color_Off}"
+        return 1
     fi
 
     local teehr_args=()
@@ -763,37 +737,30 @@ register_run_in_database() {
         -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer${VOLUME_SUFFIX}" \
         -v "$DB_DIRECTORY:$TETHYS_PERSIST_PATH/db${VOLUME_SUFFIX}" \
         --env TETHYS_SECRET_KEY="${TETHYS_SECRET_KEY:-registration-only}" \
-        --env VISUALIZER_CONF="$TETHYS_PERSIST_PATH/ngiab_visualizer/ngiab_visualizer.json" \
         --entrypoint /usr/local/bin/ngiab-register.sh \
         "$image" \
         --path "$final_path" --label "$base_name" --id "$run_uuid" "${teehr_args[@]}" \
         >/dev/null 2>&1; then
-        echo -e "  ${CHECK_MARK} ${BCyan}Registered in the database.${Color_Off}"
+        echo -e "  ${CHECK_MARK} ${BCyan}Model run \"$base_name\" registered (${run_uuid}).${Color_Off}"
     else
-        echo -e "  ${WARNING_MARK} ${BYellow}Could not register in the database; it will be imported from JSON on first start.${Color_Off}"
+        echo -e "  ${CROSS_MARK} ${BRed}Could not register \"$base_name\" in the database.${Color_Off}"
+        return 1
     fi
 }
 
 add_model_run() {
     local input_path="$1"
-    local json_file="$VISUALIZER_CONF"
 
-    # ── 0. Make sure the JSON file exists ───────────────────────────────
-    echo -e "${BGreen}Checking for $json_file...${Color_Off}"
-    [[ -f "$json_file" ]] || echo '{"model_runs":[]}' > "$json_file"
-
-    # ── 1. Gather new-run metadata ──────────────────────────────────────
-    local base_name new_uuid current_time final_path teehr_config_name
+    # 1. Gather new-run metadata
+    local base_name new_uuid final_path teehr_config_name
     base_name=$(basename "$input_path")
     new_uuid=$(uuidgen)
-    current_time=$(date +"%Y-%m-%d:%H:%M:%S")
     final_path="/var/lib/tethys_persist/ngiab_visualizer/$base_name"
 
-    # Read teehr_configuration_name from the producer's manifest (if any).
-    # The manifest travels with the run directory through copy_models_run, so
-    # it's co-located at "$input_path/teehr_run_manifest.json". If absent or
-    # malformed, fall through with an empty value -- the backend's fallback
-    # derivation path will still resolve the config name at query time.
+    # Read teehr_configuration_name from the producer's manifest (if any). The manifest
+    # travels with the run directory through copy_models_run, so it is co-located at
+    # "$input_path/teehr_run_manifest.json". If absent or malformed, fall through with an
+    # empty value -- the backend's fallback derivation still resolves it at query time.
     teehr_config_name=""
     local manifest="$input_path/teehr_run_manifest.json"
     if [ -f "$manifest" ]; then
@@ -809,13 +776,12 @@ add_model_run() {
         fi
     fi
 
-    # When the producer manifest did not supply a value, derive one from the
-    # run folder basename. Must mirror the producer rule in
-    # ngiab-teehr/scripts/teehr_ngen.py exactly:
+    # When the producer manifest did not supply a value, derive one from the run folder
+    # basename. Must mirror the producer rule in ngiab-teehr/scripts/teehr_ngen.py exactly:
     #     "ngen_" + re.sub(r"[^a-zA-Z0-9_]", "_", basename).lower()
-    # See docs/brainstorms/2026-04-20-teehr-warehouse-compatibility-requirements.md
-    # (FR2) for the canonical rule; LC_ALL=C pins sed/tr to ASCII so the
-    # output matches the producer's ASCII-only regex byte-for-byte.
+    # See docs/brainstorms/2026-04-20-teehr-warehouse-compatibility-requirements.md (FR2)
+    # for the canonical rule; LC_ALL=C pins sed/tr to ASCII so the output matches the
+    # producer's ASCII-only regex byte-for-byte.
     if [ -z "$teehr_config_name" ]; then
         teehr_config_name="ngen_$(printf '%s' "$base_name" \
             | LC_ALL=C sed -E 's/[^a-zA-Z0-9_]/_/g' \
@@ -823,78 +789,11 @@ add_model_run() {
         echo -e "  ${INFO_MARK} Derived TEEHR configuration from run folder: ${BCyan}$teehr_config_name${Color_Off}"
     fi
 
-    # ── 2. Pick a jq implementation (host → docker → fail) ──────────────
-    local jq_exec
-    if command -v jq >/dev/null 2>&1; then
-        jq_exec="jq"
-    elif command -v docker >/dev/null 2>&1; then
-        local jq_image="ghcr.io/jqlang/jq:latest"
-        ${DOCKER_CMD} image inspect "$jq_image" >/dev/null 2>&1 || {
-            echo -e "  ${INFO_MARK} ${BYellow}Pulling jq helper image...${Color_Off}"
-            ${DOCKER_CMD} pull "$jq_image" >/dev/null
-        }
-        jq_exec="${DOCKER_CMD} run --rm -i $jq_image"
-    else
-        echo -e "  ${CROSS_MARK} ${BRed}jq is required, but neither jq nor Docker is available.${Color_Off}"
-        return 1
-    fi
-
-    # ── 3. If overwriting, discard the previous record ──────────────────
-    if [ ! $overwrite_used ] ; then
-        : # Nothing to do here
-    elif $jq_exec \
-        --arg base_name    "$base_name" \
-        --arg final_path   "$final_path" \
-        --arg current_time "$current_time" \
-        --arg uuid         "$new_uuid" \
-        '
-        del (
-            .model_runs[]
-          | select(.label == $base_name and .path == $final_path)
-        )
-        ' < "$json_file" > "${json_file}.tmp" && \
-       mv -f "${json_file}.tmp" "$json_file"; then
-        ## ► success message
-        echo -e "  ${CHECK_MARK} ${BCyan}Deregistered overwritten model runs from $json_file.${Color_Off}"
-    else
-        ## ► failure message
-        echo -e "  ${WARNING_MARK} ${BYellow}Failed to unregister overwritten model run from $json_file.${Color_Off}"
-        echo -e "    ${INFO_MARK} ${BCyan}This may result in duplicate model run listings, but is otherwise harmless.${Color_Off}"
-    fi
-
-    # ── 4. Append the new record ────────────────────────────────────────
-    # The teehr_configuration_name field is only included when non-empty so
-    # legacy entries (registered before the manifest flow existed) keep the
-    # exact same JSON shape they have today.
-    if $jq_exec \
-        --arg base_name    "$base_name" \
-        --arg final_path   "$final_path" \
-        --arg current_time "$current_time" \
-        --arg uuid         "$new_uuid" \
-        --arg teehr_cfg    "$teehr_config_name" \
-        '
-        .model_runs += [
-          ({
-            label:  $base_name,
-            path:   $final_path,
-            date:   $current_time,
-            id:     $uuid,
-            subset: "",
-            tags:   []
-          }
-          + ( if $teehr_cfg == "" then {} else {teehr_configuration_name: $teehr_cfg} end ))
-        ]
-        ' < "$json_file" > "${json_file}.tmp" && \
-       mv -f "${json_file}.tmp" "$json_file"; then
-        ## ► success message
-        echo -e "  ${CHECK_MARK} ${BCyan}Model run "$base_name" registered (${new_uuid})${Color_Off}"
-        convert_run_outputs "$final_path"
-        register_run_in_database "$final_path" "$base_name" "$new_uuid" "$teehr_config_name"
-    else
-        ## ► failure message
-        echo -e "  ${CROSS_MARK} ${BRed}Failed to update $json_file with new model run.${Color_Off}"
-        return 1
-    fi
+    # 2. Convert, then register. register_run is idempotent on --path, so an overwrite
+    #    updates the existing row instead of adding a duplicate; the old jq delete-then-append
+    #    dance the JSON registry needed is gone with it.
+    convert_run_outputs "$final_path"
+    register_run_in_database "$final_path" "$base_name" "$new_uuid" "$teehr_config_name" || return 1
 }
 
 # Print URLs ordered by reliability for the current engine.

@@ -1,8 +1,8 @@
 """Database models for the NGIAB visualizer.
 
-Model runs used to live in ``ngiab_visualizer.json`` on the host: a file the launcher
-wrote, the app only read, and a human had to hand-edit to fix. Storing them here makes the
-app the owner of its own registry, so runs can be added and removed from the UI.
+Model runs used to live in a JSON file on the host: one the launcher wrote, the app only
+read, and a human had to hand-edit to fix. The database is the only registry now, so the
+app owns it and runs can be added and removed from the UI.
 
 This works only because ``conf/portal_config.yml`` lists ``tethysapp.ngiab`` in
 INSTALLED_APPS. Tethys's own app discovery loads apps dynamically for routing and does not
@@ -18,8 +18,8 @@ from django.db import models
 class ModelRun(models.Model):
     """One registered NGIAB model run."""
 
-    # Kept as a UUID because the ids already in ngiab_visualizer.json are UUID strings, and
-    # existing links of the form ?model_run_id=<uuid> must keep working after the import.
+    # A UUID so a shared link of the form ?model_run_id=<uuid> stays stable, and so ids
+    # minted before the database existed keep working.
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
     label = models.CharField(max_length=255)
@@ -45,7 +45,7 @@ class ModelRun(models.Model):
         return f"{self.label} ({self.id})"
 
     def as_dict(self):
-        """Shape matching the old ngiab_visualizer.json entry, so readers need no changes."""
+        """The dict shape every reader already expects from the registry."""
         return {
             "label": self.label,
             "path": self.path,

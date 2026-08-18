@@ -1,8 +1,7 @@
 """Register (or remove) an NGIAB model run in the database.
 
-viewOnTethys.sh used to append an entry to ngiab_visualizer.json directly, which worked
-because the file lives on the host and the app only read it. Now that the database owns the
-registry, the launcher goes through this command in a one-shot container instead:
+The database is the only registry, so the launcher goes through this command in a one-shot
+container to add a run:
 
     docker run --rm <mounts> <image> \
         tethys manage register_run --path /var/lib/tethys_persist/ngiab_visualizer/<name> \
@@ -23,7 +22,8 @@ class Command(BaseCommand):
     help = "Register an NGIAB model run in the database."
 
     def add_arguments(self, parser):
-        parser.add_argument("--path", required=True, help="Run directory as seen inside the container")
+        # Not required here: --list takes no path, and argparse would refuse it first.
+        parser.add_argument("--path", help="Run directory as seen inside the container")
         parser.add_argument("--label", default=None, help="Display name (defaults to the directory name)")
         parser.add_argument("--id", default=None, help="Explicit UUID (defaults to a new one)")
         parser.add_argument("--subset", default="")
@@ -43,11 +43,8 @@ class Command(BaseCommand):
                 self.stdout.write(f"{run.id}\t{run.label}\t{run.path}")
             return
 
-        # Import first: a non-empty table stops the lazy import and hides older runs.
-        if not ModelRun.objects.exists():
-            from tethysapp.ngiab.utils import _import_runs_from_json_once
-
-            _import_runs_from_json_once()
+        if not options["path"]:
+            raise CommandError("--path is required unless --list is given")
 
         path = options["path"].rstrip("/")
 
