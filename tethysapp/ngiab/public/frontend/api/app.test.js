@@ -173,8 +173,7 @@ describe('user-facing error messages', () => {
       },
     ));
 
-  // A shared ?model_run_id= link outlives the run it names; the panel has to say so rather
-  // than offer the retry that a generic 404 message implies.
+  // The generic 404 text invites a retry that cannot work for an unregistered run.
   it('shows the server sentence on a 404, not the generic status text', () =>
     withStubbedFetch(
       () => jsonResponse({ error: 'No such model run.' }, 404),
