@@ -32,7 +32,7 @@ export class NgiabChart extends HTMLElement {
           <select id="chart-variable"></select>
         </label>
       </div>
-      <div class="chart-status" id="chart-status">Select a catchment on the map.</div>
+      <div class="chart-status" id="chart-status" role="status">Select a catchment on the map.</div>
       <div class="chart-body">
         <div class="chart-canvas" id="chart-canvas"></div>
         <div class="chart-metrics" id="chart-metrics" hidden></div>
@@ -69,7 +69,16 @@ export class NgiabChart extends HTMLElement {
 
 
   _onStoreChange() {
-    const { selection, teehrId } = store.get();
+    const { selection, teehrId, theme } = store.get();
+
+    // uPlot bakes colours in at construction, so a theme change repaints from the last data.
+    if (theme !== this._lastTheme) {
+      this._lastTheme = theme;
+      if (this._lastDraw) {
+        const { data, labels, layout } = this._lastDraw;
+        this._draw(data, labels, layout);
+      }
+    }
 
     // Refetch only on a real feature change; the store also fires for theme and layers.
     const key = `${selection.type}:${selection.id}:${teehrId}`;
@@ -235,11 +244,13 @@ export class NgiabChart extends HTMLElement {
   _draw(data, labels, layout) {
     this._destroyPlot();
 
-    const dark = store.get().theme === 'dark';
-    const stroke = dark ? '#e9ecef' : '#1b1b1b';
-    const palette = dark
-      ? ['#4dabf7', '#20c997', '#ffa94d']
-      : ['#1f78b4', '#33a02c', '#e31a1c'];
+    // Set after _destroyPlot, which clears it: a repaint must not wipe its own source.
+    this._lastDraw = { data, labels, layout };
+
+    const token = (name) => getComputedStyle(this).getPropertyValue(name).trim();
+    const stroke = token('--fg');
+    const grid = token('--grid');
+    const palette = [token('--series-1'), token('--series-2'), token('--series-3')];
 
     this._plot = new uPlot(
       {
@@ -248,8 +259,8 @@ export class NgiabChart extends HTMLElement {
         // uPlot's built-in cursor replaces the separate @visx tooltip component.
         cursor: { drag: { x: true, y: false } },
         axes: [
-          { stroke, grid: { show: true, stroke: dark ? '#333' : '#eee' } },
-          { stroke, label: layout?.yaxis || '', grid: { show: true, stroke: dark ? '#333' : '#eee' } },
+          { stroke, grid: { show: true, stroke: grid } },
+          { stroke, label: layout?.yaxis || '', grid: { show: true, stroke: grid } },
         ],
         series: [
           {},
@@ -286,6 +297,7 @@ export class NgiabChart extends HTMLElement {
   }
 
   _destroyPlot() {
+    this._lastDraw = null;
     if (this._plot) {
       this._plot.destroy();
       this._plot = null;

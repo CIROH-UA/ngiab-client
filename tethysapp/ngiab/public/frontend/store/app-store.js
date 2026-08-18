@@ -1,4 +1,5 @@
 import { createStore } from './store.js';
+import { applyTheme } from '../lib/theme.js';
 
 // The single app-wide store.
 export const store = createStore({
@@ -99,7 +100,11 @@ export const actions = {
   setTeehrVariable: (teehrVariable) => store.set({ teehrVariable }),
   setTrouteVariable: (trouteVariable) => store.set({ trouteVariable }),
 
-  setTheme: (theme) => store.set({ theme }),
+  // Attribute first: a subscriber reading CSS variables would otherwise be one theme behind.
+  setTheme(theme) {
+    applyTheme(theme);
+    store.set({ theme });
+  },
 
   // Layers is a nested object, so patch it whole rather than relying on the shallow merge.
   setLayer(name, value) {

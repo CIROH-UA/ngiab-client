@@ -6,12 +6,13 @@ import { userMessage } from '../lib/errors.js';
 export class NgiabModelRuns extends HTMLElement {
   connectedCallback() {
     this.innerHTML = `
-      <label class="runs-label" for="model-run-select">Model run</label>
+      <label class="field-label" for="model-run-select">Model run</label>
       <div class="runs-row">
         <select id="model-run-select"></select>
-        <button id="model-run-remove" type="button" title="Unregister this run">&times;</button>
+        <button id="model-run-remove" type="button" class="icon-button"
+                aria-label="Unregister this run" title="Unregister this run">&times;</button>
       </div>
-      <div class="runs-status" id="model-run-status"></div>
+      <div class="status" id="model-run-status" role="status"></div>
     `;
 
     this._selectEl = this.querySelector('#model-run-select');

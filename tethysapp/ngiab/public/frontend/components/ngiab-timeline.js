@@ -18,11 +18,11 @@ export class NgiabTimeline extends HTMLElement {
     ).join('');
 
     this.innerHTML = `
-      <button id="timeline-play" type="button" aria-label="Play">▶</button>
+      <button id="timeline-play" type="button" class="icon-button" aria-label="Play">&#9654;</button>
       <input id="timeline-range" type="range" min="0" max="0" value="0" step="1"
              aria-label="Timestep" />
-      <output id="timeline-stamp"></output>
-      <select id="timeline-speed" aria-label="Playback speed">${speedOptions}</select>
+      <output id="timeline-stamp" aria-live="off"></output>
+      <select id="timeline-speed" class="control" aria-label="Playback speed">${speedOptions}</select>
     `;
 
     this._playEl = this.querySelector('#timeline-play');
