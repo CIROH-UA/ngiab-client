@@ -58,6 +58,10 @@
   --warning: oklch(0.631 0.13 75);
 
   --selection: oklch(0.660 0.19 25);
+  --series-1: oklch(0.680 0.13 250);
+  --series-2: oklch(0.700 0.13 150);
+  --series-3: oklch(0.720 0.14 60);
+  --grid: oklch(0.310 0.010 250);
 
   --shadow-panel: 0 1px 2px oklch(0 0 0 / 0.40), 0 4px 14px oklch(0 0 0 / 0.45);
 }
