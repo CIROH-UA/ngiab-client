@@ -133,13 +133,7 @@
 
   /* Legend -------------------------------------------------------------- */
   /* Bottom-left, clear of the timeline and above MapLibre's attribution strip. */
-  #map-legend-panel {
-    position: absolute; z-index: 1;
-    left: 12px; bottom: 30px;
-    min-width: 168px; max-width: 232px;
-    padding: 9px 11px;
-    font: 12px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
-  }
+  #map-legend-section { font-size: 12px; }
   ngiab-legend { display: block; }
   .legend-title {
     font-weight: 600; margin-bottom: 5px;
@@ -205,9 +199,9 @@
 
   /* Timeline ----------------------------------------------------------- */
   #map-timeline {
-    position: absolute; z-index: 1; left: 50%; transform: translateX(-50%); bottom: 28px;
+    position: absolute; z-index: 1; bottom: 28px;
+    left: 324px; right: 12px; margin-inline: auto; max-width: 560px;
     display: flex; align-items: center; gap: 12px;
-    width: min(560px, calc(100% - 540px));
     padding: 6px 10px;
     background: var(--surface); color: var(--fg);
     border: 1px solid var(--border); border-radius: 10px;
@@ -319,9 +313,8 @@
        without crossing the map; on a phone the map still has to be the first thing seen. */
     #map-pane { flex: 0 0 auto; display: flex; flex-direction: column; }
     #map { order: 1; position: relative; inset: auto; height: 44vh; min-height: 240px; }
-    #map-legend-panel { order: 2; }
-    #map-timeline { order: 3; }
-    #map-ui { order: 4; }
+    #map-timeline { order: 2; }
+    #map-ui { order: 3; }
 
     /* Out of the overlay and into the flow. */
     #map-ui {
@@ -334,18 +327,11 @@
     .map-card { box-shadow: none; }
     #map-search-results { max-height: 200px; }
 
-    /* Too little map left to overlay it, so the legend joins the stack instead. */
-    #map-legend-panel {
-      position: static; max-width: none; margin: 10px 10px 0;
-      font-size: 11px; box-shadow: none;
-    }
-    #map-legend-panel ngiab-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; }
-
     /* Overlays the map slice only, never the content below it. */
     #map-empty { inset: 0 0 auto 0; height: 44vh; min-height: 240px; }
 
     #map-timeline {
-      position: static; transform: none; width: auto;
+      position: static; left: auto; right: auto; max-width: none;
       margin: 10px 10px 0; box-shadow: none;
     }
 
@@ -434,16 +420,15 @@
           <!-- role=status: loading and error text is announced without stealing focus. -->
           <div id="map-status" class="status" role="status">loading...</div>
         </div>
+
+        <div class="card-section" id="map-legend-section">
+          <h3 class="sr-only">Legend</h3>
+          <ngiab-legend id="map-legend"></ngiab-legend>
+        </div>
       </div>
     </section>
 
     <div id="map" role="application" aria-label="Catchment map"></div>
-
-    <!-- A legend belongs on the map it explains, and it was the tallest block in the stack. -->
-    <div id="map-legend-panel" class="map-card">
-      <h3 class="sr-only">Legend</h3>
-      <ngiab-legend id="map-legend"></ngiab-legend>
-    </div>
 
     <div id="map-empty" role="status" hidden>
       <div class="map-card empty-card">

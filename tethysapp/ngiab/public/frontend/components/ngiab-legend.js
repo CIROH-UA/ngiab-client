@@ -44,6 +44,12 @@ export class NgiabLegend extends HTMLElement {
     const low = entries.length ? legendLabel(entries[0]) : '';
     const high = entries.length > 1 ? legendLabel(entries[entries.length - 1]) : '';
 
+    // A variable that never varies produces one class, and "1 quantile classes" reads as a bug.
+    const note =
+      entries.length > 1
+        ? `${entries.length} quantile classes, this run only`
+        : 'constant across every catchment in this run';
+
     // No units: nothing in the run's config declares them, so inventing one would be a lie.
     this.innerHTML = `
       <div class="legend-title" title="${this._variable}">${this._variable}</div>
@@ -52,7 +58,7 @@ export class NgiabLegend extends HTMLElement {
         <span>${low}</span>
         <span>${high}</span>
       </div>
-      <div class="legend-note">${entries.length} quantile classes, this run only</div>
+      <div class="legend-note">${note}</div>
     `;
   }
 
