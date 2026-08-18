@@ -33,6 +33,7 @@ export class NgiabChart extends HTMLElement {
         </label>
       </div>
       <div class="chart-status" id="chart-status" role="status">Select a catchment on the map.</div>
+      <p class="chart-note" id="chart-note" hidden></p>
       <div class="chart-body">
         <div class="chart-canvas" id="chart-canvas"></div>
         <div class="chart-metrics" id="chart-metrics" hidden></div>
@@ -43,6 +44,7 @@ export class NgiabChart extends HTMLElement {
     this._variableEl = this.querySelector('#chart-variable');
     this._variableWrapEl = this.querySelector('.chart-variable');
     this._statusEl = this.querySelector('#chart-status');
+    this._noteEl = this.querySelector('#chart-note');
     this._canvasEl = this.querySelector('#chart-canvas');
     this._metricsEl = this.querySelector('#chart-metrics');
 
@@ -137,6 +139,7 @@ export class NgiabChart extends HTMLElement {
       console.error('[chart] fetch failed', error);
       this._destroyPlot();
       this._renderMetrics(null);
+      this._setNote(null);
       this._setStatus(userMessage(error), 'error');
     } finally {
       if (seq === this._requestSeq) this._setBusy(false);
@@ -170,7 +173,15 @@ export class NgiabChart extends HTMLElement {
   }
 
 
+  // What the series actually is, when that differs from what was clicked on the map.
+  _setNote(note) {
+    this._noteEl.textContent = note ?? '';
+    this._noteEl.hidden = !note;
+  }
+
   _renderPayload(payload) {
+    this._setNote(payload.note);
+
     // TEEHR reports 'cannot answer' as a status with a severity, not as an error.
     if (payload.teehr_status) {
       this._destroyPlot();

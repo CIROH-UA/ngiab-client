@@ -10,17 +10,11 @@
   },
   "author": "",
   "license": "ISC",
-  "dependencies": {},
   "devDependencies": {
     "@esm-bundle/chai": "^4.3.4-fix.0",
     "@web/test-runner": "^1.0.0",
     "@web/test-runner-puppeteer": "^1.0.1",
-    "eslint": "^8.16.0"
-  },
-  "size-limit": [
-    {
-      "path": "tethysapp/ngiab/public/react-build/main.js",
-      "limit": "10 kB"
-    }
-  ]
+    "eslint": "^8.16.0",
+    "uplot": "^1.6.32"
+  }
 }

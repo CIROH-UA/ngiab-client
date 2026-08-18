@@ -14,6 +14,8 @@ from .utils import (
     get_troute_vars,
     get_troute_df,
     parse_troute_feature_id,
+    describe_troute_feature,
+    troute_variable_note,
     TROUTE_MISSING,
     getCatchmentsList,
     find_gpkg_file_path,
@@ -220,6 +222,19 @@ def getGeoSpatialData(request):
     )
 
 
+def _troute_note(flowpath_id, divide_id, feature_id, variable):
+    """One line telling the reader that this chart is a channel, not the catchment polygon."""
+    if flowpath_id and divide_id:
+        sentence = f"Channel routing along flowpath {flowpath_id}, which drains {divide_id}."
+    elif flowpath_id:
+        sentence = f"Channel routing along flowpath {flowpath_id}."
+    else:
+        sentence = f"Channel routing at T-Route feature {feature_id}."
+
+    caveat = troute_variable_note(variable)
+    return f"{sentence} {caveat}" if caveat else sentence
+
+
 @controller
 def getTrouteVariables(request):
     model_run_id = request.GET.get("model_run_id")
@@ -283,18 +298,28 @@ def getTrouteTimeSeries(request):
         print(f"Error: {e}")
         data = []
 
+    flowpath_id, divide_id = describe_troute_feature(model_run_id, clean_troute_id)
+    series_label = f"{flowpath_id or troute_id} {variable_column}"
+
+    troute_variables = get_troute_vars(df)
+    axis_label = next(
+        (v["label"] for v in troute_variables if v["value"] == variable_column),
+        variable_column,
+    )
+
     return JsonResponse(
         {
             "data": [
                 {
-                    "label": f"{troute_id}-{variable_column}",
+                    "label": series_label,
                     "data": data,
                 }
             ],
             "variable": variable_column,
-            "troute_variables": get_troute_vars(df),
+            "troute_variables": troute_variables,
+            "note": _troute_note(flowpath_id, divide_id, clean_troute_id, variable_column),
             "layout": {
-                "yaxis": variable_column.title(),
+                "yaxis": axis_label,
                 "xaxis": "",
                 "title": "",
             },

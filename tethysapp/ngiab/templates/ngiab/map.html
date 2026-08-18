@@ -269,6 +269,12 @@
   .chart-variable { display: flex; align-items: center; gap: 8px; }
   .chart-variable[hidden] { display: none; }
   .chart-variable select { width: auto; min-width: 180px; }
+  /* Sits between the controls and the plot: read once, then ignored. */
+  .chart-note {
+    margin: 0 0 6px; color: var(--fg-muted); font-size: 12px; line-height: 1.45;
+  }
+  .chart-note[hidden] { display: none; }
+
   .chart-status { flex: 0 0 auto; padding: 4px 0; color: var(--fg-muted); }
   .chart-status[hidden] { display: none; }
   .chart-status[data-severity="error"] { color: var(--danger); }

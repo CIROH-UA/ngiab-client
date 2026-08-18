@@ -3,6 +3,7 @@ import json
 import re
 import math
 import functools
+import sqlite3
 import base64
 import logging
 import numpy as np
@@ -238,6 +239,9 @@ def get_troute_df(model_id):
                     # Read the NetCDF file and convert to a DataFrame
                     ds = xr.open_dataset(file_path)
                     df = ds.to_dataframe()
+                    df.attrs["variable_meta"] = {
+                        str(name): dict(ds[name].attrs) for name in ds.data_vars
+                    }
 
                 # A bare NaN is invalid JSON, so gaps travel as a sentinel and come back null.
                 df.fillna(TROUTE_MISSING, inplace=True)
@@ -782,20 +786,76 @@ def parse_troute_feature_id(troute_id):
     return int(match.group()) if match else None
 
 
+# T-Route writes CF units, which read badly in a picker. Anything not listed passes through
+# verbatim rather than being guessed at.
+_UNIT_LABELS = {"m3 s-1": "m\u00b3/s", "m s-1": "m/s"}
+
+# The one T-Route output that is not a model state. Left selectable, because someone tuning
+# assimilation wants it, but not silently ranked beside flow and depth.
+_TROUTE_VARIABLE_NOTES = {
+    "nudge": "Nudge is the data-assimilation adjustment applied to flow, not a routed state."
+}
+
+
+def troute_variable_note(variable):
+    """Return the caveat for a T-Route variable, or None when it needs no explaining."""
+    return _TROUTE_VARIABLE_NOTES.get(str(variable).lower())
+
+
 def get_troute_vars(df):
-    """List the troute columns worth plotting.
+    """List the troute columns worth plotting, labelled from the file's own metadata.
 
     Numeric dtype and an explicit name blocklist, rather than dropping the first three columns
     positionally: that only worked on a flat index, so a MultiIndexed frame offered 'type' as
     a variable and plotting it returned the string 'wb' at every timestep.
+
+    T-Route declares long_name and units per variable, so the labels are read rather than
+    invented: 'flow' becomes 'flow (m3/s)' and the bare 'nudge' becomes 'streamflow nudge
+    value'. A CSV run carries no such metadata and keeps the plain column name.
     """
-    variables = [
-        {"value": name, "label": str(name).lower()}
-        for name in df.columns.tolist()
-        if str(name).lower() not in _TROUTE_NON_VARIABLES
-        and pd.api.types.is_numeric_dtype(df[name])
-    ]
+    meta = df.attrs.get("variable_meta", {})
+
+    variables = []
+    for name in df.columns.tolist():
+        if str(name).lower() in _TROUTE_NON_VARIABLES:
+            continue
+        if not pd.api.types.is_numeric_dtype(df[name]):
+            continue
+
+        attrs = meta.get(str(name), {})
+        label = str(attrs.get("long_name") or name).lower()
+        units = attrs.get("units")
+        if units:
+            label = f"{label} ({_UNIT_LABELS.get(units, units)})"
+        variables.append({"value": name, "label": label})
+
     return variables
+
+
+@functools.lru_cache(maxsize=32)
+def describe_troute_feature(model_run_id, feature_id):
+    """Say what a T-Route feature id is, checked against the run's hydrofabric.
+
+    T-Route indexes by flowpath, while the map selects a divide, and this hydrofabric numbers
+    the two alike, so clicking cat-2863630 plots the channel wb-2863630. That is a convention
+    of the fabric rather than a guarantee, so the pairing is read out of the gpkg instead of
+    assumed. Returns (flowpath_id, divide_id), either of which may be None.
+    """
+    gpkg_path = find_gpkg_file_path(model_run_id)
+    if not gpkg_path:
+        return None, None
+
+    flowpath_id = f"wb-{feature_id}"
+    try:
+        with sqlite3.connect(f"file:{gpkg_path}?mode=ro", uri=True) as connection:
+            row = connection.execute(
+                "SELECT id, divide_id FROM flowpaths WHERE id = ?", (flowpath_id,)
+            ).fetchone()
+    except sqlite3.Error:
+        logger.warning("Could not read flowpaths from %s", gpkg_path)
+        return None, None
+
+    return (row[0], row[1]) if row else (None, None)
 
 
 def check_troute_id(df, id):
