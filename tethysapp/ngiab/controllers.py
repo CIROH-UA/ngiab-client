@@ -3,7 +3,6 @@ from django.core.exceptions import ValidationError
 from django.urls import reverse
 import logging
 import pandas as pd
-import re
 import duckdb
 from tethys_sdk.routing import controller
 from .utils import (
@@ -14,6 +13,8 @@ from .utils import (
     check_troute_id,
     get_troute_vars,
     get_troute_df,
+    parse_troute_feature_id,
+    TROUTE_MISSING,
     getCatchmentsList,
     find_gpkg_file_path,
     gpkg_layer_bounds_4326,
@@ -221,24 +222,20 @@ def getGeoSpatialData(request):
 
 @controller
 def getTrouteVariables(request):
-    vars = []
     model_run_id = request.GET.get("model_run_id")
-    troute_id = request.GET.get("troute_id")
-    clean_troute_id = troute_id.split("-")[1]
+    feature_id = parse_troute_feature_id(request.GET.get("troute_id"))
     df = get_troute_df(model_run_id)
 
-    if df is None:
-        vars = []
-    else:
-        try:
-            if check_troute_id(df, clean_troute_id):
-                vars = get_troute_vars(df)
-            else:
-                vars = []
-        except Exception:
-            vars = []
+    if df is None or feature_id is None:
+        return JsonResponse({"troute_variables": []})
 
-    return JsonResponse({"troute_variables": vars})
+    # Narrow, so a bug in here stops masquerading as a run without routing output.
+    try:
+        present = check_troute_id(df, feature_id)
+    except (KeyError, ValueError, TypeError):
+        present = False
+
+    return JsonResponse({"troute_variables": get_troute_vars(df) if present else []})
 
 
 @controller
@@ -246,11 +243,9 @@ def getTrouteTimeSeries(request):
     model_run_id = request.GET.get("model_run_id")
     troute_id = request.GET.get("troute_id")
 
-    # Any digit run in the id: a bare '2863626' used to raise IndexError on split('-')[1].
-    match = re.search(r"\d+", troute_id or "")
-    if match is None:
+    clean_troute_id = parse_troute_feature_id(troute_id)
+    if clean_troute_id is None:
         return JsonResponse({"error": f"Not a usable troute id: {troute_id!r}"})
-    clean_troute_id = match.group()
 
     df = get_troute_df(model_run_id)
 
@@ -264,11 +259,11 @@ def getTrouteTimeSeries(request):
     try:
         if isinstance(df.index, pd.MultiIndex):
             # Multi-indexed DataFrame: Slice using `feature_id` in the multi-index
-            df_sliced_by_id = df.xs(int(clean_troute_id), level="feature_id")
+            df_sliced_by_id = df.xs(clean_troute_id, level="feature_id")
             time_col = df_sliced_by_id.index.get_level_values("time")
         else:
             # Flat-indexed DataFrame: Filter using `featureID` column
-            df_sliced_by_id = df[df["featureID"] == int(clean_troute_id)]
+            df_sliced_by_id = df[df["featureID"] == clean_troute_id]
             time_col = df_sliced_by_id["current_time"]
 
         var_col = df_sliced_by_id[variable_column]
@@ -280,7 +275,7 @@ def getTrouteTimeSeries(request):
                     if isinstance(time, pd.Timestamp)
                     else str(time)
                 ),
-                "y": val,
+                "y": None if val is None or val == TROUTE_MISSING else val,
             }
             for time, val in zip(time_col.tolist(), var_col.tolist())
         ]

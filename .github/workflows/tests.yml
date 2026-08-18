@@ -43,6 +43,13 @@ jobs:
       - name: Byte-compile the app
         run: python -m compileall -q tethysapp/
 
+      # compileall accepts a name that does not exist anywhere, which is how a constant
+      # referenced but never defined reached a release and emptied the T-Route tab.
+      - name: Undefined names
+        run: |
+          pip install pyflakes
+          python -m pyflakes tethysapp/
+
       - name: Check for imports of removed modules
         run: |
           set -e

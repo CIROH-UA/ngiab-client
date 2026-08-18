@@ -201,6 +201,10 @@ def find_gpkg_file_path(model_run_id):
 
 
 
+# Stands in for NaN between reading the file and serialising the response.
+TROUTE_MISSING = -9999
+
+
 def _get_base_troute_output(model_id):
     base_path = _get_model_run_path_by_id(model_id)    
     base_output_path = os.path.join(
@@ -235,8 +239,8 @@ def get_troute_df(model_id):
                     ds = xr.open_dataset(file_path)
                     df = ds.to_dataframe()
 
-                # Replace NaN values with -9999
-                df.fillna(-9999, inplace=True)
+                # A bare NaN is invalid JSON, so gaps travel as a sentinel and come back null.
+                df.fillna(TROUTE_MISSING, inplace=True)
                 return df
             except Exception as e:
                 print(f"Error reading {file_type} file '{file_path}': {e}")
@@ -761,6 +765,21 @@ def getCatchmentsList(model_id):
 
 
 
+
+
+# Identifier and coordinate columns, not model output. `type` is excluded by dtype as well,
+# but a hydrofabric that wrote it as a code rather than 'wb' would slip through that check.
+_TROUTE_NON_VARIABLES = frozenset({"type", "time", "current_time", "feature_id", "featureid"})
+
+
+def parse_troute_feature_id(troute_id):
+    """Pull the numeric feature id out of 'cat-2863630', 'wb-2863630' or a bare '2863630'.
+
+    Returns None when there is no digit run to find, which the callers turn into a message
+    rather than the IndexError that splitting on '-' used to raise for a bare id.
+    """
+    match = re.search(r"\d+", str(troute_id or ""))
+    return int(match.group()) if match else None
 
 
 def get_troute_vars(df):
