@@ -116,7 +116,7 @@ export class NgiabChart extends HTMLElement {
 
     const seq = (this._requestSeq += 1);
     this._setBusy(true);
-    this._setStatus('Loading…');
+    this._setStatus('Loading...');
 
     try {
       const payload = await this._fetchSource({ selection, modelRunId, trouteId, teehrId });

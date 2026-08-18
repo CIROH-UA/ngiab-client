@@ -86,7 +86,7 @@ describe('legendLabel', () => {
   it('leaves the outer classes open-ended', () => {
     const entries = legendEntries([10, 20], 'light');
     expect(legendLabel(entries[0])).to.equal('< 10');
-    expect(legendLabel(entries[1])).to.equal('10 – 20');
+    expect(legendLabel(entries[1])).to.equal('10 - 20');
     expect(legendLabel(entries[2])).to.equal('≥ 20');
   });
 });

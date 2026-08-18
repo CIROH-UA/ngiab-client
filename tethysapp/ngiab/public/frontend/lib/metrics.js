@@ -24,7 +24,7 @@ export function configLabel(name) {
 }
 
 export function formatMetric(value) {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
   return value.toFixed(3);
 }
 

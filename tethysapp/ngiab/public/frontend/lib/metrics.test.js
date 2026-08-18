@@ -43,7 +43,7 @@ describe('formatMetric', () => {
   // An absent metric must be visibly absent, not rendered as 0.000.
   it('shows a dash for anything non-numeric', () => {
     for (const bad of [null, undefined, '', 'n/a', NaN, Infinity, {}]) {
-      expect(formatMetric(bad), String(bad)).to.equal('—');
+      expect(formatMetric(bad), String(bad)).to.equal('-');
     }
   });
 });
@@ -74,8 +74,8 @@ describe('toMetricsTable', () => {
       { metric: 'b', only_in_second: 2 },
     ]);
     expect(columns.map((c) => c.key)).to.deep.equal(['only_in_first', 'only_in_second']);
-    expect(rows[0].values).to.deep.equal(['1.000', '—']);
-    expect(rows[1].values).to.deep.equal(['—', '2.000']);
+    expect(rows[0].values).to.deep.equal(['1.000', '-']);
+    expect(rows[1].values).to.deep.equal(['-', '2.000']);
   });
 
   it('returns an empty table for empty or malformed input', () => {

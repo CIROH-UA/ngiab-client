@@ -43,7 +43,7 @@ def _resolve_configuration_name(model_run_id):
 
     Precedence (see plan FR2):
       1. ``teehr_configuration_name`` field in ``ngiab_visualizer.json`` (written by
-         ``viewOnTethys.sh`` from the producer's manifest). Authoritative — never
+         ``viewOnTethys.sh`` from the producer's manifest). Authoritative - never
          overruled by derivation.
       2. Fallback: derive from the run's ``path`` basename using the same
          sanitization teehr applies, and validate against the warehouse

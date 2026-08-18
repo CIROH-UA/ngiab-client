@@ -72,7 +72,7 @@ export function legendLabel(entry) {
   if (lower === undefined && upper === undefined) return 'all values';
   if (lower === undefined) return `< ${formatBreak(upper)}`;
   if (upper === undefined) return `≥ ${formatBreak(lower)}`;
-  return `${formatBreak(lower)} – ${formatBreak(upper)}`;
+  return `${formatBreak(lower)} - ${formatBreak(upper)}`;
 }
 
 // Read off the string: model time has no zone, so Date would shift every frame.
