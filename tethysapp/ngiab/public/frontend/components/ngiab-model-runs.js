@@ -45,12 +45,12 @@ export class NgiabModelRuns extends HTMLElement {
     } catch (error) {
       console.error('[model-runs] could not load', error);
       this._runs = [];
-      this._setStatus(`Could not load model runs. ${userMessage(error)}`, 'error');
+      this._setStatus(this._statusEl, `Could not load model runs. ${userMessage(error)}`, 'error');
       return;
     }
 
     if (!this._runs.length) {
-      this._setStatus('No model runs registered yet. Add one below.', 'warning');
+      this._setStatus(this._statusEl, 'No model runs registered yet. Add one below.', 'warning');
       this._selectEl.replaceChildren();
       this._selectEl.disabled = true;
       this._removeEl.disabled = true;
@@ -59,7 +59,7 @@ export class NgiabModelRuns extends HTMLElement {
 
     this._selectEl.disabled = false;
     this._removeEl.disabled = false;
-    this._setStatus('');
+    this._setStatus(this._statusEl, '');
 
     // Labels repeat across runs, so the id fragment keeps options distinguishable.
     this._selectEl.replaceChildren(
@@ -105,7 +105,7 @@ export class NgiabModelRuns extends HTMLElement {
       await appAPI.removeModelRun({ model_run_id: modelRunId });
     } catch (error) {
       console.error('[model-runs] remove failed', error);
-      this._setStatus(`Could not unregister that run. ${userMessage(error)}`, 'error');
+      this._setStatus(this._statusEl, `Could not unregister that run. ${userMessage(error)}`, 'error');
       this._removeEl.disabled = false;
       return;
     }
@@ -123,31 +123,26 @@ export class NgiabModelRuns extends HTMLElement {
   }
 
   async _scan() {
-    this._setImportStatus('Looking for runs...');
+    this._setStatus(this._importStatusEl, 'Looking for runs...');
     let candidates;
     try {
       ({ candidates } = await appAPI.scanModelRuns());
     } catch (error) {
       console.error('[model-runs] scan failed', error);
-      this._setImportStatus(`Could not look for runs. ${userMessage(error)}`, 'error');
+      this._setStatus(this._importStatusEl, `Could not look for runs. ${userMessage(error)}`, 'error');
       return;
     }
 
     this._candidatesEl.replaceChildren(...candidates.map((c) => this._candidateRow(c)));
-
-    if (!candidates.length) {
-      this._setImportStatus(
-        'Nothing in the visualizer directory yet. Copy a run into it, or use viewOnTethys.sh -d <path>.',
-        'info',
-      );
-    } else if (candidates.every((c) => c.registered)) {
-      this._setImportStatus('Everything here is already registered.', 'info');
-    } else {
-      this._setImportStatus('');
-    }
+    const addable = candidates.some((c) => c.importable && !c.registered);
+    this._setStatus(
+      this._importStatusEl,
+      addable ? '' : 'Nothing here to add. Copy a run into the visualizer directory first.',
+      'info',
+    );
   }
 
-  // Listed with the reason, not hidden: invisible is indistinguishable from a bug.
+  // Unusable directories are listed with the reason: invisible would read as a bug.
   _candidateRow(candidate) {
     const row = document.createElement('li');
     row.className = 'candidate';
@@ -155,43 +150,34 @@ export class NgiabModelRuns extends HTMLElement {
     const name = document.createElement('span');
     name.className = 'candidate-name';
     name.textContent = candidate.directory;
+    row.append(name);
 
-    const note = document.createElement('span');
-    note.className = 'candidate-note';
-
-    if (candidate.registered) {
-      note.textContent = 'already registered';
-      row.append(name, note);
+    if (candidate.registered || !candidate.importable) {
+      const note = document.createElement('span');
+      note.className = 'candidate-note';
+      note.textContent = candidate.registered ? 'already registered' : candidate.reason;
+      if (!candidate.registered) row.dataset.severity = 'warning';
+      row.append(note);
       return row;
     }
-
-    if (!candidate.importable) {
-      note.textContent = candidate.reason;
-      row.dataset.severity = 'warning';
-      row.append(name, note);
-      return row;
-    }
-
-    note.textContent = candidate.has_routing ? 'map, outputs, routing' : 'map, outputs';
 
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'icon-button';
     button.textContent = 'Add';
     button.addEventListener('click', () => this._register(candidate.directory, button));
-
-    row.append(name, note, button);
+    row.append(button);
     return row;
   }
 
   async _register(directory, button) {
     button.disabled = true;
-    this._setImportStatus(`Adding ${directory}...`);
+    this._setStatus(this._importStatusEl, `Adding ${directory}...`);
     try {
       await appAPI.registerModelRun({ directory });
     } catch (error) {
       console.error('[model-runs] register failed', error);
-      this._setImportStatus(`Could not add ${directory}. ${userMessage(error)}`, 'error');
+      this._setStatus(this._importStatusEl, `Could not add ${directory}. ${userMessage(error)}`, 'error');
       button.disabled = false;
       return;
     }
@@ -200,16 +186,10 @@ export class NgiabModelRuns extends HTMLElement {
     await this._scan();
   }
 
-  _setStatus(message, severity = null) {
-    this._statusEl.textContent = message;
-    this._statusEl.hidden = !message;
-    this._statusEl.dataset.severity = message && severity ? severity : '';
-  }
-
-  _setImportStatus(message, severity = null) {
-    this._importStatusEl.textContent = message;
-    this._importStatusEl.hidden = !message;
-    this._importStatusEl.dataset.severity = message && severity ? severity : '';
+  _setStatus(el, message, severity = null) {
+    el.textContent = message;
+    el.hidden = !message;
+    el.dataset.severity = message && severity ? severity : '';
   }
 }
 

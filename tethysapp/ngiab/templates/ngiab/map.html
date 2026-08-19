@@ -100,12 +100,11 @@
     font-weight: 600;
   }
 
-  .candidate-note { flex: 0 1 auto; color: var(--fg-subtle); font-size: 12px; }
-  .candidate[data-severity="warning"] .candidate-note { color: var(--warning); }
+  .candidate-note { color: var(--fg-subtle); font-size: 12px; }
 
-  /* Wraps under the name when the reason is a sentence rather than two words. */
+  /* A reason is a sentence, so it wraps under the name instead of squeezing beside it. */
   .candidate[data-severity="warning"] { flex-wrap: wrap; }
-  .candidate[data-severity="warning"] .candidate-note { flex-basis: 100%; }
+  .candidate[data-severity="warning"] .candidate-note { flex: 1 0 100%; color: var(--warning); }
 
   .candidate .icon-button { flex: 0 0 auto; min-width: 56px; }
 

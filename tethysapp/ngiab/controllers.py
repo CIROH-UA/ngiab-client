@@ -179,35 +179,31 @@ def registerModelRun(request):
     """Register one directory from the scan.
 
     Takes a bare directory name, never a path, so there is nothing for a caller to traverse
-    with; managed_run_path re-checks containment against the resolved root anyway.
+    with, and the name is resolved against the realpath of the managed root anyway.
     """
     from .models import ModelRun
 
     directory = (request.POST.get("directory") or "").strip()
-    run_path = managed_run_path(directory)
-    if run_path is None:
-        return JsonResponse({"error": "That is not a directory the visualizer manages."}, status=400)
 
+    # Resolves the name against the root itself, so an escaping name is simply not a directory.
     described = describe_importable_run(directory)
     if described is None:
         return JsonResponse({"error": f"No directory named {directory!r} to import."}, status=404)
     if not described["importable"]:
         return JsonResponse({"error": described["reason"]}, status=400)
 
-    label = (request.POST.get("label") or "").strip() or directory
+    run_path = managed_run_path(directory)
 
     # Idempotent on path, like register_run: a second import updates rather than duplicates.
     run, created = ModelRun.objects.update_or_create(
         path=run_path,
         defaults={
-            "label": label,
+            "label": directory,
             "teehr_configuration_name": teehr_name_from_manifest(run_path),
         },
     )
 
-    return JsonResponse(
-        {"model_run": {"value": str(run.id), "label": run.label}, "created": created}
-    )
+    return JsonResponse({"model_run_id": str(run.id), "created": created})
 
 
 @controller

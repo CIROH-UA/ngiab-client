@@ -106,16 +106,30 @@ async function handle(response, path) {
   return body;
 }
 
-export async function postJSON(path, params = {}) {
-  const url = new URL(path, getPortalHost());
+// One send for both verbs: the network-failure branch was copied between them.
+async function send(url, init, path) {
+  let response;
+  try {
+    response = await fetch(url, init);
+  } catch (cause) {
+    // Network-level failure: there is no response object to inspect.
+    throw new ApiError(`Network request to ${path} failed`, {
+      body: String(cause),
+      userMessage: 'Could not reach the server. Check your connection and try again.',
+    });
+  }
+  return handle(response, path);
+}
+
+export function postJSON(path, params = {}) {
   const form = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== '') form.set(key, value);
   }
 
-  let response;
-  try {
-    response = await fetch(url, {
+  return send(
+    new URL(path, getPortalHost()),
+    {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -124,18 +138,12 @@ export async function postJSON(path, params = {}) {
       },
       credentials: 'same-origin',
       body: form.toString(),
-    });
-  } catch (cause) {
-    throw new ApiError(`Network request to ${path} failed`, {
-      body: String(cause),
-      userMessage: 'Could not reach the server. Check your connection and try again.',
-    });
-  }
-
-  return handle(response, path);
+    },
+    path,
+  );
 }
 
-export async function getJSON(path, params = {}) {
+export function getJSON(path, params = {}) {
   const url = new URL(path, getPortalHost());
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== '') {
@@ -143,19 +151,5 @@ export async function getJSON(path, params = {}) {
     }
   }
 
-  let response;
-  try {
-    response = await fetch(url, {
-      headers: { Accept: 'application/json' },
-      credentials: 'same-origin',
-    });
-  } catch (cause) {
-    // Network-level failure: there is no response object to inspect.
-    throw new ApiError(`Network request to ${path} failed`, {
-      body: String(cause),
-      userMessage: 'Could not reach the server. Check your connection and try again.',
-    });
-  }
-
-  return handle(response, path);
+  return send(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' }, path);
 }

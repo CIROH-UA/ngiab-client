@@ -173,15 +173,6 @@ def _has_catchment_output(run_path):
         return False
 
 
-def _has_troute_output(run_path):
-    troute = os.path.join(run_path, "outputs", "troute")
-    try:
-        with os.scandir(troute) as entries:
-            return any(e.name.endswith((".nc", ".csv")) for e in entries)
-    except OSError:
-        return False
-
-
 def describe_importable_run(directory):
     """Report one candidate directory: what it has, and why it cannot be imported.
 
@@ -192,24 +183,14 @@ def describe_importable_run(directory):
     if run_path is None or not os.path.isdir(run_path):
         return None
 
-    has_map = _find_gpkg_file_path(run_path) is not None
-    has_outputs = _has_catchment_output(run_path)
-
-    if not has_map:
+    if _find_gpkg_file_path(run_path) is None:
         reason = "No GeoPackage in config/, so there is nothing to draw."
-    elif not has_outputs:
+    elif not _has_catchment_output(run_path):
         reason = "No catchment outputs in outputs/ngen/, so there is nothing to plot."
     else:
         reason = None
 
-    return {
-        "directory": directory,
-        "has_map": has_map,
-        "has_outputs": has_outputs,
-        "has_routing": _has_troute_output(run_path),
-        "importable": reason is None,
-        "reason": reason,
-    }
+    return {"directory": directory, "importable": reason is None, "reason": reason}
 
 
 def scan_importable_runs():
