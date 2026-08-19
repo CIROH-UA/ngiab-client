@@ -211,11 +211,20 @@ def registerModelRun(request):
 def getCatchmentTimeSeries(request):
     model_run_id = request.GET.get("model_run_id")
     catchment_id = request.GET.get("catchment_id")
+    if not catchment_id:
+        return JsonResponse({"error": "catchment_id is required."}, status=400)
+
     variable_column = request.GET.get("variable_column")
     base_output_path = get_base_output(model_run_id)
 
-    # Metadata first, so only the two columns actually plotted are read.
-    all_columns = _read_output_columns(base_output_path, catchment_id)
+    # catchment_id names a file on disk, so an id this run never wrote is a 404, not a 500.
+    try:
+        all_columns = _read_output_columns(base_output_path, catchment_id)
+    except FileNotFoundError:
+        return JsonResponse(
+            {"error": f"This run has no output for {catchment_id}."}, status=404
+        )
+
     time_name = all_columns[1]
     list_variables = all_columns[2:]  # drop time step and time
 
