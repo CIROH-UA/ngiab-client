@@ -1,7 +1,7 @@
 # NGIAB frontend
 
 Vanilla JS + native Web Components. No bundler, no build step. Served as-is by Tethys at
-`/static/ngiab/frontend/`, entry point `main.js`. Dependencies load from the `esm.sh` CDN at
+`/static/ngiab/frontend/`, entry point `map.js`. Dependencies load from the `esm.sh` CDN at
 pinned versions — see `DEPENDENCIES.md` — wired through the import map in
 `tethysapp/ngiab/templates/ngiab/index.html`.
 
