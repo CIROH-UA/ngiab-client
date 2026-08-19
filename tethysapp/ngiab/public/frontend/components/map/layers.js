@@ -75,9 +75,12 @@ export const catchmentFillColor = (view) =>
   view.choropleth ? choroplethFillColor(view) : teehrAware(view, TEEHR_FILL, PLAIN_FILL);
 export const flowPathsLineColor = (view) => teehrAware(view, TEEHR_LINE, PLAIN_LINE);
 
-// Choropleth mode stays visible far below zoom 11, where the default ramp fades out.
-export const catchmentFillOpacity = (view) =>
-  view.choropleth ? { stops: [[4, 0.85], [9, 0.9]] } : { stops: [[7, 0], [11, 1]] };
+// Visible at the zoom a run is framed at. The old default faded from nothing at zoom 7,
+// which is where "Zoom to run extent" lands a large basin: the Susquehanna run fits at 6.88
+// and drew nothing at all until the user zoomed in. Fading by zoom would make sense for the
+// whole national fabric, but this layer is filtered to one run's catchments, so there is no
+// mass to thin out -- which is why choropleth mode already had this exception.
+export const catchmentFillOpacity = () => ({ stops: [[4, 0.85], [9, 0.9]] });
 
 export const catchmentOutlineColor = (view) => {
   if (view.choropleth) return isDark(view) ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)';
@@ -94,7 +97,7 @@ export function catchmentsSpec(view) {
     paint: {
       'fill-color': catchmentFillColor(view),
       'fill-outline-color': catchmentOutlineColor(view),
-      'fill-opacity': catchmentFillOpacity(view),
+      'fill-opacity': catchmentFillOpacity(),
     },
     layout: visibility(view.catchmentHidden),
   };
@@ -126,6 +129,7 @@ export function flowPathsSpec(view) {
     paint: {
       'line-color': flowPathsLineColor(view),
       'line-width': { stops: [[7, 1], [10, 2]] },
+      // Unchanged: the tiles drop divide_id below zoom 8, so no opacity can reveal a run.
       'line-opacity': { stops: [[7, 0], [11, 1]] },
     },
   };
@@ -187,7 +191,7 @@ export function refresh(map, view) {
 
   setPaint('catchments-layer', 'fill-color', catchmentFillColor(view));
   setPaint('catchments-layer', 'fill-outline-color', catchmentOutlineColor(view));
-  setPaint('catchments-layer', 'fill-opacity', catchmentFillOpacity(view));
+  setPaint('catchments-layer', 'fill-opacity', catchmentFillOpacity());
   setPaint('flowpaths-layer', 'line-color', flowPathsLineColor(view));
 
   for (const id of CATCHMENT_LAYERS) {
