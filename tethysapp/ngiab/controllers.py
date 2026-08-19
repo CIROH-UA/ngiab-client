@@ -11,7 +11,6 @@ from tethys_sdk.routing import controller
 from .utils import (
     UnknownModelRun,
     model_run_exists,
-    managed_run_path,
     scan_importable_runs,
     describe_importable_run,
     teehr_name_from_manifest,
@@ -176,29 +175,27 @@ def scanModelRuns(request):
 @controller
 @require_POST
 def registerModelRun(request):
-    """Register one directory from the scan.
+    """Register one directory the scan offered.
 
-    Takes a bare directory name, never a path, so there is nothing for a caller to traverse
-    with, and the name is resolved against the realpath of the managed root anyway.
+    Takes the path the scan reported, and accepts it only if a fresh scan would report it
+    again, so the set of registerable directories is exactly the set on offer.
     """
     from .models import ModelRun
 
-    directory = (request.POST.get("directory") or "").strip()
+    run_path = (request.POST.get("path") or "").strip()
 
-    # Resolves the name against the root itself, so an escaping name is simply not a directory.
-    described = describe_importable_run(directory)
+    # Refused unless a fresh scan would offer this exact path; see the docstring.
+    described = describe_importable_run(run_path)
     if described is None:
-        return JsonResponse({"error": f"No directory named {directory!r} to import."}, status=404)
+        return JsonResponse({"error": "That is not a directory the visualizer offers."}, status=404)
     if not described["importable"]:
         return JsonResponse({"error": described["reason"]}, status=400)
-
-    run_path = managed_run_path(directory)
 
     # Idempotent on path, like register_run: a second import updates rather than duplicates.
     run, created = ModelRun.objects.update_or_create(
         path=run_path,
         defaults={
-            "label": directory,
+            "label": described["label"],
             "teehr_configuration_name": teehr_name_from_manifest(run_path),
         },
     )

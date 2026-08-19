@@ -135,12 +135,12 @@ describe('mutating endpoints', () => {
     withStubbedFetch(
       () => jsonResponse({ created: true }),
       async (calls) => {
-        await appAPI.registerModelRun({ directory: 'gage-10154200' });
+        await appAPI.registerModelRun({ path: '/runs/gage-10154200' });
         await appAPI.removeModelRun({ model_run_id: 'abc' });
 
         expect(calls.map((c) => c.init.method)).to.deep.equal(['POST', 'POST']);
-        expect(calls[0].url).to.not.contain('directory=');
-        expect(calls[0].init.body).to.contain('directory=gage-10154200');
+        expect(calls[0].url).to.not.contain('path=');
+        expect(calls[0].init.body).to.contain('path=%2Fruns%2Fgage-10154200');
         expect(calls[1].init.body).to.contain('model_run_id=abc');
       },
     ));
@@ -150,7 +150,7 @@ describe('mutating endpoints', () => {
     return withStubbedFetch(
       () => jsonResponse({ created: true }),
       async (calls) => {
-        await appAPI.registerModelRun({ directory: 'x' });
+        await appAPI.registerModelRun({ path: '/runs/x' });
         expect(calls[0].init.headers['X-CSRFToken']).to.equal('token-from-django');
       },
     );
@@ -159,12 +159,12 @@ describe('mutating endpoints', () => {
   // Failure has to read the same whichever verb produced it.
   it('reports a failed POST the way it reports a failed GET', () =>
     withStubbedFetch(
-      () => jsonResponse({ error: 'That is not a directory the visualizer manages.' }, 400),
+      () => jsonResponse({ error: 'That is not a directory the visualizer offers.' }, 400),
       async () => {
         let caught = null;
-        try { await appAPI.registerModelRun({ directory: '../etc' }); } catch (e) { caught = e; }
+        try { await appAPI.registerModelRun({ path: '/etc' }); } catch (e) { caught = e; }
         expect(caught.status).to.equal(400);
-        expect(caught.userMessage).to.equal('That is not a directory the visualizer manages.');
+        expect(caught.userMessage).to.equal('That is not a directory the visualizer offers.');
       },
     ));
 });

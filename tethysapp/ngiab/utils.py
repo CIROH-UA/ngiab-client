@@ -105,34 +105,54 @@ def _get_list_model_runs():
 
 
 def get_model_runs_selectable():
-    
-    model_runs = _get_list_model_runs()
+    """The run picker's options.
+
+    ``rescannable`` says whether the importer could offer this run again, so unregistering
+    it can warn when doing so cannot be undone from the interface.
+    """
     return [
         {
-            "value": model_run["id"], 
-            "label": model_run["label"]
+            "value": model_run["id"],
+            "label": model_run["label"],
+            "rescannable": is_scannable(model_run["path"]),
         }
-        for model_run in model_runs["model_runs"]
+        for model_run in _get_list_model_runs()["model_runs"]
     ]
 
-# The directory the visualizer manages: everything the importer may offer lives under it,
-# and nothing outside it is reachable by name.
+# Where the launcher copies runs to, and the importer's default place to look.
 MANAGED_ROOT = os.environ.get("NGIAB_MANAGED_ROOT", "/var/lib/tethys_persist/ngiab_visualizer")
 
 
-def managed_run_path(directory):
-    """Resolve a bare directory name under the managed root, or None if it escapes it.
+def scan_roots():
+    """Directories the importer offers runs from, outermost first.
 
-    realpath on both sides, so neither ``../..`` in the name nor a symlink planted inside
-    the root can name a directory outside it.
+    Defaults to the managed root, which is where viewOnTethys.sh puts runs. A deployment
+    that mounts runs somewhere else lists those places in NGIAB_SCAN_ROOTS, because a run
+    the importer cannot see is a run that unregistering removes for good.
     """
-    if not directory or os.sep in directory or directory in (".", ".."):
-        return None
+    declared = [r for r in os.environ.get("NGIAB_SCAN_ROOTS", "").split(os.pathsep) if r]
+    roots, seen = [], set()
+    for root in declared or [MANAGED_ROOT]:
+        real = os.path.realpath(root)
+        if real not in seen:
+            seen.add(real)
+            roots.append(root)
+    return roots
 
-    root = os.path.realpath(MANAGED_ROOT)
-    candidate = os.path.join(MANAGED_ROOT, directory)
-    resolved = os.path.realpath(candidate)
-    return candidate if resolved.startswith(root + os.sep) else None
+
+def is_scannable(path):
+    """Whether `path` sits directly inside one of the scan roots, symlinks resolved.
+
+    realpath on both sides, so neither ``..`` in a name nor a symlink planted inside a root
+    can name a directory outside every root.
+    """
+    if not path:
+        return False
+    real = os.path.realpath(path)
+    return any(
+        real != os.path.realpath(root) and real.startswith(os.path.realpath(root) + os.sep)
+        for root in scan_roots()
+    )
 
 
 def teehr_name_from_manifest(path):
@@ -169,14 +189,16 @@ def _has_catchment_output(run_path):
         return False
 
 
-def describe_importable_run(directory):
+def describe_importable_run(run_path):
     """Report one candidate directory: what it has, and why it cannot be imported.
 
     Reported rather than filtered out, because a directory the user can see on disk and
     cannot see in the importer is indistinguishable from a bug.
+
+    Returns None for anything outside the scan roots, so a caller passing a path of its own
+    learns only that it is not something to import.
     """
-    run_path = managed_run_path(directory)
-    if run_path is None or not os.path.isdir(run_path):
+    if not is_scannable(run_path) or not os.path.isdir(run_path):
         return None
 
     if _find_gpkg_file_path(run_path) is None:
@@ -186,11 +208,16 @@ def describe_importable_run(directory):
     else:
         reason = None
 
-    return {"directory": directory, "importable": reason is None, "reason": reason}
+    return {
+        "path": run_path,
+        "label": os.path.basename(run_path.rstrip(os.sep)),
+        "importable": reason is None,
+        "reason": reason,
+    }
 
 
 def scan_importable_runs():
-    """Every directory under the managed root, with the registered ones marked.
+    """Every directory inside the scan roots, with the registered ones marked.
 
     Registered is matched on the resolved path, so a run registered through a symlink is
     not offered a second time under its real name.
@@ -200,21 +227,20 @@ def scan_importable_runs():
     }
 
     candidates = []
-    try:
-        with os.scandir(MANAGED_ROOT) as entries:
-            names = sorted(e.name for e in entries if e.is_dir())
-    except OSError:
-        logger.warning("Managed root is not readable: %s", MANAGED_ROOT)
-        return []
-
-    for name in names:
-        described = describe_importable_run(name)
-        if described is None:
+    for root in scan_roots():
+        try:
+            with os.scandir(root) as entries:
+                names = sorted(e.name for e in entries if e.is_dir())
+        except OSError:
+            logger.warning("Scan root is not readable: %s", root)
             continue
-        described["registered"] = os.path.realpath(
-            os.path.join(MANAGED_ROOT, name)
-        ) in registered
-        candidates.append(described)
+
+        for name in names:
+            described = describe_importable_run(os.path.join(root, name))
+            if described is None:
+                continue
+            described["registered"] = os.path.realpath(described["path"]) in registered
+            candidates.append(described)
 
     return candidates
 

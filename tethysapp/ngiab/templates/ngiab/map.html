@@ -102,6 +102,12 @@
 
   .candidate-note { color: var(--fg-subtle); font-size: 12px; }
 
+  /* Only shown when two roots hold the same name; a path needs the full width. */
+  .candidate.is-ambiguous { flex-wrap: wrap; }
+  .candidate.is-ambiguous .candidate-note {
+    flex: 1 0 100%; word-break: break-all; font-variant-numeric: tabular-nums;
+  }
+
   /* A reason is a sentence, so it wraps under the name instead of squeezing beside it. */
   .candidate[data-severity="warning"] { flex-wrap: wrap; }
   .candidate[data-severity="warning"] .candidate-note { flex: 1 0 100%; color: var(--warning); }

@@ -52,7 +52,9 @@ a portal with the outputs on disk and nothing listed in the run picker.
 
 Runs are added from the UI. Copy the run directory into `~/ngiab_visualizer` (or let
 `./ViewOnTethys.sh -d <path>` copy it for you), then use **Add a run** in the model run
-card. It lists the directories the container can see and says which ones it can open, so
+card. To offer runs from somewhere else as well, mount those directories and list them in
+`NGIAB_SCAN_ROOTS` (colon-separated); the importer only ever offers what it can scan, so a
+run outside those roots can be unregistered but not added back from the interface. It lists the directories the container can see and says which ones it can open, so
 there is no path to type. Directories it cannot use are listed with the reason rather than
 hidden.
 

@@ -95,10 +95,15 @@ export class NgiabModelRuns extends HTMLElement {
 
     const run = this._runs.find((r) => r.value === modelRunId);
     const label = run ? run.label : modelRunId;
+
+    // "Add a run" only offers what it can scan; outside those roots this is the last chance.
+    const note = run && run.rescannable === false
+      ? 'It lives outside the directories the visualizer scans, so "Add a run" will not find '
+        + 'it again. Re-add it with: tethys manage register_run --path <path>'
+      : 'The run directory on disk is not deleted, and "Add a run" can register it again.';
+
     // Native confirm: destructive enough to prompt, too rare to justify a widget.
-    if (!window.confirm(`Unregister "${label}"?\n\nThe run directory on disk is not deleted.`)) {
-      return;
-    }
+    if (!window.confirm(`Unregister "${label}"?\n\n${note}`)) return;
 
     this._removeEl.disabled = true;
     try {
@@ -133,7 +138,13 @@ export class NgiabModelRuns extends HTMLElement {
       return;
     }
 
-    this._candidatesEl.replaceChildren(...candidates.map((c) => this._candidateRow(c)));
+    // Two roots can hold the same name, and identical rows say nothing about which is which.
+    const seen = new Map();
+    for (const c of candidates) seen.set(c.label, (seen.get(c.label) ?? 0) + 1);
+
+    this._candidatesEl.replaceChildren(
+      ...candidates.map((c) => this._candidateRow(c, seen.get(c.label) > 1)),
+    );
     const addable = candidates.some((c) => c.importable && !c.registered);
     this._setStatus(
       this._importStatusEl,
@@ -143,14 +154,23 @@ export class NgiabModelRuns extends HTMLElement {
   }
 
   // Unusable directories are listed with the reason: invisible would read as a bug.
-  _candidateRow(candidate) {
+  _candidateRow(candidate, ambiguous = false) {
     const row = document.createElement('li');
     row.className = 'candidate';
 
     const name = document.createElement('span');
     name.className = 'candidate-name';
-    name.textContent = candidate.directory;
+    name.textContent = candidate.label;
+    name.title = candidate.path;
     row.append(name);
+
+    if (ambiguous) {
+      const where = document.createElement('span');
+      where.className = 'candidate-note';
+      where.textContent = candidate.path;
+      row.classList.add('is-ambiguous');
+      row.append(where);
+    }
 
     if (candidate.registered || !candidate.importable) {
       const note = document.createElement('span');
@@ -165,19 +185,23 @@ export class NgiabModelRuns extends HTMLElement {
     button.type = 'button';
     button.className = 'icon-button';
     button.textContent = 'Add';
-    button.addEventListener('click', () => this._register(candidate.directory, button));
+    button.addEventListener('click', () => this._register(candidate, button));
     row.append(button);
     return row;
   }
 
-  async _register(directory, button) {
+  async _register(candidate, button) {
     button.disabled = true;
-    this._setStatus(this._importStatusEl, `Adding ${directory}...`);
+    this._setStatus(this._importStatusEl, `Adding ${candidate.label}...`);
     try {
-      await appAPI.registerModelRun({ directory });
+      await appAPI.registerModelRun({ path: candidate.path });
     } catch (error) {
       console.error('[model-runs] register failed', error);
-      this._setStatus(this._importStatusEl, `Could not add ${directory}. ${userMessage(error)}`, 'error');
+      this._setStatus(
+        this._importStatusEl,
+        `Could not add ${candidate.label}. ${userMessage(error)}`,
+        'error',
+      );
       button.disabled = false;
       return;
     }
