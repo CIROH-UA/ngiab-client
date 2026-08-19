@@ -290,12 +290,38 @@ export class NgiabChart extends HTMLElement {
 
     // Now that the legend exists, size the plot to what it actually left behind.
     this._resizePlot();
+
+    this._settleSize();
+  }
+
+  /**
+   * Re-measure until the plot matches the box that holds it.
+   *
+   * A theme repaint recreates the plot while the restyle is still in flight, so the height
+   * read at construction can be the 80px floor. One frame is not reliably enough -- the
+   * second toggle still landed short -- and nothing corrects it afterwards, because
+   * #chart-canvas keeps its flex height throughout and the ResizeObserver never fires.
+   */
+  _settleSize(attempts = 8) {
+    if (this._pendingResize) cancelAnimationFrame(this._pendingResize);
+
+    this._pendingResize = requestAnimationFrame(() => {
+      this._pendingResize = null;
+      if (!this._plot) return;
+
+      const target = this._plotHeight();
+      if (this._plot.height !== target) this._resizePlot();
+      if (attempts > 1 && this._plot.height !== target) this._settleSize(attempts - 1);
+    });
   }
 
   // uPlot sizes only the canvas, so the plot takes the height left after its legend.
   _plotHeight() {
     const total = this._canvasEl.clientHeight || 260;
-    const legend = this._plot?.root?.querySelector('.u-legend')?.offsetHeight ?? 0;
+    const measured = this._plot?.root?.querySelector('.u-legend')?.offsetHeight ?? 0;
+
+    // Measured mid-layout the legend reads 173px inside a 154px box; past half is not real.
+    const legend = measured < total / 2 ? measured : LEGEND_ROW;
     return Math.max(total - legend, 80);
   }
 
@@ -308,6 +334,10 @@ export class NgiabChart extends HTMLElement {
   }
 
   _destroyPlot() {
+    if (this._pendingResize) {
+      cancelAnimationFrame(this._pendingResize);
+      this._pendingResize = null;
+    }
     this._lastDraw = null;
     if (this._plot) {
       this._plot.destroy();
