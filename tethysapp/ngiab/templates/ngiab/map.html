@@ -82,6 +82,33 @@
   .status[data-severity="warning"] { color: var(--warning); }
 
   /* Model runs -------------------------------------------------------- */
+  /* Import list: rows of what is on disk, sized to be scanned rather than read. */
+  #model-run-add { width: 100%; margin-top: 10px; }
+  #model-run-import { margin-top: 8px; }
+  #model-run-candidates { margin: 0; padding: 0; list-style: none; }
+
+  .candidate {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 0;
+    border-top: 1px solid var(--border);
+  }
+  .candidate:first-child { border-top: 0; }
+
+  .candidate-name {
+    flex: 1 1 auto; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-weight: 600;
+  }
+
+  .candidate-note { flex: 0 1 auto; color: var(--fg-subtle); font-size: 12px; }
+  .candidate[data-severity="warning"] .candidate-note { color: var(--warning); }
+
+  /* Wraps under the name when the reason is a sentence rather than two words. */
+  .candidate[data-severity="warning"] { flex-wrap: wrap; }
+  .candidate[data-severity="warning"] .candidate-note { flex-basis: 100%; }
+
+  .candidate .icon-button { flex: 0 0 auto; min-width: 56px; }
+
   .runs-row { display: flex; gap: 8px; align-items: center; }
   .runs-row select { flex: 1 1 auto; min-width: 0; }
   #model-run-remove:hover:not(:disabled) { color: var(--danger); background: var(--surface-sunken); }

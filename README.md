@@ -50,10 +50,17 @@ Both directories have to be mounted for a run to persist. `ngiab_visualizer` hol
 data; `.ngiab_visualizer_db` holds the rows that point at it. Mounting only the first gives
 a portal with the outputs on disk and nothing listed in the run picker.
 
-List what is registered:
+Adding a run is easiest from the UI: copy the run directory into `~/ngiab_visualizer`, then
+use **Add a run** in the model run card. It lists the directories the container can see and
+says which ones it can open, so there is no path to type. Directories it cannot use are
+listed with the reason rather than hidden.
+
+From a shell, the same thing:
 
 ```bash
 docker exec tethys-ngen-portal tethys manage register_run --list
+docker exec tethys-ngen-portal \
+  tethys manage register_run --path /var/lib/tethys_persist/ngiab_visualizer/<name>
 ```
 
 The path `/var/lib/tethys_persist/` belongs to the `$HOME` env variable of the container running the visualizer. When the user runs the `./ViewOnTethys.sh`, it mounts the directory from the host at `~/ngiab_visualizer` to `/var/lib/tethys_persist/ngiab_visualizer`. 

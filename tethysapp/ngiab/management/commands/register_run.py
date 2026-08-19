@@ -11,11 +11,12 @@ Idempotent on ``--path``: re-registering the same directory updates the existing
 than accumulating duplicates, so re-running the launcher is safe.
 """
 
-import json
 import os
 import uuid
 
 from django.core.management.base import BaseCommand, CommandError
+
+from tethysapp.ngiab.utils import teehr_name_from_manifest
 
 
 class Command(BaseCommand):
@@ -57,7 +58,7 @@ class Command(BaseCommand):
 
         teehr_name = options["teehr_configuration_name"]
         if teehr_name is None:
-            teehr_name = self._teehr_name_from_manifest(path)
+            teehr_name = teehr_name_from_manifest(path)
 
         run_id = options["id"]
         if run_id:
@@ -80,19 +81,3 @@ class Command(BaseCommand):
         verb = "Registered" if created else "Updated"
         self.stdout.write(self.style.SUCCESS(f"{verb} {run.label} ({run.id})"))
         self.stdout.write(str(run.id))
-
-    @staticmethod
-    def _teehr_name_from_manifest(path):
-        """Read the producer's authoritative configuration name, if it travelled with the run.
-
-        _resolve_configuration_name can derive this from the directory name, but a persisted
-        value from the manifest always wins, so it is captured at registration time.
-        """
-        manifest = os.path.join(path, "teehr_run_manifest.json")
-        if not os.path.exists(manifest):
-            return ""
-        try:
-            with open(manifest, "r") as f:
-                return json.load(f).get("configuration_name", "") or ""
-        except (OSError, ValueError):
-            return ""

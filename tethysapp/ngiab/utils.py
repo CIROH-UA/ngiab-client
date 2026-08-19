@@ -115,6 +115,133 @@ def get_model_runs_selectable():
         for model_run in model_runs["model_runs"]
     ]
 
+# The directory the visualizer manages: everything the importer may offer lives under it,
+# and nothing outside it is reachable by name. Shared with the convert_outputs command.
+MANAGED_ROOT = os.environ.get("NGIAB_MANAGED_ROOT", "/var/lib/tethys_persist/ngiab_visualizer")
+
+
+def is_managed_path(path):
+    """Whether `path` is the managed root or lives inside it, symlinks resolved.
+
+    realpath on both sides, so neither ``../..`` in a name nor a symlink planted inside the
+    root can name a directory outside it.
+    """
+    root = os.path.realpath(MANAGED_ROOT)
+    target = os.path.realpath(path)
+    return target == root or target.startswith(root + os.sep)
+
+
+def managed_run_path(directory):
+    """Resolve a bare directory name under the managed root, or None if it escapes it."""
+    if not directory or os.sep in directory or directory in (".", ".."):
+        return None
+    candidate = os.path.join(MANAGED_ROOT, directory)
+    return candidate if is_managed_path(candidate) else None
+
+
+def teehr_name_from_manifest(path):
+    """The producer's authoritative configuration name, if it travelled with the run.
+
+    _resolve_configuration_name can derive this from the directory name, but a persisted
+    value always wins, so it is captured at registration. Shared with the register_run
+    command: two implementations would agree today and drift later.
+    """
+    manifest = os.path.join(path, "teehr_run_manifest.json")
+    if not os.path.exists(manifest):
+        return ""
+    try:
+        with open(manifest, "r") as f:
+            return json.load(f).get("configuration_name", "") or ""
+    except (OSError, ValueError):
+        return ""
+
+
+def _has_catchment_output(run_path):
+    """True as soon as one catchment output is seen; never lists a whole outputs directory.
+
+    A registered run can hold tens of thousands of files and gigabytes of warehouse beside
+    them, so the scan stats known paths and stops at the first match rather than walking.
+    """
+    outputs = resolve_output_dir(run_path)
+    try:
+        with os.scandir(outputs) as entries:
+            return any(
+                e.name.startswith("cat-") and e.name.endswith(_OUTPUT_SUFFIXES)
+                for e in entries
+            )
+    except OSError:
+        return False
+
+
+def _has_troute_output(run_path):
+    troute = os.path.join(run_path, "outputs", "troute")
+    try:
+        with os.scandir(troute) as entries:
+            return any(e.name.endswith((".nc", ".csv")) for e in entries)
+    except OSError:
+        return False
+
+
+def describe_importable_run(directory):
+    """Report one candidate directory: what it has, and why it cannot be imported.
+
+    Reported rather than filtered out, because a directory the user can see on disk and
+    cannot see in the importer is indistinguishable from a bug.
+    """
+    run_path = managed_run_path(directory)
+    if run_path is None or not os.path.isdir(run_path):
+        return None
+
+    has_map = _find_gpkg_file_path(run_path) is not None
+    has_outputs = _has_catchment_output(run_path)
+
+    if not has_map:
+        reason = "No GeoPackage in config/, so there is nothing to draw."
+    elif not has_outputs:
+        reason = "No catchment outputs in outputs/ngen/, so there is nothing to plot."
+    else:
+        reason = None
+
+    return {
+        "directory": directory,
+        "has_map": has_map,
+        "has_outputs": has_outputs,
+        "has_routing": _has_troute_output(run_path),
+        "importable": reason is None,
+        "reason": reason,
+    }
+
+
+def scan_importable_runs():
+    """Every directory under the managed root, with the registered ones marked.
+
+    Registered is matched on the resolved path, so a run registered through a symlink is
+    not offered a second time under its real name.
+    """
+    registered = {
+        os.path.realpath(run["path"]) for run in _get_list_model_runs()["model_runs"]
+    }
+
+    candidates = []
+    try:
+        with os.scandir(MANAGED_ROOT) as entries:
+            names = sorted(e.name for e in entries if e.is_dir())
+    except OSError:
+        logger.warning("Managed root is not readable: %s", MANAGED_ROOT)
+        return []
+
+    for name in names:
+        described = describe_importable_run(name)
+        if described is None:
+            continue
+        described["registered"] = os.path.realpath(
+            os.path.join(MANAGED_ROOT, name)
+        ) in registered
+        candidates.append(described)
+
+    return candidates
+
+
 def _find_gpkg_file_path(model_path):
     config_path = os.path.join(model_path, "config")
     gpkg_files = []
@@ -214,13 +341,28 @@ def get_troute_df(model_id):
     return None
 
 
+# Where ngen writes by default, and what the converter and the importer both assume.
+_DEFAULT_OUTPUT_SUBDIR = "ngen"
+
+
+def resolve_output_dir(base_path):
+    """Where this run's catchment outputs live, from a run directory.
+
+    realization.json names it with ``output_root``. A run without that file, or with one
+    that does not declare it, falls back to ``outputs/ngen`` rather than raising: such runs
+    exist, and get_base_output used to call .split on the None and return a 500 for every
+    output endpoint.
+
+    Shared with the importer's scan so the reader and the scan cannot disagree about
+    whether a directory has outputs worth registering.
+    """
+    declared = get_output_path(base_path)
+    relative = declared.split("outputs")[-1].strip("/") if declared else ""
+    return os.path.join(base_path, "outputs", relative or _DEFAULT_OUTPUT_SUBDIR)
+
+
 def get_base_output(model_id):
-    base_path = _require_model_run_path(model_id)
-    output_relative_path = get_output_path(base_path).split("outputs")[-1]
-    base_output_path = os.path.join(
-        base_path, "outputs", output_relative_path.strip("/")
-    )
-    return base_output_path
+    return resolve_output_dir(_require_model_run_path(model_id))
 
 def get_output_path(base_path):
     """
@@ -242,13 +384,10 @@ def get_output_path(base_path):
             data = json.load(file)
         return data.get("output_root", None)
     except FileNotFoundError:
-        print(f"Error: The file {realizations_output_path} does not exist.")
+        logger.info("No realization.json in %s; using the default output directory", base_path)
         return None
-    except json.JSONDecodeError:
-        print("Error: Failed to decode JSON.")
-        return None
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Could not read %s: %s", realizations_output_path, exc)
         return None
 
 

@@ -1,4 +1,6 @@
 from django.http import JsonResponse
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_POST
 from django.core.exceptions import ValidationError
 from django.urls import reverse
 import functools
@@ -9,6 +11,10 @@ from tethys_sdk.routing import controller
 from .utils import (
     UnknownModelRun,
     model_run_exists,
+    managed_run_path,
+    scan_importable_runs,
+    describe_importable_run,
+    teehr_name_from_manifest,
     get_base_output,
     _read_output_frame,
     _read_output_columns,
@@ -103,12 +109,16 @@ def json_errors(view):
 
 
 @controller
+@ensure_csrf_cookie
 def home(request):
     """Render the map page.
 
     index.html loads the build-less vanilla frontend from public/frontend/ and injects the
     runtime config into window.__NGIAB__, which replaces the React build's compile-time
     TETHYS_APP_ROOT_URL substitution.
+
+    ensure_csrf_cookie because the page renders no Django form: without it the token is
+    never handed out, document.cookie has no csrftoken, and every POST is rejected.
     """
     # reverse(), not "/apps/<root>/": MULTIPLE_APP_MODE false mounts the app at "/".
     context = {"app_root_url": reverse(f"{App.package}:{App.index}")}
@@ -125,16 +135,19 @@ def getModelRuns(request):
 
 
 @controller
+@require_POST
 def removeModelRun(request):
     """Unregister a model run.
 
     Only removes the database row -- the run directory on disk is left alone. Deleting a
     user's model output because they tidied up a list would be a surprising amount of
     destruction for an unregister action.
+
+    POST because it mutates: as a GET a link prefetch or a crawler could unregister a run.
     """
     from .models import ModelRun
 
-    model_run_id = request.GET.get("model_run_id")
+    model_run_id = request.POST.get("model_run_id")
     if not model_run_id:
         return JsonResponse({"error": "model_run_id is required."}, status=400)
 
@@ -148,6 +161,53 @@ def removeModelRun(request):
         return JsonResponse({"error": "No such model run."}, status=404)
 
     return JsonResponse({"removed": model_run_id})
+
+
+@controller
+def scanModelRuns(request):
+    """List the directories under the managed root that could be registered.
+
+    Offers what is already mounted rather than a path to type: the container can only see
+    the mount, and a name the user picks from a list cannot point anywhere else.
+    """
+    return JsonResponse({"candidates": scan_importable_runs()})
+
+
+@controller
+@require_POST
+def registerModelRun(request):
+    """Register one directory from the scan.
+
+    Takes a bare directory name, never a path, so there is nothing for a caller to traverse
+    with; managed_run_path re-checks containment against the resolved root anyway.
+    """
+    from .models import ModelRun
+
+    directory = (request.POST.get("directory") or "").strip()
+    run_path = managed_run_path(directory)
+    if run_path is None:
+        return JsonResponse({"error": "That is not a directory the visualizer manages."}, status=400)
+
+    described = describe_importable_run(directory)
+    if described is None:
+        return JsonResponse({"error": f"No directory named {directory!r} to import."}, status=404)
+    if not described["importable"]:
+        return JsonResponse({"error": described["reason"]}, status=400)
+
+    label = (request.POST.get("label") or "").strip() or directory
+
+    # Idempotent on path, like register_run: a second import updates rather than duplicates.
+    run, created = ModelRun.objects.update_or_create(
+        path=run_path,
+        defaults={
+            "label": label,
+            "teehr_configuration_name": teehr_name_from_manifest(run_path),
+        },
+    )
+
+    return JsonResponse(
+        {"model_run": {"value": str(run.id), "label": run.label}, "created": created}
+    )
 
 
 @controller

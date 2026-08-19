@@ -123,8 +123,50 @@ it('exposes exactly the in-scope viewer endpoints', () => {
     'getTeehrVariables',
     'getTrouteTimeSeries',
     'getTrouteVariables',
+    'registerModelRun',
     'removeModelRun',
+    'scanModelRuns',
   ]);
+});
+
+describe('mutating endpoints', () => {
+  // A GET that unregisters a run is one link prefetch away from doing it by accident.
+  it('sends registration and removal as POST, not in the query string', () =>
+    withStubbedFetch(
+      () => jsonResponse({ created: true }),
+      async (calls) => {
+        await appAPI.registerModelRun({ directory: 'gage-10154200' });
+        await appAPI.removeModelRun({ model_run_id: 'abc' });
+
+        expect(calls.map((c) => c.init.method)).to.deep.equal(['POST', 'POST']);
+        expect(calls[0].url).to.not.contain('directory=');
+        expect(calls[0].init.body).to.contain('directory=gage-10154200');
+        expect(calls[1].init.body).to.contain('model_run_id=abc');
+      },
+    ));
+
+  it('echoes the csrf cookie back on a mutation', () => {
+    document.cookie = 'csrftoken=token-from-django';
+    return withStubbedFetch(
+      () => jsonResponse({ created: true }),
+      async (calls) => {
+        await appAPI.registerModelRun({ directory: 'x' });
+        expect(calls[0].init.headers['X-CSRFToken']).to.equal('token-from-django');
+      },
+    );
+  });
+
+  // Failure has to read the same whichever verb produced it.
+  it('reports a failed POST the way it reports a failed GET', () =>
+    withStubbedFetch(
+      () => jsonResponse({ error: 'That is not a directory the visualizer manages.' }, 400),
+      async () => {
+        let caught = null;
+        try { await appAPI.registerModelRun({ directory: '../etc' }); } catch (e) { caught = e; }
+        expect(caught.status).to.equal(400);
+        expect(caught.userMessage).to.equal('That is not a directory the visualizer manages.');
+      },
+    ));
 });
 
 // What the user is shown must never contain a status code, a URL, or a traceback.

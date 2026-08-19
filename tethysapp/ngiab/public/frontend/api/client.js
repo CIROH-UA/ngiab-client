@@ -59,28 +59,14 @@ function loginRedirect() {
   window.location.assign(`${host}/accounts/login?next=${window.location.pathname}`);
 }
 
-export async function getJSON(path, params = {}) {
-  const url = new URL(path, getPortalHost());
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null && value !== '') {
-      url.searchParams.set(key, value);
-    }
-  }
+// Django sets this cookie on any rendered page; a mutating request must echo it back.
+function csrfToken() {
+  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : '';
+}
 
-  let response;
-  try {
-    response = await fetch(url, {
-      headers: { Accept: 'application/json' },
-      credentials: 'same-origin',
-    });
-  } catch (cause) {
-    // Network-level failure: there is no response object to inspect.
-    throw new ApiError(`Network request to ${path} failed`, {
-      body: String(cause),
-      userMessage: 'Could not reach the server. Check your connection and try again.',
-    });
-  }
-
+// Shared by both verbs, so a POST reports failure exactly as a GET does.
+async function handle(response, path) {
   if (response.status === 401) {
     loginRedirect();
     throw new ApiError('Not authenticated', {
@@ -118,4 +104,58 @@ export async function getJSON(path, params = {}) {
   }
 
   return body;
+}
+
+export async function postJSON(path, params = {}) {
+  const url = new URL(path, getPortalHost());
+  const form = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') form.set(key, value);
+  }
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': csrfToken(),
+      },
+      credentials: 'same-origin',
+      body: form.toString(),
+    });
+  } catch (cause) {
+    throw new ApiError(`Network request to ${path} failed`, {
+      body: String(cause),
+      userMessage: 'Could not reach the server. Check your connection and try again.',
+    });
+  }
+
+  return handle(response, path);
+}
+
+export async function getJSON(path, params = {}) {
+  const url = new URL(path, getPortalHost());
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, value);
+    }
+  }
+
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      credentials: 'same-origin',
+    });
+  } catch (cause) {
+    // Network-level failure: there is no response object to inspect.
+    throw new ApiError(`Network request to ${path} failed`, {
+      body: String(cause),
+      userMessage: 'Could not reach the server. Check your connection and try again.',
+    });
+  }
+
+  return handle(response, path);
 }

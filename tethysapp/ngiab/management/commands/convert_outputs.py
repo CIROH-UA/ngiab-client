@@ -17,10 +17,7 @@ from django.core.management.base import BaseCommand, CommandError
 
 # Deleting source data is only ever acceptable inside the directory the visualizer manages.
 # A user pointing --path at their own run directory must not lose their CSVs.
-MANAGED_ROOT = os.environ.get(
-    "NGIAB_MANAGED_ROOT", "/var/lib/tethys_persist/ngiab_visualizer"
-)
-
+from tethysapp.ngiab.utils import MANAGED_ROOT, is_managed_path
 
 class Command(BaseCommand):
     help = "Convert a model run's ngen CSV outputs to parquet."
@@ -114,6 +111,4 @@ class Command(BaseCommand):
 
     @staticmethod
     def _is_managed(run_path):
-        root = os.path.realpath(MANAGED_ROOT)
-        target = os.path.realpath(run_path)
-        return target == root or target.startswith(root + os.sep)
+        return is_managed_path(run_path)

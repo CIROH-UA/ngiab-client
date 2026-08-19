@@ -13,14 +13,27 @@ export class NgiabModelRuns extends HTMLElement {
                 aria-label="Unregister this run" title="Unregister this run">&times;</button>
       </div>
       <div class="status" id="model-run-status" role="status"></div>
+
+      <button id="model-run-add" type="button" class="icon-button" aria-expanded="false"
+              aria-controls="model-run-import">Add a run</button>
+      <div id="model-run-import" hidden>
+        <h4 class="field-label">Directories the visualizer can see</h4>
+        <ul id="model-run-candidates"></ul>
+        <div class="status" id="model-run-import-status" role="status"></div>
+      </div>
     `;
 
     this._selectEl = this.querySelector('#model-run-select');
     this._removeEl = this.querySelector('#model-run-remove');
     this._statusEl = this.querySelector('#model-run-status');
+    this._addEl = this.querySelector('#model-run-add');
+    this._importEl = this.querySelector('#model-run-import');
+    this._candidatesEl = this.querySelector('#model-run-candidates');
+    this._importStatusEl = this.querySelector('#model-run-import-status');
 
     this._selectEl.addEventListener('change', () => this._choose(this._selectEl.value));
     this._removeEl.addEventListener('click', () => this._remove());
+    this._addEl.addEventListener('click', () => this._toggleImport());
 
     this.refresh();
   }
@@ -37,7 +50,7 @@ export class NgiabModelRuns extends HTMLElement {
     }
 
     if (!this._runs.length) {
-      this._setStatus('No model runs registered. Import one with viewOnTethys.sh -d <path>.', 'warning');
+      this._setStatus('No model runs registered yet. Add one below.', 'warning');
       this._selectEl.replaceChildren();
       this._selectEl.disabled = true;
       this._removeEl.disabled = true;
@@ -102,10 +115,101 @@ export class NgiabModelRuns extends HTMLElement {
     await this.refresh();
   }
 
+  _toggleImport() {
+    const opening = this._importEl.hidden;
+    this._importEl.hidden = !opening;
+    this._addEl.setAttribute('aria-expanded', String(opening));
+    if (opening) this._scan();
+  }
+
+  async _scan() {
+    this._setImportStatus('Looking for runs...');
+    let candidates;
+    try {
+      ({ candidates } = await appAPI.scanModelRuns());
+    } catch (error) {
+      console.error('[model-runs] scan failed', error);
+      this._setImportStatus(`Could not look for runs. ${userMessage(error)}`, 'error');
+      return;
+    }
+
+    this._candidatesEl.replaceChildren(...candidates.map((c) => this._candidateRow(c)));
+
+    if (!candidates.length) {
+      this._setImportStatus(
+        'Nothing in the visualizer directory yet. Copy a run into it, or use viewOnTethys.sh -d <path>.',
+        'info',
+      );
+    } else if (candidates.every((c) => c.registered)) {
+      this._setImportStatus('Everything here is already registered.', 'info');
+    } else {
+      this._setImportStatus('');
+    }
+  }
+
+  // Listed with the reason, not hidden: invisible is indistinguishable from a bug.
+  _candidateRow(candidate) {
+    const row = document.createElement('li');
+    row.className = 'candidate';
+
+    const name = document.createElement('span');
+    name.className = 'candidate-name';
+    name.textContent = candidate.directory;
+
+    const note = document.createElement('span');
+    note.className = 'candidate-note';
+
+    if (candidate.registered) {
+      note.textContent = 'already registered';
+      row.append(name, note);
+      return row;
+    }
+
+    if (!candidate.importable) {
+      note.textContent = candidate.reason;
+      row.dataset.severity = 'warning';
+      row.append(name, note);
+      return row;
+    }
+
+    note.textContent = candidate.has_routing ? 'map, outputs, routing' : 'map, outputs';
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'icon-button';
+    button.textContent = 'Add';
+    button.addEventListener('click', () => this._register(candidate.directory, button));
+
+    row.append(name, note, button);
+    return row;
+  }
+
+  async _register(directory, button) {
+    button.disabled = true;
+    this._setImportStatus(`Adding ${directory}...`);
+    try {
+      await appAPI.registerModelRun({ directory });
+    } catch (error) {
+      console.error('[model-runs] register failed', error);
+      this._setImportStatus(`Could not add ${directory}. ${userMessage(error)}`, 'error');
+      button.disabled = false;
+      return;
+    }
+
+    await this.refresh();
+    await this._scan();
+  }
+
   _setStatus(message, severity = null) {
     this._statusEl.textContent = message;
     this._statusEl.hidden = !message;
     this._statusEl.dataset.severity = message && severity ? severity : '';
+  }
+
+  _setImportStatus(message, severity = null) {
+    this._importStatusEl.textContent = message;
+    this._importStatusEl.hidden = !message;
+    this._importStatusEl.dataset.severity = message && severity ? severity : '';
   }
 }
 
