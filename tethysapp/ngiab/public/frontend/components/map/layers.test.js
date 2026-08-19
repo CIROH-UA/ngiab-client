@@ -1,16 +1,17 @@
 import { expect } from '@esm-bundle/chai';
 import {
-  catchmentSetFilter,
-  catchmentHighlightFilter,
-  flowPathsFilter,
-  catchmentFillColor,
-  flowPathsLineColor,
-  catchmentsSpec,
-  flowPathsSpec,
-  catchmentHighlightSpec,
+  LAYER_DIVIDES,
   SRC_DIVIDES,
   SRC_FLOWPATHS,
-  LAYER_DIVIDES,
+  catchmentFillColor,
+  catchmentHighlightFilter,
+  catchmentHighlightSpec,
+  catchmentSetFilter,
+  catchmentsSpec,
+  flowPathHighlightFilter,
+  flowPathsFilter,
+  flowPathsLineColor,
+  flowPathsSpec,
   installLayers,
 } from './layers.js';
 
@@ -130,12 +131,12 @@ function fakeMap() {
 }
 
 describe('installLayers', () => {
-  it('adds both sources and all three layers', () => {
+  it('adds both sources and all four layers', () => {
     const map = fakeMap();
     installLayers(map, view());
     expect([...map.sources.keys()].sort()).to.deep.equal([SRC_DIVIDES, SRC_FLOWPATHS].sort());
     expect([...map.layers.keys()].sort()).to.deep.equal(
-      ['catchment-highlight', 'catchments-layer', 'flowpaths-layer'],
+      ['catchment-highlight', 'catchments-layer', 'flowpath-highlight', 'flowpaths-layer'],
     );
   });
 
@@ -144,7 +145,7 @@ describe('installLayers', () => {
     installLayers(map, view());
     const first = map.layers.get('catchments-layer');
     installLayers(map, view());
-    expect(map.layers.size).to.equal(3);
+    expect(map.layers.size).to.equal(4);
     expect(map.layers.get('catchments-layer')).to.equal(first);
   });
 
@@ -157,6 +158,25 @@ describe('installLayers', () => {
 
     installLayers(map, view({ theme: 'dark' }));
     expect(map.getSource(SRC_DIVIDES)).to.not.equal(undefined);
-    expect(map.layers.size).to.equal(3);
+    expect(map.layers.size).to.equal(4);
+  });
+});
+
+describe('flowPathHighlightFilter', () => {
+  it('matches the flowpath draining the selected catchment', () => {
+    expect(flowPathHighlightFilter({ selectedCatchmentId: 2863630 })).to.deep.equal([
+      '==',
+      ['get', 'divide_id'],
+      2863630,
+    ]);
+  });
+
+  // -1 is never a divide id, so nothing is drawn rather than everything.
+  it('matches nothing when there is no selection', () => {
+    expect(flowPathHighlightFilter({ selectedCatchmentId: null })).to.deep.equal([
+      '==',
+      ['get', 'divide_id'],
+      -1,
+    ]);
   });
 });

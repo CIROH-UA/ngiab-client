@@ -19,7 +19,7 @@ export const LAYER_FLOWPATHS = 'flowpaths';
 export const CATCHMENT_KEY = 'id';
 
 export const CATCHMENT_LAYERS = ['catchments-layer', 'catchment-highlight'];
-export const TOP_LAYERS = ['flowpaths-layer', 'catchment-highlight'];
+export const TOP_LAYERS = ['flowpaths-layer', 'flowpath-highlight', 'catchment-highlight'];
 
 const isDark = (view) => view.theme === 'dark';
 const themed = (view, pair) => (isDark(view) ? pair.dark : pair.light);
@@ -41,7 +41,15 @@ export const flowPathsFilter = (view) =>
     ? ['in', ['get', 'divide_id'], ['literal', view.catchmentIds]]
     : ['==', ['get', 'divide_id'], -1];
 
+// The flowpath tiles carry the divide they drain, so the selected reach needs no lookup.
+export const flowPathHighlightFilter = (view) =>
+  view.selectedCatchmentId == null
+    ? ['==', ['get', 'divide_id'], -1]
+    : ['==', ['get', 'divide_id'], view.selectedCatchmentId];
+
 export const visibility = (hidden) => ({ visibility: hidden ? 'none' : 'visible' });
+
+const HIGHLIGHT_LINE = '#ff0000';
 
 const TEEHR_FILL = { light: 'rgba(31, 120, 180, 0.55)', dark: 'rgba(32, 201, 151, 0.55)' };
 const PLAIN_FILL = { light: 'rgba(91, 44, 111, 0.316)', dark: 'rgba(238, 51, 119, 0.316)' };
@@ -100,7 +108,7 @@ export function catchmentHighlightSpec(view) {
     'source-layer': LAYER_DIVIDES,
     filter: catchmentHighlightFilter(view),
     paint: {
-      'fill-color': '#ff0000',
+      'fill-color': HIGHLIGHT_LINE,
       'fill-outline-color': '#ffffff',
       'fill-opacity': 0.5,
     },
@@ -123,6 +131,24 @@ export function flowPathsSpec(view) {
   };
 }
 
+// Two of the three chart tabs describe this reach rather than the polygon, so selecting a
+// catchment draws the flowpath it routes through. Fades in a zoom earlier than the network
+// it belongs to: one line reads at a zoom where the whole network is still clutter.
+export function flowPathHighlightSpec(view) {
+  return {
+    id: 'flowpath-highlight',
+    type: 'line',
+    source: SRC_FLOWPATHS,
+    'source-layer': LAYER_FLOWPATHS,
+    filter: flowPathHighlightFilter(view),
+    paint: {
+      'line-color': HIGHLIGHT_LINE,
+      'line-width': { stops: [[7, 3], [10, 5]] },
+      'line-opacity': { stops: [[6, 0], [9, 1]] },
+    },
+  };
+}
+
 export function installLayers(map, view) {
   if (!map.getSource(SRC_DIVIDES)) {
     map.addSource(SRC_DIVIDES, { type: 'vector', url: DIVIDES_URL });
@@ -131,7 +157,13 @@ export function installLayers(map, view) {
     map.addSource(SRC_FLOWPATHS, { type: 'vector', url: FLOWPATHS_URL });
   }
 
-  for (const spec of [catchmentsSpec(view), flowPathsSpec(view), catchmentHighlightSpec(view)]) {
+  const specs = [
+    catchmentsSpec(view),
+    flowPathsSpec(view),
+    flowPathHighlightSpec(view),
+    catchmentHighlightSpec(view),
+  ];
+  for (const spec of specs) {
     if (!map.getLayer(spec.id)) map.addLayer(spec);
   }
 
@@ -151,6 +183,7 @@ export function refresh(map, view) {
   setFilter('catchments-layer', catchmentSetFilter(view));
   setFilter('flowpaths-layer', flowPathsFilter(view));
   setFilter('catchment-highlight', catchmentHighlightFilter(view));
+  setFilter('flowpath-highlight', flowPathHighlightFilter(view));
 
   setPaint('catchments-layer', 'fill-color', catchmentFillColor(view));
   setPaint('catchments-layer', 'fill-outline-color', catchmentOutlineColor(view));

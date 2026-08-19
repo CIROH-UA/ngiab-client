@@ -180,7 +180,9 @@ The `viewOnTethys.sh` launcher in [`NGIAB-CloudInfra`](https://github.com/CIROH-
 ###  Visualization Features 
 
 Selecting a model run draws its catchments. Clicking a catchment, or searching for one by
-id, selects it and loads its time series.
+id, selects it and loads its time series. The flowpath that catchment routes through is
+highlighted with it, because two of the three chart tabs describe that reach rather than
+the polygon.
 
 ![Figure 3: NGIAB Visualizer time series visualization from Nexus points](static/imgs/fig6-3.png){alt='A screenshot of the  NGIAB and DataStream Visualizer web interface. The map displays the ability of the visualizer to retrieve time series from Nexus points'}
 
