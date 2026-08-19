@@ -75,7 +75,6 @@ COPY --chown=1000:1000 conf/portal_config.yml /config/portal_config.yml
 COPY --chown=1000:1000 conf/portal-config.d/ /opt/portal/portal-config.d/
 COPY --chmod=0755 scripts/ngiab-seed-db.sh /usr/local/bin/ngiab-seed-db.sh
 COPY --chmod=0755 scripts/ngiab-entrypoint.sh /usr/local/bin/ngiab-entrypoint.sh
-COPY --chmod=0755 scripts/ngiab-register.sh /usr/local/bin/ngiab-register.sh
 COPY --chmod=0755 scripts/ngiab-convert.sh /usr/local/bin/ngiab-convert.sh
 
 ENV TETHYS_DB_ENGINE=django.db.backends.sqlite3

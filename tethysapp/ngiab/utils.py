@@ -143,15 +143,15 @@ def teehr_name_from_manifest(path):
     """The producer's authoritative configuration name, if it travelled with the run.
 
     _resolve_configuration_name can derive this from the directory name, but a persisted
-    value always wins, so it is captured at registration. Shared with the register_run
-    command: two implementations would agree today and drift later.
+    value always wins, so it is captured at registration.
+
+    The key is ``teehr_configuration_name``: ngiab-teehr writes that, and reading the
+    unprefixed ``configuration_name`` returned empty for every real manifest.
     """
     manifest = os.path.join(path, "teehr_run_manifest.json")
-    if not os.path.exists(manifest):
-        return ""
     try:
         with open(manifest, "r") as f:
-            return json.load(f).get("configuration_name", "") or ""
+            return json.load(f).get("teehr_configuration_name", "") or ""
     except (OSError, ValueError):
         return ""
 

@@ -118,13 +118,11 @@ Stage: final
     conf/portal_config.yml /config/portal_config.yml
     conf/portal-config.d /opt/portal/portal-config.d
     scripts/ngiab-apptainer-run.sh /usr/local/bin/ngiab-apptainer-run.sh
-    scripts/ngiab-register.sh /usr/local/bin/ngiab-register.sh
     scripts/ngiab-convert.sh /usr/local/bin/ngiab-convert.sh
 
 %post
     set -eux
     chmod 0755 /usr/local/bin/ngiab-apptainer-run.sh \
-               /usr/local/bin/ngiab-register.sh \
                /usr/local/bin/ngiab-convert.sh
     # Readable by any invoking user, since there is no fixed runtime uid.
     chmod -R a+rX /opt/ngiab /opt/duckdb_extensions /config /opt/portal

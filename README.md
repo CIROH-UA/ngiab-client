@@ -32,7 +32,7 @@ One of the advantages of the `viewOnTethys.sh` script is that it allows the user
   ⚠ Directory exists: ~/ngiab_visualizer/gage-10154200
   → Overwrite (O) or Duplicate (D)? [O/D]: o
   ✓ Overwritten ➜ ~/ngiab_visualizer/gage-10154200
-  ✓ Model run "gage-10154200" registered (6d0cb736-2dac-4ea0-a3a3-ad26cd45ef36).
+  ℹ Add it in the visualizer with "Add a run" once the portal is up.
 ```
 
 You should be able to see multiple outputs through the UI:
@@ -50,12 +50,13 @@ Both directories have to be mounted for a run to persist. `ngiab_visualizer` hol
 data; `.ngiab_visualizer_db` holds the rows that point at it. Mounting only the first gives
 a portal with the outputs on disk and nothing listed in the run picker.
 
-Adding a run is easiest from the UI: copy the run directory into `~/ngiab_visualizer`, then
-use **Add a run** in the model run card. It lists the directories the container can see and
-says which ones it can open, so there is no path to type. Directories it cannot use are
-listed with the reason rather than hidden.
+Runs are added from the UI. Copy the run directory into `~/ngiab_visualizer` (or let
+`./ViewOnTethys.sh -d <path>` copy it for you), then use **Add a run** in the model run
+card. It lists the directories the container can see and says which ones it can open, so
+there is no path to type. Directories it cannot use are listed with the reason rather than
+hidden.
 
-From a shell, the same thing:
+For a headless portal with no browser to hand, the same thing from a shell:
 
 ```bash
 docker exec tethys-ngen-portal tethys manage register_run --list

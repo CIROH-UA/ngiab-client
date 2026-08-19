@@ -711,91 +711,15 @@ convert_run_outputs() {
     fi
 }
 
-# Register the run in the portal database, which is the only registry.
+# Prepare a copied run for the visualizer.
 #
-# Runs in a one-shot container because the launcher has no Python environment of its own,
-# mounting the same database directory the serving container uses so the row lands in the
-# persistent copy rather than the image's baked one.
-#
-# A failure here is fatal: there is no file for the app to fall back to, so a run that does
-# not reach the database is a run the visualizer will never show.
-register_run_in_database() {
-    local final_path="$1" base_name="$2" run_uuid="$3" teehr_cfg="$4"
-
-    local image="${TETHYS_REPO}:${TETHYS_TAG:-latest}"
-    if ! ${DOCKER_CMD} image inspect "$image" >/dev/null 2>&1; then
-        echo -e "  ${CROSS_MARK} ${BRed}Image $image is not present locally, so the run cannot be registered.${Color_Off}"
-        echo -e "    ${INFO_MARK} ${BCyan}Pull it first, then re-run with -d to add this run.${Color_Off}"
-        return 1
-    fi
-
-    local teehr_args=()
-    [ -n "$teehr_cfg" ] && teehr_args=(--teehr-configuration-name "$teehr_cfg")
-
-    if ${DOCKER_CMD} run --rm \
-        "${USERNS_ARGS[@]}" \
-        -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer${VOLUME_SUFFIX}" \
-        -v "$DB_DIRECTORY:$TETHYS_PERSIST_PATH/db${VOLUME_SUFFIX}" \
-        --env TETHYS_SECRET_KEY="${TETHYS_SECRET_KEY:-registration-only}" \
-        --entrypoint /usr/local/bin/ngiab-register.sh \
-        "$image" \
-        --path "$final_path" --label "$base_name" --id "$run_uuid" "${teehr_args[@]}" \
-        >/dev/null 2>&1; then
-        echo -e "  ${CHECK_MARK} ${BCyan}Model run \"$base_name\" registered (${run_uuid}).${Color_Off}"
-    else
-        echo -e "  ${CROSS_MARK} ${BRed}Could not register \"$base_name\" in the database.${Color_Off}"
-        return 1
-    fi
-}
-
-add_model_run() {
-    local input_path="$1"
-
-    # 1. Gather new-run metadata
-    local base_name new_uuid final_path teehr_config_name
-    base_name=$(basename "$input_path")
-    new_uuid=$(uuidgen)
-    final_path="/var/lib/tethys_persist/ngiab_visualizer/$base_name"
-
-    # Read teehr_configuration_name from the producer's manifest (if any). The manifest
-    # travels with the run directory through copy_models_run, so it is co-located at
-    # "$input_path/teehr_run_manifest.json". If absent or malformed, fall through with an
-    # empty value -- the backend's fallback derivation still resolves it at query time.
-    teehr_config_name=""
-    local manifest="$input_path/teehr_run_manifest.json"
-    if [ -f "$manifest" ]; then
-        if command -v jq >/dev/null 2>&1; then
-            teehr_config_name=$(jq -r '.teehr_configuration_name // empty' "$manifest" 2>/dev/null || true)
-        elif command -v python3 >/dev/null 2>&1; then
-            teehr_config_name=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('teehr_configuration_name') or '')" "$manifest" 2>/dev/null || true)
-        fi
-        if [ -n "$teehr_config_name" ]; then
-            echo -e "  ${INFO_MARK} Registered TEEHR configuration: ${BCyan}$teehr_config_name${Color_Off}"
-        else
-            echo -e "  ${WARNING_MARK} ${BYellow}teehr_run_manifest.json present but teehr_configuration_name missing/unparseable.${Color_Off}"
-        fi
-    fi
-
-    # When the producer manifest did not supply a value, derive one from the run folder
-    # basename. Must mirror the producer rule in ngiab-teehr/scripts/teehr_ngen.py exactly:
-    #     "ngen_" + re.sub(r"[^a-zA-Z0-9_]", "_", basename).lower()
-    # See docs/brainstorms/2026-04-20-teehr-warehouse-compatibility-requirements.md (FR2)
-    # for the canonical rule; LC_ALL=C pins sed/tr to ASCII so the output matches the
-    # producer's ASCII-only regex byte-for-byte.
-    if [ -z "$teehr_config_name" ]; then
-        teehr_config_name="ngen_$(printf '%s' "$base_name" \
-            | LC_ALL=C sed -E 's/[^a-zA-Z0-9_]/_/g' \
-            | LC_ALL=C tr '[:upper:]' '[:lower:]')"
-        echo -e "  ${INFO_MARK} Derived TEEHR configuration from run folder: ${BCyan}$teehr_config_name${Color_Off}"
-    fi
-
-    # 2. Convert, then register. register_run is idempotent on --path, so an overwrite
-    #    updates the existing row instead of adding a duplicate; the old jq delete-then-append
-    #    dance the JSON registry needed is gone with it.
+# Registration is the user's action in the interface: the app scans this directory itself
+# and offers what it finds. Doing it here meant booting a whole one-shot Tethys container
+# per run to insert one row, and duplicating the TEEHR configuration rule in shell.
+prepare_model_run() {
+    local final_path="/var/lib/tethys_persist/ngiab_visualizer/$(basename "$1")"
     convert_run_outputs "$final_path"
-    register_run_in_database "$final_path" "$base_name" "$new_uuid" "$teehr_config_name" || return 1
 }
-
 # Print URLs ordered by reliability for the current engine.
 #
 # Under rootless Podman on WSL the Windows browser doesn't reliably route
@@ -961,11 +885,11 @@ if [ -n "$DATA_FOLDER_PATH" ]; then
         exit 1
     }
 
-    # Register the model run
-    add_model_run "$final_dir" || {
-        echo -e "${CROSS_MARK} ${BRed}Failed to register model run. Exiting.${Color_Off}"
+    prepare_model_run "$final_dir" || {
+        echo -e "${CROSS_MARK} ${BRed}Failed to prepare the model run. Exiting.${Color_Off}"
         exit 1
     }
+    echo -e "  ${INFO_MARK} ${BCyan}Add it in the visualizer with \"Add a run\" once the portal is up.${Color_Off}"
 fi
 
 print_section_header "LAUNCHING TETHYS VISUALIZATION"
