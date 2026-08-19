@@ -38,7 +38,9 @@ export class NgiabMap extends HTMLElement {
       teehrUsgsByNexus: new Map(),
     };
     this._nexusIndex = new CatchmentNexusIndex();
-    this._loadedRunId = null;
+
+    // undefined, not null: starting equal to a legitimate "no run" skipped the first sync.
+    this._loadedRunId = undefined;
 
     this._statusEl = document.getElementById('map-status');
     this._panelEl = document.getElementById('map-panel');
@@ -51,6 +53,10 @@ export class NgiabMap extends HTMLElement {
     this._timelineEl = document.querySelector('ngiab-timeline');
     this._mapVariableEl = document.getElementById('map-variable');
     this._emptyEl = document.getElementById('map-empty');
+    this._emptyTitleEl = document.getElementById('map-empty-title');
+    this._emptyBodyEl = document.getElementById('map-empty-body');
+    this._resetViewEl = document.getElementById('map-reset-view');
+    this._searchInputEl = document.getElementById('map-search');
     this._loadedVariableKey = null;
 
     // Seed from the URL so a shared link opens the right run.
@@ -113,6 +119,9 @@ export class NgiabMap extends HTMLElement {
       this._ensureLayers();
       this._nexusIndex.reindex(map);
       this._choropleth.reapply();
+
+      // The initial state, which no store change announces; guarded by _loadedRunId.
+      this._syncModelRun();
     });
 
     // Harmless today, but reinstalls sooner if a future version fires this when loaded.
@@ -299,6 +308,11 @@ export class NgiabMap extends HTMLElement {
       this._searchEl?.setIndex([], () => false);
       this._timelineEl?.setTimes([]);
       refresh(this._map, this._view);
+      this._setEmptyState(
+        'No model run to show',
+        'Nothing is registered yet. Use "Add a run" in the panel to pick a directory the ' +
+          'visualizer can see.',
+      );
       this._setStatus('No model run selected.', 'warning');
       return;
     }
@@ -329,11 +343,16 @@ export class NgiabMap extends HTMLElement {
     this._legendEl?.setTeehrCount(teehr?.count ?? 0);
 
     // Say this out loud: an empty run looks identical to a broken map otherwise.
-    this._setEmptyState(!geo.catchments);
     if (!geo.catchments) {
+      this._setEmptyState(
+        'Nothing to draw for this model run',
+        'Its outputs/ngen directory has no catchment files, so the map is empty rather than ' +
+          'broken. Pick a different run, or check that the run finished writing.',
+      );
       this._setStatus('This model run has no catchment outputs, so nothing is drawn.', 'warning');
       return;
     }
+    this._setEmptyState(null);
 
     const parts = [`${geo.catchments} catchments`];
     if (geo.dropped) parts.push(`${geo.dropped} unparseable ids dropped`);
@@ -375,8 +394,19 @@ export class NgiabMap extends HTMLElement {
   }
 
 
-  _setEmptyState(isEmpty) {
-    if (this._emptyEl) this._emptyEl.hidden = !isEmpty;
+  // A title hides the overlay when null, and names which of the two empty cases this is.
+  _setEmptyState(title, body = '') {
+    if (!this._emptyEl) return;
+    this._emptyEl.hidden = !title;
+    if (title) {
+      this._emptyTitleEl.textContent = title;
+      this._emptyBodyEl.textContent = body;
+    }
+
+    // Disabled rather than hidden, matching the shading select beside them.
+    const usable = !title;
+    if (this._searchInputEl) this._searchInputEl.disabled = !usable;
+    if (this._resetViewEl) this._resetViewEl.disabled = !usable;
   }
 
   _setStatus(message, severity = null) {

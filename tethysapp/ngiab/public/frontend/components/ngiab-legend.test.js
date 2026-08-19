@@ -11,9 +11,12 @@ function mount() {
 describe('ngiab-legend', () => {
   let el;
 
+  beforeEach(() => actions.setModelRun('11111111-2222-3333-4444-555555555555'));
+
   afterEach(() => {
     el?.remove();
     actions.setMapVariable(null);
+    actions.setModelRun(null);
   });
 
   it('names the shaded variable and both ends of the ramp', () => {
@@ -40,6 +43,14 @@ describe('ngiab-legend', () => {
   it('falls back to the layer swatches when nothing is shaded', () => {
     el = mount();
     expect(el.querySelector('.legend-ramp')).to.equal(null);
+    expect(el.querySelectorAll('.legend-scale li').length).to.be.greaterThan(0);
+  });
+
+  // A key to a map with nothing on it explains nothing.
+  it('renders nothing at all when no run is loaded', () => {
+    actions.setModelRun(null);
+    el = mount();
+    expect(el.innerHTML.trim()).to.equal('');
   });
 
   // Every mount subscribes, so a missed unsubscribe leaks a repaint per removed legend.

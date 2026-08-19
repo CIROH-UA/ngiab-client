@@ -21,7 +21,14 @@ export class NgiabLegend extends HTMLElement {
   }
 
   render() {
-    const { theme, mapVariable, layers } = store.get();
+    const { theme, mapVariable, layers, modelRunId } = store.get();
+
+    // Nothing is drawn without a run, and a key to an empty map explains nothing.
+    if (!modelRunId) {
+      this.innerHTML = '';
+      return;
+    }
+
     if (mapVariable && this._variable) this._renderGraduated(theme);
     else this._renderCategorical(theme, layers.showTeehr);
   }
