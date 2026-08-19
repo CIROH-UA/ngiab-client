@@ -79,3 +79,7 @@ jobs:
       # not the other renders light down that path.
       - name: Theme tokens
         run: python scripts/check-theme-tokens.py
+
+      # The table in DESIGN.md was wrong and the wrongness is what hid a failing role.
+      - name: Contrast
+        run: python scripts/check-contrast.py

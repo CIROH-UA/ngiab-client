@@ -429,7 +429,7 @@ export class NgiabMap extends HTMLElement {
     this._panelNoteEl.hidden = !missing;
     if (missing) {
       this._panelNoteEl.textContent =
-        'Geometry not in the loaded tiles yet — it will highlight once you pan or zoom to it.';
+        'Geometry not in the loaded tiles yet. It will highlight once you pan or zoom to it.';
     }
   }
 
