@@ -601,14 +601,27 @@ def _class_breaks(values):
     return unique
 
 
-def get_catchment_variables(model_run_id):
-    """Variables this run actually wrote, in the order the output files declare them."""
-    directory = get_base_output(model_run_id)
+@functools.lru_cache(maxsize=32)
+def _cached_catchment_variables(directory, fingerprint):
+    """Keyed on the fingerprint so new or rewritten outputs invalidate it."""
     table, _ = _output_glob(directory)
     if table is None:
-        return {"variables": [], "time_column": None}
+        return None
+    return tuple(_union_columns(table))
 
-    columns = _union_columns(table)
+
+def get_catchment_variables(model_run_id):
+    """Variables this run actually wrote, in the order the output files declare them.
+
+    Cached because the answer costs a schema read of every catchment file. Parquet answers
+    from footers, but a run still in csv has to be sniffed file by file: measured on an
+    8105-catchment run, 53.9 s as csv against 0.26 s once converted. Paying that on every
+    page load left the shading control disabled for most of a minute.
+    """
+    directory = get_base_output(model_run_id)
+    columns = _cached_catchment_variables(directory, _output_fingerprint(directory))
+    if columns is None:
+        return {"variables": [], "time_column": None}
     if len(columns) < 3:
         return {"variables": [], "time_column": None}
 
