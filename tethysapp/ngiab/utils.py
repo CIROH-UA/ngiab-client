@@ -116,27 +116,23 @@ def get_model_runs_selectable():
     ]
 
 # The directory the visualizer manages: everything the importer may offer lives under it,
-# and nothing outside it is reachable by name. Shared with the convert_outputs command.
+# and nothing outside it is reachable by name.
 MANAGED_ROOT = os.environ.get("NGIAB_MANAGED_ROOT", "/var/lib/tethys_persist/ngiab_visualizer")
 
 
-def is_managed_path(path):
-    """Whether `path` is the managed root or lives inside it, symlinks resolved.
-
-    realpath on both sides, so neither ``../..`` in a name nor a symlink planted inside the
-    root can name a directory outside it.
-    """
-    root = os.path.realpath(MANAGED_ROOT)
-    target = os.path.realpath(path)
-    return target == root or target.startswith(root + os.sep)
-
-
 def managed_run_path(directory):
-    """Resolve a bare directory name under the managed root, or None if it escapes it."""
+    """Resolve a bare directory name under the managed root, or None if it escapes it.
+
+    realpath on both sides, so neither ``../..`` in the name nor a symlink planted inside
+    the root can name a directory outside it.
+    """
     if not directory or os.sep in directory or directory in (".", ".."):
         return None
+
+    root = os.path.realpath(MANAGED_ROOT)
     candidate = os.path.join(MANAGED_ROOT, directory)
-    return candidate if is_managed_path(candidate) else None
+    resolved = os.path.realpath(candidate)
+    return candidate if resolved.startswith(root + os.sep) else None
 
 
 def teehr_name_from_manifest(path):

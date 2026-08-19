@@ -681,9 +681,8 @@ copy_models_run() {
 
 # Convert the copied run's ngen CSV outputs to parquet.
 #
-# Only ever runs against MODELS_RUNS_DIRECTORY -- the visualizer's own copy made by
-# copy_models_run -- never the directory the user passed with -d. The management command
-# refuses --delete-csv outside that root as a second line of defence.
+# Purely additive: the parquet lands beside the csv and nothing is removed, so a failed or
+# partial conversion costs read speed and never data.
 #
 # Measured on a real run: 438 MB of csv -> 65 MB of parquet in ~4.6 s, which is small
 # against the cp -r that just happened.
@@ -703,7 +702,7 @@ convert_run_outputs() {
         --env TETHYS_SECRET_KEY="${TETHYS_SECRET_KEY:-conversion-only}" \
         --entrypoint /usr/local/bin/ngiab-convert.sh \
         "$image" \
-        --path "$final_path" --delete-csv; then
+        --path "$final_path"; then
         echo -e "  ${CHECK_MARK} ${BCyan}Outputs converted.${Color_Off}"
     else
         # Non-fatal: the app reads CSV too, so a failed conversion costs speed, not function.
