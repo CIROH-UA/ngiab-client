@@ -34,10 +34,7 @@ from .utils import (
     build_series_payload,
     to_epoch_seconds,
     _DEFAULT_MAX_POINTS,
-    _resolve_configuration_name,
-    _detect_legacy_teehr_layout,
-    _open_warehouse,
-    _teehr_warehouse_path,
+    teehr_source,
 )
 from .teehr_warehouse import (
     TeehrWarehouseError,
@@ -446,13 +443,11 @@ def _empty_ts_response(variable, status_message, status_severity, variables=None
 
 def _teehr_variables_for(model_run_id):
     """The '<config>-<variable>' options for this run, or [] if none are readable."""
-    if _detect_legacy_teehr_layout(model_run_id) or not _teehr_warehouse_path():
-        return []
-    config_name = _resolve_configuration_name(model_run_id)
-    if config_name is None:
+    open_reader, config_name = teehr_source(model_run_id)
+    if open_reader is None:
         return []
     try:
-        with _open_warehouse() as reader:
+        with open_reader() as reader:
             return reader.list_configurations_for_run(config_name) or []
     except TeehrWarehouseError as exc:
         logger.warning("Could not list TEEHR variables: %s", exc)
@@ -471,8 +466,9 @@ def getTeehrTimeSeries(request):
     teehr_id = request.GET.get("teehr_id")
     model_run_id = request.GET.get("model_run_id")
 
-    if not _teehr_warehouse_path():
-        return _empty_ts_response(None, "TEEHR warehouse is not configured. See setup docs.", "info")
+    open_reader, _ = teehr_source(model_run_id)
+    if open_reader is None:
+        return _empty_ts_response(None, "No TEEHR evaluation found for this run.", "info")
 
     # The client omits a null variable on first load, so the server picks one.
     available = _teehr_variables_for(model_run_id)
@@ -491,7 +487,7 @@ def getTeehrTimeSeries(request):
             selected, "That TEEHR configuration is not readable.", "warning", available
         )
     try:
-        with _open_warehouse() as reader:
+        with open_reader() as reader:
             data = reader.get_joined_timeseries(
                 teehr_configuration, teehr_variable, teehr_id
             )
@@ -504,7 +500,7 @@ def getTeehrTimeSeries(request):
     if not data:
         return _empty_ts_response(
             selected,
-            "No TEEHR data for this location in the configured warehouse.",
+            "No TEEHR data for this location.",
             "info",
             available,
         )
@@ -536,27 +532,15 @@ def _empty_variables_response(status_message, status_severity):
 def getTeehrVariables(request):
     model_run_id = request.GET.get("model_run_id")
 
-    if _detect_legacy_teehr_layout(model_run_id):
-        return _empty_variables_response(
-            "This run has legacy TEEHR output. Re-run TEEHR with the current image to view results.",
-            "warning",
-        )
-
-    if not _teehr_warehouse_path():
-        return _empty_variables_response(
-            "TEEHR warehouse is not configured. See setup docs.",
-            "info",
-        )
-
-    config_name = _resolve_configuration_name(model_run_id)
-    if config_name is None:
+    open_reader, config_name = teehr_source(model_run_id)
+    if open_reader is None:
         return _empty_variables_response(
             "No TEEHR evaluation found for this run.",
             "info",
         )
 
     try:
-        with _open_warehouse() as reader:
+        with open_reader() as reader:
             variables = reader.list_configurations_for_run(config_name)
     except TeehrWarehouseError as exc:
         msg, severity = _teehr_status_for(exc)
@@ -597,27 +581,15 @@ def getTeehrLocations(request):
     """
     model_run_id = request.GET.get("model_run_id")
 
-    if _detect_legacy_teehr_layout(model_run_id):
-        return _empty_locations_response(
-            "This run has legacy TEEHR output. Re-run TEEHR with the current image to view results.",
-            "warning",
-        )
-
-    if not _teehr_warehouse_path():
-        return _empty_locations_response(
-            "TEEHR warehouse is not configured. See setup docs.",
-            "info",
-        )
-
-    config_name = _resolve_configuration_name(model_run_id)
-    if config_name is None:
+    open_reader, config_name = teehr_source(model_run_id)
+    if open_reader is None:
         return _empty_locations_response(
             "No TEEHR evaluation found for this run.",
             "info",
         )
 
     try:
-        with _open_warehouse() as reader:
+        with open_reader() as reader:
             pairs = reader.list_location_pairs_for_run(config_name)
     except TeehrWarehouseError as exc:
         msg, severity = _teehr_status_for(exc)

@@ -74,6 +74,34 @@ def _resolve_configuration_name(model_run_id):
     return None
 
 
+def teehr_source(model_run_id):
+    """Pick a TEEHR reader for this run: its own evaluation, else the shared warehouse.
+
+    Returns ``(open_reader, configuration_name)``, or ``(None, None)`` when neither is
+    available. ``open_reader`` is a callable so the caller keeps the ``with`` block and both
+    readers close the same way.
+
+    The per-run evaluation wins when present because it is what the documented workflow
+    writes -- guide.sh, or the ngiab-teehr image against a run directory -- and it describes
+    that run and no other. The warehouse is the shared-catalog arrangement, addressed by
+    TEEHR_WAREHOUSE_PATH and keyed by an ngen_<stem> configuration per run.
+    """
+    from .teehr_evaluation import RUN_CONFIGURATION, EvaluationReader, evaluation_dir
+
+    dataset = evaluation_dir(_get_model_run_path_by_id(model_run_id))
+    if dataset:
+        return (lambda: EvaluationReader(dataset)), RUN_CONFIGURATION
+
+    if not _teehr_warehouse_path():
+        return None, None
+
+    config_name = _resolve_configuration_name(model_run_id)
+    if config_name is None:
+        return None, None
+
+    return _open_warehouse, config_name
+
+
 def _detect_legacy_teehr_layout(model_run_id):
     """Return True if the run dir still has pre-PR ``<run>/teehr/metrics.csv``."""
     model_path = _get_model_run_path_by_id(model_run_id)
