@@ -384,6 +384,11 @@ def get_output_path(base_path):
 # them at import). Parquet first: when both exist it is the cheaper read.
 _OUTPUT_SUFFIXES = (".parquet", ".csv")
 
+# Columns no catchment wrote. ``filename`` is synthesised by DuckDB's filename=true;
+# ``catchment_id`` is written by the consolidator. Offering either as a plottable variable
+# would put a file path or an id in the chart's variable picker.
+_SYNTHETIC_COLUMNS = ("filename", "catchment_id")
+
 
 def _find_output_file(directory, stem, suffix, known):
     """(location, suffix) for one catchment's output, or raise.
@@ -404,16 +409,20 @@ def _read_output_columns(outputs, stem):
     For parquet this is answered from the footer (LIMIT 0 reads no row groups), which is
     what lets the caller then ask for just the two columns it needs.
     """
+    if stem not in outputs.catchments:
+        raise FileNotFoundError(f"No output for {stem!r} in {outputs.directory}")
+
+    if outputs.groups:
+        table = _group_table_for(outputs, stem)
+        columns = list(duckdb_conn.query(f"SELECT * FROM {table} LIMIT 0").columns)
+        return [name for name in columns if name not in _SYNTHETIC_COLUMNS]
+
     path, suffix = _find_output_file(
         outputs.directory, stem, outputs.suffix, outputs.catchments
     )
-    if suffix == ".parquet":
-        rel = duckdb_conn.query(
-            f"SELECT * FROM read_parquet({duckdb_conn.quote(path)}) LIMIT 0"
-        )
-        return list(rel.columns)
+    reader = "read_parquet" if suffix == ".parquet" else "read_csv_auto"
     return list(duckdb_conn.query(
-        f"SELECT * FROM read_csv_auto({duckdb_conn.quote(path)}) LIMIT 0"
+        f"SELECT * FROM {reader}({duckdb_conn.quote(path)}) LIMIT 0"
     ).columns)
 
 
@@ -434,6 +443,12 @@ def _read_output_frame(outputs, stem, columns=None, time_column=None):
     parquet slower end to end than csv. The cast also yields '2017-01-01 00:00:00', which is
     byte-identical to the csv path, so the response shape does not change with the format.
     """
+    if stem not in outputs.catchments:
+        raise FileNotFoundError(f"No output for {stem!r} in {outputs.directory}")
+
+    if outputs.groups:
+        return _read_from_group(outputs, stem, columns, time_column)
+
     path, suffix = _find_output_file(
         outputs.directory, stem, outputs.suffix, outputs.catchments
     )
@@ -480,19 +495,78 @@ _NO_DATA_BIN = 0
 _CLASS_COUNT = 8
 
 
-def _output_glob(directory, suffix, prefix="cat-"):
-    """A DuckDB table expression reading every prefixed output at once.
+def _group_table_for(outputs, stem):
+    """A table expression over the one consolidated group holding this catchment.
 
-    The suffix is passed in from the manifest rather than discovered by globbing the
-    directory, which is a filesystem call with no object-store equivalent. DuckDB still
-    expands the glob itself, over either backend.
+    One group, not a union across all of them. Scanning every group with ``union_by_name``
+    would pad a catchment from a narrower schema with NULL columns it never wrote, and then
+    report them as variables it has -- which is precisely what grouping by schema avoided.
+    The group index comes from the manifest, so this costs a cached lookup rather than a
+    probe per group per request.
     """
-    if not suffix:
+    index = manifest.catchment_group(outputs.run_path, stem)
+    if index is None:
+        raise FileNotFoundError(f"No output for {stem!r} in {outputs.directory}")
+
+    name = (
+        outputs.groups[index]
+        if index < len(outputs.groups)
+        else f"{manifest.CONSOLIDATED_PREFIX}{index}.parquet"
+    )
+    path = _child(outputs.directory, name)
+    return (
+        f"(SELECT * FROM read_parquet({duckdb_conn.quote(path)}) "
+        f"WHERE catchment_id = {duckdb_conn.quote(stem)})"
+    )
+
+
+def _read_from_group(outputs, stem, columns, time_column):
+    """One catchment's series out of a consolidated group.
+
+    Columns absent from that catchment's own group read back as NULL under union_by_name, so
+    they are dropped: a catchment must report the variables it wrote, not the run's union.
+    That is what the per-catchment layout gave for free and what consolidation has to
+    reproduce deliberately.
+    """
+    table = _group_table_for(outputs, stem)
+    available = set(duckdb_conn.query(f"SELECT * FROM {table} LIMIT 0").columns)
+
+    parts = []
+    for column in columns or ["*"]:
+        if column == "*":
+            parts.append("*")
+        elif column not in available:
+            continue
+        elif time_column and column == time_column:
+            parts.append(f'CAST("{column}" AS VARCHAR) AS "{column}"')
+        else:
+            parts.append(f'"{column}"')
+
+    return duckdb_conn.query(f"SELECT {', '.join(parts)} FROM {table}")
+
+
+def _output_table(outputs, prefix="cat-"):
+    """A DuckDB table expression reading every catchment output at once.
+
+    Two layouts, because a run on disk may be in either. Consolidated files carry their own
+    ``catchment_id`` column and are read by name from the manifest; per-catchment files are
+    globbed with ``filename=true`` and the id recovered from the path, which is what the
+    original layout required.
+
+    Either way the pattern comes from the manifest rather than a directory glob, which is a
+    filesystem call with no object-store equivalent. DuckDB expands the glob itself, over
+    either backend.
+    """
+    if outputs.groups:
+        pattern = _child(outputs.directory, f"{manifest.CONSOLIDATED_PREFIX}*.parquet")
+        return f"read_parquet({duckdb_conn.quote(pattern)}, union_by_name=true)", ".parquet"
+
+    if not outputs.suffix:
         return None, None
-    pattern = _child(directory, f"{prefix}*{suffix}")
-    reader = "read_parquet" if suffix == ".parquet" else "read_csv"
+    pattern = _child(outputs.directory, f"{prefix}*{outputs.suffix}")
+    reader = "read_parquet" if outputs.suffix == ".parquet" else "read_csv"
     table = f"{reader}({duckdb_conn.quote(pattern)}, filename=true, union_by_name=true)"
-    return table, suffix
+    return table, outputs.suffix
 
 
 def _union_columns(table):
@@ -505,7 +579,7 @@ def _union_columns(table):
     and leaving it in offers it to the user as a plottable variable.
     """
     columns = list(duckdb_conn.query(f"SELECT * FROM {table} LIMIT 0").columns)
-    return [name for name in columns if name != "filename"]
+    return [name for name in columns if name not in _SYNTHETIC_COLUMNS]
 
 
 def _choose_bucket_hours(distinct_times, span_hours, catchment_count):
@@ -563,9 +637,12 @@ def _class_breaks(values):
 
 
 @functools.lru_cache(maxsize=32)
-def _cached_catchment_variables(directory, version, suffix):
-    """Keyed on the run's version token so re-ingested outputs invalidate it."""
-    table, _ = _output_glob(directory, suffix)
+def _cached_catchment_variables(directory, version, table):
+    """Keyed on the run's version token so re-ingested outputs invalidate it.
+
+    The table expression is part of the key rather than an argument to rebuild, because it
+    already encodes the layout and the format -- two runs differing in either cannot collide.
+    """
     if table is None:
         return None
     return tuple(_union_columns(table))
@@ -584,6 +661,8 @@ class RunOutputs(NamedTuple):
     suffix: str
     catchments: tuple
     version: str
+    groups: tuple
+    run_path: str
 
 
 def run_outputs(model_run_id):
@@ -596,6 +675,8 @@ def run_outputs(model_run_id):
         suffix=document.get("output_format") or "",
         catchments=tuple(manifest.catchments(entry["path"])),
         version=document.get("version_token", ""),
+        groups=tuple(document.get("output_groups") or ()),
+        run_path=entry["path"],
     )
 
 
@@ -618,9 +699,8 @@ def get_catchment_variables(model_run_id):
     page load left the shading control disabled for most of a minute.
     """
     outputs = run_outputs(model_run_id)
-    columns = _cached_catchment_variables(
-        outputs.directory, outputs.version, outputs.suffix
-    )
+    table, _ = _output_table(outputs)
+    columns = _cached_catchment_variables(outputs.directory, outputs.version, table)
     if columns is None:
         return {"variables": [], "time_column": None}
     if len(columns) < 3:
@@ -631,9 +711,9 @@ def get_catchment_variables(model_run_id):
 
 
 @functools.lru_cache(maxsize=8)
-def _cached_value_matrix(directory, variable, version, suffix, catchment_count):
+def _cached_value_matrix(directory, variable, version, table, consolidated, catchment_count):
     """Keyed on the version token: a re-ingested run must not serve the previous grid."""
-    return _build_value_matrix(directory, variable, suffix, catchment_count)
+    return _build_value_matrix(table, variable, consolidated, catchment_count)
 
 
 def get_catchment_value_matrix(model_run_id, variable=None):
@@ -645,19 +725,23 @@ def get_catchment_value_matrix(model_run_id, variable=None):
     The cached dict is handed straight to JsonResponse and must not be mutated by callers.
     """
     outputs = run_outputs(model_run_id)
+    table, _ = _output_table(outputs)
     return _cached_value_matrix(
-        outputs.directory, variable, outputs.version, outputs.suffix, len(outputs.catchments)
+        outputs.directory,
+        variable,
+        outputs.version,
+        table,
+        bool(outputs.groups),
+        len(outputs.catchments),
     )
 
 
-def _build_value_matrix(directory, variable=None, suffix="", catchment_count=0):
+def _build_value_matrix(table, variable=None, consolidated=False, catchment_count=0):
     """Everything here is derived from the run being asked about.
 
     Runs differ in which variables they wrote, over what period, at what step, and across what
     range of values, so none of those may be assumed or shared between runs.
     """
-    table, _ = _output_glob(directory, suffix)
-
     empty = {
         "variable": None,
         "variables": [],
@@ -696,15 +780,17 @@ def _build_value_matrix(directory, variable=None, suffix="", catchment_count=0):
         else f"time_bucket(INTERVAL '{bucket_hours} hours', {time_expr})"
     )
 
-    # The catchment id comes from the filename because the rows themselves do not carry it.
+    # Consolidated rows carry the id; per-catchment rows do not, so it comes from the path.
+    id_source = "catchment_id" if consolidated else "filename"
+    id_expr = f"regexp_extract({id_source}, 'cat-(\\d+)', 1)"
     frame = duckdb_conn.query(
         f"""
         SELECT
-            CAST(regexp_extract(filename, 'cat-(\\d+)', 1) AS BIGINT) AS catchment,
+            CAST({id_expr} AS BIGINT) AS catchment,
             {bucket_expr} AS bucket,
             avg("{selected}") AS value
         FROM {table}
-        WHERE regexp_extract(filename, 'cat-(\\d+)', 1) <> ''
+        WHERE {id_expr} <> ''
         GROUP BY 1, 2
         ORDER BY 2, 1
         """

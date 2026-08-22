@@ -39,6 +39,9 @@ MANIFEST_NAME = "manifest.json"
 CATCHMENTS_SIDECAR = "manifest_catchments.json"
 CROSSWALK_SIDECAR = "manifest_crosswalk.parquet"
 
+# What convert_outputs writes: one parquet per schema group, holding a catchment_id column.
+CONSOLIDATED_PREFIX = "catchments-"
+
 # Mirrors utils._OUTPUT_SUFFIXES: parquet first, because the reader prefers it when both are
 # present and the manifest has to record the one that will actually be read.
 _OUTPUT_SUFFIXES = (".parquet", ".csv")
@@ -166,16 +169,53 @@ def _catchment_ids(output_dir):
     return sorted(stems)
 
 
-def _output_format(output_dir):
-    """Which suffix the reader will actually use, parquet winning when both are present."""
+def _output_layout(output_dir):
+    """How this run's catchment outputs are arranged, and in what format.
+
+    Three states, because a run on disk today may be in any of them: consolidated parquet
+    (what convert_outputs now writes), per-catchment parquet (what it used to write), or
+    per-catchment csv (what ngen writes). Recorded rather than rediscovered, since a glob is
+    a filesystem call with no object-store equivalent.
+    """
     try:
         names = os.listdir(output_dir)
     except OSError:
-        return None
+        return None, []
+
+    groups = sorted(n for n in names if n.startswith(CONSOLIDATED_PREFIX) and n.endswith(".parquet"))
+    if groups:
+        return ".parquet", groups
+
     for suffix in _OUTPUT_SUFFIXES:
         if any(name.startswith("cat-") and name.endswith(suffix) for name in names):
-            return suffix
-    return None
+            return suffix, []
+    return None, []
+
+
+def _consolidated_catchments(output_dir, groups):
+    """Which consolidated group holds each catchment: ``{"cat-100": 0, ...}``.
+
+    Filenames no longer answer this once a file holds many catchments, so the ids come out of
+    the data. The *group* is recorded alongside because reading one catchment has to read only
+    its own group -- scanning all of them under ``union_by_name`` pads a narrow catchment with
+    NULL columns it never wrote, which is exactly what grouping by schema was for.
+
+    Cheaper than the alternative: probing each group per request would be a query per group on
+    the hot path to avoid a lookup that is already cached.
+    """
+    membership = {}
+    for index, name in enumerate(groups):
+        path = os.path.join(output_dir, name)
+        try:
+            frame = duckdb_conn.query(
+                f"SELECT DISTINCT catchment_id FROM read_parquet({duckdb_conn.quote(path)})"
+            )
+        except Exception as exc:  # noqa: BLE001 - a bad group must not lose the others
+            logger.warning("Could not read catchment ids from %s: %s", path, exc)
+            continue
+        for value in frame["catchment_id"]:
+            membership[str(value)] = index
+    return membership
 
 
 def _troute(run_path):
@@ -311,7 +351,11 @@ def distill(
     output_relative = _read_realization_output_dir(run_path)
     output_dir = os.path.join(run_path, output_relative)
 
-    catchments = _catchment_ids(output_dir)
+    output_format, output_groups = _output_layout(output_dir)
+    membership = _consolidated_catchments(output_dir, output_groups)
+    if not membership:
+        membership = {stem: 0 for stem in _catchment_ids(output_dir)}
+    catchments = sorted(membership)
     gpkg_relative = _find_gpkg(run_path)
     crosswalk = _crosswalk_rows(os.path.join(run_path, gpkg_relative)) if gpkg_relative else []
 
@@ -322,7 +366,8 @@ def distill(
         "created": created,
         "legacy_uuids": [normalize_uuid(value) for value in legacy_uuids],
         "output_dir": output_relative,
-        "output_format": _output_format(output_dir),
+        "output_format": output_format,
+        "output_groups": output_groups,
         "catchment_count": len(catchments),
         "gpkg": gpkg_relative,
         "bounds": _bounds(os.path.join(run_path, gpkg_relative)) if gpkg_relative else None,
@@ -330,7 +375,7 @@ def distill(
         "troute": _troute(run_path),
         "teehr": _teehr(run_path, teehr_configuration_name),
         "version_token": _version_token(run_path, output_dir, catchments, gpkg_relative),
-        "_catchments": catchments,
+        "_catchments": membership,
         "_crosswalk": crosswalk,
     }
 
@@ -343,7 +388,7 @@ def write(run_path, document):
     request.
     """
     run_path = str(run_path).rstrip(os.sep)
-    catchments = document.get("_catchments", [])
+    catchments = document.get("_catchments", {})
     crosswalk = document.get("_crosswalk", [])
 
     hot = {key: value for key, value in document.items() if not key.startswith("_")}
@@ -407,12 +452,16 @@ def _version_of(run_path):
 
 @functools.lru_cache(maxsize=32)
 def _catchments_cached(run_path, version_token):
+    """The id-to-group mapping, tolerating the plain list earlier manifests wrote."""
     path = os.path.join(run_path, CATCHMENTS_SIDECAR)
     try:
         with open(path, "r") as handle:
-            return tuple(json.load(handle))
+            stored = json.load(handle)
     except (OSError, ValueError):
-        return ()
+        return {}
+    if isinstance(stored, list):
+        return {stem: 0 for stem in stored}
+    return dict(stored)
 
 
 def catchments(run_path):
@@ -422,7 +471,13 @@ def catchments(run_path):
     mtime -- that is the whole reason the token exists.
     """
     run_path = str(run_path).rstrip(os.sep)
-    return list(_catchments_cached(run_path, _version_of(run_path)))
+    return sorted(_catchments_cached(run_path, _version_of(run_path)))
+
+
+def catchment_group(run_path, stem):
+    """Which consolidated group holds one catchment, or None when it is not this run's."""
+    run_path = str(run_path).rstrip(os.sep)
+    return _catchments_cached(run_path, _version_of(run_path)).get(stem)
 
 
 @functools.lru_cache(maxsize=8)
