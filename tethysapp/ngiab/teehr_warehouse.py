@@ -279,27 +279,6 @@ class WarehouseReader:
         ).fetchall()
         return list(rows)
 
-    def usgs_for_ngen(self, config_name: str, ngen_id: str) -> Optional[str]:
-        """Return the USGS id crosswalked to ``ngen_id`` for this run, or None.
-
-        ``ngen_id`` is the secondary_location_id (e.g. ``ngen-12345``).
-        """
-        catalog = self._freeze_catalog()
-        xwalk_loc = catalog.get("location_crosswalks")
-        sec_loc = catalog.get("secondary_timeseries")
-        if xwalk_loc is None or sec_loc is None:
-            return None
-        row = self._execute(
-            f"SELECT x.primary_location_id "
-            f"FROM iceberg_scan('{xwalk_loc}') x "
-            f"JOIN iceberg_scan('{sec_loc}') s "
-            f"  ON s.location_id = x.secondary_location_id "
-            f"WHERE s.configuration_name = ? AND x.secondary_location_id = ? "
-            f"LIMIT 1",
-            [config_name, ngen_id],
-        ).fetchone()
-        return row[0] if row else None
-
     def get_metrics_for_location(
         self, config_name: str, usgs_location_id: str
     ) -> List[dict]:

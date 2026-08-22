@@ -239,3 +239,44 @@ def mini_run_factory(tmp_path):
 def mini_run(mini_run_factory):
     """The default run: three catchments, csv outputs, NetCDF t-route."""
     return mini_run_factory()
+
+
+@pytest.fixture
+def ingest(tmp_path, mini_run_factory, monkeypatch):
+    """Put generated runs under a storage root and distill them, as ingest would.
+
+    Returns a factory taking the run's name and whatever ``build_mini_run`` accepts. The name
+    is the run id, because a directory under the storage root *is* a registered run.
+
+    Tests that previously stubbed ``_get_list_model_runs`` with a hand-written dict use this
+    instead. The assertions are unchanged; only the plumbing is, and it is more faithful --
+    the stub could not carry a manifest, and the manifest is where every fact the read path
+    needs now lives.
+    """
+    from tethysapp.ngiab import duckdb_conn, manifest, run_store
+    from tethysapp.ngiab import utils as ngiab_utils
+
+    root = tmp_path / "ngiab_visualizer"
+    root.mkdir()
+    monkeypatch.delenv(duckdb_conn.STORAGE_BACKEND_ENV, raising=False)
+    monkeypatch.setenv(run_store.MANAGED_ROOT_ENV, str(root))
+    monkeypatch.setenv(run_store.LISTING_TTL_ENV, "0")
+
+    def _ingest(name="alpha", *, created=None, legacy_uuids=(), **kwargs):
+        source = mini_run_factory(name=f"src-{name}", **kwargs)
+        document = manifest.distill(
+            source,
+            run_id=name,
+            label=name,
+            created=created or "2026-08-01T00:00:00+00:00",
+            legacy_uuids=legacy_uuids,
+        )
+        manifest.write(source, document)
+        os.rename(source, root / name)
+        run_store.clear_caches()
+        ngiab_utils._cached_catchment_variables.cache_clear()
+        ngiab_utils._cached_value_matrix.cache_clear()
+        return name
+
+    _ingest.root = root
+    return _ingest

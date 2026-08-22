@@ -224,26 +224,6 @@ def test_sanitize_stem_rules():
     assert ngiab_utils._sanitize_stem("PLAIN") == "plain"
 
 
-def test_detect_legacy_teehr_layout_false_when_run_missing(tmp_path, monkeypatch):
-    """Unknown run id -> False, not an exception."""
-    monkeypatch.setattr(
-        ngiab_utils, "_get_list_model_runs", lambda: {"model_runs": []}
-    )
-    assert ngiab_utils._detect_legacy_teehr_layout("does-not-exist") is False
-
-
-def test_detect_legacy_teehr_layout_true_when_metrics_csv_present(tmp_path, monkeypatch):
-    run_dir = tmp_path / "run_A"
-    (run_dir / "teehr").mkdir(parents=True)
-    (run_dir / "teehr" / "metrics.csv").write_text("metric,primary_location_id\n")
-    monkeypatch.setattr(
-        ngiab_utils,
-        "_get_list_model_runs",
-        lambda: {"model_runs": [{"id": "run_A", "path": str(run_dir)}]},
-    )
-    assert ngiab_utils._detect_legacy_teehr_layout("run_A") is True
-
-
 def test_resolve_configuration_name_prefers_manifest_field(monkeypatch):
     """Persisted teehr_configuration_name wins over derivation."""
     monkeypatch.setattr(

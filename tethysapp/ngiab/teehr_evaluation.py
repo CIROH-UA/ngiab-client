@@ -17,10 +17,10 @@ Same method names and return shapes as ``teehr_warehouse.WarehouseReader``, so t
 controllers can hold either one.
 """
 
-import csv
 import logging
 import os
-from typing import List, Optional
+import posixpath
+from typing import List
 
 import duckdb
 
@@ -43,13 +43,23 @@ _METRIC_COLUMNS = (
 )
 
 
-def evaluation_dir(run_path):
-    """The evaluation directory inside a run, or None if it has no readable one."""
+def evaluation_dir(run_path, present=None):
+    """The evaluation directory inside a run, or None when it has none.
+
+    ``present`` comes from the manifest, because the probe this replaced -- os.path.isdir on
+    joined_timeseries -- is False for every ``s3://`` path regardless of what is in the
+    bucket. Without it every TEEHR endpoint on a hosted run reports "no evaluation" while the
+    parquet sits there.
+
+    Falls back to the filesystem check only when the caller has no manifest to offer, which
+    keeps this usable from a one-shot script against a local directory.
+    """
     if not run_path:
         return None
-    dataset = os.path.join(run_path, "teehr", "dataset")
-    joined = os.path.join(dataset, "joined_timeseries")
-    return dataset if os.path.isdir(joined) else None
+    dataset = posixpath.join(str(run_path).rstrip("/"), "teehr", "dataset")
+    if present is None:
+        present = os.path.isdir(os.path.join(dataset, "joined_timeseries"))
+    return dataset if present else None
 
 
 class EvaluationReader:
@@ -139,31 +149,21 @@ class EvaluationReader:
             logger.warning("Could not list location pairs in %s: %s", self._dir, exc)
             return []
 
-    def usgs_for_ngen(self, config_name: str, ngen_id: str) -> Optional[str]:
-        """The USGS id paired with ``ngen_id`` in this evaluation, or None."""
-        try:
-            rows = self._query(
-                f"SELECT primary_location_id FROM {self._joined()} "
-                f"WHERE configuration_name = ? AND secondary_location_id = ? LIMIT 1",
-                [config_name, ngen_id],
-            )
-        except duckdb.Error as exc:
-            logger.warning("Could not crosswalk %s in %s: %s", ngen_id, self._dir, exc)
-            return None
-        return rows[0][0] if rows else None
-
     def get_metrics_for_location(self, config_name: str, usgs_location_id: str) -> List[dict]:
         """Metrics for one gauge, pivoted row-per-metric with a column per configuration.
 
         Read from metrics.csv rather than recomputed: it is what teehr wrote for this
         evaluation, and recomputing would risk disagreeing with the numbers on disk.
         """
-        path = os.path.join(os.path.dirname(self._dir), "metrics.csv")
+        path = posixpath.join(posixpath.dirname(self._dir), "metrics.csv")
         try:
-            with open(path, newline="") as handle:
-                rows = [r for r in csv.DictReader(handle)
-                        if r.get("primary_location_id") == usgs_location_id]
-        except (OSError, csv.Error) as exc:
+            frame = duckdb_conn.query(
+                f"SELECT * FROM read_csv_auto({duckdb_conn.quote(path)}, all_varchar=true) "
+                f"WHERE primary_location_id = ?",
+                [usgs_location_id],
+            )
+            rows = frame.to_dict("records")
+        except Exception as exc:  # noqa: BLE001 - a missing evaluation is not an error here
             logger.warning("Could not read %s: %s", path, exc)
             return []
 

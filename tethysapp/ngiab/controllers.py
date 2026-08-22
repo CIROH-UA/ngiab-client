@@ -11,7 +11,7 @@ from . import run_store
 from .utils import (
     UnknownModelRun,
     model_run_exists,
-    get_base_output,
+    run_outputs,
     _read_output_frame,
     _read_output_columns,
     getCatchmentsIds,
@@ -23,8 +23,7 @@ from .utils import (
     troute_variable_note,
     TROUTE_MISSING,
     getCatchmentsList,
-    find_gpkg_file_path,
-    gpkg_layer_bounds_4326,
+    run_bounds_4326,
     get_model_runs_selectable,
     get_catchment_variables,
     get_catchment_value_matrix,
@@ -200,11 +199,11 @@ def getCatchmentTimeSeries(request):
         return JsonResponse({"error": "catchment_id is required."}, status=400)
 
     variable_column = request.GET.get("variable_column")
-    base_output_path = get_base_output(model_run_id)
+    outputs = run_outputs(model_run_id)
 
-    # catchment_id names a file on disk, so an id this run never wrote is a 404, not a 500.
+    # The manifest lists what this run wrote, so an id it never wrote is a 404, not a 500.
     try:
-        all_columns = _read_output_columns(base_output_path, catchment_id)
+        all_columns = _read_output_columns(outputs, catchment_id)
     except FileNotFoundError:
         return JsonResponse(
             {"error": f"This run has no output for {catchment_id}."}, status=404
@@ -216,7 +215,7 @@ def getCatchmentTimeSeries(request):
     selected = variable_column if variable_column in list_variables else list_variables[0]
 
     df = _read_output_frame(
-        base_output_path, catchment_id, columns=[time_name, selected], time_column=time_name
+        outputs, catchment_id, columns=[time_name, selected], time_column=time_name
     )
 
     # Columnar and thinned; ?max_points=0 asks for the full series. See the frontend README.
@@ -286,23 +285,12 @@ def getGeoSpatialData(request):
     which the frontend threw away.
     """
     model_run_id = request.GET.get("model_run_id")
-
-    try:
-        gpkg_path = find_gpkg_file_path(model_run_id)
-    except UnknownModelRun:
-        raise
-    except Exception:
-        logger.exception("Could not locate a GeoPackage for %s", model_run_id)
-        return JsonResponse({"error": "Failed to read GeoPackage file."})
-
-    if not gpkg_path:
+    bounds = run_bounds_4326(model_run_id)
+    if bounds is None:
         return JsonResponse({"error": "Failed to read GeoPackage file."})
 
     return JsonResponse(
-        {
-            "catchments": getCatchmentsList(model_run_id),
-            "bounds": gpkg_layer_bounds_4326(gpkg_path),
-        }
+        {"catchments": getCatchmentsList(model_run_id), "bounds": bounds}
     )
 
 

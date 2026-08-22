@@ -50,7 +50,6 @@ def registry_root(tmp_path, mini_run_factory, monkeypatch):
     run_store.clear_caches()
     ngiab_utils._cached_catchment_variables.cache_clear()
     ngiab_utils._cached_value_matrix.cache_clear()
-    ngiab_utils.describe_troute_feature.cache_clear()
     return str(root)
 
 
@@ -180,7 +179,7 @@ def test_endpoints_read_a_run_through_the_manifest_backed_registry(registry_root
     assert variables["variables"] == ["RAIN_RATE", "Q_OUT", "SOIL_STORAGE"]
 
     frame = ngiab_utils._read_output_frame(
-        ngiab_utils.get_base_output("alpha"), "cat-100", ["Time", "Q_OUT"], time_column="Time"
+        ngiab_utils.run_outputs("alpha"), "cat-100", ["Time", "Q_OUT"], time_column="Time"
     )
     assert len(frame) == 6
 

@@ -147,7 +147,10 @@ def _read_manifest(name):
 
 
 def _describe(name):
-    """One run's listing entry: what it is, and if it is unusable, why.
+    """One run's listing entry: where it is, what it is, and if unusable, why.
+
+    ``path`` is the location DuckDB reads -- a filesystem path locally, an ``s3://`` URI when
+    hosted -- so a caller resolves a run once and never has to know which backend answered.
 
     Reports rather than filters, following ``describe_importable_run``: a directory a user
     can see in the bucket and cannot see in the interface is indistinguishable from a bug.
@@ -158,16 +161,17 @@ def _describe(name):
     would be plausible and wrong.
     """
     document = _read_manifest(name)
+    base = {"name": name, "path": location(name)}
 
     if document is False:
-        return {"name": name, "manifest": None, "usable": False, "reason": _UNREADABLE}
+        return {**base, "manifest": None, "usable": False, "reason": _UNREADABLE}
     if document is None:
-        return {"name": name, "manifest": None, "usable": False, "reason": _NOT_INGESTED}
+        return {**base, "manifest": None, "usable": False, "reason": _NOT_INGESTED}
 
     version = document.get("schema_version")
     if not isinstance(version, int) or version > manifest.SCHEMA_VERSION:
         return {
-            "name": name,
+            **base,
             "manifest": document,
             "usable": False,
             "reason": _UNSUPPORTED_SCHEMA.format(
@@ -176,8 +180,8 @@ def _describe(name):
         }
 
     if not document.get("output_format"):
-        return {"name": name, "manifest": document, "usable": False, "reason": _NO_OUTPUTS}
-    return {"name": name, "manifest": document, "usable": True, "reason": None}
+        return {**base, "manifest": document, "usable": False, "reason": _NO_OUTPUTS}
+    return {**base, "manifest": document, "usable": True, "reason": None}
 
 
 def _created_of(entry):

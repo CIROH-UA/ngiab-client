@@ -2,16 +2,15 @@ import os
 import json
 import re
 import math
+import glob
 import functools
-import sqlite3
+import posixpath
+from typing import NamedTuple
 import base64
 import logging
 import numpy as np
 import pandas as pd
-import glob
 import xarray as xr
-import pyogrio
-from pyproj import Transformer
 
 
 from . import duckdb_conn, manifest, run_store
@@ -88,7 +87,10 @@ def teehr_source(model_run_id):
     """
     from .teehr_evaluation import RUN_CONFIGURATION, EvaluationReader, evaluation_dir
 
-    dataset = evaluation_dir(_get_model_run_path_by_id(model_run_id))
+    entry = _run_entry(model_run_id)
+    document = (entry or {}).get("manifest") or {}
+    present = (document.get("teehr") or {}).get("present")
+    dataset = evaluation_dir(entry["path"] if entry else None, present=present)
     if dataset:
         return (lambda: EvaluationReader(dataset)), RUN_CONFIGURATION
 
@@ -100,14 +102,6 @@ def teehr_source(model_run_id):
         return None, None
 
     return _open_warehouse, config_name
-
-
-def _detect_legacy_teehr_layout(model_run_id):
-    """Return True if the run dir still has pre-PR ``<run>/teehr/metrics.csv``."""
-    model_path = _get_model_run_path_by_id(model_run_id)
-    if model_path is None:
-        return False
-    return os.path.exists(os.path.join(model_path, "teehr", "metrics.csv"))
 
 
 def _open_warehouse():
@@ -132,7 +126,7 @@ def _entry_from_manifest(entry):
     created = document.get("created") or ""
     return {
         "label": document.get("label") or entry["name"],
-        "path": run_store.location(entry["name"]),
+        "path": entry["path"],
         "date": created.replace("T", ":")[:19] if created else "",
         "id": document.get("id") or entry["name"],
         "legacy_uuids": document.get("legacy_uuids") or [],
@@ -183,23 +177,11 @@ def get_model_runs_selectable():
 # worth keeping -- a directory a user can see and the interface cannot is a bug either way.
 
 
-def _find_gpkg_file_path(model_path):
-    config_path = os.path.join(model_path, "config")
-    gpkg_files = []
-
-    for root, dirs, files in os.walk(config_path):
-        for file in files:
-            if file.endswith(".gpkg"):
-                gpkg_files.append(os.path.join(root, file))
-
-    # A valid run whose config directory holds no gpkg is a real case, not an IndexError.
-    return gpkg_files[0] if gpkg_files else None
-
 class UnknownModelRun(Exception):
     """Raised when a request names a model run that is not registered.
 
-    Kept separate from _get_model_run_path_by_id, which returns None on purpose: callers
-    like _detect_legacy_teehr_layout want 'not applicable', not a failure.
+    Kept separate from _get_model_run_path_by_id, which returns None on purpose: a caller
+    asking "is this run known" wants an answer, not a failure.
     """
 
 
@@ -214,6 +196,47 @@ def _require_model_run_path(model_run_id):
 def model_run_exists(model_run_id):
     """Whether a run id is registered. False for None, so a missing parameter is not a match."""
     return model_run_id is not None and _get_model_run_path_by_id(model_run_id) is not None
+
+
+def _run_entry(model_run_id):
+    """The storage entry for a run id: its name, its location, and its manifest.
+
+    One lookup for everything the read path needs, so a request resolves the run once
+    instead of re-deriving facts from the filesystem each time it wants one. Accepts a
+    directory name or any id the run previously answered to.
+    """
+    if model_run_id is None:
+        return None
+
+    wanted = manifest.normalize_uuid(model_run_id)
+    for entry in run_store.list_runs():
+        document = entry.get("manifest") or {}
+        if document.get("id") == model_run_id or entry["name"] == model_run_id:
+            return entry
+        if wanted and wanted in (document.get("legacy_uuids") or []):
+            return entry
+    return None
+
+
+def _require_run_entry(model_run_id):
+    entry = _run_entry(model_run_id)
+    if entry is None:
+        raise UnknownModelRun(model_run_id)
+    return entry
+
+
+def _run_manifest(model_run_id):
+    """The distilled facts for a run. Every probe the read path used to make is in here."""
+    return _require_run_entry(model_run_id)["manifest"] or {}
+
+
+def _child(base, *parts):
+    """Join below a run's location, whether that is a path or an ``s3://`` URI.
+
+    posixpath rather than os.path because the separator has to stay ``/`` for a URI, and this
+    only ever runs on Linux where the two agree for filesystem paths anyway.
+    """
+    return posixpath.join(base, *[str(part).strip("/") for part in parts if part])
 
 
 def _get_model_run_path_by_id(id):
@@ -236,8 +259,14 @@ def _get_model_run_path_by_id(id):
             return model_run["path"]
     return None
 
-def find_gpkg_file_path(model_run_id):
-    return _find_gpkg_file_path(_require_model_run_path(model_run_id))
+def run_bounds_4326(model_run_id):
+    """The extent to frame the map on, distilled at ingest.
+
+    Was pyogrio.read_info over a GeoPackage found by walking config/. A GeoPackage is SQLite
+    and cannot be read from an object store at all, which is why this is four numbers in a
+    manifest rather than a smaller read.
+    """
+    return _run_manifest(model_run_id).get("bounds")
 
 
 
@@ -315,7 +344,14 @@ def resolve_output_dir(base_path):
 
 
 def get_base_output(model_id):
-    return resolve_output_dir(_require_model_run_path(model_id))
+    """Where this run's catchment outputs live.
+
+    From the manifest. This used to read config/realization.json on every catchment request
+    -- the highest-frequency file open in the app -- to find ``output_root``.
+    """
+    entry = _require_run_entry(model_id)
+    document = entry["manifest"] or {}
+    return _child(entry["path"], document.get("output_dir") or _DEFAULT_OUTPUT_SUBDIR)
 
 def get_output_path(base_path):
     """
@@ -349,57 +385,39 @@ def get_output_path(base_path):
 _OUTPUT_SUFFIXES = (".parquet", ".csv")
 
 
-def _list_prefixed_output_files(directory, prefix):
-    """Return the ids of output files with ``prefix``, without their extension.
+def _find_output_file(directory, stem, suffix, known):
+    """(location, suffix) for one catchment's output, or raise.
 
-    Matches parquet as well as csv. viewOnTethys.sh converts a run's outputs at import and
-    deletes the csv copies, so globbing ``*.csv`` alone would report a converted run as
-    having no catchments -- an empty map that looks exactly like a broken one.
-
-    Deduplicated by stem, so a partially converted directory containing both ``cat-1.csv``
-    and ``cat-1.parquet`` lists that catchment once.
+    Existence comes from the manifest's catchment list rather than ``os.path.exists``. The
+    FileNotFoundError is preserved deliberately: it is what getCatchmentTimeSeries turns into
+    "This run has no output for <id>", and answering an unknown catchment with an empty chart
+    instead would be worse than the 404.
     """
-    if not os.path.exists(directory):
-        logger.info("Output directory does not exist: %s", directory)
-        return []
-
-    stems = set()
-    for name in os.listdir(directory):
-        if not name.startswith(prefix):
-            continue
-        for suffix in _OUTPUT_SUFFIXES:
-            if name.endswith(suffix):
-                stems.add(name[: -len(suffix)])
-                break
-
-    return sorted(stems)
+    if not suffix or stem not in known:
+        raise FileNotFoundError(f"No output file for {stem!r} in {directory}")
+    return _child(directory, f"{stem}{suffix}"), suffix
 
 
-def _find_output_file(directory, stem):
-    """Return (path, suffix) for a run output, preferring parquet, or raise."""
-    for suffix in _OUTPUT_SUFFIXES:
-        path = os.path.join(directory, f"{stem}{suffix}")
-        if os.path.exists(path):
-            return path, suffix
-    raise FileNotFoundError(f"No output file for {stem!r} in {directory}")
-
-
-def _read_output_columns(directory, stem):
+def _read_output_columns(outputs, stem):
     """List an output file's column names without reading its rows.
 
     For parquet this is answered from the footer (LIMIT 0 reads no row groups), which is
     what lets the caller then ask for just the two columns it needs.
     """
-    path, suffix = _find_output_file(directory, stem)
+    path, suffix = _find_output_file(
+        outputs.directory, stem, outputs.suffix, outputs.catchments
+    )
     if suffix == ".parquet":
         rel = duckdb_conn.query(
             f"SELECT * FROM read_parquet({duckdb_conn.quote(path)}) LIMIT 0"
         )
         return list(rel.columns)
-    return list(pd.read_csv(path, nrows=0).columns)
+    return list(duckdb_conn.query(
+        f"SELECT * FROM read_csv_auto({duckdb_conn.quote(path)}) LIMIT 0"
+    ).columns)
 
 
-def _read_output_frame(directory, stem, columns=None, time_column=None):
+def _read_output_frame(outputs, stem, columns=None, time_column=None):
     """Read one output file as a DataFrame, preferring parquet.
 
     ``columns`` matters: parquet is columnar, so selecting two of seventeen columns reads
@@ -416,7 +434,9 @@ def _read_output_frame(directory, stem, columns=None, time_column=None):
     parquet slower end to end than csv. The cast also yields '2017-01-01 00:00:00', which is
     byte-identical to the csv path, so the response shape does not change with the format.
     """
-    path, suffix = _find_output_file(directory, stem)
+    path, suffix = _find_output_file(
+        outputs.directory, stem, outputs.suffix, outputs.catchments
+    )
 
     if suffix == ".parquet":
         # Quoted so column names containing spaces (e.g. "Time Step") survive.
@@ -433,7 +453,18 @@ def _read_output_frame(directory, stem, columns=None, time_column=None):
             f"SELECT {', '.join(parts)} FROM read_parquet({duckdb_conn.quote(path)})"
         )
 
-    return pd.read_csv(path, usecols=list(columns) if columns else None)
+    # Same VARCHAR cast as the parquet branch, and for the same measured reason.
+    parts = []
+    for column in columns or ["*"]:
+        if column == "*":
+            parts.append("*")
+        elif time_column and column == time_column:
+            parts.append(f'CAST("{column}" AS VARCHAR) AS "{column}"')
+        else:
+            parts.append(f'"{column}"')
+    return duckdb_conn.query(
+        f"SELECT {', '.join(parts)} FROM read_csv_auto({duckdb_conn.quote(path)})"
+    )
 
 
 # Frames the map animation may hold, and cells the response may carry. Both are ceilings on
@@ -449,15 +480,19 @@ _NO_DATA_BIN = 0
 _CLASS_COUNT = 8
 
 
-def _output_glob(directory, prefix="cat-"):
-    """Return a DuckDB table expression reading every prefixed output at once."""
-    for suffix in _OUTPUT_SUFFIXES:
-        pattern = os.path.join(directory, f"{prefix}*{suffix}")
-        if glob.glob(pattern):
-            reader = "read_parquet" if suffix == ".parquet" else "read_csv"
-            table = f"{reader}({duckdb_conn.quote(pattern)}, filename=true, union_by_name=true)"
-            return table, suffix
-    return None, None
+def _output_glob(directory, suffix, prefix="cat-"):
+    """A DuckDB table expression reading every prefixed output at once.
+
+    The suffix is passed in from the manifest rather than discovered by globbing the
+    directory, which is a filesystem call with no object-store equivalent. DuckDB still
+    expands the glob itself, over either backend.
+    """
+    if not suffix:
+        return None, None
+    pattern = _child(directory, f"{prefix}*{suffix}")
+    reader = "read_parquet" if suffix == ".parquet" else "read_csv"
+    table = f"{reader}({duckdb_conn.quote(pattern)}, filename=true, union_by_name=true)"
+    return table, suffix
 
 
 def _union_columns(table):
@@ -528,12 +563,50 @@ def _class_breaks(values):
 
 
 @functools.lru_cache(maxsize=32)
-def _cached_catchment_variables(directory, fingerprint):
-    """Keyed on the fingerprint so new or rewritten outputs invalidate it."""
-    table, _ = _output_glob(directory)
+def _cached_catchment_variables(directory, version, suffix):
+    """Keyed on the run's version token so re-ingested outputs invalidate it."""
+    table, _ = _output_glob(directory, suffix)
     if table is None:
         return None
     return tuple(_union_columns(table))
+
+
+class RunOutputs(NamedTuple):
+    """Everything the catchment readers used to learn by probing the directory.
+
+    Resolved once per request from the manifest, then passed down. Before this the readers
+    each rediscovered the same three facts -- which format is present, which catchments
+    exist, and whether anything changed -- with a glob, a listdir and an os.stat, none of
+    which an object store answers.
+    """
+
+    directory: str
+    suffix: str
+    catchments: tuple
+    version: str
+
+
+def run_outputs(model_run_id):
+    """The output context for a run."""
+    entry = _require_run_entry(model_run_id)
+    document = entry["manifest"] or {}
+    directory = _child(entry["path"], document.get("output_dir") or _DEFAULT_OUTPUT_SUBDIR)
+    return RunOutputs(
+        directory=directory,
+        suffix=document.get("output_format") or "",
+        catchments=tuple(manifest.catchments(entry["path"])),
+        version=document.get("version_token", ""),
+    )
+
+
+def _version_of(model_run_id):
+    """The run's content-derived cache key.
+
+    Replaces ``_output_fingerprint``, which was ``os.stat(directory).st_mtime_ns``. An object
+    store prefix has no mtime, so that call returns None there -- leaving the key constant
+    and a re-ingested run serving stale bins forever.
+    """
+    return _run_manifest(model_run_id).get("version_token", "")
 
 
 def get_catchment_variables(model_run_id):
@@ -544,8 +617,10 @@ def get_catchment_variables(model_run_id):
     8105-catchment run, 53.9 s as csv against 0.26 s once converted. Paying that on every
     page load left the shading control disabled for most of a minute.
     """
-    directory = get_base_output(model_run_id)
-    columns = _cached_catchment_variables(directory, _output_fingerprint(directory))
+    outputs = run_outputs(model_run_id)
+    columns = _cached_catchment_variables(
+        outputs.directory, outputs.version, outputs.suffix
+    )
     if columns is None:
         return {"variables": [], "time_column": None}
     if len(columns) < 3:
@@ -555,39 +630,33 @@ def get_catchment_variables(model_run_id):
     return {"variables": list(columns[2:]), "time_column": columns[1]}
 
 
-def _output_fingerprint(directory):
-    """Cheap change detector for a run's output directory."""
-    try:
-        stat = os.stat(directory)
-    except OSError:
-        return None
-    return (stat.st_mtime_ns, stat.st_size)
-
-
 @functools.lru_cache(maxsize=8)
-def _cached_value_matrix(directory, variable, fingerprint):
-    return _build_value_matrix(directory, variable)
+def _cached_value_matrix(directory, variable, version, suffix, catchment_count):
+    """Keyed on the version token: a re-ingested run must not serve the previous grid."""
+    return _build_value_matrix(directory, variable, suffix, catchment_count)
 
 
 def get_catchment_value_matrix(model_run_id, variable=None):
     """Per-catchment values over time for one variable, quantised for a choropleth.
 
     Cached because scrubbing the timeline must not re-scan the outputs, and a full read costs
-    seconds on csv. The fingerprint makes a converted or re-run directory miss the cache.
+    seconds on csv. The version token makes a converted or re-ingested run miss the cache.
 
     The cached dict is handed straight to JsonResponse and must not be mutated by callers.
     """
-    directory = get_base_output(model_run_id)
-    return _cached_value_matrix(directory, variable, _output_fingerprint(directory))
+    outputs = run_outputs(model_run_id)
+    return _cached_value_matrix(
+        outputs.directory, variable, outputs.version, outputs.suffix, len(outputs.catchments)
+    )
 
 
-def _build_value_matrix(directory, variable=None):
+def _build_value_matrix(directory, variable=None, suffix="", catchment_count=0):
     """Everything here is derived from the run being asked about.
 
     Runs differ in which variables they wrote, over what period, at what step, and across what
     range of values, so none of those may be assumed or shared between runs.
     """
-    table, _ = _output_glob(directory)
+    table, _ = _output_glob(directory, suffix)
 
     empty = {
         "variable": None,
@@ -618,7 +687,6 @@ def _build_value_matrix(directory, variable=None):
     if not distinct_times:
         return {**empty, "variable": selected, "variables": variables}
 
-    catchment_count = len(_list_prefixed_output_files(directory, "cat-"))
     span_hours = max((end - start).total_seconds() / 3600.0, 0.0)
     bucket_hours = _choose_bucket_hours(distinct_times, span_hours, catchment_count)
 
@@ -776,61 +844,14 @@ def build_series_payload(times, values, max_points=_DEFAULT_MAX_POINTS):
     return payload
 
 
-def gpkg_layer_bounds_4326(gpkg_path, layers=("divides", "nexus")):
-    """Return [west, south, east, north] for the first readable layer, in EPSG:4326.
-
-    read_info reads the layer header, not its features: the extent of a 55-catchment run
-    costs about 2 ms this way against reading every geometry into a GeoDataFrame to call
-    total_bounds on it. The map only ever used this to frame the run.
-
-    transform_bounds rather than transforming two corner points: it densifies the edges, so
-    a box in a projected crs does not shrink when the projection curves it.
-    """
-    for layer in layers:
-        try:
-            info = pyogrio.read_info(gpkg_path, layer=layer)
-        except Exception:
-            continue
-
-        bounds = info.get("total_bounds")
-        if bounds is None or not len(bounds):
-            continue
-
-        crs = info.get("crs")
-        if not crs:
-            return [float(value) for value in bounds]
-        try:
-            transformer = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
-            return [float(value) for value in transformer.transform_bounds(*bounds)]
-        except Exception:
-            logger.warning("Could not reproject %s bounds from %s", layer, crs)
-            continue
-
-    logger.info("No usable layer extent in %s", gpkg_path)
-    return None
-
-
 def getCatchmentsIds(model_run_id):
-    """
-    Get a list of catchment IDs.
-
-    Parameters:
-        app_workspace (str): The path to the application workspace.
-
-    Returns:
-        list: A list of dictionaries containing catchment IDs and labels.
-              Each dictionary has the keys 'value' and 'label'.
-    """
-    output_base_file = get_base_output(model_run_id)
-    catchment_prefix = "cat-"
-    catchment_ids_list = _list_prefixed_output_files(output_base_file, catchment_prefix)
-    return [{"value": id, "label": id} for id in catchment_ids_list]
+    """The catchment picker's options."""
+    return [{"value": cid, "label": cid} for cid in getCatchmentsList(model_run_id)]
 
 
 def getCatchmentsList(model_id):
-    output_base_file = get_base_output(model_id)
-    catchment_prefix = "cat-"
-    return _list_prefixed_output_files(output_base_file, catchment_prefix)
+    """The run's catchment ids, from the manifest sidecar rather than a directory listing."""
+    return manifest.catchments(_require_run_entry(model_id)["path"])
 
 
 
@@ -900,30 +921,27 @@ def get_troute_vars(df):
     return variables
 
 
-@functools.lru_cache(maxsize=32)
 def describe_troute_feature(model_run_id, feature_id):
     """Say what a T-Route feature id is, checked against the run's hydrofabric.
 
     T-Route indexes by flowpath, while the map selects a divide, and this hydrofabric numbers
     the two alike, so clicking cat-2863630 plots the channel wb-2863630. That is a convention
-    of the fabric rather than a guarantee, so the pairing is read out of the gpkg instead of
-    assumed. Returns (flowpath_id, divide_id), either of which may be None.
+    of the fabric rather than a guarantee, so the pairing is still read rather than assumed --
+    from the crosswalk distilled at ingest, instead of from the GeoPackage as SQLite.
+
+    No longer lru_cached per feature. The crosswalk is cached whole, keyed on the run's
+    version token, because looking one pairing up at a time is what made the old
+    ``lru_cache(32)`` necessary and is exactly the cost that does not survive object storage.
+
+    Returns (flowpath_id, divide_id), either of which may be None.
     """
-    gpkg_path = find_gpkg_file_path(model_run_id)
-    if not gpkg_path:
+    entry = _run_entry(model_run_id)
+    if entry is None:
         return None, None
 
     flowpath_id = f"wb-{feature_id}"
-    try:
-        with sqlite3.connect(f"file:{gpkg_path}?mode=ro", uri=True) as connection:
-            row = connection.execute(
-                "SELECT id, divide_id FROM flowpaths WHERE id = ?", (flowpath_id,)
-            ).fetchone()
-    except sqlite3.Error:
-        logger.warning("Could not read flowpaths from %s", gpkg_path)
-        return None, None
-
-    return (row[0], row[1]) if row else (None, None)
+    divide_id = manifest.crosswalk(entry["path"]).get(flowpath_id)
+    return (flowpath_id, divide_id) if divide_id is not None else (None, None)
 
 
 def check_troute_id(df, id):

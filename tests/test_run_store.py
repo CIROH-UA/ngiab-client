@@ -31,6 +31,11 @@ class InMemoryStorage(Storage):
     pass against FileSystemStorage and fail in a bucket.
     """
 
+    #: A real S3Storage always names a bucket, so the fake does too -- run_store builds a
+    #: run's s3:// location from it, and a fake without one is not faking the same thing.
+    bucket_name = "runs-bucket"
+    location = ""
+
     def __init__(self, objects=None, fail_with=None):
         self._objects = dict(objects or {})
         self._fail_with = fail_with
@@ -244,10 +249,9 @@ def test_local_location_is_a_filesystem_path(local_root):
     assert location == os.path.join(local_root, "alpha", "outputs", "ngen")
 
 
-def test_object_location_is_an_s3_uri(object_root, monkeypatch):
-    monkeypatch.setattr(run_store, "_bucket_uri", lambda: "s3://runs-bucket/prefix")
+def test_object_location_is_an_s3_uri(object_root):
     assert run_store.location("alpha", "outputs", "ngen") == (
-        "s3://runs-bucket/prefix/alpha/outputs/ngen"
+        "s3://runs-bucket/alpha/outputs/ngen"
     )
 
 

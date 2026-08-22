@@ -187,7 +187,7 @@ def test_the_connection_is_shared_not_reopened(local_backend, mocker):
 
 
 @pytest.fixture
-def awkward_run(mini_run_factory):
+def awkward_run(ingest):
     """A run whose directory name contains a single quote, in both output formats.
 
     Every interpolation site below took its path raw before this unit. That was safe only
@@ -196,35 +196,22 @@ def awkward_run(mini_run_factory):
     inside a user-supplied archive -- so these become input-handling paths, and a quote in a
     directory name is the mildest thing that can appear in one.
     """
-    return mini_run_factory(name="o'brien run", output_format="both")
+    return ingest("o'brien run", output_format="both")
 
 
 @pytest.fixture
-def awkward_run_id(awkward_run, monkeypatch):
-    from tethysapp.ngiab import utils as ngiab_utils
-
-    run_id = "33333333-3333-3333-3333-333333333333"
-    entry = {
-        "label": "awkward",
-        "path": awkward_run,
-        "date": "2026-08-22:00:00:00",
-        "id": run_id,
-        "subset": "",
-        "tags": [],
-        "teehr_configuration_name": "",
-    }
-    monkeypatch.setattr(ngiab_utils, "_get_list_model_runs", lambda: {"model_runs": [entry]})
-    ngiab_utils._cached_catchment_variables.cache_clear()
-    ngiab_utils._cached_value_matrix.cache_clear()
-    return run_id
+def awkward_run_id(awkward_run):
+    """The run name is the directory name, so the quote is in the id too."""
+    return awkward_run
 
 
 def test_read_output_columns_survives_a_quoted_path(awkward_run, awkward_run_id):
     """_read_output_columns, utils.py -- read_parquet(...) LIMIT 0."""
     from tethysapp.ngiab import utils as ngiab_utils
 
-    directory = ngiab_utils.get_base_output(awkward_run_id)
-    columns = ngiab_utils._read_output_columns(directory, "cat-100")
+    columns = ngiab_utils._read_output_columns(
+        ngiab_utils.run_outputs(awkward_run_id), "cat-100"
+    )
     assert columns[:2] == ["Time Step", "Time"]
 
 
@@ -232,9 +219,8 @@ def test_read_output_frame_survives_a_quoted_path(awkward_run, awkward_run_id):
     """_read_output_frame, utils.py -- the projected read behind every catchment chart."""
     from tethysapp.ngiab import utils as ngiab_utils
 
-    directory = ngiab_utils.get_base_output(awkward_run_id)
     frame = ngiab_utils._read_output_frame(
-        directory, "cat-100", ["Time", "Q_OUT"], time_column="Time"
+        ngiab_utils.run_outputs(awkward_run_id), "cat-100", ["Time", "Q_OUT"], time_column="Time"
     )
     assert len(frame) == 6
     assert frame["Time"].iloc[0] == "2017-01-01 00:00:00"

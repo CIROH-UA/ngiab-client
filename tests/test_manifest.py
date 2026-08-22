@@ -21,7 +21,6 @@ import os
 import pytest
 
 from tethysapp.ngiab import manifest
-from tethysapp.ngiab import utils as ngiab_utils
 
 
 @pytest.fixture
@@ -35,38 +34,34 @@ def distilled(mini_run):
 # ---- Distilled facts match the probes they replace -------------------------
 
 
-def test_bounds_match_the_gpkg_probe(distilled):
-    """R8: the extent gpkg_layer_bounds_4326 reads from the layer header."""
-    run, document = distilled
-    live = ngiab_utils.gpkg_layer_bounds_4326(ngiab_utils._find_gpkg_file_path(run))
-    assert document["bounds"] == pytest.approx(live)
+def test_bounds_are_reprojected_to_4326(distilled):
+    """R8: the extent the map frames on, read from the layer header at ingest.
+
+    Compared against gpkg_layer_bounds_4326 when this was written. That probe is gone as of
+    Unit 9 -- the manifest is the only source now -- so this asserts the values, which is what
+    the comparison established in the first place.
+    """
+    _, document = distilled
+    west, south, east, north = document["bounds"]
+    assert -130 < west < east < -60
+    assert 20 < south < north < 55
 
 
-def test_crosswalk_matches_describe_troute_feature(distilled, monkeypatch):
-    """R8: the flowpath-to-divide pairing, today read out of the gpkg as SQLite."""
+def test_crosswalk_pairs_every_flowpath_with_its_divide(distilled):
+    """R8: the pairing describe_troute_feature used to read out of the gpkg as SQLite."""
     run, _ = distilled
-    run_id = "44444444-4444-4444-4444-444444444444"
-    monkeypatch.setattr(
-        ngiab_utils,
-        "_get_list_model_runs",
-        lambda: {"model_runs": [{"id": run_id, "path": run, "label": "mini"}]},
-    )
-    ngiab_utils.describe_troute_feature.cache_clear()
-
     crosswalk = manifest.crosswalk(run)
-    for feature_id in (100, 101, 102):
-        live = ngiab_utils.describe_troute_feature(run_id, feature_id)
-        assert crosswalk.get(f"wb-{feature_id}") == live[1]
-        assert live[0] == f"wb-{feature_id}"
+    assert crosswalk == {
+        "wb-100": "cat-100",
+        "wb-101": "cat-101",
+        "wb-102": "cat-102",
+    }
 
 
-def test_catchment_list_matches_the_directory_listing(distilled):
-    """R9: what _list_prefixed_output_files answers by listing the output directory."""
+def test_catchment_list_is_what_the_run_wrote(distilled):
+    """R9: what _list_prefixed_output_files answered by listing the output directory."""
     run, _ = distilled
-    live = ngiab_utils._list_prefixed_output_files(
-        ngiab_utils.resolve_output_dir(run), "cat-"
-    )
-    assert manifest.catchments(run) == live
+    assert manifest.catchments(run) == ["cat-100", "cat-101", "cat-102"]
 
 
 def test_catchment_list_is_identical_across_output_formats(mini_run_factory):
@@ -80,11 +75,10 @@ def test_catchment_list_is_identical_across_output_formats(mini_run_factory):
     )
 
 
-def test_output_directory_matches_resolve_output_dir(distilled):
-    """R9: what get_output_path reads out of realization.json on every request."""
-    run, document = distilled
-    live = ngiab_utils.resolve_output_dir(run)
-    assert os.path.join(run, document["output_dir"]) == live
+def test_output_directory_is_recorded(distilled):
+    """R9: what get_output_path read out of realization.json on every request."""
+    _, document = distilled
+    assert document["output_dir"] == os.path.join("outputs", "ngen")
 
 
 def test_output_format_is_recorded(mini_run_factory):
