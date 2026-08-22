@@ -9,9 +9,9 @@ whatever the producer emitted. This file is the other half: it drives the real
 manifest-backed producer against a real storage root and asserts the readers above it work
 unchanged.
 
-The database is still present and still migrated here. Nothing reads it. That is the point of
-landing this separately from Unit 8 -- if the listing is wrong, reverting is one commit and no
-data has moved.
+When this was written the table still existed and simply went unread, which is what made the
+change revertible. Unit 8 has since dropped it, and the last test here now asserts that rather
+than spying on a model that no longer exists.
 """
 
 import json
@@ -223,13 +223,13 @@ def test_an_unparseable_ttl_falls_back_rather_than_crashing(monkeypatch):
 # ---- The database is present and unread ------------------------------------
 
 
-def test_the_listing_does_not_touch_the_database(registry_root, mocker):
-    """Unit 5 must be revertible: the table still exists and nothing consults it.
+def test_the_registry_table_is_gone(db, registry_root):
+    """Migration 0003 dropped it, and the listing never needed it.
 
-    Unit 8 drops it, after the backfill in Unit 7 has written manifests for the rows.
+    Asserted against the live schema rather than by spying on a model, because the model no
+    longer exists to spy on -- which is the point.
     """
-    from tethysapp.ngiab import models
+    from django.db import connection
 
-    spy = mocker.spy(models.ModelRun.objects, "all")
-    ngiab_utils._get_list_model_runs()
-    assert spy.call_count == 0
+    assert "ngiab_modelrun" not in connection.introspection.table_names()
+    assert len(ngiab_utils._get_list_model_runs()["model_runs"]) == 2

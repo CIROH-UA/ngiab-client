@@ -39,9 +39,32 @@ def _insert(path, label="a run", run_id=None, teehr="", created="2026-08-01 00:0
     return run_id
 
 
+def _create_legacy_table():
+    """Recreate the table migration 0003 drops.
+
+    The schema this code produces no longer has it, so an upgrade from a database that does
+    is exactly what cannot be reproduced by running migrations. Building it by hand is the
+    only way to test the path a real user takes, and it is also the honest shape of the
+    test: this command exists to read something this release does not create.
+    """
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""CREATE TABLE IF NOT EXISTS {TABLE} (
+                id char(32) NOT NULL PRIMARY KEY,
+                label varchar(255) NOT NULL,
+                path varchar(1024) NOT NULL,
+                subset varchar(255) NOT NULL,
+                tags text NOT NULL,
+                teehr_configuration_name varchar(255) NOT NULL,
+                created datetime NOT NULL
+            )"""
+        )
+
+
 @pytest.fixture
 def registry(db, tmp_path, monkeypatch):
-    """A storage root and an empty registry table, as an upgrading install would have."""
+    """A storage root and a legacy registry table, as an upgrading install would have."""
+    _create_legacy_table()
     root = tmp_path / "ngiab_visualizer"
     root.mkdir()
     monkeypatch.delenv(run_store.duckdb_conn.STORAGE_BACKEND_ENV, raising=False)
@@ -265,11 +288,11 @@ def test_an_unwritable_root_aborts_rather_than_half_finishing(
 # ---- Before and after the table exists --------------------------------------
 
 
-def test_no_registry_table_is_not_an_error(registry, monkeypatch):
-    """After Unit 8 the table is gone and this still runs on every start."""
-    monkeypatch.setattr(
-        connection.introspection, "table_names", lambda *a, **k: ["auth_user"]
-    )
+def test_no_registry_table_is_not_an_error(db, tmp_path, monkeypatch):
+    """The steady state after the migration: the table is gone and this still runs."""
+    monkeypatch.setenv(run_store.MANAGED_ROOT_ENV, str(tmp_path))
+    with connection.cursor() as cursor:
+        cursor.execute(f"DROP TABLE IF EXISTS {TABLE}")
     call_command("backfill_manifests")
 
 

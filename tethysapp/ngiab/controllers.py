@@ -7,12 +7,10 @@ import logging
 import pandas as pd
 import duckdb
 from tethys_sdk.routing import controller
+from . import run_store
 from .utils import (
     UnknownModelRun,
     model_run_exists,
-    scan_importable_runs,
-    describe_importable_run,
-    teehr_name_from_manifest,
     get_base_output,
     _read_output_frame,
     _read_output_columns,
@@ -162,70 +160,35 @@ def getModelRuns(request):
 @require_POST
 @write_login_required
 def removeModelRun(request):
-    """Temporarily unavailable, and saying so rather than pretending.
+    """Delete a run and everything under it. Irreversible.
 
-    The run picker reads the storage root now, not the database, so deleting the row this
-    endpoint used to delete would change nothing a user can see: the run would report itself
-    removed and still be there on the next refresh. A silently ineffective button is worse
-    than an absent one.
+    The run picker is derived from the storage root now, so removal has to delete: a removal
+    that only forgot would put the run back on the next listing. That resurrection is not
+    hypothetical -- under the old JSON registry, deleting the sole run brought it back on the
+    next request, which made unregistering look broken.
 
-    The real behaviour -- deleting the run's directory -- lands in Unit 8, deliberately after
-    authentication arrives in Unit 6. Shipping an irreversible delete on an endpoint that
-    ``ENABLE_OPEN_PORTAL: true`` leaves reachable by anyone is the one ordering this plan
-    will not take.
+    So this reverses a deliberate earlier decision that the app should contain no delete at
+    all. Two things carry the weight instead: it is unreachable without signing in, and the
+    interface names what is about to be destroyed before calling it.
 
-    POST is kept because it still mutates once Unit 8 lands, and because a GET here would be
-    one link prefetch away from destroying a run.
+    Takes a run name, never a path. An unknown name is a 404 rather than a 400, because the
+    caller is naming something that is not there.
     """
-    return JsonResponse(
-        {
-            "error": "Removing a run is unavailable while the registry moves to the storage "
-            "root. Delete the run's directory from the storage root instead."
-        },
-        status=501,
-    )
+    name = (request.POST.get("model_run_id") or "").strip()
+    if not name:
+        return JsonResponse({"error": "model_run_id is required."}, status=400)
 
+    try:
+        run_store.delete(name)
+    except LookupError:
+        return JsonResponse({"error": "No such model run."}, status=404)
+    except OSError as exc:
+        logger.exception("Could not delete run %s", name)
+        return JsonResponse(
+            {"error": f"Could not delete that run: {exc.strerror or exc}"}, status=500
+        )
 
-@controller
-def scanModelRuns(request):
-    """List the directories under the managed root that could be registered.
-
-    Offers what is already mounted rather than a path to type: the container can only see
-    the mount, and a name the user picks from a list cannot point anywhere else.
-    """
-    return JsonResponse({"candidates": scan_importable_runs()})
-
-
-@controller
-@require_POST
-@write_login_required
-def registerModelRun(request):
-    """Register one directory the scan offered.
-
-    Takes the path the scan reported, and accepts it only if a fresh scan would report it
-    again, so the set of registerable directories is exactly the set on offer.
-    """
-    from .models import ModelRun
-
-    run_path = (request.POST.get("path") or "").strip()
-
-    # Refused unless a fresh scan would offer this exact path; see the docstring.
-    described = describe_importable_run(run_path)
-    if described is None:
-        return JsonResponse({"error": "That is not a directory the visualizer offers."}, status=404)
-    if not described["importable"]:
-        return JsonResponse({"error": described["reason"]}, status=400)
-
-    # Idempotent on path, like register_run: a second import updates rather than duplicates.
-    run, created = ModelRun.objects.update_or_create(
-        path=run_path,
-        defaults={
-            "label": described["label"],
-            "teehr_configuration_name": teehr_name_from_manifest(run_path),
-        },
-    )
-
-    return JsonResponse({"model_run_id": str(run.id), "created": created})
+    return JsonResponse({"removed": name})
 
 
 @controller

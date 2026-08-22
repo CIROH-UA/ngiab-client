@@ -298,20 +298,3 @@ def test_clear_caches_makes_a_new_run_visible(local_root, mini_run_factory):
 
     run_store.clear_caches()
     assert len(run_store.list_runs()) == 3
-
-
-# ---- Temporary duplication with utils --------------------------------------
-
-
-def test_run_store_and_utils_agree_on_the_managed_root(monkeypatch):
-    """Both modules name the same root until Unit 5 removes utils' copy.
-
-    run_store cannot import utils: Unit 5 makes utils import run_store, and the pair would
-    become a cycle. So the constant is duplicated for three units, and this test is what
-    stops the two drifting in the meantime -- a divergence would mean the listing and the
-    importer disagreed about where runs live, with no error anywhere.
-    """
-    from tethysapp.ngiab import utils as ngiab_utils
-
-    monkeypatch.delenv(run_store.MANAGED_ROOT_ENV, raising=False)
-    assert run_store.DEFAULT_MANAGED_ROOT == ngiab_utils.MANAGED_ROOT

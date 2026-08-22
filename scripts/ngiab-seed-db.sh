@@ -3,9 +3,14 @@
 # Seed the portal database onto a host mount. Sourced by both entrypoints.
 #
 # The database is baked into the image at build time, which makes startup fast but ties its
-# lifetime to the container -- and viewOnTethys.sh runs with --rm. That was fine while the
-# database held only migrations and a superuser. It is not fine now that it owns the
-# model-run registry, which users expect to survive a restart.
+# lifetime to the container -- and viewOnTethys.sh runs with --rm.
+#
+# This was written because the database owned the model-run registry, which users expect to
+# survive a restart. It no longer does: the storage root is the registry. The script is kept
+# because a different reason arrived in place of the old one -- writes now require signing
+# in, so auth_user and django_session are worth persisting for the first time. Without the
+# seed a local user would re-authenticate after every restart and lose any account they
+# created.
 #
 # If a writable database directory is mounted, copy the baked database there once and point
 # the image's path at it with a symlink. SQLite follows the symlink and creates its

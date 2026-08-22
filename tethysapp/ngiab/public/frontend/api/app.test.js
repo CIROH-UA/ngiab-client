@@ -123,34 +123,30 @@ it('exposes exactly the in-scope viewer endpoints', () => {
     'getTeehrVariables',
     'getTrouteTimeSeries',
     'getTrouteVariables',
-    'registerModelRun',
     'removeModelRun',
-    'scanModelRuns',
   ]);
 });
 
 describe('mutating endpoints', () => {
-  // A GET that unregisters a run is one link prefetch away from doing it by accident.
-  it('sends registration and removal as POST, not in the query string', () =>
+  // A GET here would be one link prefetch away from deleting a run's outputs.
+  it('sends removal as POST, not in the query string', () =>
     withStubbedFetch(
-      () => jsonResponse({ created: true }),
+      () => jsonResponse({ removed: 'abc' }),
       async (calls) => {
-        await appAPI.registerModelRun({ path: '/runs/gage-10154200' });
         await appAPI.removeModelRun({ model_run_id: 'abc' });
 
-        expect(calls.map((c) => c.init.method)).to.deep.equal(['POST', 'POST']);
-        expect(calls[0].url).to.not.contain('path=');
-        expect(calls[0].init.body).to.contain('path=%2Fruns%2Fgage-10154200');
-        expect(calls[1].init.body).to.contain('model_run_id=abc');
+        expect(calls.map((c) => c.init.method)).to.deep.equal(['POST']);
+        expect(calls[0].url).to.not.contain('model_run_id=');
+        expect(calls[0].init.body).to.contain('model_run_id=abc');
       },
     ));
 
   it('echoes the csrf cookie back on a mutation', () => {
     document.cookie = 'csrftoken=token-from-django';
     return withStubbedFetch(
-      () => jsonResponse({ created: true }),
+      () => jsonResponse({ removed: 'x' }),
       async (calls) => {
-        await appAPI.registerModelRun({ path: '/runs/x' });
+        await appAPI.removeModelRun({ model_run_id: 'x' });
         expect(calls[0].init.headers['X-CSRFToken']).to.equal('token-from-django');
       },
     );
@@ -159,12 +155,12 @@ describe('mutating endpoints', () => {
   // Failure has to read the same whichever verb produced it.
   it('reports a failed POST the way it reports a failed GET', () =>
     withStubbedFetch(
-      () => jsonResponse({ error: 'That is not a directory the visualizer offers.' }, 400),
+      () => jsonResponse({ error: 'No such model run.' }, 404),
       async () => {
         let caught = null;
-        try { await appAPI.registerModelRun({ path: '/etc' }); } catch (e) { caught = e; }
-        expect(caught.status).to.equal(400);
-        expect(caught.userMessage).to.equal('That is not a directory the visualizer offers.');
+        try { await appAPI.removeModelRun({ model_run_id: 'nope' }); } catch (e) { caught = e; }
+        expect(caught.status).to.equal(404);
+        expect(caught.userMessage).to.equal('No such model run.');
       },
     ));
 });

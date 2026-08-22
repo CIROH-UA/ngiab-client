@@ -65,6 +65,19 @@ jobs:
           done
           echo "no references to removed modules"
 
+      # models.py is gone: the storage root is the registry. A bare "ModelRun" grep would be
+      # wrong -- the migrations name the model legitimately, and docstrings cite it as history
+      # -- so this matches the import, which is the thing that actually breaks.
+      - name: Check for imports of the removed model
+        run: |
+          set -e
+          if grep -rnE "from \.models import|from tethysapp\.ngiab\.models import" \
+               --include='*.py' tethysapp/; then
+            echo "::error::tethysapp still imports the removed ModelRun model"
+            exit 1
+          fi
+          echo "no imports of the removed model"
+
   pytest:
     runs-on: ubuntu-latest
     steps:

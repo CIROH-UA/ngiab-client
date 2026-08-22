@@ -78,8 +78,10 @@ def test_our_decorator_refuses_the_same_request():
 # ---- The endpoints themselves ----------------------------------------------
 
 
-@pytest.mark.parametrize("endpoint", ["removeModelRun", "registerModelRun"])
+@pytest.mark.parametrize("endpoint", ["removeModelRun"])
 def test_every_mutating_endpoint_refuses_an_anonymous_caller(endpoint, anonymous_post):
+    """One endpoint now. registerModelRun went with the importer -- presence in the storage
+    root is registration, so there is nothing left to register."""
     response = getattr(controllers, endpoint)(anonymous_post)
     assert response.status_code == 401
 
@@ -97,12 +99,19 @@ def test_the_refusal_says_what_to_do(anonymous_post):
     assert "Sign in" in json.loads(response.content)["error"]
 
 
-def test_a_signed_in_caller_gets_past_the_decorator(signed_in_post):
-    """Past authentication, removeModelRun's own 501 is what answers -- see Unit 5.
+def test_a_signed_in_caller_gets_past_the_decorator(signed_in_post, tmp_path, monkeypatch):
+    """Past authentication, the endpoint's own answer is what comes back.
 
-    The point is only that the decorator is not what stopped it.
+    404 here because the run named does not exist. The point is only that authentication is
+    not what stopped it -- and that a signed-in caller naming a run that is not there gets
+    told so, rather than deleting something else.
     """
-    assert controllers.removeModelRun(signed_in_post).status_code == 501
+    from tethysapp.ngiab import run_store
+
+    monkeypatch.delenv(run_store.duckdb_conn.STORAGE_BACKEND_ENV, raising=False)
+    monkeypatch.setenv(run_store.MANAGED_ROOT_ENV, str(tmp_path))
+    run_store.clear_caches()
+    assert controllers.removeModelRun(signed_in_post).status_code == 404
 
 
 def test_reads_are_untouched():
@@ -118,7 +127,6 @@ def test_reads_are_untouched():
         "getTeehrTimeSeries",
         "getTeehrVariables",
         "getTeehrLocations",
-        "scanModelRuns",
     ]
     for name in reads:
         view = getattr(controllers, name)

@@ -286,6 +286,77 @@ def _root_key():
     return f"{bucket or type(backend).__name__}/{prefix}"
 
 
+def delete(name):
+    """Remove one run and everything under it. Irreversible.
+
+    Takes a run *name*, never a path, and refuses any name the listing did not just return.
+    That is the same invariant the old importer enforced from the other direction -- it
+    accepted a path only if a fresh scan would offer that exact path, verified against
+    ``../..`` and symlinks planted inside the root. Resolving the name through the listing
+    means a caller cannot describe a directory of its own choosing at all, so there is no
+    traversal to defend against.
+
+    This reverses a deliberate decision: the app previously contained no ``os.remove`` at
+    all, because unregistering a run that the user could not re-add was judged too much
+    damage for a tidy-up action. It is reversed knowingly -- with the listing derived from
+    storage, a removal that does not delete cannot work, because the run reappears on the
+    next scan. That resurrection is a bug this project already shipped once, under the JSON
+    registry, where deleting the sole run brought it back on the next request.
+    """
+    import shutil
+
+    if not _is_plain_name(name) or find(name) is None:
+        raise LookupError(name)
+
+    if duckdb_conn.is_object_storage():
+        _delete_prefix(storage(), name)
+    else:
+        shutil.rmtree(_contained_directory(name))
+
+    clear_caches()
+
+
+def _is_plain_name(name):
+    """A run name is one path component. Anything else is not a run being named."""
+    return bool(name) and name not in (".", "..") and os.sep not in name and "/" not in name
+
+
+def _contained_directory(name):
+    """The run's real directory, or LookupError if it is not genuinely inside the root.
+
+    ``find`` is not sufficient on its own: it reports *unusable* entries too, so a symlink
+    sitting in the root comes back as an entry with a reason attached. Deleting through it
+    would follow the link out of the storage root.
+
+    This is the containment check ``is_scannable`` used to perform -- realpath on both sides,
+    so neither ``..`` in a name nor a symlink planted inside the root can name a directory
+    outside it. The importer that needed it is gone; the invariant is not. A symlink is
+    refused outright rather than unlinked, because it is not a run.
+    """
+    root = os.path.realpath(local_root())
+    target = os.path.join(root, name)
+    if os.path.islink(target) or not os.path.isdir(target):
+        raise LookupError(name)
+
+    real = os.path.realpath(target)
+    if real != root and not real.startswith(root + os.sep):
+        raise LookupError(name)
+    return real
+
+
+def _delete_prefix(backend, prefix):
+    """Delete every object under a prefix, depth first.
+
+    Object stores have no directories to remove, only keys, so this enumerates and deletes
+    rather than unlinking a tree.
+    """
+    directories, files = backend.listdir(prefix)
+    for name in files:
+        backend.delete(posixpath.join(prefix, name))
+    for name in directories:
+        _delete_prefix(backend, posixpath.join(prefix, name))
+
+
 def clear_caches():
     """Drop the cached listing. Called after ingest, after removal, and by tests."""
     _cached_listing.cache_clear()

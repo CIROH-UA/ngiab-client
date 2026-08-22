@@ -7,10 +7,8 @@ const url = (name) => `${getConfig().APP_ROOT_URL}${name}/`;
 // Viewer endpoints only.
 const appAPI = {
   getModelRuns: () => getJSON(url('getModelRuns')),
-  scanModelRuns: () => getJSON(url('scanModelRuns')),
 
   // Mutations, so POST: a GET here is one prefetch away from unregistering a run.
-  registerModelRun: (params) => postJSON(url('registerModelRun'), params),
   removeModelRun: (params) => postJSON(url('removeModelRun'), params),
 
   getGeoSpatialData: (params) => getJSON(url('getGeoSpatialData'), params),
