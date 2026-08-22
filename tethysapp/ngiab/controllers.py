@@ -4,7 +4,6 @@ from django.views.decorators.http import require_POST
 from django.urls import reverse
 import functools
 import logging
-import pandas as pd
 import duckdb
 from tethys_sdk.routing import controller
 from . import run_store
@@ -22,6 +21,8 @@ from .utils import (
     describe_troute_feature,
     troute_variable_note,
     TROUTE_MISSING,
+    TROUTE_FEATURE_COLUMN,
+    TROUTE_TIME_COLUMN,
     getCatchmentsList,
     run_bounds_4326,
     get_model_runs_selectable,
@@ -345,31 +346,17 @@ def getTrouteTimeSeries(request):
     if variable_column is None:
         return JsonResponse({"error": "This model run has no plottable troute variables."})
 
+    # One shape reaches here now; see utils._normalised_troute_frame for what it replaced.
     try:
-        if isinstance(df.index, pd.MultiIndex):
-            # Multi-indexed DataFrame: Slice using `feature_id` in the multi-index
-            df_sliced_by_id = df.xs(clean_troute_id, level="feature_id")
-            time_col = df_sliced_by_id.index.get_level_values("time")
-        else:
-            # Flat-indexed DataFrame: Filter using `featureID` column
-            df_sliced_by_id = df[df["featureID"] == clean_troute_id]
-            time_col = df_sliced_by_id["current_time"]
-
-        var_col = df_sliced_by_id[variable_column]
-
+        selected = df[df[TROUTE_FEATURE_COLUMN] == clean_troute_id]
         data = [
-            {
-                "x": (
-                    time.strftime("%Y-%m-%d %H:%M:%S")
-                    if isinstance(time, pd.Timestamp)
-                    else str(time)
-                ),
-                "y": None if val is None or val == TROUTE_MISSING else val,
-            }
-            for time, val in zip(time_col.tolist(), var_col.tolist())
+            {"x": str(when), "y": None if value == TROUTE_MISSING else value}
+            for when, value in zip(
+                selected[TROUTE_TIME_COLUMN].tolist(), selected[variable_column].tolist()
+            )
         ]
-    except Exception as e:
-        print(f"Error: {e}")
+    except (KeyError, TypeError) as exc:
+        logger.warning("Could not slice troute output for %s: %s", clean_troute_id, exc)
         data = []
 
     flowpath_id, divide_id = describe_troute_feature(model_run_id, clean_troute_id)

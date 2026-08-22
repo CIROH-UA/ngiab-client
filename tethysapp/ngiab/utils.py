@@ -2,7 +2,6 @@ import os
 import json
 import re
 import math
-import glob
 import functools
 import posixpath
 from typing import NamedTuple
@@ -278,49 +277,101 @@ def run_bounds_4326(model_run_id):
 TROUTE_MISSING = -9999
 
 
-def _get_base_troute_output(model_id):
-    base_path = _require_model_run_path(model_id)
-    return os.path.join(base_path, "outputs", "troute")
+_TROUTE_SUBDIR = os.path.join("outputs", "troute")
+
+TROUTE_FEATURE_COLUMN = "feature_id"
+TROUTE_TIME_COLUMN = "time"
+
+# Identifier and coordinate columns across every troute source shape, so the picker never
+# offers one as something to plot.
+_TROUTE_NON_VARIABLES = frozenset(
+    {"type", "time", "current_time", "feature_id", "featureid"}
+)
+
+
+@functools.lru_cache(maxsize=8)
+def _cached_troute_frame(directory, version, source, source_format):
+    """One read per run, not one per request.
+
+    getTrouteVariables and getTrouteTimeSeries are separate requests and each used to read
+    the whole file -- ``xr.open_dataset(...).to_dataframe()`` loads every feature and every
+    timestep to plot one channel. Converting to parquet makes that read cheaper; only caching
+    makes it stop happening twice per chart. Keyed on the version token, like every other
+    cache here, because an object-store prefix has no mtime.
+    """
+    return _normalised_troute_frame(source, source_format)
+
+
+def _normalised_troute_frame(source, source_format):
+    """One shape, whatever the run wrote.
+
+    T-route appears in three forms -- a converted parquet, a NetCDF whose ``to_dataframe()``
+    yields a MultiIndex keyed on feature_id, and a flat csv with a ``featureID`` column and a
+    ``current_time`` -- and the readers used to branch on which. That branching is what breaks
+    silently under conversion: parquet has no MultiIndex and its column is ``feature_id``, so
+    a converted run missed the MultiIndex branch and then missed ``featureID`` too, and every
+    chart came back empty with no error anywhere.
+
+    Normalising here instead means the endpoint has one path and conversion is an
+    optimisation rather than a change of shape. The pinned columns are ``feature_id`` and
+    ``time``, with the time already formatted the way the response emits it.
+    """
+    if source_format == ".parquet":
+        frame = duckdb_conn.query(
+            f"SELECT * FROM read_parquet({duckdb_conn.quote(source)})"
+        )
+    elif source_format == ".csv":
+        frame = duckdb_conn.query(
+            f"SELECT * FROM read_csv_auto({duckdb_conn.quote(source)})"
+        )
+        frame = frame.rename(
+            columns={"featureID": TROUTE_FEATURE_COLUMN, "current_time": TROUTE_TIME_COLUMN}
+        )
+    else:
+        dataset = xr.open_dataset(source)
+        try:
+            frame = dataset.to_dataframe().reset_index()
+        finally:
+            dataset.close()
+
+    if TROUTE_TIME_COLUMN in frame.columns:
+        frame[TROUTE_TIME_COLUMN] = frame[TROUTE_TIME_COLUMN].apply(_troute_time_string)
+    if TROUTE_FEATURE_COLUMN in frame.columns:
+        frame[TROUTE_FEATURE_COLUMN] = pd.to_numeric(
+            frame[TROUTE_FEATURE_COLUMN], errors="coerce"
+        ).astype("Int64")
+
+    # A bare NaN is invalid JSON, so gaps travel as a sentinel and come back null.
+    return frame.fillna(TROUTE_MISSING)
+
+
+def _troute_time_string(value):
+    """The response emits '%Y-%m-%d %H:%M:%S' whatever the source stored."""
+    if isinstance(value, pd.Timestamp):
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+    return str(value)
 
 
 def get_troute_df(model_id):
-    """
-    Load the first T-Route data file from the workspace as a DataFrame.
-    Supports both CSV and NetCDF (.nc) files, and replaces NaN values with -9999.
-    """
-    base_output_path = _get_base_troute_output(model_id)
+    """This run's t-route output, in the pinned shape, read once and cached."""
+    entry = _run_entry(model_id)
+    if entry is None:
+        return None
 
-    # Search for supported file types in priority order
-    file_types = [("CSV", "*.csv"), ("NetCDF", "*.nc")]
+    document = entry["manifest"] or {}
+    troute = document.get("troute")
+    if not troute:
+        return None
 
-    for file_type, pattern in file_types:
-        files = glob.glob(os.path.join(base_output_path, pattern))
-
-        if files:
-            file_path = files[0]
-            print(f"Found {file_type} file: {file_path}")
-
-            try:
-                if file_type == "CSV":
-                    # Read the CSV file into a DataFrame
-                    df = pd.read_csv(file_path)
-                elif file_type == "NetCDF":
-                    # Read the NetCDF file and convert to a DataFrame
-                    ds = xr.open_dataset(file_path)
-                    df = ds.to_dataframe()
-                    df.attrs["variable_meta"] = {
-                        str(name): dict(ds[name].attrs) for name in ds.data_vars
-                    }
-
-                # A bare NaN is invalid JSON, so gaps travel as a sentinel and come back null.
-                df.fillna(TROUTE_MISSING, inplace=True)
-                return df
-            except Exception as e:
-                print(f"Error reading {file_type} file '{file_path}': {e}")
-
-    # If no files found, return None
-    print(f"No supported T-Route output files found in {base_output_path}.")
-    return None
+    frame = _cached_troute_frame(
+        _child(entry["path"], _TROUTE_SUBDIR),
+        document.get("version_token", ""),
+        _child(entry["path"], troute["file"]),
+        troute.get("format", ""),
+    )
+    frame = frame.copy()
+    frame.attrs["variable_meta"] = troute.get("variables") or {}
+    return frame
 
 
 # Where ngen writes by default, and what the converter and the importer both assume.
@@ -946,11 +997,6 @@ def getCatchmentsList(model_id):
 
 
 
-# Identifier and coordinate columns, not model output. `type` is excluded by dtype as well,
-# but a hydrofabric that wrote it as a code rather than 'wb' would slip through that check.
-_TROUTE_NON_VARIABLES = frozenset({"type", "time", "current_time", "feature_id", "featureid"})
-
-
 def parse_troute_feature_id(troute_id):
     """Pull the numeric feature id out of 'cat-2863630', 'wb-2863630' or a bare '2863630'.
 
@@ -1031,10 +1077,12 @@ def describe_troute_feature(model_run_id, feature_id):
 
 
 def check_troute_id(df, id):
-    if isinstance(df.index, pd.MultiIndex):
-        # Multi-indexed DataFrame: Check in the `feature_id` level
-        return int(id) in df.index.get_level_values("feature_id")
-    else:
-        # Flat-indexed DataFrame: Check in the `featureID` column
-        return int(id) in df["featureID"].values
+    """Whether this run routed the given feature.
+
+    One branch now: every source shape is normalised to a ``feature_id`` column before it
+    reaches here.
+    """
+    if df is None or TROUTE_FEATURE_COLUMN not in df.columns:
+        return False
+    return int(id) in set(df[TROUTE_FEATURE_COLUMN].dropna().astype("int64").tolist())
 

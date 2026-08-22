@@ -33,6 +33,9 @@ from tethysapp.ngiab import duckdb_conn
 # Written beside the per-catchment files. The reader picks the layout off the manifest.
 CONSOLIDATED_PREFIX = "catchments-"
 
+# T-route lands in one parquet with a pinned schema; see utils._normalised_troute_frame.
+TROUTE_PARQUET = "troute.parquet"
+
 
 class Command(BaseCommand):
     help = "Consolidate a model run's ngen CSV outputs into parquet, grouped by schema."
@@ -70,6 +73,51 @@ class Command(BaseCommand):
                 f"consolidated {len(csvs)} catchment files into {written} parquet object(s)"
             )
         )
+
+        self._convert_troute(run_path, compression)
+
+    def _convert_troute(self, run_path, compression):
+        """Write t-route to parquet in the shape the readers pin.
+
+        Uncached and whole-file before this: xr.open_dataset(...).to_dataframe() loaded every
+        feature and every timestep to plot one channel, twice per chart load, because the
+        variable list and the series are separate requests.
+
+        The schema is pinned here rather than inherited from the source, because the source
+        shapes disagree -- NetCDF yields a MultiIndex keyed on feature_id, csv a flat frame
+        with featureID and current_time -- and the readers used to branch on which. A
+        converted run matched neither branch and returned an empty chart with no error.
+        """
+        from tethysapp.ngiab import utils as ngiab_utils
+
+        troute_dir = os.path.join(run_path, "outputs", "troute")
+        if not os.path.isdir(troute_dir):
+            return
+
+        sources = sorted(
+            name for name in os.listdir(troute_dir)
+            if name.endswith((".csv", ".nc")) and name != TROUTE_PARQUET
+        )
+        if not sources:
+            self.stdout.write("  no troute output to convert")
+            return
+
+        source = os.path.join(troute_dir, sources[0])
+        suffix = os.path.splitext(source)[1]
+        frame = ngiab_utils._normalised_troute_frame(source, suffix)  # noqa: SLF001
+
+        destination = os.path.join(troute_dir, TROUTE_PARQUET)
+        connection = duckdb_conn.connect_isolated()
+        try:
+            connection.register("troute_frame", frame)
+            connection.execute(
+                f"COPY (SELECT * FROM troute_frame) TO {duckdb_conn.quote(destination)} "
+                f"(FORMAT PARQUET, COMPRESSION {compression})"
+            )
+        finally:
+            connection.close()
+
+        self.stdout.write(f"  troute: {len(frame)} rows from {sources[0]}")
 
     def _group_by_schema(self, outputs, csvs):
         """Catchments keyed by their column set.

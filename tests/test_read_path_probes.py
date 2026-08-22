@@ -197,17 +197,37 @@ def test_teehr_presence_comes_from_the_manifest(ingest, probe_log):
     assert _inside_a_run(probe_log, ingest.root) == []
 
 
-# ---- The scope boundary, stated ------------------------------------------------
+# ---- Troute, which Unit 9 scoped out and Unit 11 closed ---------------------
 
 
-def test_troute_still_probes_and_that_is_unit_11(ingest, probe_log):
-    """Recorded rather than skipped, so the gap is visible and dated.
+def test_reading_troute_probes_nothing(ingest, probe_log):
+    """The assertion Unit 9 deferred. get_troute_df used to glob for *.csv then *.nc."""
+    run_id = ingest()
+    probe_log.clear()
 
-    get_troute_df globs for *.csv then *.nc and opens whichever it finds. Unit 11 converts it
-    and takes on the unrestricted version of this assertion.
+    assert ngiab_utils.get_troute_df(run_id) is not None
+    assert _inside_a_run(probe_log, ingest.root) == []
+
+
+def test_no_read_endpoint_probes_anything(ingest, probe_log):
+    """The unrestricted version, now that nothing is out of scope.
+
+    Every read a chart load makes, in one block: the run list, the catchment list, the
+    variable pickers, a catchment series, the value matrix, the map extent, the flowpath
+    pairing and the troute series. None of it reaches into a run directory with a call an
+    object store cannot answer.
     """
     run_id = ingest()
     probe_log.clear()
 
-    ngiab_utils.get_troute_df(run_id)
-    assert [name for name, _ in _inside_a_run(probe_log, ingest.root) if name == "glob"]
+    ngiab_utils.getCatchmentsList(run_id)
+    ngiab_utils.get_catchment_variables(run_id)
+    ngiab_utils.run_outputs(run_id)
+    ngiab_utils.get_catchment_value_matrix(run_id, "Q_OUT")
+    ngiab_utils.run_bounds_4326(run_id)
+    ngiab_utils.describe_troute_feature(run_id, 100)
+    frame = ngiab_utils.get_troute_df(run_id)
+    ngiab_utils.get_troute_vars(frame)
+    ngiab_utils.check_troute_id(frame, 100)
+
+    assert _inside_a_run(probe_log, ingest.root) == []

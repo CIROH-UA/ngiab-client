@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 SCHEMA_VERSION = 1
 
 MANIFEST_NAME = "manifest.json"
-CATCHMENTS_SIDECAR = "manifest_catchments.json"
+CATCHMENTS_SIDECAR = "manifest_catchments.parquet"
 CROSSWALK_SIDECAR = "manifest_crosswalk.parquet"
 
 # What convert_outputs writes: one parquet per schema group, holding a catchment_id column.
@@ -232,7 +232,8 @@ def _troute(run_path):
     except OSError:
         return None
 
-    for suffix in (".csv", ".nc"):
+    # Converted parquet first: it is the pinned shape, and the others are what it came from.
+    for suffix in (".parquet", ".csv", ".nc"):
         for name in names:
             if not name.endswith(suffix):
                 continue
@@ -243,8 +244,24 @@ def _troute(run_path):
             }
             if suffix == ".nc":
                 record["variables"] = _netcdf_variable_meta(os.path.join(troute_dir, name))
+            elif suffix == ".parquet":
+                record["variables"] = _troute_meta_from_source(troute_dir, names)
             return record
     return None
+
+
+def _troute_meta_from_source(troute_dir, names):
+    """CF metadata for a converted run, read from the NetCDF it was converted from.
+
+    Parquet carries no netCDF attributes and DuckDB does not surface parquet key-value
+    metadata either, while get_troute_vars builds every picker label from long_name and
+    units. The source file is left in place by the converter, so the labels survive
+    conversion by being read from it here, once, at ingest.
+    """
+    for name in names:
+        if name.endswith(".nc"):
+            return _netcdf_variable_meta(os.path.join(troute_dir, name))
+    return {}
 
 
 def _netcdf_variable_meta(path):
@@ -396,15 +413,45 @@ def write(run_path, document):
         json.dump(hot, handle, indent=2, sort_keys=True)
         handle.write("\n")
 
-    with open(os.path.join(run_path, CATCHMENTS_SIDECAR), "w") as handle:
-        json.dump(catchments, handle)
-        handle.write("\n")
-
+    _write_catchments(os.path.join(run_path, CATCHMENTS_SIDECAR), catchments)
     _write_crosswalk(os.path.join(run_path, CROSSWALK_SIDECAR), crosswalk)
 
     # A rewritten run in this process must not keep serving the previous sidecars.
     clear_caches()
     return hot
+
+
+def _write_catchments(path, membership):
+    """The catchment-to-group mapping, as parquet.
+
+    Parquet rather than JSON for the same reason the sidecars are read through DuckDB at all:
+    ``read_parquet`` takes an ``s3://`` URI and ``open()`` does not. A JSON sidecar read with
+    open() works perfectly on a laptop and silently returns nothing in a bucket, which is the
+    failure mode this whole plan exists to remove.
+    """
+    import pandas as pd
+
+    frame = pd.DataFrame(
+        sorted(membership.items()), columns=["catchment_id", "group_index"]
+    ).astype({"catchment_id": "str", "group_index": "int64"})
+    _copy_frame_to_parquet(frame, "catchments_frame", path)
+
+
+def _copy_frame_to_parquet(frame, name, path):
+    """Write one small frame through an isolated connection.
+
+    Isolated because register() puts a name in the catalog, and cursors on the shared
+    connection share it.
+    """
+    connection = duckdb_conn.connect_isolated()
+    try:
+        connection.register(name, frame)
+        connection.execute(
+            f"COPY (SELECT * FROM {name}) TO {duckdb_conn.quote(path)} "
+            "(FORMAT PARQUET, COMPRESSION ZSTD)"
+        )
+    finally:
+        connection.close()
 
 
 def _write_crosswalk(path, rows):
@@ -420,15 +467,14 @@ def _write_crosswalk(path, rows):
         [{"flowpath_id": str(a), "divide_id": None if b is None else str(b)} for a, b in rows],
         columns=["flowpath_id", "divide_id"],
     )
-    connection = duckdb_conn.connect_isolated()
-    try:
-        connection.register("crosswalk_frame", frame)
-        connection.execute(
-            f"COPY (SELECT * FROM crosswalk_frame) TO {duckdb_conn.quote(path)} "
-            "(FORMAT PARQUET, COMPRESSION ZSTD)"
-        )
-    finally:
-        connection.close()
+    _copy_frame_to_parquet(frame, "crosswalk_frame", path)
+
+
+def _child(base, *parts):
+    """Join below a run's location, whether that is a path or an ``s3://`` URI."""
+    import posixpath
+
+    return posixpath.join(str(base).rstrip("/"), *parts)
 
 
 def read(run_path):
@@ -452,16 +498,18 @@ def _version_of(run_path):
 
 @functools.lru_cache(maxsize=32)
 def _catchments_cached(run_path, version_token):
-    """The id-to-group mapping, tolerating the plain list earlier manifests wrote."""
-    path = os.path.join(run_path, CATCHMENTS_SIDECAR)
+    """The id-to-group mapping, read through DuckDB so an s3:// path works."""
+    path = _child(run_path, CATCHMENTS_SIDECAR)
     try:
-        with open(path, "r") as handle:
-            stored = json.load(handle)
-    except (OSError, ValueError):
+        frame = duckdb_conn.query(
+            f"SELECT * FROM read_parquet({duckdb_conn.quote(path)})"
+        )
+    except Exception:  # noqa: BLE001 - an undistilled run has no sidecar, which is not an error
         return {}
-    if isinstance(stored, list):
-        return {stem: 0 for stem in stored}
-    return dict(stored)
+    return {
+        str(cid): int(group)
+        for cid, group in zip(frame["catchment_id"], frame["group_index"])
+    }
 
 
 def catchments(run_path):
@@ -482,10 +530,19 @@ def catchment_group(run_path, stem):
 
 @functools.lru_cache(maxsize=8)
 def _crosswalk_cached(run_path, version_token):
-    path = os.path.join(run_path, CROSSWALK_SIDECAR)
-    if not os.path.exists(path):
+    """Read through DuckDB, and without an os.path.exists guard.
+
+    That guard was false for every ``s3://`` path regardless of what the bucket held, so a
+    hosted run would have reported an empty crosswalk and every troute chart would have lost
+    its flowpath pairing -- silently, because an empty crosswalk is a legitimate state.
+    """
+    path = _child(run_path, CROSSWALK_SIDECAR)
+    try:
+        frame = duckdb_conn.query(
+            f"SELECT * FROM read_parquet({duckdb_conn.quote(path)})"
+        )
+    except Exception:  # noqa: BLE001 - a run with no GeoPackage has no crosswalk
         return {}
-    frame = duckdb_conn.query(f"SELECT * FROM read_parquet({duckdb_conn.quote(path)})")
     return dict(zip(frame["flowpath_id"], frame["divide_id"]))
 
 

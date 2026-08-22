@@ -154,25 +154,22 @@ def test_missing_realization_falls_back_to_outputs_ngen(ingest):
     ).endswith("outputs/ngen")
 
 
-# ---- Changes deliberately in Unit 11: both troute shapes, captured separately ----
+# ---- Changed deliberately in Unit 11: the two troute shapes became one ------
 
 
-def test_troute_netcdf_and_csv_shapes_differ_today(ingest):
-    """Record the divergence Unit 11 has to reconcile, rather than assume it away.
+def test_both_troute_sources_now_yield_the_same_shape(ingest):
+    """This test replaces the one that recorded the divergence, and closes it.
 
-    The NetCDF path yields a MultiIndex frame keyed on feature_id; the csv path yields a flat
-    frame with a featureID column. getTrouteTimeSeries branches on exactly that difference. A
-    single pinned parquet schema cannot reproduce both, so Unit 11 must state which one it
-    targets and what the other's diff becomes -- this test is where that decision gets
-    recorded.
+    Before Unit 11 the NetCDF path yielded a MultiIndex keyed on feature_id and the csv path
+    a flat frame with featureID and current_time, and getTrouteTimeSeries branched on which.
+    That branching is what a converted run fell between, matching neither and returning an
+    empty chart without raising. Both are normalised now.
     """
-    import pandas as pd
-
     nc_frame = ngiab_utils.get_troute_df(ingest("as-nc", troute="nc"))
     csv_frame = ngiab_utils.get_troute_df(ingest("as-csv", troute="csv"))
 
-    assert isinstance(nc_frame.index, pd.MultiIndex)
-    assert "feature_id" in nc_frame.index.names
-
-    assert not isinstance(csv_frame.index, pd.MultiIndex)
-    assert "featureID" in csv_frame.columns
+    for frame in (nc_frame, csv_frame):
+        assert ngiab_utils.TROUTE_FEATURE_COLUMN in frame.columns
+        assert ngiab_utils.TROUTE_TIME_COLUMN in frame.columns
+        assert "featureID" not in frame.columns
+        assert "current_time" not in frame.columns
