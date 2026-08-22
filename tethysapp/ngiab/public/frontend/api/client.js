@@ -17,7 +17,7 @@ const GENERIC_MESSAGE = 'Something went wrong. Please try again.';
 
 const STATUS_MESSAGES = {
   400: 'That request was not valid.',
-  403: 'You do not have permission to view this.',
+  403: 'You do not have permission to do that.',
   404: 'That data is not on the server.',
   408: 'The server took too long to answer. Please try again.',
   409: 'The server is busy with this data. Please try again shortly.',

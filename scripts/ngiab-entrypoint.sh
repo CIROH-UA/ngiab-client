@@ -23,4 +23,21 @@ ngiab_seed_db
 echo "[ngiab] applying any migrations this image adds"
 "${VIRTUAL_ENV:-/opt/conda/envs/tethys}/bin/tethys" db migrate
 
+# After migrate, because it writes a user, and before serve, because it can refuse to serve.
+# A hosted deployment running on the image's baked admin/pass -- which is public, and which an
+# ephemeral database restores on every restart -- stops here rather than starting.
+#
+# Invoked through manage.py rather than `tethys manage`, and that is not a style preference:
+# `tethys manage` prints a failing command's error and still exits 0. Measured -- the same
+# command exits 1 through manage.py and 0 through the wrapper. A gate that cannot fail the
+# entrypoint is not a gate, and this one is the only thing standing between a public password
+# and a delete button.
+echo "[ngiab] checking deployment credentials"
+NGIAB_MANAGE_PY="$("${VIRTUAL_ENV:-/opt/conda/envs/tethys}/bin/tethys" manage path | tail -1)"
+test -f "${NGIAB_MANAGE_PY}" || {
+    echo "[ngiab] could not locate manage.py; refusing to start unchecked" >&2
+    exit 1
+}
+"${VIRTUAL_ENV:-/opt/conda/envs/tethys}/bin/python" "${NGIAB_MANAGE_PY}" ensure_superuser
+
 exec /usr/local/bin/serve.sh

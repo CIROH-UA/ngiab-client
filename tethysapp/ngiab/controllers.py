@@ -46,6 +46,35 @@ from .teehr_warehouse import (
 logger = logging.getLogger(__name__)
 
 
+def write_login_required(view):
+    """Refuse a mutating request from an anonymous caller.
+
+    Django's own authentication, deliberately, not Tethys's. ``@controller(login_required=True)``
+    is inert here: ``tethys_apps/decorators.py`` checks ``ENABLE_OPEN_PORTAL`` at call time and
+    passes straight through when it is set, which it is. Verified both ways -- Tethys's decorator
+    answers 200 for an anonymous request under an open portal, Django's answers 302.
+
+    401 rather than 403, and rather than Django's redirect. The caller is not forbidden, it is
+    unauthenticated, and ``api/client.js`` already turns a 401 into a redirect to the login page
+    with ``?next=``, which is the behaviour wanted. A 302 would be worse than useless here: fetch
+    follows redirects, so the browser would receive the login page's HTML with a 200 and the
+    client would report unreadable JSON.
+
+    Reads stay open. This wraps only the endpoints that change something.
+    """
+
+    @functools.wraps(view)
+    def wrapped(request, *args, **kwargs):
+        if not getattr(request, "user", None) or not request.user.is_authenticated:
+            return JsonResponse(
+                {"error": "Sign in to change model runs."},
+                status=401,
+            )
+        return view(request, *args, **kwargs)
+
+    return wrapped
+
+
 # Map warehouse exception → user-facing (status_message, severity) string pair.
 # See plan FR6 for the full state table.
 def _teehr_status_for(exc: TeehrWarehouseError):
@@ -131,6 +160,7 @@ def getModelRuns(request):
 
 @controller
 @require_POST
+@write_login_required
 def removeModelRun(request):
     """Temporarily unavailable, and saying so rather than pretending.
 
@@ -168,6 +198,7 @@ def scanModelRuns(request):
 
 @controller
 @require_POST
+@write_login_required
 def registerModelRun(request):
     """Register one directory the scan offered.
 
