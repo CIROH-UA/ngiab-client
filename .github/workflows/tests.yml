@@ -50,6 +50,10 @@ jobs:
           pip install pyflakes
           python -m pyflakes tethysapp/
 
+      # Matches the bare name, so `from .models import ModelRun` is caught as well as
+      # `from tethysapp.ngiab.models import ModelRun`. A dotted-path pattern misses the
+      # relative form, which is the form this app actually uses -- utils.py and controllers.py
+      # both import that way, so a dotted guard would pass on a broken tree.
       - name: Check for imports of removed modules
         run: |
           set -e
@@ -60,6 +64,46 @@ jobs:
             fi
           done
           echo "no references to removed modules"
+
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # setuptools-scm derives the version from git metadata, which the image build needs.
+          fetch-depth: 0
+
+      # Tests run inside the image, not in a pip or conda environment assembled here. The
+      # base image installs tethys-platform from git main, so any environment built
+      # separately is a different Tethys than the one that ships -- a suite green against it
+      # proves less than it looks like it does. The test stage stops short of the runtime
+      # stage, so this reuses the builder layers the image build already produces.
+      - name: Build the test image
+        run: docker build --target test -t ngiab-visualizer:test .
+
+      # The count assertion is the point of this step. pytest exits 0 when every test skips,
+      # and the existing TEEHR suite skips 19 of 28 without its fixture warehouse -- so "the
+      # suite passed" and "the suite ran" are different claims, and only the second one is
+      # worth gating on. The parity suite generates its own fixtures and must never skip.
+      - name: Run the suite, and prove it actually ran
+        run: |
+          docker run --rm ngiab-visualizer:test /bin/sh -c '
+            set -e
+            "${VIRTUAL_ENV}/bin/python" -m pytest \
+              -p no:cacheprovider --no-cov \
+              --junit-xml=/tmp/report.xml
+            "${VIRTUAL_ENV}/bin/python" - <<PYCHECK
+          import sys, xml.etree.ElementTree as ET
+
+          suite = ET.parse("/tmp/report.xml").getroot().find("testsuite")
+          total = int(suite.get("tests", 0))
+          skipped = int(suite.get("skipped", 0))
+          executed = total - skipped
+          print(f"collected {total}, skipped {skipped}, executed {executed}")
+          if executed == 0:
+              sys.exit("::error::every test skipped -- the suite proved nothing")
+          PYCHECK
+          '
 
   comment-style:
     runs-on: ubuntu-latest

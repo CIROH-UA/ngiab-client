@@ -62,6 +62,37 @@ RUN mkdir -p /opt/ngiab/static \
     && echo "baked static: $(find /opt/ngiab/static -type f | wc -l) files"
 
 # ---------------------------------------------------------------------------
+# Test: the builder, plus the dev dependencies pytest needs
+# ---------------------------------------------------------------------------
+# Tests run here rather than in a conda environment on the developer's machine, because the
+# base image installs tethys-platform from git main: a locally built environment is a
+# different Tethys than the one that ships, so a suite that passes there proves less than it
+# appears to. This stage inherits the builder's venv, the provisioned database, the rendered
+# portal_config.yml and the DuckDB extension directory, so pytest sees exactly the runtime
+# the app is deployed onto.
+#
+# Dev dependencies are listed in pyproject.toml under [tool.pdm.dev-dependencies], which
+# `uv pip install /build` does not install -- hence naming them again here. Keep the two in
+# step.
+FROM builder AS test
+
+# Pinned, not floored. pyproject.toml's dev-dependencies use >= because pdm.lock does the
+# pinning there; nothing locks this stage, so a floating range lets an unrelated pytest
+# release break CI. These match pdm.lock so the container and a local `pdm run test` agree.
+RUN uv pip install --python "${VIRTUAL_ENV}" \
+        pytest==8.3.3 \
+        pytest-django==4.9.0 \
+        pytest-mock==3.14.0 \
+        pytest-cov==6.0.0 \
+        pytest-unordered==0.6.1
+
+WORKDIR /build
+
+# --no-cov by default: coverage is a reporting concern for CI to opt into, and addopts in
+# pyproject.toml turns it on for every invocation otherwise.
+CMD ["/bin/sh", "-c", "\"${VIRTUAL_ENV}/bin/python\" -m pytest -p no:cacheprovider --no-cov"]
+
+# ---------------------------------------------------------------------------
 # Runtime
 # ---------------------------------------------------------------------------
 FROM ghcr.io/aquaveo/tethys-uvx:runtime-base-${TETHYS_UVX_TAG}
