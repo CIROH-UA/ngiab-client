@@ -22,7 +22,6 @@ the full design rationale (OD1, OD2, FR3).
 """
 
 import logging
-import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -30,18 +29,14 @@ import duckdb
 from packaging.specifiers import SpecifierSet
 from packaging.version import InvalidVersion, Version
 
+from . import duckdb_conn
+
 logger = logging.getLogger(__name__)
 
 SUPPORTED_TEEHR_VERSIONS = SpecifierSet(">=0.6.0,<0.7.0")
 
-# DuckDB 1.5's LOAD (and some other ops) resolve ~/.duckdb/ via HOME. In the
-# Tethys container HOME=/root from the build stage but the runtime runs as a
-# non-root user that can't access /root. Pointing both home_directory and
-# extension_directory at a shared writable path avoids the 'Failed to create
-# directory "/root/.duckdb": Permission denied' error. The Dockerfile
-# pre-installs extensions to this same path so LOAD finds them without a
-# runtime network fetch.
-DEFAULT_DUCKDB_HOME = "/usr/lib/tethys/duckdb_extensions"
+# Connection setup moved to duckdb_conn, which every DuckDB caller now shares. The path this
+# module used to default to did not exist in the image; see duckdb_conn.DEFAULT_DUCKDB_HOME.
 
 # Iceberg tables under the `teehr` namespace that the visualizer reads.
 _REQUIRED_TABLES = (
@@ -116,16 +111,10 @@ class WarehouseReader:
             )
         self._check_version()
         try:
-            self._conn = duckdb.connect(":memory:")
-            # A shared writable extension dir; see DEFAULT_DUCKDB_HOME above.
-            duckdb_home = os.environ.get("DUCKDB_HOME", DEFAULT_DUCKDB_HOME)
-            self._conn.execute(f"SET home_directory='{duckdb_home}'")
-            self._conn.execute(f"SET extension_directory='{duckdb_home}'")
-            # Extensions are pre-installed at image build time; only LOAD here.
-            self._conn.execute("LOAD sqlite")
-            self._conn.execute("LOAD iceberg")
+            # Its own connection: ATTACH mutates the catalog two readers would share.
+            self._conn = duckdb_conn.connect_isolated()
             self._conn.execute(
-                f"ATTACH '{self._catalog_path}' AS cat (TYPE sqlite, READ_ONLY)"
+                f"ATTACH {duckdb_conn.quote(self._catalog_path)} AS cat (TYPE sqlite, READ_ONLY)"
             )
         except duckdb.Error as exc:
             self._force_close()

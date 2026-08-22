@@ -62,6 +62,8 @@ c.execute(f\"SET extension_directory='{h}'\")
 c.execute('INSTALL sqlite')
 c.execute('INSTALL iceberg')
 c.execute('INSTALL avro')
+c.execute('INSTALL httpfs')
+c.execute('INSTALL aws')
 print('duckdb extensions installed:', duckdb.__version__)"
     chmod -R a+rX "${DUCKDB_HOME}"
 

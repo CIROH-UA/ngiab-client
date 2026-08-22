@@ -226,9 +226,9 @@ def mini_run_factory(tmp_path):
     """Build mini runs on demand, each in its own directory."""
     counter = {"n": 0}
 
-    def factory(**kwargs):
+    def factory(name=None, **kwargs):
         counter["n"] += 1
-        root = tmp_path / f"run-{counter['n']}"
+        root = tmp_path / (name or f"run-{counter['n']}")
         root.mkdir()
         return build_mini_run(root, **kwargs)
 

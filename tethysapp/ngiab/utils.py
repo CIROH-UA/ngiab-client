@@ -9,12 +9,12 @@ import logging
 import numpy as np
 import pandas as pd
 import glob
-import duckdb
 import xarray as xr
 import pyogrio
 from pyproj import Transformer
 
 
+from . import duckdb_conn
 from .teehr_warehouse import (
     TeehrWarehouseError,
     WarehouseReader,
@@ -470,7 +470,9 @@ def _read_output_columns(directory, stem):
     """
     path, suffix = _find_output_file(directory, stem)
     if suffix == ".parquet":
-        rel = duckdb.query(f"SELECT * FROM read_parquet('{path}') LIMIT 0")
+        rel = duckdb_conn.query(
+            f"SELECT * FROM read_parquet({duckdb_conn.quote(path)}) LIMIT 0"
+        )
         return list(rel.columns)
     return list(pd.read_csv(path, nrows=0).columns)
 
@@ -505,7 +507,9 @@ def _read_output_frame(directory, stem, columns=None, time_column=None):
                 parts.append(f'CAST("{column}" AS VARCHAR) AS "{column}"')
             else:
                 parts.append(f'"{column}"')
-        return duckdb.query(f"SELECT {', '.join(parts)} FROM read_parquet('{path}')").df()
+        return duckdb_conn.query(
+            f"SELECT {', '.join(parts)} FROM read_parquet({duckdb_conn.quote(path)})"
+        )
 
     return pd.read_csv(path, usecols=list(columns) if columns else None)
 
@@ -529,8 +533,8 @@ def _output_glob(directory, prefix="cat-"):
         pattern = os.path.join(directory, f"{prefix}*{suffix}")
         if glob.glob(pattern):
             reader = "read_parquet" if suffix == ".parquet" else "read_csv"
-            escaped = pattern.replace("'", "''")
-            return f"{reader}('{escaped}', filename=true, union_by_name=true)", suffix
+            table = f"{reader}({duckdb_conn.quote(pattern)}, filename=true, union_by_name=true)"
+            return table, suffix
     return None, None
 
 
@@ -543,7 +547,7 @@ def _union_columns(table):
     'filename' is dropped: it is synthesised by filename=true, not something the run wrote,
     and leaving it in offers it to the user as a plottable variable.
     """
-    columns = list(duckdb.query(f"SELECT * FROM {table} LIMIT 0").columns)
+    columns = list(duckdb_conn.query(f"SELECT * FROM {table} LIMIT 0").columns)
     return [name for name in columns if name != "filename"]
 
 
@@ -685,9 +689,9 @@ def _build_value_matrix(directory, variable=None):
     selected = variable if variable in variables else variables[0]
 
     time_expr = f'CAST("{time_name}" AS TIMESTAMP)'
-    extent = duckdb.query(
+    extent = duckdb_conn.fetchone(
         f"SELECT min({time_expr}), max({time_expr}), count(DISTINCT {time_expr}) FROM {table}"
-    ).fetchone()
+    )
     start, end, distinct_times = extent
     if not distinct_times:
         return {**empty, "variable": selected, "variables": variables}
@@ -703,7 +707,7 @@ def _build_value_matrix(directory, variable=None):
     )
 
     # The catchment id comes from the filename because the rows themselves do not carry it.
-    frame = duckdb.query(
+    frame = duckdb_conn.query(
         f"""
         SELECT
             CAST(regexp_extract(filename, 'cat-(\\d+)', 1) AS BIGINT) AS catchment,
@@ -714,7 +718,7 @@ def _build_value_matrix(directory, variable=None):
         GROUP BY 1, 2
         ORDER BY 2, 1
         """
-    ).df()
+    )
 
     if frame.empty:
         return {**empty, "variable": selected, "variables": variables}

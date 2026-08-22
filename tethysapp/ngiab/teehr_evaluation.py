@@ -24,6 +24,8 @@ from typing import List, Optional
 
 import duckdb
 
+from . import duckdb_conn
+
 logger = logging.getLogger(__name__)
 
 # The configuration name teehr writes for the run's own simulation. The warehouse needs
@@ -59,7 +61,7 @@ class EvaluationReader:
 
     def _connect(self):
         if self._con is None:
-            self._con = duckdb.connect()
+            self._con = duckdb_conn.connect()
         return self._con
 
     def close(self):
