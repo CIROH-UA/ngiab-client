@@ -30,6 +30,7 @@ import functools
 import logging
 import os
 import posixpath
+import time
 
 from . import duckdb_conn, manifest
 
@@ -43,9 +44,18 @@ DEFAULT_MANAGED_ROOT = "/var/lib/tethys_persist/ngiab_visualizer"
 # when the backend is object storage; the local backend needs no configuration at all.
 STORAGE_ALIAS = "ngiab_runs"
 
+# How long a listing may be stale. See _time_bucket for why this is a window rather than an
+# invalidation signal, and why 10 seconds.
+LISTING_TTL_ENV = "NGIAB_LISTING_TTL_SECONDS"
+DEFAULT_LISTING_TTL_SECONDS = 10.0
+
 _NOT_INGESTED = "This directory has no manifest, so it has not been ingested yet."
 _NO_OUTPUTS = "No catchment outputs in this run, so there is nothing to plot."
 _UNREADABLE = "This run's manifest could not be read."
+_UNSUPPORTED_SCHEMA = (
+    "This run's manifest uses schema version {found}, which this version of the visualizer "
+    "does not understand (it reads up to {supported})."
+)
 
 
 class StorageUnreachable(RuntimeError):
@@ -141,6 +151,11 @@ def _describe(name):
 
     Reports rather than filters, following ``describe_importable_run``: a directory a user
     can see in the bucket and cannot see in the interface is indistinguishable from a bug.
+
+    A manifest from a newer writer is unusable rather than fatal. One run written by a later
+    image should degrade on its own, not take the portal's entire run list with it -- and
+    reading it as if it were this schema would be worse than refusing, because the fields
+    would be plausible and wrong.
     """
     document = _read_manifest(name)
 
@@ -148,6 +163,18 @@ def _describe(name):
         return {"name": name, "manifest": None, "usable": False, "reason": _UNREADABLE}
     if document is None:
         return {"name": name, "manifest": None, "usable": False, "reason": _NOT_INGESTED}
+
+    version = document.get("schema_version")
+    if not isinstance(version, int) or version > manifest.SCHEMA_VERSION:
+        return {
+            "name": name,
+            "manifest": document,
+            "usable": False,
+            "reason": _UNSUPPORTED_SCHEMA.format(
+                found=version, supported=manifest.SCHEMA_VERSION
+            ),
+        }
+
     if not document.get("output_format"):
         return {"name": name, "manifest": document, "usable": False, "reason": _NO_OUTPUTS}
     return {"name": name, "manifest": document, "usable": True, "reason": None}
@@ -176,8 +203,42 @@ def _ordered(entries):
     return sorted(by_label, key=_created_of, reverse=True)
 
 
-@functools.lru_cache(maxsize=1)
-def _cached_listing(root_key):
+def listing_ttl_seconds():
+    """Seconds a cached listing may be stale. Zero disables caching."""
+    try:
+        return max(float(os.environ.get(LISTING_TTL_ENV, DEFAULT_LISTING_TTL_SECONDS)), 0.0)
+    except ValueError:
+        return DEFAULT_LISTING_TTL_SECONDS
+
+
+def _time_bucket():
+    """A value that changes once per TTL window, used as part of the cache key.
+
+    A time window rather than an invalidation signal, because there is nothing to signal on.
+    The obvious key would be each run's version token -- but the token lives *inside* the
+    manifest the cache exists to avoid fetching, so learning it changed costs exactly the
+    round trips being saved. That circularity is why the plan's "a newly ready run appears
+    without a restart" could not be implemented as written.
+
+    A window resolves it and, usefully, also resolves the cross-process problem: several
+    uvicorn workers each hold their own cache with no channel between them, but all of them
+    converge within one TTL, so worker count stops mattering. An event-based scheme would
+    have needed a shared bus to achieve the same thing.
+
+    Ten seconds because the cost it bounds is small and the delay it imposes is felt. At the
+    default a hosted deployment does one LIST plus one GET per run per ten seconds no matter
+    the request rate, and an operator who drops a directory into the root waits at most ten
+    seconds to see it -- against today, where a copied directory never appears until someone
+    clicks "Add a run".
+    """
+    ttl = listing_ttl_seconds()
+    if ttl <= 0:
+        return time.monotonic()
+    return int(time.monotonic() // ttl)
+
+
+@functools.lru_cache(maxsize=2)
+def _cached_listing(root_key, time_bucket):
     backend = storage()
     try:
         directories, _files = backend.listdir("")
@@ -199,7 +260,7 @@ def list_runs():
     uncached listing is two storage round trips before an endpoint does any work of its own.
     The cache is dropped by ``clear_caches``, which ingest and removal both call.
     """
-    return [dict(entry) for entry in _cached_listing(_root_key())]
+    return [dict(entry) for entry in _cached_listing(_root_key(), _time_bucket())]
 
 
 def find(name):

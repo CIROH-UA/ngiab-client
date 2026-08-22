@@ -14,7 +14,7 @@ import pyogrio
 from pyproj import Transformer
 
 
-from . import duckdb_conn
+from . import duckdb_conn, manifest, run_store
 from .teehr_warehouse import (
     TeehrWarehouseError,
     WarehouseReader,
@@ -120,29 +120,63 @@ def _open_warehouse():
         return None
     return WarehouseReader(path)
 
+def _entry_from_manifest(entry):
+    """One run_store entry, in the dict shape every reader here already expects.
+
+    ``subset`` and ``tags`` are gone: nothing ever wrote ``tags``, and ``subset`` was
+    settable only through ``register_run`` and read by nothing. ``date`` keeps the odd
+    ``%Y-%m-%d:%H:%M:%S`` spelling ModelRun.as_dict produced, because parity costs less than
+    divergence for a field no view renders today.
+    """
+    document = entry["manifest"] or {}
+    created = document.get("created") or ""
+    return {
+        "label": document.get("label") or entry["name"],
+        "path": run_store.location(entry["name"]),
+        "date": created.replace("T", ":")[:19] if created else "",
+        "id": document.get("id") or entry["name"],
+        "legacy_uuids": document.get("legacy_uuids") or [],
+        "teehr_configuration_name": (document.get("teehr") or {}).get(
+            "configuration_name", ""
+        ),
+    }
+
+
 def _get_list_model_runs():
     """Return the registered model runs, in the shape callers already expect.
 
-    The database is the only registry. Keeps returning ``{"model_runs": [...]}`` so every
-    caller -- _get_model_run_path_by_id, _resolve_configuration_name,
-    get_model_runs_selectable -- works unchanged.
-    """
-    from .models import ModelRun
+    The storage root is the registry now: a directory with a usable manifest under it is a
+    registered run. Keeps returning ``{"model_runs": [...]}`` so every caller --
+    _get_model_run_path_by_id, _resolve_configuration_name, get_model_runs_selectable,
+    scan_importable_runs -- works unchanged. That contract is what makes removing the
+    database a contained change rather than a sweep.
 
-    return {"model_runs": [run.as_dict() for run in ModelRun.objects.all()]}
+    Only usable runs are listed, which preserves today's split exactly: a directory the
+    importer would have refused was never in the picker either. run_store keeps the
+    unusable ones, with the reason, for the interface work in Unit 8.
+    """
+    return {
+        "model_runs": [
+            _entry_from_manifest(entry) for entry in run_store.list_runs() if entry["usable"]
+        ]
+    }
 
 
 def get_model_runs_selectable():
     """The run picker's options.
 
-    ``rescannable`` says whether the importer could offer this run again, so unregistering
-    it can warn when doing so cannot be undone from the interface.
+    ``rescannable`` is vestigial and constant now. It told the removal confirmation whether
+    the importer could offer a run again, which mattered while a run could be registered
+    from outside the managed root; every run is under the storage root by definition today,
+    so the answer is always yes. The field and the frontend branch reading it go together in
+    Unit 8 -- dropping it here alone would flip that confirmation to its scarier wording for
+    three units.
     """
     return [
         {
             "value": model_run["id"],
             "label": model_run["label"],
-            "rescannable": is_scannable(model_run["path"]),
+            "rescannable": True,
         }
         for model_run in _get_list_model_runs()["model_runs"]
     ]
@@ -307,10 +341,22 @@ def model_run_exists(model_run_id):
 
 
 def _get_model_run_path_by_id(id):
-    model_runs = _get_list_model_runs()
-    for model_run in model_runs["model_runs"]:
+    """Resolve a run id to its location, accepting the ids it answered to before.
 
+    A shared ``?model_run_id=<uuid>`` link predates the manifest, so the migration records
+    each run's former UUIDs and this matches them too. Both spellings are normalised first:
+    Django stored a UUIDField in SQLite as 32 undashed hex characters, and a row written by
+    anything else could hold the 36-character dashed form -- which reads back fine and never
+    matches. migrations/0002 had to repair exactly that.
+    """
+    if id is None:
+        return None
+
+    wanted = manifest.normalize_uuid(id)
+    for model_run in _get_list_model_runs()["model_runs"]:
         if model_run["id"] == id:
+            return model_run["path"]
+        if wanted and wanted in model_run.get("legacy_uuids", []):
             return model_run["path"]
     return None
 

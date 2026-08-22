@@ -1,7 +1,6 @@
 from django.http import JsonResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
-from django.core.exceptions import ValidationError
 from django.urls import reverse
 import functools
 import logging
@@ -133,30 +132,28 @@ def getModelRuns(request):
 @controller
 @require_POST
 def removeModelRun(request):
-    """Unregister a model run.
+    """Temporarily unavailable, and saying so rather than pretending.
 
-    Only removes the database row -- the run directory on disk is left alone. Deleting a
-    user's model output because they tidied up a list would be a surprising amount of
-    destruction for an unregister action.
+    The run picker reads the storage root now, not the database, so deleting the row this
+    endpoint used to delete would change nothing a user can see: the run would report itself
+    removed and still be there on the next refresh. A silently ineffective button is worse
+    than an absent one.
 
-    POST because it mutates: as a GET a link prefetch or a crawler could unregister a run.
+    The real behaviour -- deleting the run's directory -- lands in Unit 8, deliberately after
+    authentication arrives in Unit 6. Shipping an irreversible delete on an endpoint that
+    ``ENABLE_OPEN_PORTAL: true`` leaves reachable by anyone is the one ordering this plan
+    will not take.
+
+    POST is kept because it still mutates once Unit 8 lands, and because a GET here would be
+    one link prefetch away from destroying a run.
     """
-    from .models import ModelRun
-
-    model_run_id = request.POST.get("model_run_id")
-    if not model_run_id:
-        return JsonResponse({"error": "model_run_id is required."}, status=400)
-
-    try:
-        deleted, _ = ModelRun.objects.filter(id=model_run_id).delete()
-    except (ValueError, ValidationError):
-        # A malformed uuid is a bad request, not a server error.
-        return JsonResponse({"error": f"Not a valid model run id: {model_run_id}"}, status=400)
-
-    if not deleted:
-        return JsonResponse({"error": "No such model run."}, status=404)
-
-    return JsonResponse({"removed": model_run_id})
+    return JsonResponse(
+        {
+            "error": "Removing a run is unavailable while the registry moves to the storage "
+            "root. Delete the run's directory from the storage root instead."
+        },
+        status=501,
+    )
 
 
 @controller
