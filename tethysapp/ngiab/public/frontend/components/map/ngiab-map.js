@@ -310,8 +310,8 @@ export class NgiabMap extends HTMLElement {
       refresh(this._map, this._view);
       this._setEmptyState(
         'No model run to show',
-        'Nothing is registered yet. Use "Add a run" in the panel to pick a directory the ' +
-          'visualizer can see.',
+        'No model runs yet. Copy a run directory into the visualizer\u2019s storage and ' +
+          'it will appear in the run picker.',
       );
       this._setStatus('No model run selected.', 'warning');
       return;

@@ -63,9 +63,11 @@ settings:
     # and its endpoints are reachable without signing in. This is a local, single-purpose
     # viewer of model output the user already has on disk, and a login screen in front of it
     # is friction rather than protection. Django's own admin stays authenticated.
-    # Whoever can reach the port can also call removeModelRun, which unregisters a run --
-    # a database row only, never the run directory. Do not expose this port to a network
-    # you do not trust.
+    # Reads are open; writes are not. removeModelRun and the upload endpoint carry Django's
+    # own login_required, because Tethys's passes straight through when this is true.
+    # removeModelRun now deletes the run's directory, so signing in is what stands between
+    # a visitor and someone's model output. Still: do not expose this port to a network you
+    # do not trust.
     ENABLE_OPEN_PORTAL: true
     # Single-app mode: this image ships exactly one app, so the portal's app library and the
     # /apps/<name>/ prefix are pure overhead. The app is served at /, and Tethys sets

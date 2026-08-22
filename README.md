@@ -32,7 +32,7 @@ One of the advantages of the `viewOnTethys.sh` script is that it allows the user
   ⚠ Directory exists: ~/ngiab_visualizer/gage-10154200
   → Overwrite (O) or Duplicate (D)? [O/D]: o
   ✓ Overwritten ➜ ~/ngiab_visualizer/gage-10154200
-  ℹ Add it in the visualizer with "Add a run" once the portal is up.
+  ℹ It appears in the visualizer's run picker once the portal is up.
 ```
 
 You should be able to see multiple outputs through the UI:
@@ -41,67 +41,73 @@ You should be able to see multiple outputs through the UI:
 
 #### Visualizer Directory Organization
 
-The Visualizer keeps model run outputs in a directory named `ngiab_visualizer`, and the
-registry of those runs in its portal database under `~/.ngiab_visualizer_db`. The database
-is the only registry: there is no configuration file to create or hand-edit, and the
-`./ViewOnTethys.sh` script registers each run for you as it imports it.
+The Visualizer keeps model run outputs in a directory named `ngiab_visualizer`, and **that
+directory is the registry**. A run is registered by being there: one directory per run, each
+holding a `manifest.json` the visualizer writes when it ingests the run. There is no database
+table of runs, no configuration file to hand-edit, and nothing to register.
 
-Both directories have to be mounted for a run to persist. `ngiab_visualizer` holds the
-data; `.ngiab_visualizer_db` holds the rows that point at it. Mounting only the first gives
-a portal with the outputs on disk and nothing listed in the run picker.
+Copy a run directory into `~/ngiab_visualizer` (or let `./ViewOnTethys.sh -d <path>` copy it
+for you) and it appears in the run picker within ten seconds. A directory the visualizer
+cannot use is listed with the reason rather than hidden, the same as before.
 
-Runs are added from the UI. Copy the run directory into `~/ngiab_visualizer` (or let
-`./ViewOnTethys.sh -d <path>` copy it for you), then use **Add a run** in the model run
-card. To offer runs from somewhere else as well, mount those directories and list them in
-`NGIAB_SCAN_ROOTS` (colon-separated); the importer only ever offers what it can scan, so a
-run outside those roots can be unregistered but not added back from the interface. It lists the directories the container can see and says which ones it can open, so
-there is no path to type. Directories it cannot use are listed with the reason rather than
-hidden.
-
-For a headless portal with no browser to hand, the same thing from a shell:
-
-```bash
-docker exec tethys-ngen-portal tethys manage register_run --list
-docker exec tethys-ngen-portal \
-  tethys manage register_run --path /var/lib/tethys_persist/ngiab_visualizer/<name>
-```
-
-The path `/var/lib/tethys_persist/` belongs to the `$HOME` env variable of the container running the visualizer. When the user runs the `./ViewOnTethys.sh`, it mounts the directory from the host at `~/ngiab_visualizer` to `/var/lib/tethys_persist/ngiab_visualizer`. 
-
-However, if the user wants more control, the user can copy their data directory to `~/ngiab_visualizer` on the host(not the container) while the container is **stop**, 
-
-```bash
-chown -R $USER: ~/ngiab_visualizer
-cp -R your/data/path ~/ngiab_visualizer
-```
-Finally the user registers that directory with the visualizer. The path is the one the
-container sees, not the host path:
+Give a run its manifest, which also converts its outputs to parquet:
 
 ```bash
 docker exec tethys-ngen-portal \
-  tethys manage register_run \
-    --path /var/lib/tethys_persist/ngiab_visualizer/gage-35054600 \
-    --label gage-35054600
+  tethys manage write_manifest --path /var/lib/tethys_persist/ngiab_visualizer/<name>
 ```
 
-Registration is idempotent on `--path`, so re-running it updates the existing row instead
-of adding a duplicate. `--remove --path <same path>` deregisters it again.
+`./ViewOnTethys.sh` does this for you on import. Re-running it is safe: the manifest is
+derived from the run's own contents, so an unchanged run rewrites identical files.
 
-The user can then run `./ViewOnTethys.sh` script to spin again the container or if the user wants more control and just define the env variables and running the container
+The `~/.ngiab_visualizer_db` mount still matters, but for a different reason than it used to.
+It no longer holds the run registry. It holds the portal's own database -- sign-ins and
+sessions -- which became worth persisting when changing a run started requiring one. Without
+that mount you sign in again after every restart.
+
+**Deleting a run deletes it.** The `×` button next to the run picker removes the run's
+directory and everything in it, and asks first. This changed: it used to only forget the run
+and leave the data alone. With the directory *being* the registry, a removal that only forgot
+would put the run back on the next scan, so it deletes for real. Only a signed-in user can.
+
+**Changing a run requires signing in; viewing does not.** The portal stays open -- share a
+`?model_run_id=` link with anyone -- but deleting a run or uploading one needs an account.
+Sign in at `/accounts/login`.
+
+##### Upgrading from an earlier version
+
+Runs registered in the old database are converted on the first start after the upgrade, and
+the shared links they were given keep working. Two things to know:
+
+- **A run outside `~/ngiab_visualizer` is not carried over.** `NGIAB_SCAN_ROOTS` used to let
+  the importer offer runs from other mounts; there is no importer now, and a directory
+  outside the storage root will not be listed. The upgrade names any it finds, with the path.
+  Move or copy them under `~/ngiab_visualizer` before upgrading.
+- **Downgrading afterwards is not supported.** The upgrade drops the old registry table, and
+  an older image expects it. Keep a copy of `~/.ngiab_visualizer_db` if you may want to go
+  back.
+
+##### Hosted deployments
+
+Set `NGIAB_STORAGE_BACKEND=s3` and configure a `ngiab_runs` entry in Django's `STORAGES`
+setting; runs are then addressed as objects rather than files and read with DuckDB over
+`httpfs`. A hosted deployment **refuses to start** on the image's baked `admin`/`pass`
+superuser or its default `TETHYS_SECRET_KEY`, both of which are public: supply
+`PORTAL_SUPERUSER_NAME`, `PORTAL_SUPERUSER_PASSWORD` and `TETHYS_SECRET_KEY` of your own.
 
 ### Unassisted Usage
 
 First create the `MODELS_RUNS_DIRECTORY` directory at `"$HOME/ngiab_visualizer"` and the
-`DB_DIRECTORY` directory at `"$HOME/.ngiab_visualizer_db"`. The second one holds the portal
-database, which is where registered runs live; without it every run is forgotten when the
-container is removed.
+`DB_DIRECTORY` directory at `"$HOME/.ngiab_visualizer_db"`. The first holds the runs and is
+the registry. The second holds the portal's own database -- sign-ins and sessions -- which is
+worth persisting now that changing a run requires signing in.
 
 Copy your `my-ngen-output` into `MODELS_RUNS_DIRECTORY`, start the container as below, then
-register the run:
+give the run its manifest:
 
 ```bash
 docker exec tethys-ngen-portal \
-  tethys manage register_run \
+  tethys manage write_manifest \
     --path /var/lib/tethys_persist/ngiab_visualizer/my-ngen-output \
     --label my-ngen-output
 ```

@@ -8,7 +8,7 @@ const url = (name) => `${getConfig().APP_ROOT_URL}${name}/`;
 const appAPI = {
   getModelRuns: () => getJSON(url('getModelRuns')),
 
-  // Mutations, so POST: a GET here is one prefetch away from unregistering a run.
+  // Mutations, so POST: a GET here is one prefetch away from deleting a run's outputs.
   removeModelRun: (params) => postJSON(url('removeModelRun'), params),
 
   getGeoSpatialData: (params) => getJSON(url('getGeoSpatialData'), params),

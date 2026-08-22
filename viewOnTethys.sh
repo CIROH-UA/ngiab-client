@@ -56,8 +56,10 @@ TETHYS_CONTAINER_NAME="tethys-ngen-portal"
 TETHYS_REPO="awiciroh/tethys-ngiab"
 
 MODELS_RUNS_DIRECTORY="${MODELS_RUNS_DIRECTORY:-$HOME/ngiab_visualizer}"
-# The portal database lives here so registered model runs survive `docker run --rm`.
-# The image ships a baked database and seeds it into this directory on first start.
+# The portal database lives here. It no longer holds the model runs -- the runs directory is
+# the registry now -- but it does hold sign-ins and sessions, which became worth persisting
+# once changing a run required one. The image ships a baked database and seeds it here on
+# first start.
 DB_DIRECTORY="${DB_DIRECTORY:-$HOME/.ngiab_visualizer_db}"
 TETHYS_PERSIST_PATH="/var/lib/tethys_persist"
 
@@ -888,7 +890,7 @@ if [ -n "$DATA_FOLDER_PATH" ]; then
         echo -e "${CROSS_MARK} ${BRed}Failed to prepare the model run. Exiting.${Color_Off}"
         exit 1
     }
-    echo -e "  ${INFO_MARK} ${BCyan}Add it in the visualizer with \"Add a run\" once the portal is up.${Color_Off}"
+    echo -e "  ${INFO_MARK} ${BCyan}It appears in the visualizer's run picker once the portal is up.${Color_Off}"
 fi
 
 print_section_header "LAUNCHING TETHYS VISUALIZATION"
