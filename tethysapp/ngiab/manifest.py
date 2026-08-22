@@ -226,7 +226,7 @@ def _netcdf_variable_meta(path):
         return {}
 
 
-def _teehr(run_path):
+def _teehr(run_path, fallback_configuration_name=""):
     """Whether this run carries its own TEEHR evaluation, and the producer's config name.
 
     ``present`` replaces evaluation_dir's ``os.path.isdir``, which is False for every
@@ -236,6 +236,12 @@ def _teehr(run_path):
     The configuration name is read from the producer's manifest under the key
     ``teehr_configuration_name``. Reading the unprefixed ``configuration_name`` returned
     empty for every real manifest, which is the bug commit b80395b fixed.
+
+    ``fallback_configuration_name`` is what the registry row held, and it is used only when
+    the run carries no producer manifest to read. That case is not hypothetical: the value
+    was captured at registration from a manifest that may since have been removed, or the run
+    may have been registered by hand -- and without the fallback the backfill would drop it,
+    which is the one TEEHR fact this app cannot re-derive from the run directory.
     """
     joined = os.path.join(run_path, "teehr", "dataset", "joined_timeseries")
     present = os.path.isdir(joined)
@@ -248,7 +254,10 @@ def _teehr(run_path):
     except (OSError, ValueError):
         configuration_name = ""
 
-    return {"present": present, "configuration_name": configuration_name}
+    return {
+        "present": present,
+        "configuration_name": configuration_name or fallback_configuration_name or "",
+    }
 
 
 def _version_token(run_path, output_dir, catchments, gpkg_relative):
@@ -282,7 +291,15 @@ def _version_token(run_path, output_dir, catchments, gpkg_relative):
     return digest.hexdigest()[:32]
 
 
-def distill(run_path, *, run_id=None, label=None, created=None, legacy_uuids=()):
+def distill(
+    run_path,
+    *,
+    run_id=None,
+    label=None,
+    created=None,
+    legacy_uuids=(),
+    teehr_configuration_name="",
+):
     """Read a run directory and return its manifest document.
 
     Pure with respect to the run: it reads, it does not write. ``write`` puts the result on
@@ -311,7 +328,7 @@ def distill(run_path, *, run_id=None, label=None, created=None, legacy_uuids=())
         "bounds": _bounds(os.path.join(run_path, gpkg_relative)) if gpkg_relative else None,
         "crosswalk_count": len(crosswalk),
         "troute": _troute(run_path),
-        "teehr": _teehr(run_path),
+        "teehr": _teehr(run_path, teehr_configuration_name),
         "version_token": _version_token(run_path, output_dir, catchments, gpkg_relative),
         "_catchments": catchments,
         "_crosswalk": crosswalk,
