@@ -75,6 +75,27 @@ class Command(BaseCommand):
         )
 
         self._convert_troute(run_path, compression)
+        self._write_manifest(run_path)
+
+    def _write_manifest(self, run_path):
+        """Give the run its manifest, because converting without one leaves it invisible.
+
+        A directory under the storage root is only a *registered* run once it has a manifest,
+        and this command is what the launcher runs on import. Converting the outputs and then
+        not recording them meant a freshly imported run did not appear in the picker at all --
+        found by running the built image rather than by any test, because every test wrote the
+        manifest itself.
+        """
+        from tethysapp.ngiab import manifest
+
+        document = manifest.distill(run_path)
+        manifest.write(run_path, document)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"wrote manifest: {document['catchment_count']} catchments, "
+                f"token {document['version_token'][:12]}"
+            )
+        )
 
     def _convert_troute(self, run_path, compression):
         """Write t-route to parquet in the shape the readers pin.

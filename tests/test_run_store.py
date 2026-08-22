@@ -193,7 +193,7 @@ def test_directory_without_a_manifest_is_reported_not_hidden(local_root):
     entries = {entry["name"]: entry for entry in run_store.list_runs()}
     assert "not-a-run" in entries
     assert entries["not-a-run"]["usable"] is False
-    assert "not been ingested" in entries["not-a-run"]["reason"]
+    assert "write_manifest" in entries["not-a-run"]["reason"]
 
 
 def test_run_without_outputs_is_reported_with_a_reason(local_root):

@@ -49,7 +49,9 @@ STORAGE_ALIAS = "ngiab_runs"
 LISTING_TTL_ENV = "NGIAB_LISTING_TTL_SECONDS"
 DEFAULT_LISTING_TTL_SECONDS = 10.0
 
-_NOT_INGESTED = "This directory has no manifest, so it has not been ingested yet."
+_NOT_INGESTED = (
+    "This directory has no manifest yet. Run: tethys manage write_manifest --path <run>"
+)
 _NO_OUTPUTS = "No catchment outputs in this run, so there is nothing to plot."
 _UNREADABLE = "This run's manifest could not be read."
 _UNSUPPORTED_SCHEMA = (

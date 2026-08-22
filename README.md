@@ -46,19 +46,26 @@ directory is the registry**. A run is registered by being there: one directory p
 holding a `manifest.json` the visualizer writes when it ingests the run. There is no database
 table of runs, no configuration file to hand-edit, and nothing to register.
 
-Copy a run directory into `~/ngiab_visualizer` (or let `./ViewOnTethys.sh -d <path>` copy it
-for you) and it appears in the run picker within ten seconds. A directory the visualizer
-cannot use is listed with the reason rather than hidden, the same as before.
+`./ViewOnTethys.sh -d <path>` copies a run in and prepares it, and it appears in the picker
+within ten seconds. Preparing is what writes the manifest -- a directory without one is listed
+as unusable, with the reason, rather than hidden.
 
-Give a run its manifest, which also converts its outputs to parquet:
+If you copy a directory in yourself, prepare it once:
 
 ```bash
 docker exec tethys-ngen-portal \
   tethys manage write_manifest --path /var/lib/tethys_persist/ngiab_visualizer/<name>
 ```
 
-`./ViewOnTethys.sh` does this for you on import. Re-running it is safe: the manifest is
-derived from the run's own contents, so an unchanged run rewrites identical files.
+Or convert its outputs to parquet at the same time, which is what the launcher runs:
+
+```bash
+docker exec tethys-ngen-portal \
+  tethys manage convert_outputs --path /var/lib/tethys_persist/ngiab_visualizer/<name>
+```
+
+Either is safe to re-run: the manifest is derived from the run's own contents, so an
+unchanged run rewrites identical files.
 
 The `~/.ngiab_visualizer_db` mount still matters, but for a different reason than it used to.
 It no longer holds the run registry. It holds the portal's own database -- sign-ins and
