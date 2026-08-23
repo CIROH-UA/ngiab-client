@@ -60,7 +60,9 @@ function loginRedirect() {
 }
 
 // Django sets this cookie on any rendered page; a mutating request must echo it back.
-function csrfToken() {
+// Exported because the upload path sends its body through XMLHttpRequest, which needs the
+// same token and has no business parsing the cookie a second time.
+export function csrfToken() {
   const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
   return match ? decodeURIComponent(match[1]) : '';
 }

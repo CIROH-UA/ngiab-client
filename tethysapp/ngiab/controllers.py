@@ -4,10 +4,16 @@ from django.views.decorators.http import require_POST
 from django.urls import reverse
 import functools
 import logging
+import os
+import posixpath
+import subprocess
+import sys
+import tempfile
+import uuid
 import duckdb
 from tethys_sdk.routing import controller
 from tethys_sdk.permissions import has_permission
-from . import run_store
+from . import duckdb_conn, ingest, run_store
 from .utils import (
     UnknownModelRun,
     model_run_exists,
@@ -47,19 +53,23 @@ logger = logging.getLogger(__name__)
 
 #: Granted through the ``run_managers`` group; see App.permissions.
 DELETE_PERMISSION = "delete_model_runs"
+UPLOAD_PERMISSION = "upload_model_runs"
+
+#: How long a presigned upload URL stays valid. Six hours, because the ceiling on what
+#: can be uploaded is the user's link rather than anything this app controls.
+UPLOAD_URL_TTL_SECONDS = 6 * 60 * 60
 
 
-def may_manage_runs(request):
-    """Whether this request's user may destroy a run.
+def _may(request, permission):
+    """Whether this request's user holds one app permission.
 
     Superusers short-circuit rather than relying on ``has_permission``. Django grants a
     superuser every permission anyway, but only once Tethys has resolved the request to an
     installed app -- and that resolution reads the URL. Answering from the user object keeps
     an administrator working regardless.
 
-    Fails closed. If the permission cannot be evaluated the answer is no, because the only
-    action behind this deletes data: a lookup that breaks should stop a delete, not wave it
-    through.
+    Fails closed. The actions behind these permissions destroy data or consume shared
+    storage, so a lookup that breaks should stop them rather than wave them through.
     """
     user = getattr(request, "user", None)
     if not user or not user.is_authenticated:
@@ -67,10 +77,40 @@ def may_manage_runs(request):
     if getattr(user, "is_superuser", False):
         return True
     try:
-        return bool(has_permission(request, DELETE_PERMISSION))
+        return bool(has_permission(request, permission))
     except Exception:  # noqa: BLE001 - see the docstring: any failure denies
-        logger.exception("Could not evaluate the %s permission", DELETE_PERMISSION)
+        logger.exception("Could not evaluate the %s permission", permission)
         return False
+
+
+def may_upload_runs(request):
+    """Whether this request's user may add a run."""
+    return _may(request, UPLOAD_PERMISSION)
+
+
+def may_manage_runs(request):
+    """Whether this request's user may destroy a run."""
+    return _may(request, DELETE_PERMISSION)
+
+
+def upload_permission_required(view):
+    """Refuse an upload from anyone without the upload permission.
+
+    Separate from delete so the two can be granted apart: adding a run is additive, removing
+    one is not, and the destructive grant should stay the scarcer of the two.
+    """
+
+    @functools.wraps(view)
+    def wrapped(request, *args, **kwargs):
+        if not getattr(request, "user", None) or not request.user.is_authenticated:
+            return JsonResponse({"error": "Sign in to upload a model run."}, status=401)
+        if not may_upload_runs(request):
+            return JsonResponse(
+                {"error": "You do not have permission to upload model runs."}, status=403
+            )
+        return view(request, *args, **kwargs)
+
+    return wrapped
 
 
 def write_login_required(view):
@@ -191,6 +231,7 @@ def home(request):
         "app_root_url": reverse(f"{App.package}:{App.index}"),
         "signed_in": bool(user and user.is_authenticated),
         "can_delete": may_manage_runs(request),
+        "can_upload": may_upload_runs(request),
     }
     return App.render(request, "index.html", context)
 
@@ -237,6 +278,189 @@ def removeModelRun(request):
         )
 
     return JsonResponse({"removed": name})
+
+
+@controller
+@require_POST
+@upload_permission_required
+def createUpload(request):
+    """Reserve a job and say how the archive should be sent.
+
+    Hosted, the answer is a presigned PUT straight into the bucket: the archive is the
+    largest thing this app handles, and routing gigabytes through one uvicorn worker would
+    stall the portal for every other user while it copied. Locally there is no bucket, so
+    the client posts the file here instead.
+
+    The name is validated now rather than after the transfer, because being told the name is
+    taken is worth much less once the user has already waited out a 6 GB upload.
+    """
+    name = (request.POST.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"error": "A name for the run is required."}, status=400)
+    if not ingest.is_valid_name(name):
+        return JsonResponse(
+            {"error": "Use letters, numbers, dots, dashes and underscores in the run name."},
+            status=400,
+        )
+    if run_store.find(name) is not None:
+        return JsonResponse(
+            {"error": f"A run called {name} already exists."}, status=409
+        )
+
+    job_id = uuid.uuid4().hex
+    ingest.write_status(job_id, state=ingest.PENDING, stage="waiting",
+                        message="waiting for the archive", run=name)
+
+    if not duckdb_conn.is_object_storage():
+        return JsonResponse({"job": job_id, "mode": "direct", "name": name})
+
+    try:
+        url = _presigned_put(ingest.staging_key(job_id))
+    except Exception as exc:  # noqa: BLE001 - reported, not raised into a 500
+        logger.exception("Could not presign an upload")
+        ingest.write_status(job_id, state=ingest.FAILED, stage="failed",
+                            message=str(exc), run=name)
+        return JsonResponse(
+            {"error": "This portal's object storage would not accept an upload."},
+            status=503,
+        )
+    return JsonResponse({"job": job_id, "mode": "presigned", "url": url, "name": name})
+
+
+def _presigned_put(key):
+    """A URL the browser can PUT the archive to, valid for long enough to send it.
+
+    NGIAB_S3_PUBLIC_ENDPOINT exists because the endpoint the server uses is not always the
+    one a browser can resolve -- a container talking to ``minio:9000`` presigns a host that
+    means nothing outside the container network, and the same split shows up wherever the
+    bucket has an internal service address. Signing is host-sensitive, so the substitution
+    happens before the signature rather than after.
+    """
+    backend = run_store.storage()
+    bucket = getattr(backend, "bucket_name", None)
+    if not bucket:
+        raise ingest.IngestError("No bucket is configured for run storage.")
+
+    prefix = (getattr(backend, "location", "") or "").strip("/")
+    full_key = posixpath.join(prefix, key) if prefix else key
+
+    public = os.environ.get("NGIAB_S3_PUBLIC_ENDPOINT", "").strip()
+    client = backend.connection.meta.client
+    if public:
+        import boto3
+
+        client = boto3.client(
+            "s3",
+            endpoint_url=public,
+            aws_access_key_id=getattr(backend, "access_key", None),
+            aws_secret_access_key=getattr(backend, "secret_key", None),
+            region_name=getattr(backend, "region_name", None),
+            config=client.meta.config,
+        )
+
+    return client.generate_presigned_url(
+        "put_object",
+        Params={"Bucket": bucket, "Key": full_key},
+        ExpiresIn=UPLOAD_URL_TTL_SECONDS,
+    )
+
+
+@controller
+@require_POST
+@upload_permission_required
+def startUpload(request):
+    """Begin preparing an archive that is already in storage.
+
+    Returns as soon as the job is launched. Extraction and conversion happen in another
+    process -- see the ingest_archive command for why a thread would not do.
+    """
+    job_id = (request.POST.get("job") or "").strip()
+    name = (request.POST.get("name") or "").strip()
+    if not job_id or not name:
+        return JsonResponse({"error": "job and name are required."}, status=400)
+    if not _is_job_id(job_id) or not ingest.is_valid_name(name):
+        return JsonResponse({"error": "That job or name is not valid."}, status=400)
+
+    ingest.write_status(job_id, state=ingest.PENDING, stage="queued",
+                        message="preparing to unpack", run=name)
+    _launch(["--job", job_id, "--name", name])
+    return JsonResponse({"job": job_id, "state": ingest.PENDING})
+
+
+@controller
+@require_POST
+@upload_permission_required
+def uploadRun(request):
+    """Take the archive as a plain upload, for deployments with no bucket.
+
+    Written to a temporary file rather than held in memory: Django spills large uploads to
+    disk already, and the job needs a path it can hand to another process anyway.
+    """
+    job_id = (request.POST.get("job") or "").strip()
+    name = (request.POST.get("name") or "").strip()
+    upload = request.FILES.get("archive")
+    if not upload:
+        return JsonResponse({"error": "No archive was uploaded."}, status=400)
+    if not _is_job_id(job_id) or not ingest.is_valid_name(name):
+        return JsonResponse({"error": "That job or name is not valid."}, status=400)
+
+    handle, path = tempfile.mkstemp(prefix=f"ngiab-{job_id}-", suffix=".archive")
+    with os.fdopen(handle, "wb") as sink:
+        for chunk in upload.chunks():
+            sink.write(chunk)
+
+    ingest.write_status(job_id, state=ingest.PENDING, stage="queued",
+                        message="preparing to unpack", run=name)
+    _launch(["--archive", path, "--name", name, "--job", job_id])
+    return JsonResponse({"job": job_id, "state": ingest.PENDING})
+
+
+@controller
+def uploadStatus(request):
+    """Where a job has got to. Polled until it reports a terminal state."""
+    job_id = (request.GET.get("job") or "").strip()
+    if not _is_job_id(job_id):
+        return JsonResponse({"error": "That job id is not valid."}, status=400)
+
+    status = ingest.read_status(job_id)
+    if status is None:
+        return JsonResponse({"error": "No such upload job."}, status=404)
+    status["terminal"] = status.get("state") in ingest.TERMINAL
+    return JsonResponse(status)
+
+
+def _is_job_id(value):
+    """Job ids are hex uuids we minted; anything else is not one.
+
+    Checked because the id reaches a storage key and a subprocess argument.
+    """
+    return bool(value) and len(value) == 32 and all(c in "0123456789abcdef" for c in value)
+
+
+def _launch(arguments):
+    """Run ingest_archive in its own process.
+
+    django-admin rather than a located manage.py: the settings module is the same one this
+    process is running under, and resolving manage.py costs a subprocess of its own. The
+    child is deliberately not waited on -- it outlives this request by design, and its exit
+    status reaches the client through the job status rather than through the return code.
+    """
+    executable = os.path.join(os.path.dirname(sys.executable), "django-admin")
+    command = [executable, "ingest_archive", *arguments]
+    environment = dict(
+        os.environ,
+        DJANGO_SETTINGS_MODULE=os.environ.get(
+            "DJANGO_SETTINGS_MODULE", "tethys_portal.settings"
+        ),
+    )
+    logger.info("launching %s", " ".join(command))
+    subprocess.Popen(  # noqa: S603 - fixed executable, validated arguments
+        command,
+        env=environment,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
 
 
 @controller

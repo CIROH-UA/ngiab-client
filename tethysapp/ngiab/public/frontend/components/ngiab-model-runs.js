@@ -28,7 +28,15 @@ export class NgiabModelRuns extends HTMLElement {
     this._selectEl.addEventListener('change', () => this._choose(this._selectEl.value));
     this._removeEl?.addEventListener('click', () => this._remove());
 
+    // Published runs come from the upload panel, which does not know about this one.
+    this._onPublished = () => this.refresh();
+    document.addEventListener('run-published', this._onPublished);
+
     this.refresh();
+  }
+
+  disconnectedCallback() {
+    document.removeEventListener('run-published', this._onPublished);
   }
 
   async refresh() {

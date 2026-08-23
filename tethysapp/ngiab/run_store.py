@@ -356,7 +356,26 @@ def _cached_listing(root_key, time_bucket):
     except Exception as exc:
         raise StorageUnreachable(f"Could not list runs at {root_key}: {exc}") from exc
 
-    return tuple(_ordered([_describe(name) for name in directories]))
+    return tuple(
+        _ordered([_describe(name) for name in directories if not is_reserved(name)])
+    )
+
+
+def is_reserved(name):
+    """Whether this directory belongs to the machinery rather than to a user.
+
+    Upload staging and job status live under the same root as the runs, because the run
+    store is the one place both backends are already configured. Without this they would
+    list as runs with no manifest -- an invented "unusable run" the user cannot act on.
+
+    A leading underscore, so the rule is visible in the bucket rather than a hardcoded list.
+    Run directories are named for gages and preprocessor output; none begin with one.
+    """
+    return name.startswith("_")
+
+
+#: Where an uploaded archive waits before it is a run, and where job status is written.
+STAGING_DIR = "_uploads"
 
 
 def list_runs():

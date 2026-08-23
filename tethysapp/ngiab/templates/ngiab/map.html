@@ -118,6 +118,14 @@
   .runs-row select { flex: 1 1 auto; min-width: 0; }
   #model-run-remove:hover:not(:disabled) { color: var(--danger); background: var(--surface-sunken); }
 
+  #upload-panel { margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.5rem; }
+  #upload-panel summary { cursor: pointer; color: var(--text-muted); font-size: 0.85rem; }
+  #upload-panel summary:hover { color: var(--text); }
+  #upload-panel input[type="text"],
+  #upload-panel input[type="file"] { width: 100%; margin-bottom: 0.4rem; }
+  #upload-start { width: 100%; margin-top: 0.25rem; }
+  #upload-progress { width: 100%; margin-top: 0.4rem; }
+
   /* Search ------------------------------------------------------------ */
   #map-search-box { position: relative; }
   /* Reads as a field, not a caption: without a fill and border it looked like a label. */
@@ -409,6 +417,7 @@
         <div class="card-section" id="map-runs">
           <h3 class="sr-only">Model run</h3>
           <ngiab-model-runs></ngiab-model-runs>
+          <ngiab-upload-run></ngiab-upload-run>
         </div>
 
         <ngiab-search>

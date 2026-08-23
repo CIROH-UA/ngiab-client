@@ -27,14 +27,22 @@ class App(TethysAppBase):
         portal shared by an institution "signed in" means everybody.
 
         A Tethys permission rather than an ``is_staff`` check, because it is grantable: a
-        portal administrator can hand ``delete_model_runs`` to the people who curate runs
-        without making them staff. Superusers hold every app permission already, so an
-        administrator needs no grant.
+        portal administrator can hand these to the people who curate runs without making
+        them staff. Superusers hold every app permission already, so an administrator needs
+        no grant.
+
+        Two permissions rather than one, so uploading and deleting can be granted apart.
+        Adding a run consumes shared storage; removing one destroys someone's output. The
+        second is the scarcer grant.
         """
         return (
             PermissionGroup(
                 name="run_managers",
                 permissions=(
+                    Permission(
+                        name="upload_model_runs",
+                        description="Upload model run archives and publish them",
+                    ),
                     Permission(
                         name="delete_model_runs",
                         description="Delete model runs and the outputs stored with them",

@@ -8,7 +8,17 @@ export function getConfig() {
     MODEL_RUN_ID: cfg.MODEL_RUN_ID || '',
     SIGNED_IN: cfg.SIGNED_IN === true,
     CAN_DELETE: cfg.CAN_DELETE === true,
+    CAN_UPLOAD: cfg.CAN_UPLOAD === true,
   };
+}
+
+// Whether to offer the upload panel.
+//
+// Unlike delete, this is hidden from anonymous visitors too. The delete button stays visible
+// signed out because its 401 is a route to the login page; the upload panel is a form, and
+// filling one in before being told to sign in is worse than not being offered it.
+export function canUpload() {
+  return getConfig().CAN_UPLOAD;
 }
 
 // Whether to render the delete control at all.

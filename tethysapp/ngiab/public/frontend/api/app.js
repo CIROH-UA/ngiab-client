@@ -23,6 +23,12 @@ const appAPI = {
   getTeehrLocations: (params) => getJSON(url('getTeehrLocations'), params),
   getTeehrVariables: (params) => getJSON(url('getTeehrVariables'), params),
   getTeehrTimeSeries: (params) => getJSON(url('getTeehrTimeSeries'), params),
+
+  // Upload is three calls: reserve a job, send the bytes (elsewhere), then start the work.
+  createUpload: (params) => postJSON(url('createUpload'), params),
+  startUpload: (params) => postJSON(url('startUpload'), params),
+  uploadStatus: (params) => getJSON(url('uploadStatus'), params),
+  uploadRunUrl: () => url('uploadRun'),
 };
 
 export default appAPI;
