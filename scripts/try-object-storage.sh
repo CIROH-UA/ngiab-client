@@ -10,8 +10,11 @@
 # Usage:
 #     scripts/try-object-storage.sh <prepared-run-directory> [port]
 #
-# The run directory must already have a manifest -- prepare one with:
-#     docker run --rm -v "$PWD/myrun:/run" <image> /usr/local/bin/ngiab-convert.sh --path /run
+# The run directory must already be converted. Mount the PARENT and pass the full path:
+#     docker run --rm -v "$PWD:/runs" <image> /usr/local/bin/ngiab-convert.sh --path /runs/myrun
+#
+# Mounting the run itself at /run instead would name it "run": distill takes the id from the
+# basename of the path it is given, so the mount point becomes the run's identity.
 #
 # Tear down with: scripts/try-object-storage.sh --down
 
@@ -43,7 +46,44 @@ if [ ! -f "$RUN_DIR/manifest.json" ]; then
     echo "error: $RUN_DIR has no manifest.json -- convert it first (see the header)" >&2
     exit 1
 fi
-RUN_NAME="$(basename "$(cd "$RUN_DIR" && pwd)")"
+RUN_ABS="$(cd "$RUN_DIR" && pwd)"
+RUN_NAME="$(basename "$RUN_ABS")"
+
+# An unconverted run half-works on object storage, which is worse than not working: DuckDB
+# globs the catchment CSVs over s3:// happily, but troute is still netCDF and xarray cannot
+# open an s3:// URI at all, so every routing chart 500s. Converting is the hosted workflow,
+# not an optimisation, so refuse rather than serve something broken.
+TROUTE_FORMAT="$(python3 -c "
+import json, sys
+doc = json.load(open('$RUN_ABS/manifest.json'))
+print((doc.get('troute') or {}).get('format', ''))
+" 2>/dev/null || echo "")"
+if [ "$TROUTE_FORMAT" = ".nc" ] || [ "$TROUTE_FORMAT" = ".csv" ]; then
+    cat >&2 <<MSG
+error: $RUN_NAME has unconverted t-route output ($TROUTE_FORMAT).
+
+  Catchment data would load, but every routing chart would fail: xarray cannot open an
+  s3:// URI. Convert it first, mounting the PARENT so the run keeps its name:
+
+    docker run --rm -v "$(dirname "$RUN_ABS"):/runs" $IMAGE \
+        /usr/local/bin/ngiab-convert.sh --path /runs/$RUN_NAME
+
+MSG
+    exit 1
+fi
+
+# The id the picker uses comes from the manifest, not the directory, and conversion stamps it
+# from whatever path it was given. Catch a mismatch here rather than as an empty map.
+MANIFEST_ID="$(python3 -c "
+import json
+print(json.load(open('$RUN_ABS/manifest.json')).get('id', ''))
+" 2>/dev/null || echo "")"
+if [ -n "$MANIFEST_ID" ] && [ "$MANIFEST_ID" != "$RUN_NAME" ]; then
+    echo "error: $RUN_NAME carries manifest id '$MANIFEST_ID'." >&2
+    echo "  The picker would offer '$MANIFEST_ID' and nothing would resolve. Re-convert with" >&2
+    echo "  the parent mounted, so the basename matches the run." >&2
+    exit 1
+fi
 
 trap 'echo; echo "(leaving containers up; scripts/try-object-storage.sh --down to remove)"' INT
 
