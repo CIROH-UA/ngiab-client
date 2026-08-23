@@ -321,3 +321,39 @@ def test_the_command_does_not_import_the_model(registry):
         text = handle.read()
     assert "from .models" not in text
     assert "import ModelRun" not in text
+
+
+def test_a_row_whose_path_is_stale_is_found_by_name_in_the_root(registry, run_in_root):
+    """A registry row can point somewhere that does not exist inside the container.
+
+    Two ordinary ways: the path was recorded on the host and never existed in the container,
+    or the runs have since been mounted elsewhere. Either leaves the row dangling while the
+    run itself sits in the storage root under the same name.
+
+    Found by running the real upgrade against a real database -- all five rows held host
+    paths, all five were reported missing, and the migration then dropped the table, losing
+    the ids that keep shared links working for runs that were present the whole time.
+    """
+    alpha = run_in_root("alpha")
+    stale = "/somewhere/that/never/existed/alpha"
+    original = _insert(stale, label="alpha")
+
+    call_command("backfill_manifests")
+
+    assert manifest.read(alpha) is not None
+    assert original in manifest.read(alpha)["legacy_uuids"]
+
+
+def test_a_correct_path_still_wins(registry, run_in_root, mini_run_factory):
+    """A deployment whose paths resolve must not be redirected by name matching."""
+    alpha = run_in_root("alpha")
+    _insert(alpha, label="alpha")
+    call_command("backfill_manifests")
+    assert manifest.read(alpha) is not None
+
+
+def test_a_row_matching_nothing_is_still_reported_missing(registry, capsys):
+    """Name matching must not turn a genuinely absent run into a silent success."""
+    _insert("/gone/entirely/nowhere-run", label="nowhere-run")
+    call_command("backfill_manifests")
+    assert "no longer exists" in capsys.readouterr().err

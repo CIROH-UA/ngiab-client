@@ -127,9 +127,10 @@ class Command(BaseCommand):
         therefore become one manifest, and every one of their UUIDs has to survive or the
         share links minted against the others break.
         """
+        root = os.path.realpath(run_store.local_root())
         grouped = {}
         for row in rows:
-            directory = os.path.realpath(str(row["path"]).rstrip("/"))
+            directory = self._resolve(str(row["path"]).rstrip("/"), root)
             entry = grouped.setdefault(
                 directory, {"uuids": [], "label": None, "teehr": "", "created": None}
             )
@@ -140,6 +141,36 @@ class Command(BaseCommand):
             if created and (entry["created"] is None or str(created) < str(entry["created"])):
                 entry["created"] = created
         return grouped
+
+    def _resolve(self, stored, root):
+        """Where a registered run actually is now, which may not be where the row says.
+
+        A registry row holds whatever path was passed at registration, and that path can be
+        stale in two ordinary ways: it may be a *host* path that never existed inside the
+        container, or the runs may since have been mounted somewhere else. Both leave a row
+        pointing at nothing while the run itself sits in the storage root under the same
+        name.
+
+        Found by running the real upgrade against a real database: all five rows held host
+        paths, every one was reported missing, and the migration then dropped the table --
+        losing the ids that keep shared links working, for runs that were present the whole
+        time. Matching on the directory name inside the root recovers them.
+
+        The stored path still wins when it resolves, so a deployment whose paths are correct
+        is unaffected.
+        """
+        stored_real = os.path.realpath(stored)
+        if os.path.isdir(stored_real):
+            return stored_real
+
+        candidate = os.path.join(root, os.path.basename(stored_real))
+        if os.path.isdir(candidate):
+            self.stdout.write(
+                f"  {os.path.basename(stored_real)}: registered as {stored}, found in the "
+                "storage root"
+            )
+            return os.path.realpath(candidate)
+        return stored_real
 
     def _inside_root(self, directory, root):
         """Whether a registered directory is somewhere the listing will ever look.
