@@ -99,6 +99,23 @@ CMD ["/bin/sh", "-c", "\"${VIRTUAL_ENV}/bin/python\" -m pytest -p no:cacheprovid
 # ---------------------------------------------------------------------------
 FROM ghcr.io/aquaveo/tethys-uvx:runtime-base-${TETHYS_UVX_TAG}
 
+# Security floors the base image has not picked up yet. The Grype gate in
+# build_and_push_dev_image.yml fails the build on a high-severity finding with a fix
+# available, and these three are all of them: libexpat1, and libpq5 with the
+# postgresql-client-17 it comes from. Named rather than a blanket `apt-get upgrade`, so the
+# next person can see exactly what was pinned up and drop it once the base image moves.
+#
+# The Python-side equivalents (cryptography, sqlparse) are floors in pyproject.toml, which is
+# where this repo already keeps urllib3, idna, anyio and ujson for the same reason.
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends --only-upgrade \
+        libexpat1 \
+        libpq5 \
+        postgresql-client-17 \
+    && rm -rf /var/lib/apt/lists/*
+USER 1000
+
 COPY --from=builder /opt/python /opt/python
 COPY --from=builder /opt/conda /opt/conda
 COPY --from=builder /opt/duckdb_extensions /opt/duckdb_extensions
