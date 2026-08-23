@@ -163,10 +163,11 @@ Access at: http://localhost:80
 The image is also compatible with rootless Podman (no `sudo` required). The main differences vs. Docker:
 
 - Use port `8080` (rootless cannot bind privileged ports < 1024). Set `NGINX_PORT=8080`.
-- Pass `--userns=keep-id:uid=1011` so files written by the container's `www` user (UID 1011 in the Tethys base image) appear with the invoking user's UID on the host.
+- Pass `--userns=keep-id:uid=1000` so files written by the container's `tethys` user (UID 1000 in the tethys-uvx base) appear with the invoking user's UID on the host. This was 1011 under the old conda base image.
 - Append `:Z` to bind mounts on SELinux-enforcing hosts (RHEL, Fedora, Rocky, etc.).
 - Build with `--format docker` so the `HEALTHCHECK` directive is preserved (Podman's default OCI format strips it).
 - Wrap `ALLOWED_HOSTS` in literal outer double-quotes so the value survives the salt-state shell rendering inside the container.
+- Reach the portal at `http://127.0.0.1:8080`, not `http://localhost:8080`. Podman's default pasta networking publishes the port on IPv4 only, and `localhost` resolves to `::1` first, so the browser reports a refused connection while the container is serving normally.
 
 ```bash
 # Build (Docker format so HEALTHCHECK is preserved)
@@ -174,7 +175,7 @@ podman build --format docker -t ngiab-visualizer:latest .
 
 # Run
 podman run --rm -d \
-  --userns=keep-id:uid=1011 \
+  --userns=keep-id:uid=1000 \
   -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer:Z" \
   -v "$DB_DIRECTORY:$TETHYS_PERSIST_PATH/db:Z" \
   -p "8080:8080" \

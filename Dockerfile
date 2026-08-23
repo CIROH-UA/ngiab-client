@@ -101,9 +101,15 @@ FROM ghcr.io/aquaveo/tethys-uvx:runtime-base-${TETHYS_UVX_TAG}
 
 # Security floors the base image has not picked up yet. The Grype gate in
 # build_and_push_dev_image.yml fails the build on a high-severity finding with a fix
-# available, and these three are all of them: libexpat1, and libpq5 with the
-# postgresql-client-17 it comes from. Named rather than a blanket `apt-get upgrade`, so the
-# next person can see exactly what was pinned up and drop it once the base image moves.
+# available: libexpat1, and libpq5 with the postgresql-client-17 it comes from.
+#
+# The util-linux family below is not yet failing that gate -- CVE-2026-53612..53615 are too
+# recent to carry a score, so they read as Unknown and pass. They are upgraded anyway,
+# because the fix is already published and the gate would start failing the day NVD scores
+# them. Waiting for that turns a one-line bump into a broken build on an unrelated PR.
+#
+# Named rather than a blanket `apt-get upgrade`, so the next person can see exactly what was
+# pinned up and drop it once the base image moves.
 #
 # The Python-side equivalents (cryptography, sqlparse) are floors in pyproject.toml, which is
 # where this repo already keeps urllib3, idna, anyio and ujson for the same reason.
@@ -113,6 +119,14 @@ RUN apt-get update \
         libexpat1 \
         libpq5 \
         postgresql-client-17 \
+        bsdutils \
+        libblkid1 \
+        libmount1 \
+        libsmartcols1 \
+        libuuid1 \
+        login \
+        mount \
+        util-linux \
     && rm -rf /var/lib/apt/lists/*
 USER 1000
 

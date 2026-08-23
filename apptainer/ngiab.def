@@ -16,7 +16,7 @@
 #
 # or simply, for a local port:
 #
-#     PORT=8080 apptainer run ngiab.sif
+#     APPTAINERENV_PORT=9000 apptainer run ngiab.sif
 #
 # WHAT DIFFERS FROM THE CONTAINER IMAGE, AND WHY
 #
@@ -124,6 +124,28 @@ Stage: final
 
 %post
     set -eux
+
+    # Security floors the base image has not picked up yet, matched to the Dockerfile's
+    # runtime stage -- read the reasoning there, including why the util-linux family is
+    # upgraded while its CVEs are still unscored. Named rather than a blanket upgrade so the
+    # next person can see what was pinned up and drop it once the base moves. The Python-side
+    # equivalents (cryptography, sqlparse) are floors in pyproject.toml and arrive with the
+    # venv from the build stage.
+    apt-get update
+    apt-get install -y --no-install-recommends --only-upgrade \
+        libexpat1 \
+        libpq5 \
+        postgresql-client-17 \
+        bsdutils \
+        libblkid1 \
+        libmount1 \
+        libsmartcols1 \
+        libuuid1 \
+        login \
+        mount \
+        util-linux
+    rm -rf /var/lib/apt/lists/*
+
     chmod 0755 /usr/local/bin/ngiab-apptainer-run.sh \
                /usr/local/bin/ngiab-convert.sh
     # Readable by any invoking user, since there is no fixed runtime uid.
@@ -144,8 +166,12 @@ Stage: final
     export TETHYS_DB_NAME=/opt/ngiab/tethys_platform.sqlite
     export STATIC_ROOT=/opt/ngiab/static
 
-    export PORT=8080
-    export TETHYS_PORT=8080
+    # Defaulted rather than fixed, so `--env PORT=9000` is honoured. Note that a bare
+    # `PORT=9000 apptainer run ...` is not: Apptainer does not carry that one through, which
+    # is why the help below says APPTAINERENV_PORT. NGIAB_STATE_DIR does pass plainly,
+    # because nothing here declares it.
+    export PORT="${PORT:-8080}"
+    export TETHYS_PORT="${TETHYS_PORT:-${PORT:-8080}}"
 
     # Matches the container image. The baked database already contains this superuser, so
     # changing these alone does not change the password. Override for any shared
