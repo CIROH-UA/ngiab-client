@@ -29,7 +29,9 @@ def anonymous_post():
 
 
 @pytest.fixture
-def signed_in_post(db):
+def signed_in_post(db, monkeypatch):
+    """Signed in *and* permitted. The permission gate is covered in test_delete_permission."""
+    monkeypatch.setattr(controllers, "has_permission", lambda request, perm: True)
     request = RequestFactory().post("/removeModelRun/", {"model_run_id": "alpha"})
     request.user = get_user_model()(username="someone", is_active=True)
     return request

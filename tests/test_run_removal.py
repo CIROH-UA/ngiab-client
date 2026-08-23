@@ -49,7 +49,11 @@ def _post(name, user=None):
 
 
 @pytest.fixture
-def signed_in(db):
+def signed_in(db, monkeypatch):
+    """A user who may delete. Signing in stopped being enough; see test_delete_permission."""
+    from tethysapp.ngiab import controllers as _c
+
+    monkeypatch.setattr(_c, "has_permission", lambda request, perm: True)
     return get_user_model()(username="operator", is_active=True)
 
 

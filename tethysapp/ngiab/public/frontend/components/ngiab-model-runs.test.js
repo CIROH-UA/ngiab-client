@@ -116,6 +116,44 @@ describe('ngiab-model-runs', () => {
     expect(asked).to.contain('preproc-test');
   });
 
+  // Deleting takes a permission now, not just a session; these cover what the user is shown.
+  describe('the delete control', () => {
+    afterEach(() => { delete window.__NGIAB__; });
+
+    it('is hidden from a signed-in user who lacks the permission', async () => {
+      window.__NGIAB__ = { SIGNED_IN: true, CAN_DELETE: false };
+      el = mount();
+      await settle();
+
+      expect(el.querySelector('#model-run-remove')).to.equal(null);
+    });
+
+    it('is shown to a signed-in user who has it', async () => {
+      window.__NGIAB__ = { SIGNED_IN: true, CAN_DELETE: true };
+      el = mount();
+      await settle();
+
+      expect(el.querySelector('#model-run-remove')).to.not.equal(null);
+    });
+
+    it('stays visible for an anonymous visitor, whose 401 leads to the login page', async () => {
+      window.__NGIAB__ = { SIGNED_IN: false, CAN_DELETE: false };
+      el = mount();
+      await settle();
+
+      expect(el.querySelector('#model-run-remove')).to.not.equal(null);
+    });
+
+    it('does not break the empty-state path when it is absent', async () => {
+      window.__NGIAB__ = { SIGNED_IN: true, CAN_DELETE: false };
+      appAPI.getModelRuns = async () => ({ model_runs: [] });
+      el = mount();
+      await settle();
+
+      expect(el.querySelector('#model-run-status').dataset.severity).to.equal('warning');
+    });
+  });
+
   it('offers no importer, because presence in the storage root is registration', async () => {
     el = mount();
     await settle();

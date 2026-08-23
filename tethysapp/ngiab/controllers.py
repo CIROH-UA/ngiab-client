@@ -6,6 +6,7 @@ import functools
 import logging
 import duckdb
 from tethys_sdk.routing import controller
+from tethys_sdk.permissions import has_permission
 from . import run_store
 from .utils import (
     UnknownModelRun,
@@ -44,6 +45,34 @@ from .teehr_warehouse import (
 logger = logging.getLogger(__name__)
 
 
+#: Granted through the ``run_managers`` group; see App.permissions.
+DELETE_PERMISSION = "delete_model_runs"
+
+
+def may_manage_runs(request):
+    """Whether this request's user may destroy a run.
+
+    Superusers short-circuit rather than relying on ``has_permission``. Django grants a
+    superuser every permission anyway, but only once Tethys has resolved the request to an
+    installed app -- and that resolution reads the URL. Answering from the user object keeps
+    an administrator working regardless.
+
+    Fails closed. If the permission cannot be evaluated the answer is no, because the only
+    action behind this deletes data: a lookup that breaks should stop a delete, not wave it
+    through.
+    """
+    user = getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    try:
+        return bool(has_permission(request, DELETE_PERMISSION))
+    except Exception:  # noqa: BLE001 - see the docstring: any failure denies
+        logger.exception("Could not evaluate the %s permission", DELETE_PERMISSION)
+        return False
+
+
 def write_login_required(view):
     """Refuse a mutating request from an anonymous caller.
 
@@ -59,6 +88,11 @@ def write_login_required(view):
     client would report unreadable JSON.
 
     Reads stay open. This wraps only the endpoints that change something.
+
+    Two refusals, not one, because the client acts on them differently. An anonymous caller
+    gets 401 and ``api/client.js`` sends them to sign in. A signed-in caller without the
+    permission gets 403, which the same client renders as a message and does *not* redirect
+    -- sending them to a login page they are already past would be a loop.
     """
 
     @functools.wraps(view)
@@ -67,6 +101,11 @@ def write_login_required(view):
             return JsonResponse(
                 {"error": "Sign in to change model runs."},
                 status=401,
+            )
+        if not may_manage_runs(request):
+            return JsonResponse(
+                {"error": "You do not have permission to delete model runs."},
+                status=403,
             )
         return view(request, *args, **kwargs)
 
@@ -141,9 +180,18 @@ def home(request):
 
     ensure_csrf_cookie because the page renders no Django form: without it the token is
     never handed out, document.cookie has no csrftoken, and every POST is rejected.
+
+    The two permission flags decide whether the page renders a delete control at all. They
+    are a courtesy, not a control: removeModelRun re-checks on every call, because anything
+    decided in a template can be edited in a console.
     """
     # reverse(), not "/apps/<root>/": MULTIPLE_APP_MODE false mounts the app at "/".
-    context = {"app_root_url": reverse(f"{App.package}:{App.index}")}
+    user = getattr(request, "user", None)
+    context = {
+        "app_root_url": reverse(f"{App.package}:{App.index}"),
+        "signed_in": bool(user and user.is_authenticated),
+        "can_delete": may_manage_runs(request),
+    }
     return App.render(request, "index.html", context)
 
 

@@ -113,7 +113,39 @@ def _configure(connection):
                 "Extensions are installed at image build time; a missing one means the image "
                 "and the DuckDB version have drifted apart."
             ) from exc
+
+    if is_object_storage():
+        _authenticate(connection)
     return connection
+
+
+def _authenticate(connection):
+    """Give the connection credentials for the run bucket.
+
+    Imported here rather than at module scope because run_store imports this module: the
+    connection factory cannot know about storage configuration at import time, only by the
+    time someone asks for a connection.
+
+    The statement is never logged. It carries the portal's own object-store credentials, and
+    the whole point of taking them from the storage configuration is that they are real.
+    """
+    from . import run_store
+
+    try:
+        statement = run_store.duckdb_secret_sql()
+    except Exception:  # noqa: BLE001 - reported on use, where the caller can act on it
+        logger.warning(
+            "Could not build S3 credentials for DuckDB; reads of run data will fail",
+            exc_info=True,
+        )
+        return
+
+    if not statement:
+        return
+    try:
+        connection.execute(statement)
+    except duckdb.Error:
+        logger.warning("DuckDB refused the S3 credentials for the run bucket", exc_info=True)
 
 
 class ExtensionUnavailable(RuntimeError):

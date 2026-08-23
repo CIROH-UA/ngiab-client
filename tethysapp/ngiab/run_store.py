@@ -42,7 +42,18 @@ DEFAULT_MANAGED_ROOT = "/var/lib/tethys_persist/ngiab_visualizer"
 
 # The named entry in Django's STORAGES setting that addresses the run bucket. Only consulted
 # when the backend is object storage; the local backend needs no configuration at all.
+#
+# Optional. A portal that already stores its media in a bucket has the credentials, the
+# endpoint and the bucket configured once, under ``default``; asking an administrator to
+# repeat all of it under a second alias invites the two to drift, and the failure when they
+# do is a 403 that this code reports as an empty run list. With no ``ngiab_runs`` entry the
+# run store borrows ``default`` and keeps its runs under a prefix of their own.
 STORAGE_ALIAS = "ngiab_runs"
+
+# Where runs live inside the portal's media bucket when the alias above is absent. A prefix
+# rather than the bucket root, so run directories do not interleave with uploaded media.
+RUNS_PREFIX_ENV = "NGIAB_RUNS_PREFIX"
+DEFAULT_RUNS_PREFIX = "ngiab_visualizer"
 
 # How long a listing may be stale. See _time_bucket for why this is a window rather than an
 # invalidation signal, and why 10 seconds.
@@ -81,9 +92,45 @@ def _storage_for_backend():
     """
     from django.core.files.storage import FileSystemStorage, storages
 
-    if duckdb_conn.is_object_storage():
+    if not duckdb_conn.is_object_storage():
+        return FileSystemStorage(location=local_root())
+
+    try:
         return storages[STORAGE_ALIAS]
-    return FileSystemStorage(location=local_root())
+    except Exception:  # noqa: BLE001 - InvalidStorageError is not importable across versions
+        return _borrowed_from_default()
+
+
+def runs_prefix():
+    """The prefix runs live under inside the portal's media bucket."""
+    return os.environ.get(RUNS_PREFIX_ENV, DEFAULT_RUNS_PREFIX).strip("/")
+
+
+def _borrowed_from_default():
+    """A storage on the portal's media bucket, re-pointed at the runs prefix.
+
+    Built from the ``default`` entry in STORAGES rather than from the instantiated
+    ``default_storage``, because what has to change is a constructor argument: the same
+    bucket and credentials with ``location`` moved to the run prefix. Reading the settings
+    dict is the only way to get that without reconstructing the backend's own attribute
+    names.
+    """
+    from django.conf import settings
+    from django.utils.module_loading import import_string
+
+    entry = (getattr(settings, "STORAGES", None) or {}).get("default")
+    if not entry or not entry.get("BACKEND"):
+        raise StorageUnreachable(
+            f"Runs are configured as object storage, but neither a {STORAGE_ALIAS!r} storage "
+            "nor a usable 'default' storage is defined for this portal."
+        )
+
+    options = dict(entry.get("OPTIONS") or {})
+    base = str(options.get("location") or "").strip("/")
+    prefix = runs_prefix()
+    options["location"] = posixpath.join(base, prefix) if base else prefix
+
+    return import_string(entry["BACKEND"])(**options)
 
 
 def storage():
@@ -107,6 +154,59 @@ def _bucket_uri():
         )
     prefix = (getattr(backend, "location", "") or "").strip("/")
     return f"s3://{bucket}/{prefix}" if prefix else f"s3://{bucket}"
+
+
+def duckdb_secret_sql():
+    """A ``CREATE SECRET`` statement for the storage DuckDB is about to read, or None.
+
+    DuckDB and django-storages reach the same bucket by different routes: the storage
+    interface reads the manifest and its sidecars, DuckDB reads the bulk. Only the first is
+    configured by Django, and DuckDB does not consult the AWS environment on its own --
+    measured, ``duckdb_secrets()`` is empty with AWS_ACCESS_KEY_ID and friends all exported.
+    Without a secret every parquet read fails, and the error names the wrong problem: with no
+    region resolved it reports ``NoSuchBucket`` against the real AWS endpoint.
+
+    Derived from the resolved storage object rather than read from the environment a second
+    time, so there is exactly one answer to "which credentials" and no way for the two halves
+    to disagree about it.
+
+    Falls back to ``credential_chain`` when the storage carries no static key, which is the
+    normal shape when the portal authenticates by instance or workload identity.
+
+    A custom endpoint is reduced to ``host[:port]``, because DuckDB carries the scheme in
+    USE_SSL instead, and forced to path-style addressing: a custom endpoint is almost always
+    a non-AWS store, and virtual-host style would resolve ``bucket.minio``, which does not
+    exist.
+    """
+    if not duckdb_conn.is_object_storage():
+        return None
+
+    backend = storage()
+    key = getattr(backend, "access_key", None)
+    secret = getattr(backend, "secret_key", None)
+    token = getattr(backend, "security_token", None)
+
+    parts = ["TYPE s3"]
+    if key and secret:
+        parts.append(f"KEY_ID {duckdb_conn.quote(key)}")
+        parts.append(f"SECRET {duckdb_conn.quote(secret)}")
+        if token:
+            parts.append(f"SESSION_TOKEN {duckdb_conn.quote(token)}")
+    else:
+        parts.append("PROVIDER credential_chain")
+
+    region = getattr(backend, "region_name", None)
+    if region:
+        parts.append(f"REGION {duckdb_conn.quote(region)}")
+
+    endpoint = getattr(backend, "endpoint_url", None)
+    if endpoint:
+        without_scheme = str(endpoint).split("://", 1)[-1].rstrip("/")
+        parts.append(f"ENDPOINT {duckdb_conn.quote(without_scheme)}")
+        parts.append("URL_STYLE 'path'")
+        parts.append("USE_SSL " + ("true" if str(endpoint).startswith("https") else "false"))
+
+    return "CREATE OR REPLACE SECRET ngiab_runs_s3 (" + ", ".join(parts) + ")"
 
 
 def location(name, *parts):

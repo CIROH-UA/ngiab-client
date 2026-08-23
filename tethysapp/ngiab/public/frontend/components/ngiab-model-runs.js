@@ -1,6 +1,7 @@
 import appAPI from '../api/app.js';
 import { store, actions } from '../store/app-store.js';
 import { userMessage } from '../lib/errors.js';
+import { canSeeDelete } from '../config.js';
 
 // <ngiab-model-runs> -- pick which model run to view.
 export class NgiabModelRuns extends HTMLElement {
@@ -17,9 +18,15 @@ export class NgiabModelRuns extends HTMLElement {
 
     this._selectEl = this.querySelector('#model-run-select');
     this._removeEl = this.querySelector('#model-run-remove');
+
+    // Removed, not disabled: a greyed control invites a hunt for what would enable it.
+    if (!canSeeDelete()) {
+      this._removeEl.remove();
+      this._removeEl = null;
+    }
     this._statusEl = this.querySelector('#model-run-status');
     this._selectEl.addEventListener('change', () => this._choose(this._selectEl.value));
-    this._removeEl.addEventListener('click', () => this._remove());
+    this._removeEl?.addEventListener('click', () => this._remove());
 
     this.refresh();
   }
@@ -44,12 +51,12 @@ export class NgiabModelRuns extends HTMLElement {
       );
       this._selectEl.replaceChildren();
       this._selectEl.disabled = true;
-      this._removeEl.disabled = true;
+      if (this._removeEl) this._removeEl.disabled = true;
       return;
     }
 
     this._selectEl.disabled = false;
-    this._removeEl.disabled = false;
+    if (this._removeEl) this._removeEl.disabled = false;
     this._setStatus(this._statusEl, '');
 
     // Labels repeat across runs, so the id fragment keeps options distinguishable.
@@ -81,6 +88,9 @@ export class NgiabModelRuns extends HTMLElement {
   }
 
   async _remove() {
+    // The button is absent without the permission; the server refuses regardless.
+    if (!this._removeEl) return;
+
     const modelRunId = this._selectEl.value;
     if (!modelRunId) return;
 

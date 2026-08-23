@@ -14,7 +14,11 @@
         APP_ROOT_URL: "{{ app_root_url|escapejs }}",
         PORTAL_HOST: "",
         // Default model run; override per request with ?model_run_id=... in the URL.
-        MODEL_RUN_ID: ""
+        MODEL_RUN_ID: "",
+        // Whether to offer the delete control. The server refuses regardless; this only
+        // decides whether the user is shown an action they cannot complete.
+        SIGNED_IN: {{ signed_in|yesno:"true,false" }},
+        CAN_DELETE: {{ can_delete|yesno:"true,false" }}
       };
     </script>
 

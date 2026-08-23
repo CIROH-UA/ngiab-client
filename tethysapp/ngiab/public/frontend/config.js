@@ -6,7 +6,19 @@ export function getConfig() {
     APP_ROOT_URL: cfg.APP_ROOT_URL || '/apps/ngiab/',
     PORTAL_HOST: cfg.PORTAL_HOST || '',
     MODEL_RUN_ID: cfg.MODEL_RUN_ID || '',
+    SIGNED_IN: cfg.SIGNED_IN === true,
+    CAN_DELETE: cfg.CAN_DELETE === true,
   };
+}
+
+// Whether to render the delete control at all.
+//
+// Both flags default false, which reads as "anonymous": the control stays visible so the
+// server's 401 can send an unauthenticated visitor to sign in. Only a signed-in user who has
+// been refused the permission loses the button, because for them it is a dead end.
+export function canSeeDelete() {
+  const cfg = getConfig();
+  return cfg.CAN_DELETE || !cfg.SIGNED_IN;
 }
 
 // The portal origin: the injected value, else wherever the page was served from.
