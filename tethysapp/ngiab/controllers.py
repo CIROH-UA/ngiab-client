@@ -50,6 +50,11 @@ from .teehr_warehouse import (
 
 logger = logging.getLogger(__name__)
 
+# S3 takes at most 5 GiB in a single PUT and the archive goes up as one, so this is the
+# store's limit rather than a policy. Kept in step with MAX_UPLOAD_BYTES in
+# public/frontend/lib/upload.js, which stops the transfer before a job is reserved.
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
+
 
 DELETE_PERMISSION = "delete_model_runs"
 UPLOAD_PERMISSION = "upload_model_runs"
@@ -237,6 +242,10 @@ def createUpload(request):
             {"error": f"A run called {name} already exists."}, status=409
         )
 
+    oversized = _too_large_to_send(request.POST.get("size"))
+    if oversized:
+        return JsonResponse({"error": oversized}, status=413)
+
     job_id = uuid.uuid4().hex
     ingest.write_status(job_id, state=ingest.PENDING, stage="waiting",
                         message="waiting for the archive", run=name)
@@ -255,6 +264,26 @@ def createUpload(request):
             status=503,
         )
     return JsonResponse({"job": job_id, "mode": "presigned", "url": url, "name": name})
+
+
+def _too_large_to_send(declared):
+    """Refuse a size the single PUT cannot carry, before a job is reserved for it.
+
+    The browser checks this too, and reaches the user faster. This is here so a caller that
+    did not check gets an answer about the file rather than whatever the store says about a
+    request body it will not take.
+    """
+    try:
+        size = int(declared)
+    except (TypeError, ValueError):
+        return None
+    if size <= MAX_UPLOAD_BYTES:
+        return None
+    return (
+        f"That archive is {size / 1024 ** 3:.1f} GiB, over the "
+        f"{MAX_UPLOAD_BYTES / 1024 ** 3:.1f} GiB limit for a single upload. Compress the "
+        "run as .tar.gz and upload that."
+    )
 
 
 def _presigned_put(key):

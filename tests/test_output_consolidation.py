@@ -143,3 +143,70 @@ def test_a_value_matrix_read_touches_one_object(consolidate, ingest):
 
     parquet = [p for p in os.listdir(outputs_dir) if p.endswith(".parquet")]
     assert len(parquet) == 1
+
+
+def _csv_names(outputs_dir):
+    return sorted(n for n in os.listdir(outputs_dir) if n.endswith(".csv"))
+
+
+def test_conversion_leaves_the_sources_alone_unless_asked(consolidate, ingest):
+    """The command is also run by hand against a real run directory; it must not eat it."""
+    run_id = consolidate()
+    assert _csv_names(ingest.root / run_id / "outputs" / "ngen")
+
+
+def test_pruning_removes_each_source_the_parquet_replaced(ingest):
+    run_id = ingest("pruned", output_format="csv")
+    run_path = str(ingest.root / run_id)
+    outputs_dir = ingest.root / run_id / "outputs" / "ngen"
+    assert _csv_names(outputs_dir)
+
+    call_command("convert_outputs", "--path", run_path, "--prune-sources")
+
+    assert _csv_names(outputs_dir) == []
+    assert sorted(p for p in os.listdir(outputs_dir) if p.endswith(".parquet"))
+
+
+def test_pruning_keeps_every_catchment_when_the_run_has_several_schemas(ingest):
+    """Sources go as each group lands, so a later group must not lose what an earlier one took."""
+    run_id = ingest("two-schemas", output_format="csv")
+    outputs_dir = ingest.root / run_id / "outputs" / "ngen"
+    (outputs_dir / "cat-900.csv").write_text(
+        "Time,OTHER_VAR\n2017-01-01 00:00:00,5.0\n2017-01-01 01:00:00,6.0\n"
+    )
+
+    call_command("convert_outputs", "--path", str(ingest.root / run_id), "--prune-sources")
+
+    groups = sorted(p for p in os.listdir(outputs_dir) if p.startswith("catchments-"))
+    assert len(groups) == 2, f"expected one parquet per schema, got {groups}"
+    assert _csv_names(outputs_dir) == []
+
+    from tethysapp.ngiab import duckdb_conn
+
+    seen = set()
+    for name in groups:
+        frame = duckdb_conn.query(
+            f"SELECT DISTINCT catchment_id FROM read_parquet("
+            f"{duckdb_conn.quote(str(outputs_dir / name))})"
+        )
+        seen.update(frame["catchment_id"].tolist())
+    assert seen == {"cat-100", "cat-101", "cat-102", "cat-900"}
+
+
+def test_a_source_is_never_removed_next_to_a_parquet_that_was_not_written(ingest, monkeypatch):
+    """Deleting a source beside an empty replacement is data that exists nowhere."""
+    from django.core.management.base import CommandError
+
+    from tethysapp.ngiab.management.commands import convert_outputs
+
+    run_id = ingest("unwritten", output_format="csv")
+    outputs_dir = ingest.root / run_id / "outputs" / "ngen"
+    before = _csv_names(outputs_dir)
+
+    monkeypatch.setattr(
+        convert_outputs.Command, "_write_group", lambda *a, **k: None
+    )
+    with pytest.raises(CommandError, match="left in place"):
+        call_command("convert_outputs", "--path", str(ingest.root / run_id), "--prune-sources")
+
+    assert _csv_names(outputs_dir) == before

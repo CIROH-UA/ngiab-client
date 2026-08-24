@@ -69,13 +69,16 @@ export class NgiabUploadRun extends HTMLElement {
     if (!name) return this._say('Give the run a name.', 'warning');
     if (!file) return this._say('Choose an archive to upload.', 'warning');
 
+    const oversized = transfer.tooLarge(file);
+    if (oversized) return this._say(oversized, 'error');
+
     this._busy(true);
     this._progressEl.value = 0;
     this._say('Reserving…');
 
     let ticket;
     try {
-      ticket = await appAPI.createUpload({ name });
+      ticket = await appAPI.createUpload({ name, size: file.size });
     } catch (error) {
       this._busy(false);
       return this._say(userMessage(error), 'error');

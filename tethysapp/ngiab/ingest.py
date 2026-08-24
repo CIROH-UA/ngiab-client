@@ -218,11 +218,13 @@ def _run_stages(archive_path, run_name, workspace, say):
     from django.core.management import call_command
 
     say("extracting", "unpacking the archive")
-    unpacked = archive.extract(archive_path, os.path.join(workspace, "run"))
+    unpacked = archive.extract(
+        archive_path, os.path.join(workspace, "run"), skip=archive.UNREAD_DIRS
+    )
 
     say("converting", "converting outputs to parquet")
     try:
-        call_command("convert_outputs", "--path", unpacked)
+        call_command("convert_outputs", "--path", unpacked, "--prune-sources")
     except Exception as exc:  # noqa: BLE001
         raise IngestError(f"The run's outputs could not be converted: {exc}") from exc
 
@@ -325,22 +327,22 @@ def _files_under(source):
 
 
 def superseded(document):
-    """Run-relative paths a converted run no longer needs published.
+    """What a converted run no longer needs published, as ``(kind, path)`` pairs.
 
-    Conversion writes parquet beside the source and removes nothing, so a published run
-    carried both copies. Storage is the smaller half of that: the catchment CSVs go up as one
-    object each, so an 8,105-catchment run spent 8,105 extra objects on data nothing reads --
-    against the one parquet per schema group that consolidating produced. Object count is
-    what the listing and the delete pay for.
+    Conversion writes parquet beside the sources and removes nothing, so a published run
+    carried both copies. Object count is what the listing and the delete pay for: an
+    8,105-catchment run spent 8,105 objects on per-catchment data no reader opens, against
+    the one parquet per schema group that consolidating produced.
 
-    Only what the manifest says has a replacement. A run whose outputs are still csv, or whose
-    t-route is still netCDF, has one copy and it goes up untouched.
+    Only what the manifest says has a replacement. A run whose outputs are still csv, or
+    whose t-route is still netCDF, has one copy and it goes up untouched.
     """
     replaced = set()
-    output_dir = document.get("output_dir") or ""
+    output_dir = document.get("output_dir")
 
-    if document.get("output_format") == ".parquet" and document.get("output_groups"):
-        replaced.add(("csv", output_dir))
+    if output_dir and document.get("output_format") == ".parquet" \
+            and document.get("output_groups"):
+        replaced.add(("outputs", output_dir))
 
     troute = document.get("troute") or {}
     if troute.get("format") == ".parquet" and troute.get("file"):
@@ -349,16 +351,29 @@ def superseded(document):
 
 
 def _publishable(files, document):
-    """``files`` without the sources conversion has already replaced."""
+    """``files`` without the sources conversion replaced, and without what nothing reads.
+
+    Once the outputs are consolidated the readers open the group files and nothing else in
+    that directory, so that is all it contributes. The per-catchment sources it was built
+    from and the nexus output beside them are a second copy and a set of objects no request
+    ever asks for.
+
+    Extraction already leaves the unread trees in the archive, so on the upload path that
+    part drops nothing. It still matters for a run that reached the workspace some other way,
+    where the walk would otherwise find them.
+    """
     replaced = superseded(document)
-    csv_dir = next((d for kind, d in replaced if kind == "csv"), None)
+    output_dir = next((d for kind, d in replaced if kind == "outputs"), None)
+    groups = set(document.get("output_groups") or ())
     troute_keep = next((f for kind, f in replaced if kind == "troute"), None)
     troute_dir = posixpath.dirname(troute_keep) if troute_keep else None
 
     keep = {}
     for relative, path in files.items():
-        if (csv_dir is not None and relative.endswith(".csv")
-                and posixpath.dirname(relative) == csv_dir):
+        if archive.skipped(relative, "", archive.UNREAD_DIRS):
+            continue
+        if (output_dir is not None and posixpath.dirname(relative) == output_dir
+                and posixpath.basename(relative) not in groups):
             continue
         if (troute_dir is not None and posixpath.dirname(relative) == troute_dir
                 and relative != troute_keep and not relative.endswith(".parquet")):

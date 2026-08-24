@@ -291,3 +291,36 @@ def _run_view(view, request):
         return view(request)
     except Exception as exc:  # noqa: BLE001 - the bug under test is an unhandled raise
         return JsonResponse({"error": f"{type(exc).__name__}: {exc}"}, status=500)
+
+
+def test_an_archive_over_the_single_put_limit_is_refused_before_a_job_exists(
+    permitted, user, storage_root
+):
+    """S3 answers an oversized PUT with a complaint about the request, not about the file."""
+    over = controllers.MAX_UPLOAD_BYTES + 1
+    response = _post(controllers.createUpload, user, name="gage-99", size=str(over))
+
+    assert response.status_code == 413
+    body = json.loads(response.content)
+    assert "tar.gz" in body["error"]
+    assert "job" not in body
+
+
+def test_an_archive_at_the_limit_is_accepted(permitted, user, storage_root):
+    """The limit is the store's, so refusing at it would refuse a file S3 would take."""
+    response = _post(
+        controllers.createUpload, user, name="gage-99",
+        size=str(controllers.MAX_UPLOAD_BYTES),
+    )
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize("size", ["", "not-a-number", None])
+def test_a_missing_or_unreadable_size_does_not_block_the_upload(
+    permitted, user, storage_root, size
+):
+    """Older clients send no size; the store still refuses what it cannot take."""
+    fields = {"name": "gage-99"}
+    if size is not None:
+        fields["size"] = size
+    assert _post(controllers.createUpload, user, **fields).status_code == 200

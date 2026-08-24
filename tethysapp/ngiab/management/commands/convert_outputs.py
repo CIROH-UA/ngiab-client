@@ -20,6 +20,11 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--path", required=True, help="Run directory (as seen in the container)")
         parser.add_argument("--compression", default="zstd")
+        parser.add_argument(
+            "--prune-sources",
+            action="store_true",
+            help="Delete each source file once the parquet that replaces it is written.",
+        )
 
     def handle(self, *args, **options):
         run_path = options["path"].rstrip("/")
@@ -37,21 +42,28 @@ class Command(BaseCommand):
 
         groups = self._group_by_schema(outputs, csvs)
         compression = options["compression"].upper()
+        prune = options["prune_sources"]
         written = 0
+        reclaimed = 0
 
         for index, (columns, members) in enumerate(sorted(groups.items())):
             destination = os.path.join(outputs, f"{CONSOLIDATED_PREFIX}{index}.parquet")
-            self._write_group(outputs, destination, members, columns, compression)
+            sources = [os.path.join(outputs, f"{stem}.csv") for stem in members]
+            self._write_group(destination, sources, columns, compression)
             written += 1
             self.stdout.write(f"  group {index}: {len(members)} catchments, {len(columns)} columns")
+            if prune:
+                reclaimed += self._discard(sources, destination)
 
         self.stdout.write(
             self.style.SUCCESS(
                 f"consolidated {len(csvs)} catchment files into {written} parquet object(s)"
             )
         )
+        if prune:
+            self.stdout.write(f"  reclaimed {reclaimed // (1024 ** 2)} MiB of source CSV")
 
-        self._convert_troute(run_path, compression)
+        self._convert_troute(run_path, compression, prune)
         self._write_manifest(run_path)
 
     def _write_manifest(self, run_path):
@@ -67,7 +79,7 @@ class Command(BaseCommand):
             )
         )
 
-    def _convert_troute(self, run_path, compression):
+    def _convert_troute(self, run_path, compression, prune=False):
         """Write t-route to parquet in the shape the readers pin."""
         from tethysapp.ngiab import utils as ngiab_utils
 
@@ -100,6 +112,9 @@ class Command(BaseCommand):
 
         self.stdout.write(f"  troute: {len(frame)} rows from {sources[0]}")
 
+        if prune:
+            self._discard([source], destination)
+
     def _group_by_schema(self, outputs, csvs):
         """Catchments keyed by their column set."""
         groups = {}
@@ -112,11 +127,15 @@ class Command(BaseCommand):
             groups.setdefault(tuple(header.columns), []).append(stem)
         return groups
 
-    def _write_group(self, outputs, destination, members, columns, compression):
-        """One parquet holding every catchment that shares this column set."""
-        pattern = os.path.join(outputs, "cat-*.csv")
+    def _write_group(self, destination, sources, columns, compression):
+        """One parquet holding every catchment that shares this column set.
+
+        The group reads the files it owns rather than globbing the directory and discarding
+        what does not match, so a run is parsed once across all groups instead of once per
+        group. The list travels as a parameter, which also keeps thousands of catchment
+        names out of the statement text.
+        """
         selected = ", ".join(duckdb_conn.quote_identifier(column) for column in columns)
-        members_list = ", ".join(duckdb_conn.quote(member) for member in members)
         time_column = columns[1] if len(columns) > 1 else columns[0]
 
         duckdb_conn.query(
@@ -124,10 +143,29 @@ class Command(BaseCommand):
             COPY (
                 SELECT {selected},
                        regexp_extract(filename, '(cat-[0-9]+)', 1) AS catchment_id
-                FROM read_csv_auto({duckdb_conn.quote(pattern)}, filename=true, union_by_name=true)
-                WHERE regexp_extract(filename, '(cat-[0-9]+)', 1) IN ({members_list})
+                FROM read_csv_auto(?, filename=true, union_by_name=true)
                 ORDER BY catchment_id, {duckdb_conn.quote_identifier(time_column)}
             ) TO {duckdb_conn.quote(destination)}
             (FORMAT PARQUET, COMPRESSION {compression})
-            """
+            """,
+            [sources],
         )
+
+    def _discard(self, sources, destination):
+        """Remove sources the parquet has replaced, and report the bytes reclaimed.
+
+        Nothing is removed until the replacement is on disk with bytes in it. A source
+        deleted next to an empty parquet is data that no longer exists anywhere.
+        """
+        if not os.path.isfile(destination) or os.path.getsize(destination) == 0:
+            raise CommandError(
+                f"{destination} was not written, so its sources were left in place."
+            )
+        reclaimed = 0
+        for path in sources:
+            try:
+                reclaimed += os.path.getsize(path)
+                os.remove(path)
+            except OSError as exc:
+                self.stderr.write(f"  could not remove {path}: {exc}")
+        return reclaimed

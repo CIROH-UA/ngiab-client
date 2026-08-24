@@ -174,6 +174,11 @@ def _converted_manifest():
     }
 
 
+def _readable(files):
+    """``files`` less the trees publishing leaves behind, whatever the manifest says."""
+    return {name for name in files if name.split("/")[0] not in archive.UNREAD_DIRS}
+
+
 def _files():
     return {
         "manifest.json": "/x/manifest.json",
@@ -182,6 +187,7 @@ def _files():
         "outputs/ngen/cat-100.csv": "/x/outputs/ngen/cat-100.csv",
         "outputs/ngen/cat-101.csv": "/x/outputs/ngen/cat-101.csv",
         "outputs/ngen/catchments-0.parquet": "/x/outputs/ngen/catchments-0.parquet",
+        "outputs/ngen/nex-2172114_output.csv": "/x/outputs/ngen/nex-2172114_output.csv",
         "outputs/troute/troute_output.nc": "/x/outputs/troute/troute_output.nc",
         "outputs/troute/troute.parquet": "/x/outputs/troute/troute.parquet",
         "forcings/forcing.nc": "/x/forcings/forcing.nc",
@@ -201,18 +207,24 @@ def test_a_converted_run_drops_the_netcdf_troute_replaced():
     assert "outputs/troute/troute_output.nc" not in kept
 
 
-def test_inputs_and_config_are_never_dropped():
-    """Forcings and the GeoPackage have one copy; only outputs get replaced."""
+def test_config_is_never_dropped():
+    """The GeoPackage and the realization have one copy; only outputs get replaced."""
     kept = set(ingest._publishable(_files(), _converted_manifest()))
-    for required in ("config/realization.json", "config/mini.gpkg", "forcings/forcing.nc"):
+    for required in ("config/realization.json", "config/mini.gpkg"):
         assert required in kept
 
 
-def test_an_unconverted_run_keeps_every_source():
+def test_a_tree_nothing_reads_is_not_published():
+    """Forcings are most of a run's bytes and no reader opens them."""
+    for document in (_converted_manifest(), {}):
+        assert "forcings/forcing.nc" not in ingest._publishable(_files(), document)
+
+
+def test_an_unconverted_run_keeps_every_source_it_publishes():
     """No parquet means the csv and the netCDF are the only copy there is."""
     document = {"output_dir": "outputs/ngen", "output_format": ".csv", "output_groups": [],
                 "troute": {"format": ".nc", "file": "outputs/troute/troute_output.nc"}}
-    assert set(ingest._publishable(_files(), document)) == set(_files())
+    assert set(ingest._publishable(_files(), document)) == _readable(_files())
 
 
 def test_a_run_converted_only_halfway_keeps_the_unconverted_half():
@@ -225,12 +237,36 @@ def test_a_run_converted_only_halfway_keeps_the_unconverted_half():
     assert "outputs/troute/troute_output.nc" in kept
 
 
-def test_a_missing_manifest_publishes_everything():
+def test_a_missing_manifest_still_publishes_every_source():
     """Never drop a source because the manifest could not be read."""
-    assert set(ingest._publishable(_files(), {})) == set(_files())
+    assert set(ingest._publishable(_files(), {})) == _readable(_files())
 
 
 def test_a_csv_outside_the_output_directory_is_kept():
     """Only the directory the manifest names was consolidated."""
     files = dict(_files(), **{"config/notes.csv": "/x/config/notes.csv"})
     assert "config/notes.csv" in ingest._publishable(files, _converted_manifest())
+
+
+def test_a_consolidated_output_directory_publishes_only_its_groups():
+    """The readers open the group files; the sources and the nexus output beside them are
+    a second copy and objects no request asks for."""
+    kept = set(ingest._publishable(_files(), _converted_manifest()))
+
+    in_outputs = {k for k in kept if k.startswith("outputs/ngen/")}
+    assert in_outputs == {"outputs/ngen/catchments-0.parquet"}
+
+
+def test_an_unconsolidated_output_directory_keeps_the_nexus_output():
+    """Nothing replaced it, so dropping it would be dropping the only copy."""
+    document = {"output_dir": "outputs/ngen", "output_format": ".csv", "output_groups": [],
+                "troute": {"format": ".nc", "file": "outputs/troute/troute_output.nc"}}
+    assert "outputs/ngen/nex-2172114_output.csv" in ingest._publishable(_files(), document)
+
+
+def test_an_empty_output_dir_in_the_manifest_does_not_swallow_the_run_root():
+    """dirname of a top-level file is also the empty string."""
+    document = dict(_converted_manifest(), output_dir="")
+    kept = set(ingest._publishable(_files(), document))
+    assert "manifest.json" in kept
+    assert "config/realization.json" in kept

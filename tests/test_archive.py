@@ -203,3 +203,172 @@ def test_a_run_archived_without_a_top_level_directory_works(tmp_path):
     }
     unpacked = archive.extract(write_zip(tmp_path / "a.zip", flat), str(tmp_path / "d"))
     assert os.path.isfile(os.path.join(unpacked, "config", "realization.json"))
+
+
+class _Usage:
+    def __init__(self, free):
+        self.free = free
+
+
+def test_free_space_is_measured_from_the_nearest_existing_parent(tmp_path, monkeypatch):
+    """The destination does not exist yet, so measuring it directly would raise."""
+    asked = []
+
+    def fake(path):
+        asked.append(path)
+        return _Usage(free=100 * 1024 ** 3)
+
+    monkeypatch.setattr(archive.shutil, "disk_usage", fake)
+    archive.usable_bytes(str(tmp_path / "not" / "created" / "yet"))
+    assert asked == [str(tmp_path)]
+
+
+def test_headroom_is_held_back_rather_than_offering_the_last_byte(monkeypatch):
+    monkeypatch.setattr(archive.shutil, "disk_usage", lambda _p: _Usage(free=100 * 1024 ** 3))
+    usable = archive.usable_bytes("/")
+    assert usable == 90 * 1024 ** 3
+
+
+def test_a_nearly_full_disk_offers_nothing_rather_than_a_negative_cap(monkeypatch):
+    monkeypatch.setattr(archive.shutil, "disk_usage", lambda _p: _Usage(free=1024))
+    assert archive.usable_bytes("/") == 0
+
+
+def test_an_unmeasurable_disk_leaves_the_ceiling_alone(monkeypatch):
+    def refuse(_path):
+        raise OSError("no statvfs here")
+
+    monkeypatch.setattr(archive.shutil, "disk_usage", refuse)
+    assert archive.usable_bytes("/") is None
+
+
+def test_an_archive_larger_than_the_free_disk_is_refused_before_anything_is_written(
+    tmp_path, monkeypatch
+):
+    """Without this the disk fills mid-extract and the caller gets OSError and a partial run."""
+    files = _run_files()
+    files["myrun/outputs/big"] = b"0" * 200_000
+    path = write_tar(tmp_path / "a.tar", files)
+    destination = tmp_path / "dest"
+
+    monkeypatch.setattr(archive, "usable_bytes", lambda _d: 1024)
+    with pytest.raises(archive.ArchiveRejected, match="free space"):
+        archive.extract(path, str(destination))
+
+    assert not destination.exists()
+
+
+def test_the_disk_only_lowers_the_ceiling_it_never_raises_it(tmp_path, monkeypatch):
+    """A roomy disk must not license an archive the caller's own cap already refuses."""
+    files = _run_files()
+    files["myrun/outputs/big"] = b"0" * 200_000
+    path = write_tar(tmp_path / "a.tar", files)
+
+    monkeypatch.setattr(archive, "usable_bytes", lambda _d: 500 * 1024 ** 3)
+    with pytest.raises(archive.ArchiveRejected) as raised:
+        archive.extract(path, str(tmp_path / "dest"), max_bytes=1024)
+    assert "free space" not in str(raised.value)
+
+
+def test_a_roomy_disk_does_not_disturb_an_ordinary_extraction(tmp_path, monkeypatch):
+    path = write_tar(tmp_path / "a.tar", _run_files())
+    monkeypatch.setattr(archive, "usable_bytes", lambda _d: 500 * 1024 ** 3)
+    unpacked = archive.extract(path, str(tmp_path / "dest"))
+    assert os.path.isfile(os.path.join(unpacked, "config", "realization.json"))
+
+
+def test_an_unread_tree_is_left_in_the_tar(tmp_path):
+    files = _run_files()
+    files["myrun/forcings/big.nc"] = b"0" * 5000
+    files["myrun/restart/state.nc"] = b"0" * 5000
+    path = write_tar(tmp_path / "a.tar", files)
+
+    unpacked = archive.extract(path, str(tmp_path / "dest"), skip=archive.UNREAD_DIRS)
+
+    assert os.path.isfile(os.path.join(unpacked, "outputs", "ngen", "cat-100.csv"))
+    assert not os.path.exists(os.path.join(unpacked, "forcings"))
+    assert not os.path.exists(os.path.join(unpacked, "restart"))
+
+
+def test_an_unread_tree_is_left_in_the_zip(tmp_path):
+    files = _run_files()
+    files["myrun/forcings/big.nc"] = b"0" * 5000
+    path = write_zip(tmp_path / "a.zip", files)
+
+    unpacked = archive.extract(str(path), str(tmp_path / "dest"), skip=archive.UNREAD_DIRS)
+
+    assert os.path.isfile(os.path.join(unpacked, "config", "realization.json"))
+    assert not os.path.exists(os.path.join(unpacked, "forcings"))
+
+
+def test_a_skipped_tree_is_not_charged_against_the_cap(tmp_path):
+    """Charging a run for bytes that never reach the disk would refuse runs that fit."""
+    files = _run_files()
+    files["myrun/forcings/big.nc"] = b"0" * 200_000
+    path = write_tar(tmp_path / "a.tar", files)
+
+    with pytest.raises(archive.ArchiveRejected, match="unpacks to more than"):
+        archive.inspect(path, max_bytes=50_000)
+
+    root, _ = archive.inspect(path, max_bytes=50_000, skip=archive.UNREAD_DIRS)
+    assert root == "myrun"
+
+
+def test_skipping_does_not_excuse_an_unsafe_path_inside_the_skipped_tree(tmp_path):
+    """A refusal is about the archive, not about which parts this caller wanted."""
+    files = _run_files()
+    files["myrun/forcings/../../../etc/pwn"] = b"x"
+    path = write_tar(tmp_path / "a.tar", files)
+
+    with pytest.raises(archive.ArchiveRejected, match="unsafe path"):
+        archive.inspect(path, skip=archive.UNREAD_DIRS)
+
+
+def test_a_directory_named_like_an_unread_tree_deeper_in_the_run_is_kept(tmp_path):
+    """The names are top-level trees, not a substring match on every path."""
+    files = _run_files()
+    files["myrun/outputs/forcings/keep.csv"] = b"a,b\n1,2\n"
+    path = write_tar(tmp_path / "a.tar", files)
+
+    unpacked = archive.extract(path, str(tmp_path / "dest"), skip=archive.UNREAD_DIRS)
+    assert os.path.isfile(os.path.join(unpacked, "outputs", "forcings", "keep.csv"))
+
+
+def test_a_rootless_archive_still_has_its_unread_trees_skipped(tmp_path):
+    files = {
+        "config/realization.json": b'{"time": {}}',
+        "outputs/ngen/cat-100.csv": b"Time,Q_OUT\n2017-01-01,1.0\n",
+        "forcings/big.nc": b"0" * 5000,
+    }
+    path = write_tar(tmp_path / "a.tar", files)
+
+    unpacked = archive.extract(path, str(tmp_path / "dest"), skip=archive.UNREAD_DIRS)
+    assert os.path.isfile(os.path.join(unpacked, "outputs", "ngen", "cat-100.csv"))
+    assert not os.path.exists(os.path.join(unpacked, "forcings"))
+
+
+def test_a_nested_unread_tree_is_left_in_the_archive(tmp_path):
+    """cat_config sits under config/, which is otherwise kept in full."""
+    files = _run_files()
+    files["myrun/config/cat_config/NOAH-OWP-M/cat-100.input"] = b"x"
+    files["myrun/config/mini.gpkg"] = b"gpkg"
+    path = write_tar(tmp_path / "a.tar", files)
+
+    unpacked = archive.extract(path, str(tmp_path / "dest"), skip=archive.UNREAD_DIRS)
+
+    assert os.path.isfile(os.path.join(unpacked, "config", "realization.json"))
+    assert os.path.isfile(os.path.join(unpacked, "config", "mini.gpkg"))
+    assert not os.path.exists(os.path.join(unpacked, "config", "cat_config"))
+
+
+def test_a_tree_whose_name_only_starts_the_same_is_kept(tmp_path):
+    """Matching is on whole segments, not on the string the name begins with."""
+    files = _run_files()
+    files["myrun/config/cat_config_notes/readme.txt"] = b"x"
+    files["myrun/forcings_summary.txt"] = b"x"
+    path = write_tar(tmp_path / "a.tar", files)
+
+    unpacked = archive.extract(path, str(tmp_path / "dest"), skip=archive.UNREAD_DIRS)
+
+    assert os.path.isfile(os.path.join(unpacked, "config", "cat_config_notes", "readme.txt"))
+    assert os.path.isfile(os.path.join(unpacked, "forcings_summary.txt"))

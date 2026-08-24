@@ -16,6 +16,12 @@ function file(name = 'gage-99.tar.gz') {
   return new File([new Uint8Array([1, 2, 3])], name, { type: 'application/gzip' });
 }
 
+function oversized(name = 'gage-99.tar') {
+  const f = file(name);
+  Object.defineProperty(f, 'size', { value: transfer.MAX_UPLOAD_BYTES + 1 });
+  return f;
+}
+
 function attach(el, f) {
   const dt = new DataTransfer();
   dt.items.add(f);
@@ -275,4 +281,36 @@ describe('ngiab-upload-run', () => {
     expect(status.dataset.severity).to.equal('error');
     expect(status.textContent).to.contain('realization.json');
   }).timeout(10000);
+
+  it('refuses an archive past the single-PUT limit without reserving a job', async () => {
+    let called = false;
+    appAPI.createUpload = async () => { called = true; return {}; };
+    el = mount();
+    await settle();
+
+    el.querySelector('#upload-name').value = 'gage-99';
+    attach(el, oversized());
+    el.querySelector('#upload-start').click();
+    await settle();
+
+    expect(called).to.equal(false);
+    const status = el.querySelector('#upload-status');
+    expect(status.dataset.severity).to.equal('error');
+    expect(status.textContent).to.contain('tar.gz');
+  });
+
+  it('tells the server the size so a client that skipped the check is still refused', async () => {
+    let sent = null;
+    appAPI.createUpload = async (params) => { sent = params; return { job: 'j', mode: 'direct' }; };
+    appAPI.uploadStatus = async () => ({ state: 'DONE', terminal: true, message: 'ready' });
+    el = mount();
+    await settle();
+
+    el.querySelector('#upload-name').value = 'gage-99';
+    attach(el, file());
+    el.querySelector('#upload-start').click();
+    await settle();
+
+    expect(sent.size).to.equal(3);
+  });
 });
