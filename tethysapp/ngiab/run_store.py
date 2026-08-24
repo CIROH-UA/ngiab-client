@@ -521,24 +521,18 @@ def delete_prefix(backend, prefix, keys=None):
     if not keys:
         return
 
-    client = getattr(getattr(backend, "connection", None), "meta", None)
-    client = getattr(client, "client", None)
-    bucket = getattr(backend, "bucket_name", None)
+    client, bucket = _s3_client(backend)
     if client is None or not bucket:
         for key in keys:
             backend.delete(key)
         return
 
-    location = (getattr(backend, "location", "") or "").strip("/")
     failures = []
     for chunk in (keys[i:i + 1000] for i in range(0, len(keys), 1000)):
         response = client.delete_objects(
             Bucket=bucket,
             Delete={
-                "Objects": [
-                    {"Key": posixpath.join(location, key) if location else key}
-                    for key in chunk
-                ],
+                "Objects": [{"Key": raw_key(backend, key)} for key in chunk],
                 "Quiet": True,
             },
         )
@@ -614,6 +608,17 @@ class ClaimHeld(RuntimeError):
     """Raised when another publisher holds the run name."""
 
 
+def raw_key(backend, key):
+    """``key`` with the backend's own prefix applied, for a call that bypasses the backend.
+
+    django-storages prepends ``location`` itself, so anything going through ``save``/``open``
+    must not. A boto3 call made directly against the bucket does have to, and three of those
+    were each doing the strip-and-join by hand.
+    """
+    location = (getattr(backend, "location", "") or "").strip("/")
+    return posixpath.join(location, key) if location else key
+
+
 def _s3_client(backend):
     """The backend's boto3 client and bucket, or (None, None) when it has none."""
     meta = getattr(getattr(backend, "connection", None), "meta", None)
@@ -621,9 +626,7 @@ def _s3_client(backend):
 
 
 def _claim_key(backend, name):
-    location = (getattr(backend, "location", "") or "").strip("/")
-    key = posixpath.join(CLAIM_DIR, name)
-    return posixpath.join(location, key) if location else key
+    return raw_key(backend, posixpath.join(CLAIM_DIR, name))
 
 
 def _take_claim(client, bucket, key, name):

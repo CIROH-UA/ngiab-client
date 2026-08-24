@@ -202,14 +202,18 @@ def _load(job_id):
     Separate from read_status because the terminal guard below has to compare against what
     the writer actually recorded. Feeding it a synthesised failure would let a stale-looking
     job block its own heartbeat.
+
+    Opened rather than probed first, the same way run_store._read_manifest does it. A client
+    polls this every two seconds for the length of a job, so an exists() ahead of the open
+    doubled the round trips for the whole of a conversion.
     """
     backend = run_store.storage()
     key = status_key(job_id)
     try:
-        if not backend.exists(key):
-            return None
         with backend.open(key) as handle:
             payload = handle.read()
+    except FileNotFoundError:
+        return None
     except Exception as exc:  # noqa: BLE001
         raise run_store.StorageUnreachable(str(exc)) from exc
 

@@ -133,10 +133,15 @@ def test_unknown_catchment_raises_rather_than_returning_empty(ingest):
 
 
 def test_unknown_run_id_raises_unknown_model_run(ingest):
-    """Every path build funnels through _require_model_run_path; keep the funnel."""
+    """Every path build funnels through _require_run_entry; keep the funnel.
+
+    It used to name _require_model_run_path, which the manifest-backed lookup replaced and
+    left with no production caller -- so the assertion still passed while the funnel it
+    claimed to guard was no longer the one in use.
+    """
     ingest()
     with pytest.raises(ngiab_utils.UnknownModelRun):
-        ngiab_utils._require_model_run_path("22222222-2222-2222-2222-222222222222")
+        ngiab_utils._require_run_entry("22222222-2222-2222-2222-222222222222")
 
 
 # ---- Must not change: output directory resolution --------------------------

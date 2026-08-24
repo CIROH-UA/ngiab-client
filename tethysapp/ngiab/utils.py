@@ -183,14 +183,6 @@ class UnknownModelRun(Exception):
     """
 
 
-def _require_model_run_path(model_run_id):
-    """The run's directory, or raise. Every path built from a run id goes through here."""
-    path = _get_model_run_path_by_id(model_run_id)
-    if path is None:
-        raise UnknownModelRun(model_run_id)
-    return path
-
-
 def model_run_exists(model_run_id):
     """Whether a run id is registered. False for None, so a missing parameter is not a match."""
     return model_run_id is not None and _get_model_run_path_by_id(model_run_id) is not None
@@ -279,7 +271,7 @@ _TROUTE_NON_VARIABLES = frozenset(
 )
 
 
-@functools.lru_cache(maxsize=8)
+@functools.lru_cache(maxsize=32)
 def _cached_troute_frame(directory, version, source, source_format):
     """One read per run, not one per request.
 
@@ -388,22 +380,16 @@ def get_troute_df(model_id):
     return frame
 
 
-# Where ngen writes by default, and what the converter and the importer both assume.
-_DEFAULT_OUTPUT_SUBDIR = "ngen"
 
 
 def get_base_output(model_id):
     """Where this run's catchment outputs live.
 
-    From the manifest. This used to read config/realization.json on every catchment request
-    -- the highest-frequency file open in the app -- to find ``output_root``.
+    One field of what run_outputs already resolves. Recomputing it here was exactly the
+    rediscovery run_outputs exists to stop.
     """
-    entry = _require_run_entry(model_id)
-    document = entry["manifest"] or {}
-    return _child(
-        entry["path"],
-        manifest.contained_output_dir(document.get("output_dir")),
-    )
+    return run_outputs(model_id).directory
+
 
 # Output files may be csv (as ngen writes them) or parquet (as viewOnTethys.sh rewrites
 # them at import). Parquet first: when both exist it is the cheaper read.
@@ -726,7 +712,7 @@ def get_catchment_variables(model_run_id):
     return {"variables": list(columns[2:]), "time_column": columns[1]}
 
 
-@functools.lru_cache(maxsize=8)
+@functools.lru_cache(maxsize=32)
 def _cached_value_matrix(directory, variable, version, table, consolidated, catchment_count):
     """Keyed on the version token: a re-ingested run must not serve the previous grid."""
     return _build_value_matrix(table, variable, consolidated, catchment_count)
@@ -1040,9 +1026,9 @@ def describe_troute_feature(model_run_id, feature_id):
 
     flowpath_id = f"wb-{feature_id}"
     document = entry.get("manifest") or {}
-    divide_id = manifest.crosswalk(
-        entry["path"], document.get("version_token", "")
-    ).get(flowpath_id)
+    divide_id = manifest.divide_for(
+        entry["path"], flowpath_id, document.get("version_token", "")
+    )
     return (flowpath_id, divide_id) if divide_id is not None else (None, None)
 
 

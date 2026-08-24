@@ -5,7 +5,6 @@ from django.urls import reverse
 import functools
 import logging
 import os
-import posixpath
 import subprocess
 import sys
 import tempfile
@@ -61,6 +60,17 @@ UPLOAD_PERMISSION = "upload_model_runs"
 UPLOAD_URL_TTL_SECONDS = 6 * 60 * 60
 
 
+def signed_in(request):
+    """Whether this request carries an authenticated user.
+
+    One question asked four ways before this -- twice in decorators, once in the permission
+    predicate, once for the template flag -- each spelling out the same getattr-and-truthiness
+    dance.
+    """
+    user = getattr(request, "user", None)
+    return bool(user and user.is_authenticated)
+
+
 def _may(request, permission):
     """Whether this request's user holds one app permission.
 
@@ -72,10 +82,9 @@ def _may(request, permission):
     Fails closed. The actions behind these permissions destroy data or consume shared
     storage, so a lookup that breaks should stop them rather than wave them through.
     """
-    user = getattr(request, "user", None)
-    if not user or not user.is_authenticated:
+    if not signed_in(request):
         return False
-    if getattr(user, "is_superuser", False):
+    if getattr(request.user, "is_superuser", False):
         return True
     try:
         return bool(has_permission(request, permission))
@@ -103,7 +112,7 @@ def upload_permission_required(view):
 
     @functools.wraps(view)
     def wrapped(request, *args, **kwargs):
-        if not getattr(request, "user", None) or not request.user.is_authenticated:
+        if not signed_in(request):
             return JsonResponse({"error": "Sign in to upload a model run."}, status=401)
         if not may_upload_runs(request):
             return JsonResponse(
@@ -138,7 +147,7 @@ def write_login_required(view):
 
     @functools.wraps(view)
     def wrapped(request, *args, **kwargs):
-        if not getattr(request, "user", None) or not request.user.is_authenticated:
+        if not signed_in(request):
             return JsonResponse(
                 {"error": "Sign in to change model runs."},
                 status=401,
@@ -239,10 +248,9 @@ def home(request):
     decided in a template can be edited in a console.
     """
     # reverse(), not "/apps/<root>/": MULTIPLE_APP_MODE false mounts the app at "/".
-    user = getattr(request, "user", None)
     context = {
         "app_root_url": reverse(f"{App.package}:{App.index}"),
-        "signed_in": bool(user and user.is_authenticated),
+        "signed_in": signed_in(request),
         "can_delete": may_manage_runs(request),
         "can_upload": may_upload_runs(request),
     }
@@ -354,8 +362,7 @@ def _presigned_put(key):
     if not bucket:
         raise ingest.IngestError("No bucket is configured for run storage.")
 
-    prefix = (getattr(backend, "location", "") or "").strip("/")
-    full_key = posixpath.join(prefix, key) if prefix else key
+    full_key = run_store.raw_key(backend, key)
 
     public = os.environ.get("NGIAB_S3_PUBLIC_ENDPOINT", "").strip()
     client = backend.connection.meta.client

@@ -91,7 +91,7 @@ def test_path_resolution_works_through_the_real_producer(registry_root):
 
 def test_unknown_id_still_raises_unknown_model_run(registry_root):
     with pytest.raises(ngiab_utils.UnknownModelRun):
-        ngiab_utils._require_model_run_path("nope")
+        ngiab_utils._require_run_entry("nope")
 
 
 # ---- R14: links minted before the manifest keep working --------------------

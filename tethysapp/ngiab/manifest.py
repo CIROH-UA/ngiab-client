@@ -593,7 +593,7 @@ def _token(run_path, supplied):
     return supplied if supplied is not None else _version_of(run_path)
 
 
-@functools.lru_cache(maxsize=8)
+@functools.lru_cache(maxsize=32)
 def _crosswalk_cached(run_path, version_token):
     """Read through DuckDB, and without an os.path.exists guard.
 
@@ -606,6 +606,16 @@ def _crosswalk_cached(run_path, version_token):
     if frame is None:
         return {}
     return dict(zip(frame["flowpath_id"], frame["divide_id"]))
+
+
+def divide_for(run_path, flowpath_id, version_token=None):
+    """The divide a single flowpath maps to, or None.
+
+    What the one caller actually wants. ``crosswalk`` hands back a copy of the whole mapping,
+    which for a 10,000-flowpath run is a dict rebuilt per request to answer one lookup.
+    """
+    run_path = str(run_path).rstrip(os.sep)
+    return _crosswalk_cached(run_path, _token(run_path, version_token)).get(flowpath_id)
 
 
 def crosswalk(run_path, version_token=None):
