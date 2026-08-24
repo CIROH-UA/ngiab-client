@@ -1,0 +1,89 @@
+{
+  "reviewer": "adversarial",
+  "findings": [
+    {
+      "title": "Cascade: a heartbeat write that outlives the join timeout resurrects RUNNING over a terminal status",
+      "severity": "P0",
+      "file": "tethysapp/ngiab/ingest.py",
+      "line": 258,
+      "confidence": 0.78,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "thread.join(timeout=...) does not report whether it actually joined. Check thread.is_alive() after join and, if still alive, do not let the caller proceed to write a terminal status while it is -- either block until the beat's own write_status call returns (e.g. have beat() acquire a lock around its write and have publish's finally take that same lock before returning), or have write_status itself detect 'a terminal status already exists for this job' and refuse to downgrade it back to RUNNING (compare-and-swap on state before replacing).",
+      "evidence": [
+        "Trigger: the object storage backend hangs on a write (no connect/read timeout configured on the S3 client, or a stalled connection) while the heartbeat thread is inside write_status() at ingest.py:252.",
+        "Step 1: publish() finishes _run() and the `with _heartbeat(...)` block's generator runs its finally at ingest.py:258-261: stop.set() then thread.join(timeout=heartbeat_seconds()+5).",
+        "Step 2: the heartbeat thread is still blocked inside the hung write_status() call from before stop was set; join() times out and returns while the thread is still alive. Nothing checks thread.is_alive() -- the finally block, and therefore publish(), returns anyway.",
+        "Step 3: management/commands/ingest_archive.py:86-88 (or the _fail path at line 73/77 -> Command._fail) then writes the terminal status (DONE or FAILED) for the same job_id, through the same write_status()/_replace() machinery.",
+        "Step 4: the stuck heartbeat call eventually completes (the hang resolves or the socket times out at the library level) and performs its os.replace() with state=RUNNING and a stale stage, landing after the terminal write. beat() then loops, sees stop is set, and exits -- but the damage is already written.",
+        "Outcome: uploadStatus (controllers.py:446) serves state='running' for a job that has actually finished (or failed). The client's poll loop (ngiab-upload-run.js:159, 'if (!status.terminal) continue') keeps polling a job that will never move again, since no more writes will ever occur -- this is the exact bug the commit's docstring says it closes, reintroduced through the one path (join timeout) the fix does not bound."
+      ]
+    },
+    {
+      "title": "Repeated write failures make the heartbeat 'beat' without ever persisting a timestamp, silently reproducing the staleness bug it was written to fix",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/ingest.py",
+      "line": 117,
+      "confidence": 0.8,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "write_status()'s broad except is right for an occasional lost update, but the heartbeat loop has no way to notice a persistent failure. Consider having beat() count consecutive write_status failures (write_status would need to signal failure instead of swallowing unconditionally) and log at error/escalate after a few, so an operator sees 'heartbeat cannot persist' rather than only a job later reported as stale/failed with no indication it was actually still running.",
+      "evidence": [
+        "Trigger: the bucket credentials backing run_store.storage() are revoked or start returning 403 partway through a long conversion (a token expiring mid-job is the ordinary version of this).",
+        "Step 1: every call to write_status(), both from the heartbeat thread (ingest.py:252) and from the main thread's say()/progress callback, reaches _replace() (ingest.py:127) which raises, and write_status's except at ingest.py:117-118 logs a warning and swallows it -- by design, 'a lost status update must not kill the job'.",
+        "Step 2: beat()'s loop (ingest.py:250-252) does not inspect write_status's return value or catch anything itself, so it keeps running on schedule, believing it is doing its job, while nothing is actually reaching storage.",
+        "Step 3: the last status object with a real timestamp on it ages past STALE_AFTER_SECONDS. _fail_if_stale (ingest.py:180-207) starts reporting state=FAILED to every poll, even though the subprocess is alive and may go on to succeed.",
+        "Outcome: this is the precise failure mode the commit's own docstring names as the bug being fixed ('a run large enough to convert for longer than the window was declared dead while it was still working'), reopened via a write-failure route instead of a missing-write route -- and there is no signal anywhere that distinguishes 'the beat is alive but cannot write' from 'the beat is dead'."
+      ]
+    },
+    {
+      "title": "heartbeat_seconds()'s floor of 1.0s can exceed STALE_AFTER_SECONDS when an operator tightens the staleness window below 1 second",
+      "severity": "P3",
+      "file": "tethysapp/ngiab/ingest.py",
+      "line": 66,
+      "confidence": 0.62,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Clamp or validate STALE_AFTER_SECONDS itself at import (e.g. minimum of a few seconds), or make heartbeat_seconds() assert/log when its result is not comfortably below STALE_AFTER_SECONDS, so a misconfiguration fails loudly instead of quietly defeating the fix.",
+      "evidence": [
+        "heartbeat_seconds() = max(1.0, min(60.0, STALE_AFTER_SECONDS / 4)) (ingest.py:66-73).",
+        "If an operator sets NGIAB_JOB_STALE_SECONDS to e.g. 0.5 (plausible when tightening staleness detection for a fast test/staging environment, since nothing documents or enforces a floor on this env var), STALE_AFTER_SECONDS/4 = 0.125, so the floor forces heartbeat_seconds() to return 1.0 -- a beat interval twice as long as the staleness window it exists to keep from firing.",
+        "Outcome: _fail_if_stale (ingest.py:180) would report a live, beating job as FAILED between beats, exactly the scenario the commit fixes, purely from an env var value nothing in this code path validates.",
+        "Note: the new test suite (tests/test_heartbeat.py) never exercises the real formula for this edge -- every test that sets STALE_AFTER_SECONDS also monkeypatches heartbeat_seconds() directly to a fixed lambda, so this derivation's boundary behavior is untested."
+      ]
+    },
+    {
+      "title": "A SIGKILL mid-write can orphan a .tmp file in the never-swept status directory",
+      "severity": "P3",
+      "file": "tethysapp/ngiab/ingest.py",
+      "line": 149,
+      "confidence": 0.62,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Not fixable from inside the killed process; if it matters, sweep stray *.tmp files under the staging prefix opportunistically (e.g. on next write_status for the same job, or from whatever periodically visits _uploads).",
+      "evidence": [
+        "_replace() writes to a tempfile.mkstemp() file and cleans it up on BaseException (ingest.py:149-157), but SIGKILL (the documented cause of an ingest dying -- see the STALE_AFTER_SECONDS docstring at line 58: 'A SIGKILL...skips the command's except and finally') bypasses all Python exception handling, including this cleanup, if it lands between mkstemp() and os.replace().",
+        "The heartbeat thread multiplies the number of write_status calls across the job's lifetime (one every heartbeat_seconds()), which multiplies the number of narrow windows in which a kill can land mid-write, compared to the pre-commit code that wrote status only at stage boundaries.",
+        "Nothing in this codebase ever deletes the _uploads/<job_id>/ directory (discard_staged only removes the 'archive' key, per ingest.py:470-476), so an orphaned status_XXXX.tmp file, once created, is permanent litter under the storage root -- small per-incident, but the heartbeat makes the window in which it can happen categorically more frequent than before this commit."
+      ]
+    }
+  ],
+  "residual_risks": [
+    "The heartbeat's snapshot() reads at['stage'] and at['message'] as two separate dict lookups (ingest.py:290: lambda: (at['stage'], at['message'])) while the main thread's say() updates both keys via at.update(...) (ingest.py:272-273). In CPython this update is effectively atomic under the GIL, but the two-key read is not guaranteed atomic by language semantics, only by the low frequency of these calls relative to the GIL's switch interval. A torn read would pair a new stage with a stale message (or vice versa) in the status object during RUNNING. Traced the client (ngiab-upload-run.js:158-165) and confirmed it only reads status.run and treats status.message/stage as free text while non-terminal, so the observable effect is a momentarily confusing progress message, not a wrong client action -- kept out of findings on that basis, but flagged since it depends on an implementation detail (the GIL) rather than a documented guarantee.",
+    "startUpload/uploadRun (controllers.py) and _launch/_start_or_report have no dedup keyed on job_id -- only a global MAX_CONCURRENT_INGESTS cap. A double-submit of the same job_id (double-click before the button disables, or a client retry after an ambiguous network failure) would start two ingest_archive subprocesses, each running its own heartbeat thread and its own progress-writer against the same status.json, doubling the writer count behind the single-process race analyzed above. This predates the heartbeat commit's writer count (it already had two processes able to write the same job_id) and the harness scoped this review to the diff, so it is noted here rather than filed as a finding against this commit.",
+    "The workspace directory (_workspace(), ingest.py:326-343) and the status directory (status_key -> _uploads/<job_id>/status.json) both live under the shared _uploads staging root but are distinct child directories (workspace uses a random ingest-XXXXXX tempdir; status uses the job_id itself) -- confirmed by reading _key/staging_key/status_key and _workspace. shutil.rmtree(workspace, ...) in publish's finally therefore cannot remove the status directory out from under a heartbeat write. This attack surface, as raised in the task brief, was checked and found not to apply."
+  ],
+  "testing_gaps": [
+    "No test drives thread.join(timeout=...) to actually time out (e.g. by making write_status block past heartbeat_seconds()+5) to verify the caller does not write a terminal status while the beat thread is still alive -- the highest-severity finding here has no regression test either direction.",
+    "No test makes write_status fail repeatedly (simulating a bucket 403 or similar) across multiple heartbeat cycles to check whether the job is still reported correctly, or drifts silently into the same staleness bug via the write-failure route.",
+    "test_heartbeat.py's 'brisk' fixture monkeypatches heartbeat_seconds() directly to a fixed lambda in every test, so the real formula in ingest.py (max(1.0, min(60.0, STALE_AFTER_SECONDS/4))) and its floor/ceiling edges are never exercised against the actual STALE_AFTER_SECONDS value under test."
+  ]
+}

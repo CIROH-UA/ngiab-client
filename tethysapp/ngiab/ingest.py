@@ -58,8 +58,11 @@ UPLOAD_CONCURRENCY = int(os.environ.get("NGIAB_UPLOAD_CONCURRENCY", "10"))
 #: A SIGKILL -- an OOM kill is the likely one, since conversion is the memory-hungry part --
 #: skips the command's except and finally, so nothing writes a terminal status and the client
 #: polls a job that will never move. Nothing supervises the child, so staleness is the only
-#: signal available. Generous, because a large conversion is legitimately quiet for minutes:
-#: progress is reported per stage, not per catchment.
+#: signal available.
+#:
+#: A live job is no longer quiet between stages -- the heartbeat re-stamps throughout one --
+#: so this window is now sized for how long a client should wait before believing a job that
+#: has genuinely stopped reporting, not for how long a slow stage might legitimately take.
 STALE_AFTER_SECONDS = float(os.environ.get("NGIAB_JOB_STALE_SECONDS", 30 * 60))
 
 
@@ -67,11 +70,17 @@ def heartbeat_seconds():
     """How often a working job re-stamps its status.
 
     Derived from the staleness window rather than configured separately, because the only
-    thing that matters is that it is comfortably shorter: a quarter of the window means three
-    beats can be lost before a live job looks dead. Capped at a minute so a job is not writing
-    to storage more often than a person would refresh.
+    thing that matters is that it is comfortably shorter. A quarter of the window leaves
+    three beats of margin before a live job looks dead; the cap of a minute takes over above
+    a four-minute window, and at the default of thirty minutes it is the cap that governs --
+    a beat a minute, thirty beats of margin, and a job writing no more often than a person
+    would refresh.
+
+    The floor is small rather than a whole second: a second was longer than the entire window
+    for anyone who had turned NGIAB_JOB_STALE_SECONDS right down, which would have quietly
+    defeated the heartbeat in exactly the configuration that most wanted it.
     """
-    return max(1.0, min(60.0, STALE_AFTER_SECONDS / 4))
+    return min(60.0, max(0.05, STALE_AFTER_SECONDS / 4))
 
 
 #: What a newly published run may be called.
@@ -108,12 +117,25 @@ def status_key(job_id):
 # ---- Status, readable from a process that is not doing the work -------------
 
 
-def write_status(job_id, **fields):
-    """Record where a job has got to. Last write wins.
+def write_status(job_id, *, only_if_running=False, **fields):
+    """Record where a job has got to. Last write wins, except over a finished one.
 
-    Two writers now, not one: the stage transitions in ``publish`` and the heartbeat that
-    runs beside them. Both go through here, and the reader is a third process entirely.
+    Three writers, not one: the stage transitions in ``publish``, the heartbeat beside them,
+    and the terminal DONE/FAILED that the management command writes once ``publish`` returns
+    -- from the same process but outside the heartbeat's scope.
+
+    ``only_if_running`` is what the heartbeat passes. Stopping the beat is a request, not a
+    guarantee: ``join`` takes a timeout, and a beat already inside a slow ``save`` outlives
+    it, so a RUNNING write could land after DONE and resurrect a finished job as a running
+    one that then goes stale and reads as failed. Checking the stored state first costs one
+    read per beat -- once a minute at the default -- and makes the ordering not matter.
     """
+    if only_if_running:
+        current = _load(job_id)
+        if current and current.get("state") in TERMINAL:
+            logger.debug("Not re-stamping %s; it has already finished", job_id)
+            return current
+
     payload = {"job": job_id, "updated": time.time(), **fields}
     try:
         _replace(run_store.storage(), status_key(job_id),
@@ -131,18 +153,20 @@ def _replace(backend, key, body):
     at all and was answered "no such upload job". A heartbeat multiplies the number of writes
     by the length of the job, so it would have turned a rare wrong answer into a common one.
 
+    Which branch runs is decided by ``path()`` raising: Django's base ``Storage`` defines it
+    for every backend, so a ``hasattr`` check answers yes even for S3 and discriminates
+    nothing. ``S3Storage.path`` raises ``NotImplementedError`` -- measured, not assumed.
+
     ``S3Storage`` overwrites on save, so the delete was never needed there.
     ``FileSystemStorage`` refuses to, inventing ``status_a1b2c3.json`` beside the original --
     which is why the delete existed. The local path writes a temporary file in the same
     directory and ``os.replace``s it over the target instead: atomic within a filesystem, and
     a reader sees either the old bytes or the new ones.
     """
-    target = None
-    if hasattr(backend, "path"):
-        try:
-            target = backend.path(key)
-        except (NotImplementedError, ValueError, AttributeError):
-            target = None
+    try:
+        target = backend.path(key)
+    except NotImplementedError:
+        target = None
 
     if target is None:
         from django.core.files.base import ContentFile
@@ -164,7 +188,21 @@ def _replace(backend, key, body):
 
 
 def read_status(job_id):
-    """This job's last recorded state, or None when there is no such job."""
+    """This job's last recorded state, or None when there is no such job.
+
+    A job that stopped reporting is reported failed here rather than in storage; see
+    _fail_if_stale.
+    """
+    return _fail_if_stale(_load(job_id))
+
+
+def _load(job_id):
+    """The status exactly as it was written, with no staleness verdict applied.
+
+    Separate from read_status because the terminal guard below has to compare against what
+    the writer actually recorded. Feeding it a synthesised failure would let a stale-looking
+    job block its own heartbeat.
+    """
     backend = run_store.storage()
     key = status_key(job_id)
     try:
@@ -178,10 +216,9 @@ def read_status(job_id):
     if isinstance(payload, bytes):
         payload = payload.decode("utf-8")
     try:
-        document = json.loads(payload)
+        return json.loads(payload)
     except ValueError:
         return None
-    return _fail_if_stale(document)
 
 
 def _fail_if_stale(document):
@@ -236,9 +273,13 @@ def _heartbeat(job_id, snapshot):
     hold for every long step -- including the object-by-object upload, and whichever step
     turns out to be slow next -- rather than only the one that is slow today.
 
-    The thread is joined rather than merely signalled on the way out: a beat already in
-    flight has to land before the caller writes its terminal status, or it would put RUNNING
-    back over DONE.
+    The thread is joined rather than merely signalled on the way out, but a join takes a
+    timeout and a beat inside a slow write outlives it -- so the ordering is not relied on.
+    ``write_status(only_if_running=True)`` is what actually prevents a late beat putting
+    RUNNING back over DONE; the join just makes it rare enough not to matter.
+
+    The loop swallows its own errors. A beat thread that dies on one bad write stops
+    reporting, which is precisely the state this exists to prevent.
     """
     if not job_id:
         yield
@@ -248,17 +289,22 @@ def _heartbeat(job_id, snapshot):
 
     def beat():
         while not stop.wait(heartbeat_seconds()):
-            stage, message = snapshot()
-            write_status(job_id, state=RUNNING, stage=stage, message=message)
+            if stop.is_set():
+                return
+            try:
+                write_status(job_id, only_if_running=True, state=RUNNING, **snapshot())
+            except Exception:  # noqa: BLE001 - a thread that dies here reopens the bug
+                logger.warning("Heartbeat for %s could not report", job_id, exc_info=True)
 
     thread = threading.Thread(target=beat, name=f"ngiab-heartbeat-{job_id}", daemon=True)
     thread.start()
     try:
         yield
     finally:
-        # Joined, not just signalled; see the docstring.
         stop.set()
         thread.join(timeout=heartbeat_seconds() + 5)
+        if thread.is_alive():
+            logger.error("Heartbeat for %s did not stop; storage is likely wedged", job_id)
 
 
 def publish(archive_path, run_name, *, job_id=None, progress=None):
@@ -267,10 +313,12 @@ def publish(archive_path, run_name, *, job_id=None, progress=None):
     Returns the published run's name. Raises ArchiveRejected for anything the user can fix
     and IngestError for anything they cannot.
     """
-    at = {"stage": "starting", "message": "preparing the upload"}
+    at = {"fields": {"stage": "starting", "message": "preparing the upload", "run": run_name}}
 
     def say(stage, message):
-        at.update(stage=stage, message=message)
+        # One assignment, so the heartbeat thread cannot read a half-updated pair.
+        at["fields"] = {"stage": stage, "message": message, "run": run_name}
+
         logger.info("[ingest %s] %s", job_id or "-", message)
         if progress:
             progress(stage, message)
@@ -288,13 +336,13 @@ def publish(archive_path, run_name, *, job_id=None, progress=None):
 
     workspace = _workspace()
     try:
-        with _heartbeat(job_id, lambda: (at["stage"], at["message"])):
-            return _run(archive_path, run_name, workspace, say)
+        with _heartbeat(job_id, lambda: at["fields"]):
+            return _run_stages(archive_path, run_name, workspace, say)
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
 
 
-def _run(archive_path, run_name, workspace, say):
+def _run_stages(archive_path, run_name, workspace, say):
     """The stages themselves, lifted out so publish can wrap them in one heartbeat."""
     from django.core.management import call_command
 
