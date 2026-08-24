@@ -144,6 +144,50 @@ message about no longer responding was declared dead on the `NGIAB_JOB_STALE_SEC
 rather than by the job itself. The CLI form bypasses the concurrency bound, so a script
 running several must limit itself.
 
+###### Installing into an existing portal image
+
+A portal that builds its own image installs this app the way it installs any other, but two
+things it will not do on its own: the DuckDB extensions, and the `INSTALLED_APPS` entry.
+
+```dockerfile
+COPY apps/ngiab-client ${TETHYS_HOME}/apps/ngiab-client
+RUN cd ${TETHYS_HOME}/apps/ngiab-client && uv pip install .
+
+# The runtime has no route to extensions.duckdb.org, so the extensions are installed here
+# and pinned to the duckdb the app declares. A floating duckdb cannot load them.
+ENV DUCKDB_HOME=/opt/duckdb_extensions
+RUN mkdir -p "${DUCKDB_HOME}" && "${VIRTUAL_ENV}/bin/python" -c "\
+import duckdb, os; \
+h = os.environ['DUCKDB_HOME']; \
+c = duckdb.connect(); \
+c.execute(f\"SET home_directory='{h}'\"); \
+c.execute(f\"SET extension_directory='{h}'\"); \
+[c.execute(f'INSTALL {e}') for e in ('sqlite', 'iceberg', 'avro', 'httpfs', 'aws')]" \
+    && chmod -R a+rX "${DUCKDB_HOME}"
+```
+
+Then, in the portal's `portal_config.yml`:
+
+```yaml
+settings:
+  INSTALLED_APPS:
+    - tethysapp.ngiab
+```
+
+Tethys's own app discovery loads apps for routing only, which is enough for an app that is
+just controllers. This one also ships management commands, and `ingest_archive` runs
+`convert_outputs` in a subprocess, so Django has to see it as an application or an upload
+fails at the conversion stage with `Unknown command`.
+
+The app needs `django-storages` and a `numpy` no older than 1.26 from the portal, both of
+which a portal serving media from S3 already has. It declares `duckdb` itself. Installing it
+into the CIROH portal image left that image's `django`, `numpy`, `django-storages`,
+`geopandas`, `pandas` and `boto3` untouched and added only `duckdb`.
+
+Verified against that image on Django 4.2.30 and PostgreSQL: the suite passes except for
+tests written for the standalone container, which mounts the app at the root rather than
+under `/apps/ngiab/` and provisions SQLite.
+
 ### Unassisted Usage
 
 First create the `MODELS_RUNS_DIRECTORY` directory at `"$HOME/ngiab_visualizer"` and the
