@@ -496,11 +496,14 @@ def _write_crosswalk(path, rows):
     _copy_frame_to_parquet(frame, "crosswalk_frame", path)
 
 
-def _child(base, *parts):
-    """Join below a run's location, whether that is a path or an ``s3://`` URI."""
-    import posixpath
+def child(base, *parts):
+    """Join below a run's location, whether that is a path or an ``s3://`` URI.
 
-    return posixpath.join(str(base).rstrip("/"), *parts)
+    posixpath rather than os.path because the separator has to stay ``/`` for a URI, and this
+    only ever runs on Linux where the two agree for filesystem paths anyway. One join for
+    both callers: the sidecars here, and the run-relative locations the read path builds.
+    """
+    return posixpath.join(str(base), *[str(part).strip("/") for part in parts if part])
 
 
 def read(run_path):
@@ -525,7 +528,7 @@ def _version_of(run_path):
 @functools.lru_cache(maxsize=32)
 def _catchments_cached(run_path, version_token):
     """The id-to-group mapping, read through DuckDB so an s3:// path works."""
-    frame = _read_sidecar(_child(run_path, CATCHMENTS_SIDECAR))
+    frame = _read_sidecar(child(run_path, CATCHMENTS_SIDECAR))
     if frame is None:
         return {}
     return {
@@ -599,7 +602,7 @@ def _crosswalk_cached(run_path, version_token):
     its flowpath pairing -- silently, because an empty crosswalk is a legitimate state. The
     same reasoning is why _read_sidecar no longer swallows a refusal into that state either.
     """
-    frame = _read_sidecar(_child(run_path, CROSSWALK_SIDECAR))
+    frame = _read_sidecar(child(run_path, CROSSWALK_SIDECAR))
     if frame is None:
         return {}
     return dict(zip(frame["flowpath_id"], frame["divide_id"]))

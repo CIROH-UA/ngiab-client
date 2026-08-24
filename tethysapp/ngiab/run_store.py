@@ -28,9 +28,11 @@ actionable way to show it.
 
 import contextlib
 import functools
+import json
 import logging
 import os
 import posixpath
+import shutil
 import time
 
 from . import duckdb_conn, manifest
@@ -91,7 +93,7 @@ def local_root():
     return os.environ.get(MANAGED_ROOT_ENV, DEFAULT_MANAGED_ROOT)
 
 
-def _storage_for_backend():
+def storage():
     """The Django storage addressing the run root, chosen by the backend predicate.
 
     The local case builds a FileSystemStorage directly rather than reading a STORAGES entry,
@@ -138,11 +140,6 @@ def _borrowed_from_default():
     options["location"] = posixpath.join(base, prefix) if base else prefix
 
     return import_string(entry["BACKEND"])(**options)
-
-
-def storage():
-    """The configured storage for run data."""
-    return _storage_for_backend()
 
 
 def _bucket_uri():
@@ -237,8 +234,6 @@ def _read_manifest(name):
     Opened rather than probed first, because ``exists()`` is a round trip of its own and the
     listing paid two per run before it could show any of them.
     """
-    import json
-
     backend = storage()
     key = posixpath.join(name, manifest.MANIFEST_NAME)
     try:
@@ -467,13 +462,11 @@ def delete(name):
     next scan. That resurrection is a bug this project already shipped once, under the JSON
     registry, where deleting the sole run brought it back on the next request.
     """
-    import shutil
-
     if not _is_plain_name(name) or find(name) is None:
         raise LookupError(name)
 
     if duckdb_conn.is_object_storage():
-        _delete_prefix(storage(), name)
+        delete_prefix(storage(), name)
     else:
         shutil.rmtree(_contained_directory(name))
 
@@ -509,11 +502,6 @@ def _contained_directory(name):
 
 
 def delete_prefix(backend, prefix, keys=None):
-    """Public entry point for removing an object-storage prefix. See _delete_prefix."""
-    return _delete_prefix(backend, prefix, keys=keys)
-
-
-def _delete_prefix(backend, prefix, keys=None):
     """Delete every object under a prefix.
 
     Object stores have no directories to remove, only keys, so this enumerates and deletes
@@ -645,9 +633,6 @@ def _take_claim(client, bucket, key, name):
     not implement the condition -- returns True, because the alternative is refusing to
     publish on a store that works fine for everything else.
     """
-    import json
-    import time
-
     body = json.dumps({"run": name, "claimed": time.time()}).encode("utf-8")
     try:
         client.put_object(Bucket=bucket, Key=key, Body=body, IfNoneMatch="*")
@@ -684,9 +669,6 @@ def _is_precondition_failure(exc):
 
 def _claim_is_stale(client, bucket, key):
     """Whether an existing claim is old enough that its publisher is presumed gone."""
-    import json
-    import time
-
     from .ingest import STALE_AFTER_SECONDS
 
     try:

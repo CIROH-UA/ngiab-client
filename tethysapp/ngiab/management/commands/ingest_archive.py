@@ -95,17 +95,12 @@ class Command(BaseCommand):
         _staged, or written directly by controllers.uploadRun -- stayed on disk for the life
         of the container, one full archive per upload.
         """
-        import os
-
         try:
             os.remove(path)
         except OSError:
             logger.warning("Could not remove the temporary archive %s", path, exc_info=True)
 
     def _staged(self, job_id):
-        import os
-        import tempfile
-
         handle, path = tempfile.mkstemp(prefix=f"ngiab-{job_id}-", suffix=".archive")
         os.close(handle)
         return ingest.fetch_staged(job_id, path)

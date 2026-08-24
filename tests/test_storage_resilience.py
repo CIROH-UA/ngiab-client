@@ -194,7 +194,7 @@ class _Backend:
 def test_deletion_walks_nested_prefixes():
     """The recursion only runs if listdir reports subdirectories, which the real one does."""
     backend = _Backend(["run/a.txt", "run/outputs/ngen/b.parquet", "run/config/c.json"])
-    run_store._delete_prefix(backend, "run")
+    run_store.delete_prefix(backend, "run")
     assert sorted(backend.deleted) == [
         "run/a.txt", "run/config/c.json", "run/outputs/ngen/b.parquet",
     ]
@@ -205,7 +205,7 @@ def test_deletion_batches_through_the_client_when_there_is_one():
     keys = [f"run/outputs/ngen/cat-{i}.csv" for i in range(2500)]
     backend = _Backend(keys, client=client)
 
-    run_store._delete_prefix(backend, "run")
+    run_store.delete_prefix(backend, "run")
 
     assert [len(batch) for batch in client.batches] == [1000, 1000, 500]
     assert backend.deleted == [], "the per-key fallback should not also run"
@@ -214,7 +214,7 @@ def test_deletion_batches_through_the_client_when_there_is_one():
 def test_batched_keys_carry_the_backend_location():
     client = _Client()
     backend = _Backend(["run/a.txt"], client=client, location="media")
-    run_store._delete_prefix(backend, "run")
+    run_store.delete_prefix(backend, "run")
     assert client.batches == [["media/run/a.txt"]]
 
 
@@ -224,7 +224,7 @@ def test_a_partial_delete_failure_is_raised_not_swallowed():
     backend = _Backend(["run/a.txt"], client=client)
 
     with pytest.raises(run_store.StorageUnreachable, match="could not be deleted"):
-        run_store._delete_prefix(backend, "run")
+        run_store.delete_prefix(backend, "run")
 
 
 def test_deleting_an_explicit_key_list_does_not_list_the_prefix():

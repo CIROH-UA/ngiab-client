@@ -328,15 +328,10 @@ def publish(archive_path, run_name, *, job_id=None, progress=None):
             f"{run_name!r} is not a usable run name. Use letters, numbers, dots, dashes and "
             "underscores, starting with a letter or a digit."
         )
-    try:
-        claim = run_store.claimed(run_name)
-    except run_store.ClaimHeld as exc:
-        raise archive.ArchiveRejected(str(exc)) from exc
-
     workspace = _workspace()
     try:
         # Taken before the existence check, so the pair cannot be straddled.
-        with claim:
+        with run_store.claimed(run_name):
             if run_store.find(run_name) is not None:
                 raise archive.ArchiveRejected(
                     f"A run called {run_name!r} already exists. Delete it first, or upload "
@@ -436,11 +431,6 @@ def _upload_directory(source, run_name):
     an 8,105-catchment run's config, forcing and restart files are thousands of sequential
     requests. Bounded because this runs beside a portal on one worker.
 
-    Every upload is awaited before the first failure is re-raised. ``Executor.map``'s
-    iterator cancels the futures it has not yielded once it is abandoned, so raising at the
-    first error left siblings either cancelled or still in flight -- and one still in flight
-    writes its object *after* the cleanup has already swept the prefix.
-
     Cleanup deletes the keys this call actually wrote rather than re-listing the prefix.
     Re-listing would also sweep whatever a *concurrent* upload of the same name had put
     there, turning one job's failure into another's corruption.
@@ -450,49 +440,38 @@ def _upload_directory(source, run_name):
     left on a store that does not implement the conditional write the claim relies on, where
     claiming degrades to a no-op.
     """
-    from concurrent.futures import ThreadPoolExecutor
     from django.core.files.base import File
 
     backend = run_store.storage()
-    manifest_relative = manifest.MANIFEST_NAME
-    payload = []
-    for root, _dirs, files in os.walk(source):
-        for name in files:
-            path = os.path.join(root, name)
-            relative = os.path.relpath(path, source).replace(os.sep, "/")
-            payload.append((path, relative))
+    manifest_key = posixpath.join(run_name, manifest.MANIFEST_NAME)
 
-    body = [item for item in payload if item[1] != manifest_relative]
-    tail = [item for item in payload if item[1] == manifest_relative]
-
-    def put(item):
-        path, relative = item
+    def put(relative, path):
+        key = posixpath.join(run_name, relative)
         with open(path, "rb") as handle:
-            backend.save(posixpath.join(run_name, relative), File(handle))
+            backend.save(key, File(handle))
+        return key
+
+    body = {
+        relative: path
+        for relative, path in _files_under(source).items()
+        if relative != manifest.MANIFEST_NAME
+    }
 
     written = []
     try:
-        # All awaited before any failure is raised; see the docstring for why.
-        with ThreadPoolExecutor(max_workers=UPLOAD_CONCURRENCY) as pool:
-            futures = {pool.submit(put, item): item for item in body}
-            failure = None
-            for future, item in futures.items():
-                try:
-                    future.result()
-                    written.append(posixpath.join(run_name, item[1]))
-                except Exception as exc:  # noqa: BLE001 - the first one is re-raised below
-                    failure = failure or exc
+        uploaded, failure = _upload_all(put, body)
+        written.extend(uploaded)
         if failure is not None:
             raise failure
 
         # Last check before the object that makes this a run; see the docstring.
-        if backend.exists(posixpath.join(run_name, manifest_relative)):
+        if backend.exists(manifest_key):
             raise archive.ArchiveRejected(
                 f"A run called {run_name!r} was published while this one was uploading."
             )
-        for item in tail:
-            put(item)
-            written.append(posixpath.join(run_name, item[1]))
+        local_manifest = os.path.join(source, manifest.MANIFEST_NAME)
+        if os.path.isfile(local_manifest):
+            written.append(put(manifest.MANIFEST_NAME, local_manifest))
     except Exception:
         logger.warning("Publishing %s failed; removing what it wrote", run_name)
         try:
@@ -500,6 +479,39 @@ def _upload_directory(source, run_name):
         except Exception:  # noqa: BLE001 - the original failure is the one worth raising
             logger.warning("Could not clean up the partial run %s", run_name, exc_info=True)
         raise
+
+
+def _files_under(source):
+    """Every file in the prepared run, as ``{run-relative posix path: local path}``."""
+    found = {}
+    for root, _dirs, files in os.walk(source):
+        for name in files:
+            path = os.path.join(root, name)
+            found[os.path.relpath(path, source).replace(os.sep, "/")] = path
+    return found
+
+
+def _upload_all(put, items):
+    """Run ``put`` over every item concurrently: ``(keys written, first failure or None)``.
+
+    Every upload is awaited before the caller sees a failure, which is why the failure is
+    returned rather than raised. ``Executor.map``'s iterator cancels the futures it has not
+    yielded once it is abandoned, so raising at the first error left siblings either
+    cancelled or still in flight -- and one still in flight writes its object *after* the
+    cleanup has already swept the prefix.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    written = []
+    failure = None
+    with ThreadPoolExecutor(max_workers=UPLOAD_CONCURRENCY) as pool:
+        futures = [pool.submit(put, relative, path) for relative, path in items.items()]
+        for future in futures:
+            try:
+                written.append(future.result())
+            except Exception as exc:  # noqa: BLE001 - the first one is returned, not raised
+                failure = failure or exc
+    return written, failure
 
 
 def fetch_staged(job_id, destination):
@@ -522,9 +534,9 @@ def fetch_staged(job_id, destination):
 def discard_staged(job_id):
     """Remove the staged archive. Called whether the job succeeded or not."""
     backend = run_store.storage()
-    for key in (staging_key(job_id),):
-        try:
-            if backend.exists(key):
-                backend.delete(key)
-        except Exception:  # noqa: BLE001 - staging litter is not worth failing a job over
-            logger.warning("Could not discard staged archive for %s", job_id, exc_info=True)
+    key = staging_key(job_id)
+    try:
+        if backend.exists(key):
+            backend.delete(key)
+    except Exception:  # noqa: BLE001 - staging litter is not worth failing a job over
+        logger.warning("Could not discard staged archive for %s", job_id, exc_info=True)

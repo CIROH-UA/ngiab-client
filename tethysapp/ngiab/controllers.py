@@ -492,15 +492,24 @@ def _reap():
     Popen objects that are never waited on leave zombies until the worker exits. Nothing
     here needs the exit status -- the job's own status object carries the outcome -- but
     something has to call poll() or the process table fills with one entry per upload.
-
-    Mutates in place under the lock rather than rebinding, so a concurrent append cannot be
-    overwritten by a list this call built from an earlier read.
     """
     with _running_lock:
-        for child in list(_running):
-            child.poll()
-        _running[:] = [child for child in _running if child.returncode is None]
-        return len(_running)
+        return _reap_locked()
+
+
+def _reap_locked():
+    """The reaping itself, for callers that already hold the lock.
+
+    ``_launch`` is one: its count and its append have to be one step, so it cannot reap
+    through ``_reap`` and then take the lock again.
+
+    Mutates in place rather than rebinding, so a concurrent append cannot be overwritten by
+    a list this call built from an earlier read.
+    """
+    for child in list(_running):
+        child.poll()
+    _running[:] = [child for child in _running if child.returncode is None]
+    return len(_running)
 
 
 def _launch(arguments):
@@ -525,10 +534,7 @@ def _launch(arguments):
     )
     logger.info("launching %s", " ".join(command))
     with _running_lock:
-        for child in list(_running):
-            child.poll()
-        _running[:] = [child for child in _running if child.returncode is None]
-        if len(_running) >= MAX_CONCURRENT_INGESTS:
+        if _reap_locked() >= MAX_CONCURRENT_INGESTS:
             raise IngestBusy(
                 f"{MAX_CONCURRENT_INGESTS} uploads are already being prepared. "
                 "Wait for one to finish and try again."

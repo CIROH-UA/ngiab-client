@@ -2,7 +2,6 @@ import os
 import re
 import math
 import functools
-import posixpath
 from typing import NamedTuple
 import base64
 import logging
@@ -12,6 +11,7 @@ import xarray as xr
 
 
 from . import duckdb_conn, manifest, run_store
+from .manifest import child as _child
 from .teehr_warehouse import (
     TeehrWarehouseError,
     WarehouseReader,
@@ -226,15 +226,6 @@ def _require_run_entry(model_run_id):
 def _run_manifest(model_run_id):
     """The distilled facts for a run. Every probe the read path used to make is in here."""
     return _require_run_entry(model_run_id)["manifest"] or {}
-
-
-def _child(base, *parts):
-    """Join below a run's location, whether that is a path or an ``s3://`` URI.
-
-    posixpath rather than os.path because the separator has to stay ``/`` for a URI, and this
-    only ever runs on Linux where the two agree for filesystem paths anyway.
-    """
-    return posixpath.join(base, *[str(part).strip("/") for part in parts if part])
 
 
 def _get_model_run_path_by_id(id):
@@ -486,34 +477,32 @@ def _read_output_frame(outputs, stem, columns=None, time_column=None):
     path, suffix = _find_output_file(
         outputs.directory, stem, outputs.suffix, outputs.catchments
     )
+    reader = "read_parquet" if suffix == ".parquet" else "read_csv_auto"
+    return duckdb_conn.query(
+        f"SELECT {_projection(columns, time_column)} "
+        f"FROM {reader}({duckdb_conn.quote(path)})"
+    )
 
-    if suffix == ".parquet":
-        # Quoted so column names containing spaces (e.g. "Time Step") survive.
-        selected = columns if columns else ["*"]
-        parts = []
-        for column in selected:
-            if column == "*":
-                parts.append("*")
-            elif time_column and column == time_column:
-                parts.append(f'CAST("{column}" AS VARCHAR) AS "{column}"')
-            else:
-                parts.append(duckdb_conn.quote_identifier(column))
-        return duckdb_conn.query(
-            f"SELECT {', '.join(parts)} FROM read_parquet({duckdb_conn.quote(path)})"
-        )
 
-    # Same VARCHAR cast as the parquet branch, and for the same measured reason.
+def _projection(columns, time_column, available=None):
+    """The SELECT list for one output read: quoted names, with the time column cast.
+
+    Quoted so column names containing spaces (e.g. "Time Step") survive, and cast for the
+    measured reason _read_output_frame gives. ``available`` is what a consolidated group
+    needs: columns absent from that catchment's own group are dropped rather than read back
+    as NULL.
+    """
     parts = []
     for column in columns or ["*"]:
         if column == "*":
             parts.append("*")
+        elif available is not None and column not in available:
+            continue
         elif time_column and column == time_column:
             parts.append(f'CAST("{column}" AS VARCHAR) AS "{column}"')
         else:
             parts.append(duckdb_conn.quote_identifier(column))
-    return duckdb_conn.query(
-        f"SELECT {', '.join(parts)} FROM read_csv_auto({duckdb_conn.quote(path)})"
-    )
+    return ", ".join(parts)
 
 
 # Frames the map animation may hold, and cells the response may carry. Both are ceilings on
@@ -564,19 +553,9 @@ def _read_from_group(outputs, stem, columns, time_column):
     """
     table = _group_table_for(outputs, stem)
     available = set(duckdb_conn.query(f"SELECT * FROM {table} LIMIT 0").columns)
-
-    parts = []
-    for column in columns or ["*"]:
-        if column == "*":
-            parts.append("*")
-        elif column not in available:
-            continue
-        elif time_column and column == time_column:
-            parts.append(f'CAST("{column}" AS VARCHAR) AS "{column}"')
-        else:
-            parts.append(duckdb_conn.quote_identifier(column))
-
-    return duckdb_conn.query(f"SELECT {', '.join(parts)} FROM {table}")
+    return duckdb_conn.query(
+        f"SELECT {_projection(columns, time_column, available)} FROM {table}"
+    )
 
 
 def _output_table(outputs, prefix="cat-"):
@@ -740,9 +719,7 @@ def get_catchment_variables(model_run_id):
     outputs = run_outputs(model_run_id)
     table, _ = _output_table(outputs)
     columns = _cached_catchment_variables(outputs.directory, outputs.version, table)
-    if columns is None:
-        return {"variables": [], "time_column": None}
-    if len(columns) < 3:
+    if columns is None or len(columns) < 3:
         return {"variables": [], "time_column": None}
 
     # Same positional contract as getCatchmentTimeSeries: 0 is the step, 1 is the timestamp.

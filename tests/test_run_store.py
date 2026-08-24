@@ -114,7 +114,7 @@ def object_root(tmp_path, mini_run_factory, monkeypatch):
 
     storage = InMemoryStorage(objects)
     monkeypatch.setenv(run_store.duckdb_conn.STORAGE_BACKEND_ENV, "s3")
-    monkeypatch.setattr(run_store, "_storage_for_backend", lambda: storage)
+    monkeypatch.setattr(run_store, "storage", lambda: storage)
     run_store.clear_caches()
     return storage
 
@@ -222,7 +222,7 @@ def test_unreachable_backend_raises_rather_than_reporting_empty(monkeypatch):
     """
     storage = InMemoryStorage(fail_with=PermissionError("Access Denied"))
     monkeypatch.setenv(run_store.duckdb_conn.STORAGE_BACKEND_ENV, "s3")
-    monkeypatch.setattr(run_store, "_storage_for_backend", lambda: storage)
+    monkeypatch.setattr(run_store, "storage", lambda: storage)
     run_store.clear_caches()
 
     with pytest.raises(run_store.StorageUnreachable) as excinfo:
@@ -271,7 +271,7 @@ def test_a_listing_spanning_several_pages_returns_every_entry(monkeypatch):
     objects = {f"run-{index:05d}/{manifest.MANIFEST_NAME}": b"{}" for index in range(1500)}
     storage = InMemoryStorage(objects)
     monkeypatch.setenv(run_store.duckdb_conn.STORAGE_BACKEND_ENV, "s3")
-    monkeypatch.setattr(run_store, "_storage_for_backend", lambda: storage)
+    monkeypatch.setattr(run_store, "storage", lambda: storage)
     run_store.clear_caches()
 
     assert len(run_store.list_runs()) == 1500
