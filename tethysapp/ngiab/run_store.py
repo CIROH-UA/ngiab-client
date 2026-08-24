@@ -55,12 +55,14 @@ STORAGE_ALIAS = "ngiab_runs"
 RUNS_PREFIX_ENV = "NGIAB_RUNS_PREFIX"
 DEFAULT_RUNS_PREFIX = "ngiab_visualizer"
 
+# Manifests fetched at once when building a listing. Bounded so a bucket with many runs does
+# not open a connection per run against a portal that also has pages to serve.
+# Ten, not more: botocore's default max_pool_connections is 10, and exceeding it makes
+# urllib3 discard and reopen connections, spending in handshakes what the concurrency saves.
+LISTING_CONCURRENCY = int(os.environ.get("NGIAB_LISTING_CONCURRENCY", "10"))
+
 # How long a listing may be stale. See _time_bucket for why this is a window rather than an
 # invalidation signal, and why 10 seconds.
-#: Manifests fetched at once when building a listing. Bounded so a bucket with many runs
-#: does not open a connection per run against a portal that also has pages to serve.
-LISTING_CONCURRENCY = int(os.environ.get("NGIAB_LISTING_CONCURRENCY", "16"))
-
 LISTING_TTL_ENV = "NGIAB_LISTING_TTL_SECONDS"
 DEFAULT_LISTING_TTL_SECONDS = 10.0
 
@@ -502,11 +504,20 @@ def _contained_directory(name):
     return real
 
 
-def _delete_prefix(backend, prefix):
+def delete_prefix(backend, prefix, keys=None):
+    """Public entry point for removing an object-storage prefix. See _delete_prefix."""
+    return _delete_prefix(backend, prefix, keys=keys)
+
+
+def _delete_prefix(backend, prefix, keys=None):
     """Delete every object under a prefix.
 
     Object stores have no directories to remove, only keys, so this enumerates and deletes
     rather than unlinking a tree.
+
+    ``Quiet=True`` suppresses the per-key successes, not the errors, and the response is
+    read: without that a partly-failed delete looked exactly like a clean one, to both the
+    user deleting a run and the ingest cleanup that sweeps a half-published one.
 
     Batched through ``delete_objects`` where the backend exposes a boto3 client, because
     removal runs inside the HTTP request: a run whose config, forcing and restart files were
@@ -514,7 +525,7 @@ def _delete_prefix(backend, prefix):
     times out before it finishes. Falls back to per-key deletion for the filesystem backend
     and for any backend that does not offer a client.
     """
-    keys = list(_walk_keys(backend, prefix))
+    keys = list(keys) if keys is not None else list(_walk_keys(backend, prefix))
     if not keys:
         return
 
@@ -527,8 +538,9 @@ def _delete_prefix(backend, prefix):
         return
 
     location = (getattr(backend, "location", "") or "").strip("/")
+    failures = []
     for chunk in (keys[i:i + 1000] for i in range(0, len(keys), 1000)):
-        client.delete_objects(
+        response = client.delete_objects(
             Bucket=bucket,
             Delete={
                 "Objects": [
@@ -537,6 +549,15 @@ def _delete_prefix(backend, prefix):
                 ],
                 "Quiet": True,
             },
+        )
+        failures.extend(response.get("Errors") or [])
+
+    if failures:
+        detail = ", ".join(
+            f"{item.get('Key')}: {item.get('Code')}" for item in failures[:5]
+        )
+        raise StorageUnreachable(
+            f"{len(failures)} object(s) under {prefix!r} could not be deleted: {detail}"
         )
 
 

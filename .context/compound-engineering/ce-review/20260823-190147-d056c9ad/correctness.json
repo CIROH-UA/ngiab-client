@@ -1,0 +1,64 @@
+{
+  "reviewer": "correctness",
+  "findings": [
+    {
+      "title": "uploadStatus's 503 terminal:false contract is discarded by the shared fetch handler, so the client still stops polling on a storage blip",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/public/frontend/api/client.js",
+      "line": 80,
+      "confidence": 0.88,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "handle() throws on any !response.ok before the caller ever sees the JSON body, and readErrorDetail() only keeps body.error as a string, dropping state/terminal/job. So the new uploadStatus 503 {terminal:false, state:running} response reaches ngiab-upload-run.js's _await() catch block (components/ngiab-upload-run.js:135-137) exactly like any other fatal error, and _await() calls this._busy(false); return this._say(...) -- ending the poll loop and reporting the job as failed, which is precisely the bug this commit's uploadStatus docstring says it closes ('any error ends its poll loop'). The user-facing message even says 'Retrying.' while polling has in fact stopped. Fix by attaching the parsed JSON body to ApiError for non-ok responses too, and in _await's catch, check error.status === 503 && error.body?.terminal === false to log the message and `continue` the loop instead of returning."
+    },
+    {
+      "title": "_fail_if_stale can report a still-converting job as FAILED while the child process is genuinely alive and later publishes successfully",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/ingest.py",
+      "line": 133,
+      "confidence": 0.75,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "publish() (ingest.py:194-198) writes status once at the start of the 'converting' stage and then makes one blocking call_command('convert_outputs', ...) with no intermediate progress callback; the next write_status is 'describing', only after conversion fully finishes. For any run whose conversion legitimately runs longer than STALE_AFTER_SECONDS (default 1800s, env-configurable) -- plausible for the 8,105-catchment case the module docstrings use as the reference size -- read_status()/_fail_if_stale() (ingest.py:112-159) will synthesize a FAILED response purely from the update-timestamp gap, uploadStatus will report terminal:true/failed, and the JS client stops polling and tells the user the upload failed. The subprocess is still running and will go on to publish the run and write DONE, so the run appears later even though the UI already said it failed -- and if the user retries the upload under the same name in response, the two ingests race for the same run_name concurrently. Fix by having convert_outputs (or a wrapper around the blocking call) report periodic heartbeat progress so `updated` keeps advancing during a legitimately long conversion, rather than relying solely on stage-boundary writes to prove liveness."
+    },
+    {
+      "title": "_running is a module-global list mutated by concurrent request threads with no lock, so a launch can be silently dropped from tracking",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/controllers.py",
+      "line": 469,
+      "confidence": 0.7,
+      "autofix_class": "gated_auto",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "_reap() (controllers.py:469-480) reads _running into a local list, polls each child, then reassigns `_running = [child for child in _running if ...]` computed from a second read of the global. Two threads calling _launch() (controllers.py:495, 510) close together -- exactly the scenario MAX_CONCURRENT_INGESTS exists to police -- can interleave so that thread A's reassignment, computed before thread B's `_running.append(Popen(...))` ran, overwrites the global after B's append, discarding B's Popen handle. The dropped handle is never reaped (a lingering zombie/process-table entry) and never counted, so a later _reap() undercounts live ingests and MAX_CONCURRENT_INGESTS can be exceeded. Guard reads and writes of _running with a threading.Lock in both _reap() and _launch()'s append."
+    },
+    {
+      "title": "A launch failure on the direct-portal-upload path leaks the local temp archive; discard_staged only ever cleans the presigned-bucket staging key",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/controllers.py",
+      "line": 406,
+      "confidence": 0.8,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "uploadRun() writes the uploaded archive to a local tempfile.mkstemp() path (controllers.py:406-409) and passes it via `--archive path` to _start_or_report (controllers.py:413-415). On any launch failure, _start_or_report's except branches (controllers.py:532-545) call ingest.discard_staged(job_id), which only deletes run_store.storage()'s staging_key(job_id) object (ingest.py:340-348) -- the object written by the presigned-upload flow used by startUpload. uploadRun's local temp file is never registered under that key, so it is skipped and leaked on disk every time _launch raises (including the routine IngestBusy case, which will recur under normal load since MAX_CONCURRENT_INGESTS defaults to 2). The command's own cleanup for a bare --archive path (ingest_archive.py's _discard_local) only runs if the subprocess actually starts, so a launch failure never reaches it either. Fix by having _start_or_report or uploadRun's failure path also remove the local `path` it created (mirroring ingest_archive.py's _discard_local/_is_upload_temp logic) when the archive came from a local upload rather than the bucket."
+    }
+  ],
+  "residual_risks": [
+    "ingest._publish_directory's local os.rename guard only raises when the destination is a non-empty directory or existing file; POSIX rename() silently succeeds and replaces an existing *empty* directory of the same run name without error, so the 'refuses when the destination exists' guarantee is not literally true for that case. No code path in this diff creates such a leftover empty directory (run_store.delete() uses shutil.rmtree for the local backend), so this needs an external precondition (an operator-created or otherwise stray empty directory under the storage root) to matter.",
+    "_upload_directory's manifest-last ordering only protects a single upload's all-or-nothing visibility; it does not provide mutual exclusion between two concurrent uploads racing to publish the same run_name on object storage. Unlike the local os.rename path, nothing prevents interleaved objects from two different archives ending up under one prefix if two clients upload under the same name at once against a bucket.",
+    "duckdb_conn.reset() (still docstringed 'Tests only') is now invoked from production request handling via _with_fresh_credentials on any S3 auth-failure-shaped error message, clearing the shared lru_cache-backed connection while other threads may be mid-query against it. Empirically a DuckDB cursor keeps working after its parent connection's Python reference is dropped, so this did not reproduce a crash locally, but the marker-string matching (_AUTH_FAILURE_MARKERS on lower-cased exception text) is broad enough (e.g. bare 'access denied') that it could also fire for non-auth permission errors and force an unnecessary reconnect for unrelated concurrent callers."
+  ],
+  "testing_gaps": [
+    "test_a_storage_failure_is_retryable_not_terminal only asserts on controllers.uploadStatus's raw JSON/status code; nothing exercises the browser-side fetch client (client.js's handle()) or ngiab-upload-run.js's _await() against a 503 uploadStatus response, which is exactly where the terminal:false signal is currently lost.",
+    "No test drives publish()/ingest_archive with a conversion step that outlives STALE_AFTER_SECONDS while the subprocess is still legitimately running, to confirm the job is not reported failed out from under an in-progress conversion.",
+    "No test exercises _launch()/_reap() from concurrent threads to catch lost updates to the module-global _running list.",
+    "No test covers a launch failure on the uploadRun (direct portal upload, non-presigned) path verifying the local temp archive file is removed."
+  ]
+}

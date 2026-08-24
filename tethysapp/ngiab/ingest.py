@@ -47,7 +47,9 @@ TERMINAL = (DONE, FAILED)
 
 #: Objects uploaded at once when publishing a run. Bounded because this shares a host with
 #: the portal; concurrent because each PUT is a round trip and a run is many small objects.
-UPLOAD_CONCURRENCY = int(os.environ.get("NGIAB_UPLOAD_CONCURRENCY", "16"))
+#: Ten, not more: botocore's default max_pool_connections is 10, and going past it makes
+#: urllib3 discard and reopen connections, spending in handshakes what concurrency saves.
+UPLOAD_CONCURRENCY = int(os.environ.get("NGIAB_UPLOAD_CONCURRENCY", "10"))
 
 #: How long a job may go without a status update before it is presumed dead.
 #:
@@ -276,6 +278,19 @@ def _upload_directory(source, run_name):
     iterator cancels the futures it has not yielded once it is abandoned, so raising at the
     first error left siblings either cancelled or still in flight -- and one still in flight
     writes its object *after* the cleanup has already swept the prefix.
+
+    Cleanup deletes the keys this call actually wrote rather than re-listing the prefix.
+    Re-listing would also sweep whatever a *concurrent* upload of the same name had put
+    there, turning one job's failure into another's corruption.
+
+    **Two uploads of the same name are still not mutually exclusive here.** The local path
+    gets that from ``os.rename``; object storage has no equivalent, and the conditional PUT
+    that would provide one (``If-None-Match: *``) is not dependable across the stores this
+    has to run against -- which is a decision that was deferred and never made. What this
+    does instead is check for the manifest immediately before writing it, which narrows the
+    window from the whole upload to the gap between that check and one PUT. The names are
+    operator-chosen and the bound on concurrent ingests is small, so the residual race is
+    unlikely rather than impossible; it is written down here because it is not closed.
     """
     from concurrent.futures import ThreadPoolExecutor
     from django.core.files.base import File
@@ -297,24 +312,33 @@ def _upload_directory(source, run_name):
         with open(path, "rb") as handle:
             backend.save(posixpath.join(run_name, relative), File(handle))
 
+    written = []
     try:
         # All awaited before any failure is raised; see the docstring for why.
         with ThreadPoolExecutor(max_workers=UPLOAD_CONCURRENCY) as pool:
-            futures = [pool.submit(put, item) for item in body]
+            futures = {pool.submit(put, item): item for item in body}
             failure = None
-            for future in futures:
+            for future, item in futures.items():
                 try:
                     future.result()
+                    written.append(posixpath.join(run_name, item[1]))
                 except Exception as exc:  # noqa: BLE001 - the first one is re-raised below
                     failure = failure or exc
         if failure is not None:
             raise failure
+
+        # Last check before the object that makes this a run; see the docstring.
+        if backend.exists(posixpath.join(run_name, manifest_relative)):
+            raise archive.ArchiveRejected(
+                f"A run called {run_name!r} was published while this one was uploading."
+            )
         for item in tail:
             put(item)
+            written.append(posixpath.join(run_name, item[1]))
     except Exception:
-        logger.warning("Publishing %s failed; removing the partial run", run_name)
+        logger.warning("Publishing %s failed; removing what it wrote", run_name)
         try:
-            run_store._delete_prefix(backend, run_name)  # noqa: SLF001
+            run_store.delete_prefix(backend, run_name, keys=written)
         except Exception:  # noqa: BLE001 - the original failure is the one worth raising
             logger.warning("Could not clean up the partial run %s", run_name, exc_info=True)
         raise

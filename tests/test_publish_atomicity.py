@@ -11,6 +11,7 @@ a rename on a filesystem, and manifest-last ordering in a bucket, since a direct
 
 import os
 import tarfile
+from types import SimpleNamespace
 
 import pytest
 
@@ -108,12 +109,23 @@ def test_nothing_is_left_in_staging_after_a_publish(storage_root, archived):
 
 
 class _Recorder:
-    """A storage that records the order keys are written, and can fail on cue."""
+    """A storage that records the order keys are written, and can fail on cue.
 
-    def __init__(self, fail_on=None):
+    ``listdir`` models django-storages' contract rather than a convenient shortcut: it
+    returns (immediate subdirectory names, file names at this level), which is what makes
+    run_store._walk_keys actually recurse. A fake that flattened the tree would let the
+    recursive branch go unexercised while the tests still passed -- the shape of mistake
+    this project has been bitten by before.
+    """
+
+    def __init__(self, fail_on=None, client=None, bucket_name=None):
         self.saved = []
         self.deleted = []
         self.fail_on = fail_on
+        self.bucket_name = bucket_name
+        self.location = ""
+        if client is not None:
+            self.connection = SimpleNamespace(meta=SimpleNamespace(client=client))
 
     def save(self, key, content):
         if self.fail_on and self.fail_on in key:
@@ -121,9 +133,21 @@ class _Recorder:
         self.saved.append(key)
         return key
 
+    def exists(self, key):
+        return key in self.saved
+
     def listdir(self, prefix):
-        under = [k for k in self.saved if k.startswith(f"{prefix}/")]
-        return [], [k.split("/", 1)[1] for k in under]
+        head = f"{prefix}/" if prefix else ""
+        directories, files = set(), []
+        for key in self.saved:
+            if not key.startswith(head):
+                continue
+            rest = key[len(head):]
+            if "/" in rest:
+                directories.add(rest.split("/", 1)[0])
+            else:
+                files.append(rest)
+        return sorted(directories), files
 
     def delete(self, key):
         self.deleted.append(key)

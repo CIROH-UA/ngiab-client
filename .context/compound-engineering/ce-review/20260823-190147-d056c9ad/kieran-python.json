@@ -1,0 +1,89 @@
+{
+  "reviewer": "kieran-python",
+  "commit_range": "fa6674c..HEAD",
+  "files_reviewed": [
+    "tethysapp/ngiab/controllers.py",
+    "tethysapp/ngiab/ingest.py",
+    "tethysapp/ngiab/run_store.py",
+    "tethysapp/ngiab/duckdb_conn.py",
+    "tethysapp/ngiab/utils.py",
+    "tests/test_job_lifecycle.py",
+    "tests/test_publish_atomicity.py"
+  ],
+  "findings": [
+    {
+      "title": "Batched S3 delete_objects response is discarded, so a partial per-key deletion failure is silent",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/run_store.py",
+      "line": 530,
+      "confidence": 0.72,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "detail": "client.delete_objects(...) is called with Quiet: True and its return value is never captured. S3's delete_objects never raises for a per-object failure (only for request-level errors); per-object failures come back in the response's Errors list, which Quiet mode does not suppress. Because the response is dropped, a key that fails to delete (permission denial, object lock, versioning edge case) leaves debris with no exception and no log line -- exactly the silent-empty-looking failure the surrounding module (_is_missing's docstring, StorageUnreachable) is otherwise careful to avoid, and it undercuts _upload_directory's docstring claim that a failed publish's partial objects 'are removed on the way out'.",
+      "suggested_fix": "Capture the response and check response.get('Errors'); log (or raise) when it is non-empty so a partial cleanup failure is visible rather than silent."
+    },
+    {
+      "title": "_delete_prefix's batched branch reaches into django-storages internals with no test coverage",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/run_store.py",
+      "line": 521,
+      "confidence": 0.62,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "detail": "The batched path is reached only through getattr(backend, 'connection').meta.client and reconstructs the bucket key by hand (posixpath.join(location, key)), duplicating S3Boto3Storage's own name normalization instead of going through the storage abstraction. Neither test_publish_atomicity.py nor test_run_store.py exercises this branch (the fake _Recorder/backends used in tests have no .connection, so they always fall through to the per-key path). A mismatch between the hand-built key and the backend's real normalization (leading slash handling, clean_name) would only surface against a live bucket.",
+      "suggested_fix": "Add a test with a stand-in object that has .connection.meta.client/.bucket_name/.location so the batched path is actually exercised, or use backend._normalize_name if it's available to avoid duplicating that logic."
+    },
+    {
+      "title": "_is_missing's getattr chain is hard to read at a glance",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/run_store.py",
+      "line": 269,
+      "confidence": 0.68,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "detail": "code = getattr(getattr(exc, 'response', None), 'get', lambda _k, _d=None: None)('Error', {}) packs three levels of defensive getattr plus a throwaway lambda default onto one expression. The docstring explaining WHY is excellent, but the implementation itself needs to be mentally executed to trust it.",
+      "suggested_fix": "def _is_missing(exc):\n    if isinstance(exc, FileNotFoundError):\n        return True\n    response = getattr(exc, 'response', None)\n    error = response.get('Error', {}) if hasattr(response, 'get') else {}\n    return str(error.get('Code')) in ('404', 'NoSuchKey')"
+    },
+    {
+      "title": "_reap() rebinds the module global instead of mutating _running in place, inconsistent with _launch's append",
+      "severity": "P3",
+      "file": "tethysapp/ngiab/controllers.py",
+      "line": 476,
+      "confidence": 0.63,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "detail": "_reap uses `global _running` then rebinds it to a new list comprehension, while _launch mutates the same list with .append(). Since the operation is a filter, an in-place `_running[:] = [c for c in _running if c.returncode is None]` gets the same result without the global statement, and keeps both functions treating _running as the same mutable object rather than one function replacing the name and the other appending to it.",
+      "suggested_fix": "_running[:] = [child for child in _running if child.returncode is None]; return len(_running)  # drop the `global` line"
+    },
+    {
+      "title": "New function-local `from concurrent.futures import ThreadPoolExecutor` imports don't fit the module's local-import convention",
+      "severity": "P3",
+      "file": "tethysapp/ngiab/ingest.py",
+      "line": 280,
+      "confidence": 0.62,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "detail": "run_store.py and ingest.py already use function-local imports, but every existing one (django.core.files.storage, django.conf.settings, json) is deferring a Django import until the app registry is ready, or avoiding a real cross-module cycle. ThreadPoolExecutor is stdlib with no such constraint and no cycle risk, so importing it locally in ingest._upload_directory (line 280) and run_store._cached_listing (run_store.py line 390) reads as inconsistent with that convention rather than deliberate, and neither docstring gives a reason.",
+      "suggested_fix": "Move `from concurrent.futures import ThreadPoolExecutor` to the top-level imports in both modules unless there's an import-time cost or cycle reason to keep it local -- if there is, say so in the docstring the way the Django imports do."
+    }
+  ],
+  "residual_risks": [
+    "duckdb_conn._with_fresh_credentials matches auth failures by lowercased substring of the exception message (http 401/403, expiredtoken, etc.). httpfs's error text is not a stable API; a DuckDB or httpfs upgrade that rewords those messages would silently stop triggering the retry, and the failure mode (stale credentials never refreshed) is exactly the bug this commit closes. Worth a regression test pinned to the current DuckDB version, or a comment flagging it as a string the team should watch across upgrades."
+  ],
+  "testing_gaps": [
+    "No test exercises duckdb_conn._with_fresh_credentials / _AUTH_FAILURE_MARKERS: the retry-on-auth-failure path that is one of the four things this commit's intent calls out (credential refresh) has no coverage for either the retry-then-succeed case or the non-auth-error passthrough case.",
+    "No test exercises run_store._delete_prefix's batched delete_objects branch (requires a backend with .connection.meta.client/.bucket_name/.location); existing tests only cover the per-key fallback.",
+    "No test exercises run_store._is_missing distinguishing a botocore ClientError 404 from FileNotFoundError from an unrelated/unreachable-storage error.",
+    "No test exercises utils.troute_readable_here / the object-storage netCDF guard added to get_troute_df."
+  ]
+}

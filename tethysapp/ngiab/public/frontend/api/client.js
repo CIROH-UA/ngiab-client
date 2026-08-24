@@ -4,12 +4,15 @@ import { getPortalHost } from '../config.js';
 
 // `message` is for the console; only `userMessage` may reach the interface.
 export class ApiError extends Error {
-  constructor(message, { status = null, body = null, userMessage = null } = {}) {
+  constructor(message, {
+    status = null, body = null, userMessage = null, retryable = false,
+  } = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.body = body;
     this.userMessage = userMessage ?? GENERIC_MESSAGE;
+    this.retryable = retryable;
   }
 }
 
@@ -28,6 +31,11 @@ const STATUS_MESSAGES = {
 };
 
 const messageForStatus = (status) => STATUS_MESSAGES[status] ?? GENERIC_MESSAGE;
+
+// Statuses that mean "ask again", not "give up". A poller that treats every failure as final
+// turns a momentary blip into a reported failure for work that is still running -- and the
+// blip need not even reach the server, so keying off a response body would not be enough.
+const RETRYABLE_STATUSES = new Set([408, 429, 502, 503, 504]);
 
 // Only short single-line text is a user-facing sentence; tracebacks and HTML are not.
 function usableServerMessage(text) {
@@ -82,6 +90,7 @@ async function handle(response, path) {
     throw new ApiError(`HTTP ${response.status} from ${path}${detail ? `: ${detail}` : ''}`, {
       status: response.status,
       userMessage: usableServerMessage(detail) ?? messageForStatus(response.status),
+      retryable: RETRYABLE_STATUSES.has(response.status),
     });
   }
 

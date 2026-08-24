@@ -164,6 +164,105 @@ describe('ngiab-upload-run', () => {
     expect(el.querySelector('#upload-status').textContent).to.contain('still going');
   }).timeout(10000);
 
+  // A poll that stops on the first hiccup reports still-running work as failed.
+  it('keeps polling through a retryable failure instead of giving up', async () => {
+    appAPI.createUpload = async () => ({ job: 'g'.repeat(32), mode: 'direct', name: 'g' });
+    appAPI.uploadRunUrl = () => '/uploadRun/';
+    let calls = 0;
+    appAPI.uploadStatus = async () => {
+      calls += 1;
+      if (calls === 1) {
+        const error = new Error('HTTP 503');
+        error.status = 503;
+        error.retryable = true;
+        error.userMessage = 'The server is unavailable.';
+        throw error;
+      }
+      return { state: 'done', stage: 'done', message: 'ready', run: 'g', terminal: true };
+    };
+
+    el = mount();
+    await settle();
+    let announced = null;
+    document.addEventListener('run-published', (e) => { announced = e.detail.run; });
+
+    el.querySelector('#upload-name').value = 'g';
+    attach(el, file());
+    el.querySelector('#upload-start').click();
+    await new Promise((resolve) => setTimeout(resolve, 4600));
+
+    expect(calls).to.be.greaterThan(1);
+    expect(announced).to.equal('g');
+  }).timeout(10000);
+
+  it('gives up once retryable failures stop being occasional', async () => {
+    appAPI.createUpload = async () => ({ job: 'h'.repeat(32), mode: 'direct', name: 'g' });
+    appAPI.uploadRunUrl = () => '/uploadRun/';
+    appAPI.uploadStatus = async () => {
+      const error = new Error('HTTP 503');
+      error.status = 503;
+      error.retryable = true;
+      error.userMessage = 'The server is unavailable.';
+      throw error;
+    };
+
+    el = mount();
+    await settle();
+    el.querySelector('#upload-name').value = 'g';
+    attach(el, file());
+    el.querySelector('#upload-start').click();
+    await new Promise((resolve) => setTimeout(resolve, 12000));
+
+    expect(el.querySelector('#upload-status').dataset.severity).to.equal('error');
+  }).timeout(20000);
+
+  it('a non-retryable failure still stops immediately', async () => {
+    appAPI.createUpload = async () => ({ job: 'i'.repeat(32), mode: 'direct', name: 'g' });
+    appAPI.uploadRunUrl = () => '/uploadRun/';
+    let calls = 0;
+    appAPI.uploadStatus = async () => {
+      calls += 1;
+      const error = new Error('HTTP 500');
+      error.status = 500;
+      error.retryable = false;
+      error.userMessage = 'The server could not process this data.';
+      throw error;
+    };
+
+    el = mount();
+    await settle();
+    el.querySelector('#upload-name').value = 'g';
+    attach(el, file());
+    el.querySelector('#upload-start').click();
+    await new Promise((resolve) => setTimeout(resolve, 4600));
+
+    expect(calls).to.equal(1);
+    expect(el.querySelector('#upload-status').dataset.severity).to.equal('error');
+  }).timeout(10000);
+
+  it('stops polling once the panel is removed', async () => {
+    appAPI.createUpload = async () => ({ job: 'j'.repeat(32), mode: 'direct', name: 'g' });
+    appAPI.uploadRunUrl = () => '/uploadRun/';
+    let calls = 0;
+    appAPI.uploadStatus = async () => {
+      calls += 1;
+      return { state: 'running', stage: 'converting', message: 'working', terminal: false };
+    };
+
+    el = mount();
+    await settle();
+    el.querySelector('#upload-name').value = 'g';
+    attach(el, file());
+    el.querySelector('#upload-start').click();
+    await new Promise((resolve) => setTimeout(resolve, 2600));
+
+    const seen = calls;
+    el.remove();
+    await new Promise((resolve) => setTimeout(resolve, 4600));
+
+    expect(calls).to.equal(seen, 'the loop kept polling after the element was removed');
+  }).timeout(12000);
+
   it('surfaces a failed job as an error rather than silence', async () => {
     appAPI.createUpload = async () => ({ job: 'c'.repeat(32), mode: 'direct', name: 'g' });
     appAPI.uploadRunUrl = () => '/uploadRun/';

@@ -96,11 +96,53 @@ the shared links they were given keep working. Two things to know:
 
 ##### Hosted deployments
 
-Set `NGIAB_STORAGE_BACKEND=s3` and configure a `ngiab_runs` entry in Django's `STORAGES`
-setting; runs are then addressed as objects rather than files and read with DuckDB over
-`httpfs`. A hosted deployment **refuses to start** on the image's baked `admin`/`pass`
-superuser or its default `TETHYS_SECRET_KEY`, both of which are public: supply
-`PORTAL_SUPERUSER_NAME`, `PORTAL_SUPERUSER_PASSWORD` and `TETHYS_SECRET_KEY` of your own.
+Set `NGIAB_STORAGE_BACKEND=s3`; runs are then addressed as objects rather than files and read
+with DuckDB over `httpfs`. If Django's `STORAGES` has no `ngiab_runs` entry the run store
+borrows the portal's `default` storage — the bucket that already holds media — and keeps runs
+under a prefix of their own, so a portal with media in S3 needs no second configuration.
+
+A hosted deployment **refuses to start** without a superuser of its own, or on the image's
+baked `admin`/`pass` or its default `TETHYS_SECRET_KEY`, all of which are public: supply
+`PORTAL_SUPERUSER_NAME`, `PORTAL_SUPERUSER_PASSWORD` and `TETHYS_SECRET_KEY`.
+
+Uploading and deleting runs each take a Tethys permission — `upload_model_runs` and
+`delete_model_runs`, both in the `run_managers` group — granted in the portal admin. Signing
+in alone is not enough. Superusers hold both.
+
+###### Configuration
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `NGIAB_STORAGE_BACKEND` | `local` | `s3` addresses runs as objects. Anything else stays on the filesystem. |
+| `NGIAB_MANAGED_ROOT` | `/var/lib/tethys_persist/ngiab_visualizer` | Where runs live on the filesystem backend. |
+| `NGIAB_RUNS_PREFIX` | `ngiab_visualizer` | Prefix runs live under when borrowing the portal's media bucket. |
+| `NGIAB_S3_BUCKET` | — | Bucket for the container's own `STORAGES` hook. Required when that hook configures storage. |
+| `NGIAB_S3_ENDPOINT` | — | Custom endpoint (MinIO, an S3-compatible store). Omit for AWS. |
+| `NGIAB_S3_PUBLIC_ENDPOINT` | — | Endpoint used when signing upload URLs, for when the browser cannot resolve the one the server uses. |
+| `NGIAB_LISTING_TTL_SECONDS` | `10` | How stale the run listing may be. |
+| `NGIAB_LISTING_CONCURRENCY` | `10` | Manifests fetched at once when listing. Above botocore's pool of 10, connections churn. |
+| `NGIAB_UPLOAD_CONCURRENCY` | `10` | Objects uploaded at once when publishing a run. Same ceiling applies. |
+| `NGIAB_MAX_CONCURRENT_INGESTS` | `2` | Uploads prepared at once **per worker process**. Beyond it, uploads are refused with 503. |
+| `NGIAB_JOB_STALE_SECONDS` | `1800` | How long an upload may go without progress before it is reported failed. Raise it if conversions legitimately run longer. |
+| `DUCKDB_HOME` | `/opt/duckdb_extensions` | Where the image's DuckDB extensions live. |
+
+All of these are read once at startup, so changing one needs a restart.
+
+###### Uploading without a browser
+
+`createUpload` → PUT the archive → `startUpload` → poll `uploadStatus`, or, with the archive
+already on the machine:
+
+```bash
+tethys manage ingest_archive --archive /path/to/run.tar.gz --name gage-07144100
+```
+
+`uploadStatus` answers `503` with `terminal: false` when storage is briefly unreachable —
+poll again rather than treating it as failure. `startUpload` answers `503` when
+`NGIAB_MAX_CONCURRENT_INGESTS` is reached; back off and retry. A job reported `failed` with a
+message about no longer responding was declared dead on the `NGIAB_JOB_STALE_SECONDS` timer
+rather than by the job itself. The CLI form bypasses the concurrency bound, so a script
+running several must limit itself.
 
 ### Unassisted Usage
 

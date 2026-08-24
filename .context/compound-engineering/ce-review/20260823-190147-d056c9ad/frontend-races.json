@@ -1,0 +1,66 @@
+{
+  "reviewer": "frontend-races",
+  "commit_reviewed": "3e8bdb5 (Make an upload survive the ways it can go wrong)",
+  "base": "fa6674cf4a912df911faafe3db0ffee89f7f77d5",
+  "summary": "The disconnect fix narrows the original unbounded race (poll loop outliving the element indefinitely) down to a small window, but does not close it: the isConnected/_stopped guard is only re-checked right after the setTimeout sleep, not after the uploadStatus fetch that follows it, so a disconnect during that fetch still lets the callback write to detached nodes and dispatch run-published from a detached tree. Separately, the same commit adds a server-side 503/terminal:false contract for transient storage read failures specifically to keep the poll alive through a glitch, but the frontend's shared error handler (api/client.js handle()) throws on any non-2xx response before it ever looks at the body, so that 503 is treated as a fatal, poll-ending error exactly the way the commit's own controller docstring says it must not be. _upload() has no disconnect guard at all, so removing the panel mid-transfer does not cancel the underlying XHR (upload.js) and lets it finish in the background occupying the portal's single worker in non-presigned mode. this._stopped is set in disconnectedCallback but never reset in connectedCallback, so if the same element instance is ever reconnected rather than recreated, every future upload's poll loop dies after one tick with no visible feedback.",
+  "findings": [
+    {
+      "title": "Reconnect guard is checked only after the poll's sleep, not after the status fetch -- a disconnect during uploadStatus() still writes to detached nodes and can dispatch run-published where the picker's document listener never sees it",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/public/frontend/components/ngiab-upload-run.js",
+      "line": 120,
+      "confidence": 0.8,
+      "autofix_class": "gated_auto",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "Re-check `if (this._stopped || !this.isConnected) return undefined;` immediately after `status = await appAPI.uploadStatus({ job })` resolves (line 134), before any _say/_busy/_progressEl write or the run-published dispatch at lines 140-155. Better: hold an AbortController created in connectedCallback, pass its signal through getJSON/fetch, and call controller.abort() from disconnectedCallback so the in-flight request itself is cancelled instead of racing a second connectivity check."
+    },
+    {
+      "title": "Same commit adds a 503 'terminal: false' retry contract on the server, but client.js's handle() throws on any non-2xx before reading the body, so the poll loop treats the transient storage glitch as a fatal error and stops -- exactly the failure mode the new controller docstring says it exists to prevent",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/public/frontend/api/client.js",
+      "line": 80,
+      "confidence": 0.85,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "Either let uploadStatus's caller inspect a non-throwing result, or special-case status 503 with an 'error' body containing terminal:false in handle()/uploadStatus() so _await's catch clause (ngiab-upload-run.js lines 132-138) can distinguish 'retry, still running' from an actual terminal failure and `continue` the loop instead of calling this._busy(false) and returning. controllers.py already documents the intended behavior at lines 420-424 of controllers.py; the frontend side of that contract was never written."
+    },
+    {
+      "title": "_upload() has no disconnect guard at all, and the underlying XMLHttpRequest in lib/upload.js is never aborted -- removing the panel mid-transfer leaves the upload running in the background and lets it fire a trailing startUpload/_await call for a job whose UI is already gone",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/public/frontend/components/ngiab-upload-run.js",
+      "line": 92,
+      "confidence": 0.75,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "Keep the XHR handle from lib/upload.js reachable (e.g. return { promise, abort } from putPresigned/postToPortal instead of a bare promise) and call abort() from disconnectedCallback, mirroring the _stopped guard already added for the poll loop. At minimum, check this._stopped before the appAPI.startUpload call at line 98 and before entering _await at line 112 to avoid firing requests for a torn-down panel."
+    },
+    {
+      "title": "this._stopped is set true in disconnectedCallback but never reset in connectedCallback -- if this element instance is ever reconnected (moved, or re-inserted by a parent) instead of recreated, every subsequent _await() poll loop dies after its first tick with no error shown and _busy(true) left engaged",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/public/frontend/components/ngiab-upload-run.js",
+      "line": 21,
+      "confidence": 0.6,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Add `this._stopped = false;` at the top of connectedCallback (line 22), so a reconnect restores the component to a live state instead of a permanently-poisoned one. Not currently reachable from the static markup in templates/ngiab/map.html, but the guard should not depend on the element only ever being connected once."
+    }
+  ],
+  "residual_risks": [
+    "In non-presigned mode (postToPortal), a large archive upload continues consuming the portal's single worker after the uploading panel is removed from the DOM, since nothing cancels the XHR on disconnect.",
+    "A transient storage read failure (503) during polling is currently indistinguishable, from the frontend's point of view, from a real terminal failure -- users will see 'server unavailable' and a dead progress UI for a job that may complete moments later, with no way to resume watching it short of a manual reload."
+  ],
+  "testing_gaps": [
+    "No test disconnects the element while appAPI.uploadStatus() is in flight (e.g. a fetch mock resolved after disconnectedCallback runs) to assert no DOM writes or run-published dispatch happen afterward.",
+    "No test exercises a 503 response with { terminal: false } from uploadStatus and asserts the poll loop retries rather than treating it as a fatal error.",
+    "No test disconnects the element during _upload()'s createUpload/transfer/startUpload steps to check for leftover network activity or trailing writes.",
+    "No test reconnects the same NgiabUploadRun instance (calls connectedCallback twice) and verifies a subsequent upload still completes and its poll loop runs to a terminal state."
+  ]
+}

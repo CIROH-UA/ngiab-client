@@ -270,5 +270,11 @@ def _fetchone_once(sql, parameters=None):
 
 
 def reset():
-    """Drop the cached connection. Tests only."""
+    """Drop the cached connection, so the next caller builds a fresh one.
+
+    No longer tests-only: ``_with_fresh_credentials`` calls this from a request when an S3
+    read fails on authentication, to rebuild the secret the connection was configured with.
+    A cursor already handed out keeps working against the old connection -- verified against
+    duckdb 1.4.4 -- so clearing the cache mid-flight does not disturb a query in progress.
+    """
     _base_connection.cache_clear()

@@ -1,0 +1,100 @@
+{
+  "reviewer": "testing",
+  "findings": [
+    {
+      "title": "_Recorder fake in test_publish_atomicity.py does not model django-storages' listdir(prefix) contract, so _delete_prefix's directory-recursion and boto3 batched-delete paths are never exercised",
+      "severity": "P1",
+      "file": "tests/test_publish_atomicity.py",
+      "line": 124,
+      "confidence": 0.85,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "Rewrite _Recorder.listdir to return (directories, files) the way S3Storage/FileSystemStorage do: files with no '/' at that level, and immediate child names in `directories` for anything nested, so _walk_keys' recursive branch (run_store.py:543-549) actually recurses. Also give the fake a `.connection.meta.client`-shaped stub (or a second fixture) plus a `.bucket_name` so the `client.delete_objects` batched path in run_store._delete_prefix (run_store.py:521-540) is exercised at least once, since that path -- reached in production via run_store.delete() for S3-hosted runs, run_store.py:469-470 -- currently has no test coverage at all; only the filesystem backend is exercised by test_run_removal.py."
+    },
+    {
+      "title": "duckdb_conn._with_fresh_credentials has no test: the auth-retry path, the marker matching, and 'do not retry on a missing object' are all untested",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/duckdb_conn.py",
+      "line": 234,
+      "confidence": 0.9,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "Add tests in tests/test_duckdb_conn.py that: (1) stub `run` to raise a duckdb.Error whose message contains one of _AUTH_FAILURE_MARKERS (e.g. 'HTTP 403') under is_object_storage()=True, and assert `reset()` is called and the retried `run` succeeds; (2) assert a duckdb.Error with a non-auth message (e.g. a 'file not found' style message) is re-raised without calling reset(); (3) assert an auth-shaped error under the local (non-object-storage) backend is re-raised immediately without a retry, since `is_object_storage()` gates the whole retry."
+    },
+    {
+      "title": "run_store._is_missing is never tested against a botocore-shaped ClientError; only the FileNotFoundError branch is implicitly reachable",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/run_store.py",
+      "line": 260,
+      "confidence": 0.8,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "Add a unit test that constructs an exception with a `.response` dict shaped like botocore's ClientError (e.g. `exc.response = {'Error': {'Code': '404'}}`) and asserts `_is_missing(exc)` is True, plus one with Code '403' or no `.response` attribute at all asserting False. Also add a test that drives this through `_read_manifest`/`_cached_listing` on the S3 backend so a missing manifest is reported as 'not registered' rather than raising StorageUnreachable."
+    },
+    {
+      "title": "utils.troute_readable_here and the new object-storage gating branch in get_troute_df are completely untested",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/utils.py",
+      "line": 364,
+      "confidence": 0.85,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "Add tests that set STORAGE_BACKEND_ENV to 's3' and assert troute_readable_here('.parquet') is True while troute_readable_here('.nc')/'' are False, and a get_troute_df test (in tests/test_troute_conversion.py) that publishes a run with troute format '.nc' under the object-storage backend and asserts get_troute_df returns None and logs a warning, rather than raising inside xarray -- this is the exact bug the function's docstring says it fixes, and all existing troute tests run under the local backend where the gate is a no-op (troute_readable_here always returns True there)."
+    },
+    {
+      "title": "Frontend polling changes (POLL_CEILING_MS backstop, disconnectedCallback/_stopped guard) ship with zero JS test additions",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/public/frontend/components/ngiab-upload-run.js",
+      "line": 116,
+      "confidence": 0.85,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "ngiab-upload-run.test.js was not touched by this commit. Add tests using fake timers that: (1) advance past POLL_CEILING_MS while uploadStatus keeps returning a non-terminal state, and assert _await resolves with the 'taking longer than expected' warning message and re-enables the UI (_busy(false), progress hidden); (2) call disconnectedCallback mid-poll and assert the next tick returns without touching _statusEl/_busy (i.e. no work happens on a detached node)."
+    },
+    {
+      "title": "test_a_failed_upload_removes_what_it_wrote only asserts recorder.deleted is truthy, not that the actually-uploaded key was deleted",
+      "severity": "P3",
+      "file": "tests/test_publish_atomicity.py",
+      "line": 171,
+      "confidence": 0.75,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Replace `assert recorder.deleted, \"...\"` with an assertion on the actual key(s), e.g. `assert any(k.endswith('catchments-0.parquet') for k in recorder.deleted)`, so a cleanup that deletes the wrong key (or an empty/irrelevant one) would fail the test instead of passing on mere non-emptiness."
+    },
+    {
+      "title": "_upload_directory's ThreadPoolExecutor concurrency is only exercised with two items and a single failure, not genuine concurrent multi-item behavior",
+      "severity": "P3",
+      "file": "tests/test_publish_atomicity.py",
+      "line": 141,
+      "confidence": 0.65,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "Extend _prepared() (or add a variant) to create enough files (e.g. 20+) that UPLOAD_CONCURRENCY's pool actually runs multiple items in flight, and add a case where two non-manifest uploads fail concurrently, asserting the raised exception is one of them and that every attempted key (not just one) shows up in the cleanup delete, to validate the 'await all futures before raising' claim under real concurrency rather than incidentally."
+    }
+  ],
+  "residual_risks": [
+    "run_store._delete_prefix's boto3 delete_objects batching (chunking at 1000 keys, Bucket/Delete/Quiet shape) is exercised by no test in the suite -- it will only be validated against a real S3 bucket the first time a large hosted run is deleted.",
+    "The job_lifecycle Live/Done fakes model subprocess.Popen well enough for _reap() (poll()/returncode), but no test drives _reap() through a mix of one live and one finished child in the same call, nor through a real subprocess.Popen object, so a future change to _reap()'s filtering logic has a smaller safety net than the pass rate suggests."
+  ],
+  "testing_gaps": [
+    "duckdb_conn._with_fresh_credentials: no test for retry-on-auth-failure, marker matching, or non-retry on a non-auth error.",
+    "run_store._is_missing: no test with a botocore ClientError-shaped exception.",
+    "utils.troute_readable_here / get_troute_df: no test under the object-storage backend.",
+    "run_store._delete_prefix: boto3 delete_objects batched path and multi-level directory recursion untested by any fake in the suite.",
+    "ngiab-upload-run.js: POLL_CEILING_MS timeout and disconnectedCallback guard have no JS test coverage."
+  ]
+}

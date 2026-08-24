@@ -1,0 +1,80 @@
+{
+  "reviewer": "agent-native",
+  "commit": "HEAD (diff vs fa6674cf4a912df911faafe3db0ffee89f7f77d5)",
+  "scope_note": "Internal hardening (job lifecycle, publish atomicity, storage round trips, credential refresh) on top of the existing browser-upload / ingest_archive CLI parity. No new user-facing capability; assessed only for new failure modes, new env knobs, and whether the one existing headless entry point (ingest_archive) keeps pace with the browser path.",
+  "findings": [
+    {
+      "title": "The only implemented consumer of the new 'uploadStatus 503 = keep polling' contract does not implement it -- it aborts the poll loop like any other error",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/public/frontend/components/ngiab-upload-run.js",
+      "line": 133,
+      "confidence": 0.85,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "detail": "controllers.uploadStatus (controllers.py:419-440) now answers a StorageUnreachable read with HTTP 503 and terminal:false, and its docstring/comment explicitly reasons about this ('Explicitly not terminal: the client stops polling on a terminal answer'). But api/client.js's handle() throws an ApiError for ANY non-2xx response (client.js:80-85) before terminal/state fields are ever inspected, and ngiab-upload-run.js's _await() catch block (line 135-138) treats that thrown error exactly like a real terminal failure: it calls this._busy(false) and returns, ending the poll loop. So a transient storage blip during polling stops the UI's retry loop with an error message that itself says 'Retrying.' (the 503 body's error text, written in controllers.py) while nothing retries. A scripted caller has no working reference implementation to copy this contract from -- the one caller that exists gets it wrong. test files (ngiab-upload-run.test.js) also have no case for this path; it isn't exercised anywhere.",
+      "suggested_fix": "In _await(), branch on the ApiError's status (or better, thread the parsed body through so terminal/state survive the throw) and `continue` the poll loop on 503 instead of returning. Add a component test asserting a 503 from uploadStatus is retried, not surfaced as a terminal error."
+    },
+    {
+      "title": "New HTTP failure modes and retry semantics for startUpload/uploadRun/uploadStatus are not documented anywhere a non-browser caller would find them",
+      "severity": "P2",
+      "file": "README.md",
+      "line": 1,
+      "confidence": 0.75,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "detail": "startUpload/uploadRun can now answer 503 ('N uploads are already being prepared', controllers.py:521-540) or 500 (launch failure, same block) instead of always succeeding once status was written PENDING; uploadStatus can now answer 503 with terminal:false (controllers.py:428-437). None of this -- nor the expected caller behaviour (back off and retry later on startUpload 503; keep polling on uploadStatus 503) -- appears in README.md, which documents other management commands (write_manifest, convert_outputs) but says nothing about the upload API's status codes or retry contract. A scripted/headless caller integrating against these endpoints has to read controllers.py to learn this.",
+      "suggested_fix": "Add a short section to README.md (or a docs/API.md) enumerating createUpload/startUpload/uploadRun/uploadStatus response shapes, including the 500/503 cases and the poll-again-on-503-vs-back-off-on-503 distinction between the two endpoints."
+    },
+    {
+      "title": "A synthesised 'stale' FAILED status is indistinguishable from a genuine failure except by parsing free-text message",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/ingest.py",
+      "line": 133,
+      "confidence": 0.65,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "detail": "_fail_if_stale (ingest.py:133-153) rewrites a stale document's state to FAILED and stage to 'failed', identical to a job that genuinely failed. The only signal that this was synthesised (job stopped reporting, not necessarily broken) is the message string, e.g. 'This upload stopped responding with no result for over 30 minutes...'. A scripted poller that checks structured fields (state/stage) rather than parsing message text cannot tell 'the ingest process died/was OOM-killed with unknown final state' from 'the ingest process ran and explicitly reported failure'. Not documented in README either.",
+      "suggested_fix": "Add a structured field, e.g. \"reason\": \"stale\" alongside state=failed, so a scripted caller can branch without string-matching, and mention NGIAB_JOB_STALE_SECONDS and this synthesis behaviour in README."
+    },
+    {
+      "title": "Four new environment variables that tune ingest/upload/listing behaviour are undocumented for operators",
+      "severity": "P3",
+      "file": "README.md",
+      "line": 1,
+      "confidence": 0.65,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": false,
+      "pre_existing": false,
+      "detail": "NGIAB_MAX_CONCURRENT_INGESTS (controllers.py:459), NGIAB_JOB_STALE_SECONDS (ingest.py:59), NGIAB_UPLOAD_CONCURRENCY (ingest.py:50), and NGIAB_LISTING_CONCURRENCY (run_store.py:62) are new operator-facing tunables with no mention in README.md. Note this matches an existing project pattern -- NGIAB_RUNS_PREFIX, NGIAB_LISTING_TTL_SECONDS, and NGIAB_S3_PUBLIC_ENDPOINT are likewise undocumented from before this commit -- so this is consistent with (not a regression from) current practice, but an operator automating deployment via env vars still has no discoverable list of what exists.",
+      "suggested_fix": "Add an environment-variable reference table to README.md covering both the pre-existing and these four new variables, with defaults and what each controls."
+    },
+    {
+      "title": "The concurrency bound introduced for the HTTP upload path does not apply to the headless ingest_archive CLI path",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/management/commands/ingest_archive.py",
+      "line": 48,
+      "confidence": 0.75,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "detail": "controllers._launch (controllers.py:483-519) now refuses to start a subprocess past NGIAB_MAX_CONCURRENT_INGESTS, tracked via a process-local _running list populated only when the HTTP-triggered subprocess is spawned. `Command.handle()` in ingest_archive.py calls `ingest.publish()` directly (line 66) and is never routed through _launch/_reap/IngestBusy, so a script that shells out to `tethys manage ingest_archive --archive <path> --name <name>` in a loop -- exactly the 'headless counterpart to browser upload' the command's own docstring describes -- has no backpressure at all and can freely oversubscribe the single uvicorn worker's GIL/memory that this commit's concurrency limit exists to protect. This asymmetry is new: before this commit neither path was bounded, so the HTTP path is now safer while the documented headless equivalent is not.",
+      "suggested_fix": "Either have ingest_archive's handle() consult the same MAX_CONCURRENT_INGESTS accounting (hard given it's a separate process invocation and _running is in-memory), or explicitly document in the command's docstring/README that CLI-driven bulk ingestion must be rate-limited by the caller."
+    }
+  ],
+  "residual_risks": [
+    "MAX_CONCURRENT_INGESTS and the _running list are per-worker-process state (acknowledged in controllers.py's own docstring); under a multi-worker deployment the effective global concurrency is (workers * NGIAB_MAX_CONCURRENT_INGESTS), not the configured value. Not flagged as a finding since the code already documents this tradeoff explicitly.",
+    "The frontend's POLL_CEILING_MS (60 minutes) backstop and the backend's STALE_AFTER_SECONDS (30 minutes) are independently configured constants that happen to be documented as consistent with each other; if an operator changes NGIAB_JOB_STALE_SECONDS without knowing about the frontend constant, the two could drift (e.g. stale-after set above the poll ceiling), reintroducing the 'polls forever' UX the ceiling exists to prevent. Low confidence this is a live problem today; worth a code comment cross-reference."
+  ],
+  "testing_gaps": [
+    "No component test (ngiab-upload-run.test.js) exercises a 503/StorageUnreachable response from uploadStatus, which is exactly the scenario this commit's backend change was meant to make safe -- the gap that let the retry-vs-terminal mismatch (finding 1) go unnoticed.",
+    "No test drives ingest_archive.py's Command.handle() concurrently to demonstrate/guard the missing concurrency bound on the CLI path (finding 5)."
+  ]
+}

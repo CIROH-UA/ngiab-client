@@ -17,8 +17,15 @@ const POLL_MS = 2000;
 // only the backstop for a status object that cannot be read at all.
 const POLL_CEILING_MS = 60 * 60 * 1000;
 
+// Consecutive failed status checks tolerated before the loop gives up. The server answers a
+// storage failure with a retryable status precisely so polling continues, but a dropped
+// connection never reaches it -- so the loop counts failures rather than reading a body.
+const POLL_MAX_CONSECUTIVE_FAILURES = 5;
+
 export class NgiabUploadRun extends HTMLElement {
   connectedCallback() {
+    // Reset, so a moved element is not left inert by its own disconnectedCallback.
+    this._stopped = false;
     if (!canUpload()) return;
 
     this.innerHTML = `
@@ -115,6 +122,7 @@ export class NgiabUploadRun extends HTMLElement {
   // Unpacking outlives the request that started it, so its outcome arrives by polling.
   async _await(job) {
     const started = Date.now();
+    let failures = 0;
     for (;;) {
       await new Promise((resolve) => setTimeout(resolve, POLL_MS));
       if (this._stopped || !this.isConnected) return undefined;
@@ -132,11 +140,21 @@ export class NgiabUploadRun extends HTMLElement {
       let status;
       try {
         status = await appAPI.uploadStatus({ job });
+        failures = 0;
       } catch (error) {
+        // Re-checked: the element can be removed while the request is in flight.
+        if (this._stopped || !this.isConnected) return undefined;
+
+        failures += 1;
+        if (error.retryable && failures < POLL_MAX_CONSECUTIVE_FAILURES) {
+          this._say('Still working. The server is briefly unreachable…', 'warning');
+          continue;
+        }
         this._busy(false);
         return this._say(userMessage(error), 'error');
       }
 
+      if (this._stopped || !this.isConnected) return undefined;
       this._say(status.message || status.stage || 'Working…');
       if (!status.terminal) continue;
 

@@ -9,6 +9,7 @@ import posixpath
 import subprocess
 import sys
 import tempfile
+import threading
 import uuid
 import duckdb
 from tethys_sdk.routing import controller
@@ -411,7 +412,8 @@ def uploadRun(request):
     ingest.write_status(job_id, state=ingest.PENDING, stage="queued",
                         message="preparing to unpack", run=name)
     return _start_or_report(
-        job_id, name, ["--archive", path, "--name", name, "--job", job_id]
+        job_id, name, ["--archive", path, "--name", name, "--job", job_id],
+        local_archive=path,
     )
 
 
@@ -459,7 +461,13 @@ def _is_job_id(value):
 MAX_CONCURRENT_INGESTS = int(os.environ.get("NGIAB_MAX_CONCURRENT_INGESTS", "2"))
 
 #: Handles for launched ingests, kept only so they can be reaped. Nothing waits on these.
+#:
+#: Guarded by a lock because the check and the append are not one step: two requests arriving
+#: together -- the case the bound exists to police -- could both read a count under the limit
+#: before either appended, and one thread's rebuild of the list could drop the other's handle,
+#: leaving a child untracked, never reaped, and never counted against the bound.
 _running = []
+_running_lock = threading.Lock()
 
 
 class IngestBusy(RuntimeError):
@@ -472,12 +480,15 @@ def _reap():
     Popen objects that are never waited on leave zombies until the worker exits. Nothing
     here needs the exit status -- the job's own status object carries the outcome -- but
     something has to call poll() or the process table fills with one entry per upload.
+
+    Mutates in place under the lock rather than rebinding, so a concurrent append cannot be
+    overwritten by a list this call built from an earlier read.
     """
-    global _running
-    for child in list(_running):
-        child.poll()
-    _running = [child for child in _running if child.returncode is None]
-    return len(_running)
+    with _running_lock:
+        for child in list(_running):
+            child.poll()
+        _running[:] = [child for child in _running if child.returncode is None]
+        return len(_running)
 
 
 def _launch(arguments):
@@ -492,12 +503,6 @@ def _launch(arguments):
     worth anything, and the honest answer to "the machine is already converting two runs" is
     to say so now rather than accept work that will sit invisibly.
     """
-    if _reap() >= MAX_CONCURRENT_INGESTS:
-        raise IngestBusy(
-            f"{MAX_CONCURRENT_INGESTS} uploads are already being prepared. "
-            "Wait for one to finish and try again."
-        )
-
     executable = os.path.join(os.path.dirname(sys.executable), "django-admin")
     command = [executable, "ingest_archive", *arguments]
     environment = dict(
@@ -507,15 +512,24 @@ def _launch(arguments):
         ),
     )
     logger.info("launching %s", " ".join(command))
-    _running.append(
-        subprocess.Popen(  # noqa: S603 - fixed executable, validated arguments
-            command,
-            env=environment,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
+    with _running_lock:
+        for child in list(_running):
+            child.poll()
+        _running[:] = [child for child in _running if child.returncode is None]
+        if len(_running) >= MAX_CONCURRENT_INGESTS:
+            raise IngestBusy(
+                f"{MAX_CONCURRENT_INGESTS} uploads are already being prepared. "
+                "Wait for one to finish and try again."
+            )
+        _running.append(
+            subprocess.Popen(  # noqa: S603 - fixed executable, validated arguments
+                command,
+                env=environment,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
         )
-    )
 
 
 def _start_or_report(job_id, name, arguments):
