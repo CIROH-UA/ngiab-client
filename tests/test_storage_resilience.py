@@ -1,11 +1,5 @@
 """The pieces of the hardening pass that shipped with no test at all.
-
-A review found four fixes here that were argued for in docstrings and never exercised: the
-DuckDB credential retry, the missing-versus-unreachable classification, the object-storage
-t-route guard, and the batched delete. Three of them exist precisely to tell one failure apart
-from another, which is the kind of logic that looks obviously right and is wrong in one
-direction only.
-"""
+Covers the DuckDB credential retry, missing-vs-unreachable classification, and batched delete."""
 
 from types import SimpleNamespace
 
@@ -51,8 +45,7 @@ def _raiser(message, times=1):
     "Access Denied",
 ])
 def test_an_auth_failure_rebuilds_the_connection_and_retries_once(hosted, monkeypatch, message):
-    """The secret is built when the connection is configured and cached for the process, so
-    rotating credentials broke every read until a restart."""
+    """An auth failure rebuilds the DuckDB connection and retries the read once."""
     reset_calls = []
     monkeypatch.setattr(duckdb_conn, "reset", lambda: reset_calls.append(1))
 
@@ -63,8 +56,7 @@ def test_an_auth_failure_rebuilds_the_connection_and_retries_once(hosted, monkey
 
 
 def test_a_non_auth_error_is_raised_without_a_rebuild(hosted, monkeypatch):
-    """A missing object must stay missing; retrying it would be two round trips to the same
-    wrong answer."""
+    """A missing object stays missing rather than triggering a retry to the same wrong answer."""
     reset_calls = []
     monkeypatch.setattr(duckdb_conn, "reset", lambda: reset_calls.append(1))
 

@@ -1,14 +1,6 @@
 """Distill one model run into the manifest the read path consults.
 
-    tethys manage write_manifest --path /var/lib/tethys_persist/ngiab_visualizer/<name>
-
-Idempotent: the version token is derived from the run's own outputs rather than minted, so
-re-running against an unchanged run rewrites byte-identical files. Unit 7's backfill leans on
-that, because it runs on every container start.
-
-This command is the seam the launcher and the ingest worker both go through, so a run gains
-its manifest the same way whichever put it there. Like convert_outputs, it is a one-shot
-against a directory and touches no database.
+Idempotent: re-running against an unchanged run rewrites byte-identical files.
 """
 
 import os

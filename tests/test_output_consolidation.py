@@ -1,21 +1,5 @@
 """One parquet per schema group instead of one per catchment.
-
-Read docs/plans/2026-08-22-001-feat-storage-backed-model-runs-plan.md, Unit 10.
-
-Measured on 2,000 catchments x 100 timesteps before writing any of this: 3.2 MB across 2,000
-files against 0.1 MB in one, the value matrix 90.1 ms against 3.1 ms, a schema read 24.2 ms
-against 0.8 ms, and a single-catchment read 0.3 ms *slower*. The plan expected the two access
-patterns to pull in opposite directions and left the layout to be measured; sorted by
-(catchment_id, Time) they do not conflict, and that is what these tests hold in place.
-
-Consolidation removes three things the per-catchment layout supplied for free, and each has a
-test here rather than a note:
-
-1. the catchment id, which used to come from the filename because the rows do not carry it;
-2. the positional contract, where column 0 is the step and column 1 the timestamp, which a
-   naively-placed id column would shift;
-3. the 404 for an unknown catchment, which a filtered scan turns into an empty result.
-"""
+Consolidation must keep the catchment id, the positional contract, and the per-catchment 404."""
 
 import os
 
@@ -95,12 +79,7 @@ def test_one_catchment_series_matches_the_per_catchment_layout(ingest, consolida
 
 
 def test_catchment_id_is_never_offered_as_a_variable(consolidate):
-    """Column 0 is the step and column 1 the timestamp; everything after is plottable.
-
-    The id is appended rather than prepended so that contract does not shift, and excluded by
-    name the way the synthesised ``filename`` column already was. Without the exclusion the
-    variable picker offers "catchment_id" as something to chart.
-    """
+    """Column 0 is the step and column 1 the timestamp; catchment_id must not appear as a variable."""
     run_id = consolidate()
 
     run_wide = ngiab_utils.get_catchment_variables(run_id)
@@ -114,12 +93,7 @@ def test_catchment_id_is_never_offered_as_a_variable(consolidate):
 
 
 def test_an_unknown_catchment_still_raises(consolidate):
-    """A filtered scan returns nothing for an id that was never written.
-
-    Left as-is that becomes an empty chart. The manifest's catchment list is what keeps it a
-    FileNotFoundError, which getCatchmentTimeSeries turns into "This run has no output for
-    cat-999".
-    """
+    """A filtered scan for an unknown catchment id still raises rather than returning empty."""
     outputs = ngiab_utils.run_outputs(consolidate())
 
     with pytest.raises(FileNotFoundError):
@@ -129,12 +103,7 @@ def test_an_unknown_catchment_still_raises(consolidate):
 
 
 def test_catchments_with_different_columns_go_in_different_groups(consolidate, ingest):
-    """union_by_name would pad the narrow ones with NULLs and report the union for all.
-
-    This is the case _output_glob's union_by_name=true exists to handle, and the one
-    consolidation threatens. Grouping by column set means each catchment's file holds exactly
-    the columns that catchment wrote.
-    """
+    """Catchments with different columns are grouped separately, not padded with NULLs."""
     run_id = consolidate(narrow_last=True)
     outputs_dir = ingest.root / run_id / "outputs" / "ngen"
 

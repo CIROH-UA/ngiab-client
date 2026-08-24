@@ -1,17 +1,5 @@
-"""Backfilling manifests for runs the database still registers.
-
-Read docs/plans/2026-08-22-001-feat-storage-backed-model-runs-plan.md, Unit 7.
-
-This is the only unit that touches data a user already has. Everything before it added code
-paths; this one reads rows somebody's laptop has been accumulating since August and has to
-turn them into manifests without losing any of them. The tests are written against that
-standard rather than against a fresh database -- a fresh database is the case that cannot go
-wrong.
-
-Rows are inserted with raw SQL here for the same reason the command reads them that way: the
-model disappears in Unit 8, and a test that depended on it would stop compiling exactly when
-the behaviour it covers still matters.
-"""
+"""Backfilling manifests for runs the database still registers, without losing any of them.
+Rows are inserted with raw SQL since the model that reads them disappears in a later migration."""
 
 import os
 import uuid
@@ -40,13 +28,7 @@ def _insert(path, label="a run", run_id=None, teehr="", created="2026-08-01 00:0
 
 
 def _create_legacy_table():
-    """Recreate the table migration 0003 drops.
-
-    The schema this code produces no longer has it, so an upgrade from a database that does
-    is exactly what cannot be reproduced by running migrations. Building it by hand is the
-    only way to test the path a real user takes, and it is also the honest shape of the
-    test: this command exists to read something this release does not create.
-    """
+    """Recreate the table migration 0003 drops."""
     with connection.cursor() as cursor:
         cursor.execute(
             f"""CREATE TABLE IF NOT EXISTS {TABLE} (
@@ -129,16 +111,7 @@ def test_created_is_carried_across(registry, run_in_root):
 
 
 def test_teehr_configuration_name_is_carried_across(registry, run_in_root):
-    """It was captured from the producer's manifest at registration, and can outlive it.
-
-    distill reads this from teehr_run_manifest.json inside the run. A run whose producer
-    manifest was removed, or which was registered by hand, has nowhere for distill to read it
-    from -- so the registry row is the only copy, and dropping it here loses the one TEEHR
-    fact this app cannot re-derive from the directory.
-
-    Caught by an end-to-end check in the container, not by this test, which originally
-    asserted `in ("ngen_alpha", "")` and so could not fail.
-    """
+    """It was captured from the producer's manifest at registration, and can outlive it."""
     alpha = run_in_root("alpha")
     assert not os.path.exists(os.path.join(alpha, "teehr_run_manifest.json"))
     _insert(alpha, label="alpha", teehr="ngen_alpha")
@@ -161,11 +134,7 @@ def test_the_producer_manifest_still_wins_over_the_registry_row(registry, run_in
 
 
 def test_every_uuid_on_a_shared_directory_survives(registry, run_in_root):
-    """ModelRun.path was deliberately not unique -- once per import, says its own comment.
-
-    Collapsing N rows onto one manifest with a single legacy id would resolve one share link
-    and silently break the rest.
-    """
+    """ModelRun.path was deliberately not unique -- once per import, says its own comment."""
     alpha = run_in_root("alpha")
     first = _insert(alpha, label="alpha")
     second = _insert(alpha, label="alpha again")
@@ -209,13 +178,7 @@ def test_an_existing_manifest_gains_ids_rather_than_losing_them(registry, run_in
 def test_a_directory_outside_the_storage_root_is_reported_not_dropped(
     registry, mini_run_factory, tmp_path, capsys
 ):
-    """The common upgrade case, not the exotic one.
-
-    NGIAB_SCAN_ROOTS exists so a deployment can register runs from other mounts, so an
-    upgrading install may well have several. Once the registry is dropped, a directory
-    outside the root is a run that simply stops appearing -- so it is named, with the path
-    and what to do about it.
-    """
+    """A directory outside the storage root is reported by name, not silently dropped."""
     outside = mini_run_factory(name="elsewhere")
     _insert(outside, label="elsewhere")
 
@@ -296,12 +259,7 @@ def test_dry_run_writes_nothing(registry, run_in_root):
 
 
 def test_the_command_does_not_import_the_model(registry):
-    """It has to outlive models.py, which Unit 8 deletes.
-
-    An operator upgrading from a pre-manifest image straight to a post-removal one is exactly
-    the person who needs this to work, and an ImportError would lose every registration they
-    had in the one upgrade path that cannot be retried.
-    """
+    """The backfill command must not import the ORM model, which a later migration deletes."""
     source = os.path.join(
         os.path.dirname(backfill_manifests.__file__), "backfill_manifests.py"
     )
@@ -312,16 +270,7 @@ def test_the_command_does_not_import_the_model(registry):
 
 
 def test_a_row_whose_path_is_stale_is_found_by_name_in_the_root(registry, run_in_root):
-    """A registry row can point somewhere that does not exist inside the container.
-
-    Two ordinary ways: the path was recorded on the host and never existed in the container,
-    or the runs have since been mounted elsewhere. Either leaves the row dangling while the
-    run itself sits in the storage root under the same name.
-
-    Found by running the real upgrade against a real database -- all five rows held host
-    paths, all five were reported missing, and the migration then dropped the table, losing
-    the ids that keep shared links working for runs that were present the whole time.
-    """
+    """A registry row can point somewhere that does not exist inside the container."""
     alpha = run_in_root("alpha")
     stale = "/somewhere/that/never/existed/alpha"
     original = _insert(stale, label="alpha")

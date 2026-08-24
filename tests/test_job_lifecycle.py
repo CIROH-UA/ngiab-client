@@ -1,14 +1,6 @@
 """What happens to an upload when something other than the archive goes wrong.
+Every state a job can be left in must be legible from its status object alone."""
 
-The pipeline's happy path was covered; its failure paths were not, and every finding here
-came from a reviewer asking "and if this dies?" The answers were: the client polls forever,
-the archive stays in the bucket, and the run half-exists.
-
-The common thread is that the job outlives the request that started it, so nothing is
-watching. Every state a job can be left in has to be legible from its status object alone.
-"""
-
-import os
 import time
 
 import pytest
@@ -55,8 +47,7 @@ def _post(view, user, **data):
 
 
 def test_a_failed_launch_reports_a_failed_job(permitted, user, storage_root, monkeypatch):
-    """It used to raise out of the view, after the status said PENDING and, on the presigned
-    path, after the archive was already in the bucket. The client then polled forever."""
+    """A launch failure must report a failed job rather than raising out of the view."""
     def explode(arguments):
         raise FileNotFoundError("django-admin")
 
@@ -114,8 +105,7 @@ def test_finished_children_are_reaped_and_free_a_slot(storage_root, monkeypatch)
 
 
 def test_a_job_that_went_quiet_is_reported_failed(storage_root, monkeypatch):
-    """A SIGKILL -- an OOM kill during conversion is the likely one -- skips the command's
-    except and finally, so nothing ever writes a terminal status."""
+    """A job killed outright is still reported failed rather than left silent forever."""
     job = "d" * 32
     ingest.write_status(job, state=ingest.RUNNING, stage="converting", message="working")
     monkeypatch.setattr(ingest, "STALE_AFTER_SECONDS", 0.0)

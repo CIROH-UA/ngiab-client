@@ -1,14 +1,5 @@
 """A job that is working must not be mistaken for a job that has died.
-
-Staleness is the only evidence available that an ingest died -- nothing supervises the child,
-and a SIGKILL writes no status. But it was measuring the wrong thing: status was written only
-at stage boundaries, and conversion is one blocking call, so a run large enough to convert for
-longer than the window was declared dead while it was still working. The client stopped
-polling and said it failed; the job then published anyway.
-
-These tests pin the two halves of the fix: a working job keeps its timestamp moving, and a
-dead one still stops.
-"""
+A working job keeps its heartbeat timestamp moving; a dead one still stops."""
 
 import json
 import os
@@ -92,12 +83,7 @@ def test_staleness_still_fires_once_the_beat_stops(storage_root, brisk):
 
 
 def test_the_thread_is_stopped_by_the_time_the_block_exits(storage_root, brisk):
-    """Asserted on the thread, not on a timing coincidence.
-
-    The earlier version wrote DONE after the block and checked it survived -- which holds
-    whether or not the join is there, because __exit__ joins synchronously. Naming the
-    thread lets this fail if the join is ever dropped.
-    """
+    """The heartbeat thread is asserted joined by block exit, not just that a status was written."""
     job = "e" * 32
     with ingest._heartbeat(job, lambda: {"stage": "publishing", "message": "working"}):
         time.sleep(0.15)
@@ -107,11 +93,7 @@ def test_the_thread_is_stopped_by_the_time_the_block_exits(storage_root, brisk):
 
 
 def test_a_late_beat_cannot_undo_a_finished_job(storage_root, brisk, monkeypatch):
-    """The guarantee that does not depend on the join landing in time.
-
-    join() takes a timeout and a beat inside a slow write outlives it, so ordering alone is
-    not enough. A beat is forced to run after DONE is written and must decline.
-    """
+    """A heartbeat forced to run after DONE is written must decline rather than overwrite it."""
     job = "j" * 32
     ingest.write_status(job, state=ingest.DONE, stage="done", message="ready", run="x")
 
@@ -145,16 +127,7 @@ def test_no_job_id_means_no_thread(storage_root):
 
 
 def test_a_status_update_is_never_momentarily_absent(storage_root):
-    """delete-then-save left a window in which a poll read 'no such upload job'.
-
-    Entered on every update, and the heartbeat multiplies updates by the length of the job,
-    so a rare wrong answer would have become a common one.
-
-    The reader runs in its own thread, because that is the only way this can fail. Checking
-    after each write returns -- which is what this test did first -- passes just as happily
-    against delete-then-save, since the file is back by the time the call returns. A test
-    that cannot fail against the implementation it names is worse than no test.
-    """
+    """A status update must never leave a window where a poll reads 'no such upload job'."""
     job = "f" * 32
     ingest.write_status(job, state=ingest.RUNNING, stage="one", message="a")
     path = run_store.storage().path(ingest.status_key(job))
@@ -199,11 +172,7 @@ def test_the_written_status_is_always_complete_json(storage_root):
 
 
 def test_publish_beats_while_a_stage_is_slow(storage_root, brisk, monkeypatch):
-    """The helper working proves nothing if publish does not wrap the stages in it.
-
-    _run stands in for the real stages here because the thing under test is the wiring: a
-    stage that takes longer than the stale window must leave the job readable as running.
-    """
+    """publish must wrap its stages in the heartbeat helper, not just leave it available."""
     job = "i" * 32
     ingest.write_status(job, state=ingest.PENDING, stage="queued", message="queued")
     observed = {}
@@ -243,8 +212,7 @@ def test_the_interval_is_a_quarter_of_the_window_capped_at_a_minute(monkeypatch,
 
 @pytest.mark.parametrize("stale", [0.2, 1, 2, 60, 240, 1800, 7200])
 def test_the_beat_always_fits_several_times_into_the_window(monkeypatch, stale):
-    """A floor that exceeded the window would defeat the heartbeat in exactly the tight
-    configuration that most wants it -- which a whole-second floor used to do."""
+    """The heartbeat floor must always fit several times inside the stale window."""
     monkeypatch.setattr(ingest, "STALE_AFTER_SECONDS", float(stale))
     assert stale / ingest.heartbeat_seconds() >= 4
 
@@ -287,8 +255,7 @@ def test_a_failing_write_does_not_kill_the_beat(storage_root, brisk, monkeypatch
 
 
 def test_a_backend_without_a_filesystem_path_is_saved_through_the_storage_api():
-    """S3Storage.path raises NotImplementedError -- every Storage defines path(), so that
-    raise is the discrimination, not a hasattr check."""
+    """A storage backend with no filesystem path is detected by path() raising, not by hasattr."""
     saved = {}
 
     class Bucketed:
@@ -304,8 +271,7 @@ def test_a_backend_without_a_filesystem_path_is_saved_through_the_storage_api():
 
 
 def test_a_write_failure_leaves_no_temporary_file(storage_root, monkeypatch):
-    """The temp file is created before the replace; a failure between the two must not
-    leave litter in a directory nothing sweeps."""
+    """A failure between creating the temp file and replacing it must leave no litter behind."""
     job = "p" * 32
     ingest.write_status(job, state=ingest.RUNNING, stage="a", message="b")
     directory = os.path.dirname(run_store.storage().path(ingest.status_key(job)))

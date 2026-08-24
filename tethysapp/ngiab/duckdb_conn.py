@@ -1,31 +1,6 @@
 """One configured DuckDB connection for the whole app.
 
-Three modules reached DuckDB three different ways before this: ``utils.py`` through the
-module-level default connection (``duckdb.query``), ``teehr_evaluation.py`` through a bare
-``duckdb.connect()``, and only ``teehr_warehouse.py`` through a connection that actually
-configured itself. That was survivable while every read was a local file. It stops being
-survivable when reads may address object storage, because ``httpfs`` has to be loaded and
-credentials have to be supplied, and a caller that skips the setup fails at query time with
-an error that points at the query rather than the connection.
-
-**Extensions are installed at image build time and only loaded here.** The extension
-directory is read-only at runtime and the container has no reason to reach
-``extensions.duckdb.org``, so ``autoinstall_known_extensions`` and
-``autoload_known_extensions`` are both turned off: a missing extension should fail loudly
-and immediately rather than hang on a network fetch that cannot succeed. This has bitten the
-project once already -- DuckDB's iceberg extension autoloading ``avro`` on first use is why
-``avro`` is in the Dockerfile's install list.
-
-**Concurrency.** Callers get a ``cursor()`` off one configured connection, not a connection
-of their own. Measured in the image: a fresh configured connection costs 7.5 ms, or 21.3 ms
-once ``httpfs`` is loaded, against 0.005 ms for a cursor -- and a parquet catchment read is
-about 9 ms, so per-request connections would more than double the cheapest endpoint. Cursors
-are separate handles and safe to use from different threads (verified under 16 concurrent
-threads), but queries issued through them **serialize on the underlying connection**;
-``cursor()`` is isolation, not parallelism. That is what ``duckdb.query`` already did, so
-this is not a regression -- but if serialization ever becomes the bottleneck the answer is a
-small pool of configured connections, not more cursors. Intra-query parallelism is
-unaffected and still governed by DuckDB's own ``threads`` setting.
+Loads extensions and sets up credentials once, so callers just get a cursor.
 """
 
 import functools
@@ -46,17 +21,7 @@ STORAGE_BACKEND_ENV = "NGIAB_STORAGE_BACKEND"
 
 
 def storage_backend():
-    """Which storage backend this deployment reads runs from: ``"local"`` or ``"s3"``.
-
-    Defined here rather than alongside the run store because the connection factory is the
-    first thing that needs it -- whether to load httpfs is a connection-time decision. The
-    run store consumes the same predicate so the two cannot disagree about which backend is
-    in play.
-
-    Anything other than ``s3`` is local, deliberately: an unset or misspelled value should
-    leave a deployment on the behaviour it has today rather than silently reaching for a
-    bucket it has no credentials for.
-    """
+    """Which storage backend this deployment reads runs from: ``"local"`` or ``"s3"``."""
     return "s3" if os.environ.get(STORAGE_BACKEND_ENV, "").strip().lower() == "s3" else "local"
 
 
@@ -71,53 +36,17 @@ def duckdb_home():
 
 
 def quote(value):
-    """Return ``value`` as a SQL string literal, quotes included and internal quotes doubled.
-
-    Returns the surrounding quotes rather than just the escaped body, because the failure
-    mode this exists to prevent is a caller that escapes and then forgets to quote, or quotes
-    and forgets to escape. There is one correct way to interpolate a path and this is it.
-
-    Only ``_output_glob`` escaped before. Every other interpolation site took the path raw,
-    which was safe only because paths came from operator-controlled directory scans. Once a
-    path can be derived from a user-supplied archive's realization.json, it is input.
-    """
+    """Return ``value`` as a SQL string literal, quotes included and internal quotes doubled."""
     return "'" + str(value).replace("'", "''") + "'"
 
 
 def quote_identifier(name):
-    """Return ``name`` as a SQL identifier, double quotes included and internal ones doubled.
-
-    The identifier counterpart to ``quote``, and it exists for the same reason: there is one
-    correct way to interpolate a name and this is it.
-
-    Column names became attacker-controlled the moment a run could arrive as an uploaded
-    archive. ``read_csv_auto`` takes the header verbatim, and a CSV header may contain a
-    double quote, so ``f'"{column}"'`` let a crafted header close the identifier and splice
-    arbitrary SQL into the statement -- demonstrated running ``(SELECT 31337) AS pwned`` and
-    reading ``current_setting('extension_directory')`` on the shared connection, which is the
-    connection holding the run bucket's credentials.
-    """
+    """Return ``name`` as a SQL identifier, double quotes included and internal ones doubled."""
     return '"' + str(name).replace('"', '""') + '"'
 
 
 def is_missing_error(exc):
-    """Whether a failed read means the object is not there, rather than unreachable.
-
-    Told apart structurally where possible: DuckDB's ``HTTPException`` carries the store's
-    own ``status_code``, so a 404 is a missing object and a 403 is a refusal -- no message
-    parsing, and no chance of a wording change turning "denied" into "absent". Measured
-    against MinIO: a missing key and a missing bucket both answer 404 with a
-    ``X-Minio-Error-Code`` of NoSuchKey / NoSuchBucket, and bad credentials answer 403.
-
-    The local backend has no status code, so the filesystem case falls back to DuckDB's
-    phrasing for a glob that matched nothing. That is a message match and it is fragile, but
-    it fails in the safe direction: an unrecognised message reads as unreachable, which is
-    reported, rather than as absent, which is not.
-
-    A missing *bucket* also answers 404 and so reads as "no sidecar". The run listing has
-    already enumerated that bucket by the time any sidecar is read, so it would have failed
-    loudly first.
-    """
+    """Whether a failed read means the object is not there, rather than unreachable."""
     status = getattr(exc, "status_code", None)
     if status is not None:
         return status == 404
@@ -152,15 +81,7 @@ def _configure(connection):
 
 
 def _authenticate(connection):
-    """Give the connection credentials for the run bucket.
-
-    Imported here rather than at module scope because run_store imports this module: the
-    connection factory cannot know about storage configuration at import time, only by the
-    time someone asks for a connection.
-
-    The statement is never logged. It carries the portal's own object-store credentials, and
-    the whole point of taking them from the storage configuration is that they are real.
-    """
+    """Give the connection credentials for the run bucket."""
     from . import run_store
 
     try:
@@ -181,52 +102,28 @@ def _authenticate(connection):
 
 
 class ExtensionUnavailable(RuntimeError):
-    """Raised when a required DuckDB extension is not present in the extension directory.
-
-    Its own class because the remedy is a rebuild, not a retry, and the caller should not
-    confuse it with a query error.
-    """
+    """Raised when a required DuckDB extension is not present in the extension directory."""
 
 
 @functools.lru_cache(maxsize=1)
 def _base_connection():
-    """The one configured connection, created on first use.
-
-    lru_cache rather than a module-level constant so that importing this module does not
-    open a connection -- Django imports it during app loading, and a connection opened there
-    would outlive nothing useful and fail the import if the extension directory were absent.
-    """
+    """The one configured connection, created on first use."""
     logger.debug("opening the DuckDB connection (backend=%s)", storage_backend())
     return _configure(duckdb.connect())
 
 
 def connect():
-    """A cursor on the shared configured connection.
-
-    Callers should treat the result as their own handle and close it when finished. See the
-    module docstring for why this is a cursor rather than a connection.
-    """
+    """A cursor on the shared configured connection."""
     return _base_connection().cursor()
 
 
 def connect_isolated():
-    """A fresh configured connection with a catalog of its own.
-
-    For callers that ``ATTACH``. A cursor shares the underlying connection's catalog, so two
-    readers attaching under the same alias would collide -- the TEEHR warehouse reader
-    attaches its SQLite catalog as ``cat``, and two of those must not see each other. Pays
-    the full setup cost (7.5 ms, 21.3 ms with httpfs), which is why it is not the default.
-
-    The caller owns the result and must close it.
-    """
+    """A fresh configured connection with a catalog of its own, for callers that ``ATTACH``."""
     return _configure(duckdb.connect(":memory:"))
 
 
 def query(sql, parameters=None):
-    """Run one statement on a short-lived cursor and return the relation's DataFrame.
-
-    The common shape in utils.py, which reads a result and discards the handle.
-    """
+    """Run one statement on a short-lived cursor and return the relation's DataFrame."""
     return _with_fresh_credentials(lambda: _query_once(sql, parameters))
 
 
@@ -245,17 +142,7 @@ _AUTH_FAILURE_MARKERS = (
 
 
 def _with_fresh_credentials(run):
-    """Run a query, and retry it once against a rebuilt connection on an auth failure.
-
-    The S3 secret is created when the connection is configured, and the connection is cached
-    for the life of the process. Credentials that rotate or expire -- which is the normal
-    case for instance and workload identity, the very providers ``credential_chain`` exists
-    to serve -- left every read failing until the worker restarted.
-
-    Only auth failures retry. A missing object must stay a missing object: rebuilding the
-    connection for those would turn one wrong answer into two round trips of the same wrong
-    answer.
-    """
+    """Run a query, and retry it once against a rebuilt connection on an auth failure."""
     try:
         return run()
     except duckdb.Error as exc:
@@ -283,11 +170,5 @@ def _fetchone_once(sql, parameters=None):
 
 
 def reset():
-    """Drop the cached connection, so the next caller builds a fresh one.
-
-    No longer tests-only: ``_with_fresh_credentials`` calls this from a request when an S3
-    read fails on authentication, to rebuild the secret the connection was configured with.
-    A cursor already handed out keeps working against the old connection -- verified against
-    duckdb 1.4.4 -- so clearing the cache mid-flight does not disturb a query in progress.
-    """
+    """Drop the cached connection, so the next caller builds a fresh one."""
     _base_connection.cache_clear()

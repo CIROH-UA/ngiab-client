@@ -1,20 +1,6 @@
 """Provision the portal superuser at start, and refuse to serve on a shipped default.
 
-    tethys manage ensure_superuser
-
-The image bakes ``admin``/``pass`` into the database at build time so a laptop container is
-usable the moment it starts. That is fine while nothing can be lost through the interface and
-the port is on someone's own machine. It stops being fine here for two reasons at once:
-authentication became the only thing standing in front of a destructive action, and the
-hosted database is ephemeral -- so those baked credentials do not merely persist, they are
-*restored* on every restart, in a public image, where anybody can read them.
-
-So in hosted mode this refuses to start rather than serve with them. A deployment that cannot
-boot is a bad afternoon; a deployment that boots with published credentials in front of a
-delete button is a bad quarter.
-
-Locally nothing changes: with no credentials supplied and no object-storage backend, this is
-a no-op and the baked superuser stays exactly as it is.
+Refuses to start a hosted deployment that is still using the image's baked credentials.
 """
 
 import os
@@ -70,14 +56,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"{verb} superuser {name}"))
 
     def _require_credentials(self, name, password):
-        """Refuse a hosted start that supplies no superuser at all.
-
-        _refuse_shipped_defaults only fires on a password that is *supplied and wrong*. With
-        none supplied the command fell through to "leaving the database alone" and started
-        anyway -- on the baked admin/pass account, which is in a public image and which an
-        ephemeral database restores on every restart. The gate was checking the lock and
-        ignoring the open window.
-        """
+        """Refuse a hosted start that supplies no superuser at all."""
         if name and password:
             return
         missing = " and ".join(
@@ -91,14 +70,7 @@ class Command(BaseCommand):
         )
 
     def _refuse_shipped_defaults(self, password, secret_key):
-        """Fail closed. Both of these are published in a public image.
-
-        The secret key is checked twice, against the environment and against the key Django
-        will actually sign with. They can disagree: the runtime stage sets the default through
-        ENV and portal-config.sh merges it into the rendered config, so an operator who sets
-        the variable but whose value never reaches settings would pass an environment-only
-        check while signing cookies with the published key.
-        """
+        """Fail closed when the password or secret key still match the image's published defaults."""
         problems = []
         if password == BAKED_PASSWORD:
             problems.append(

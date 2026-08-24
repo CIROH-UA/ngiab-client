@@ -1,27 +1,6 @@
 """Convert a model run's ngen output CSVs to consolidated parquet.
 
-One parquet per *schema group* rather than one per catchment. Measured on 2,000 catchments
-x 100 timesteps: 3.2 MB across 2,000 files against 0.1 MB in one, because per-file parquet
-metadata dominates when the files are small; the value matrix goes from 90.1 ms to 3.1 ms and
-a schema read from 24.2 ms to 0.8 ms. Reading one catchment costs 0.3 ms more, which is the
-whole price.
-
-That settles a question the plan left open: the two access patterns -- one catchment across
-all time, and one variable across all catchments -- were expected to pull in opposite
-directions. Sorted by (catchment_id, Time) they do not.
-
-Against object storage the size and the timings matter less than the count. A per-catchment
-layout makes the value matrix one GET per catchment; consolidated it is one.
-
-Grouped by schema, not merged with union_by_name, because catchments produced by different
-formulations write different columns. Merging them pads the narrow ones with NULLs and makes
-every catchment report the union, which changes what the variable picker offers for that
-catchment. One file per distinct column set keeps each catchment's own answer intact.
-
-Original CSVs are left in place, as before: nothing here removes anything, and a run that has
-not been converted still reads from csv. The earlier per-catchment parquet conversion this
-replaces measured 438 MB of csv down to 65 MB (6.7x) and a two-column read from 35 ms to
-9 ms; consolidating keeps both of those and adds the count reduction on top.
+One parquet per schema group instead of per catchment, to cut file count and overhead.
 """
 
 import os
@@ -76,14 +55,7 @@ class Command(BaseCommand):
         self._write_manifest(run_path)
 
     def _write_manifest(self, run_path):
-        """Give the run its manifest, because converting without one leaves it invisible.
-
-        A directory under the storage root is only a *registered* run once it has a manifest,
-        and this command is what the launcher runs on import. Converting the outputs and then
-        not recording them meant a freshly imported run did not appear in the picker at all --
-        found by running the built image rather than by any test, because every test wrote the
-        manifest itself.
-        """
+        """Give the run its manifest, because converting without one leaves it invisible."""
         from tethysapp.ngiab import manifest
 
         document = manifest.distill(run_path)
@@ -96,17 +68,7 @@ class Command(BaseCommand):
         )
 
     def _convert_troute(self, run_path, compression):
-        """Write t-route to parquet in the shape the readers pin.
-
-        Uncached and whole-file before this: xr.open_dataset(...).to_dataframe() loaded every
-        feature and every timestep to plot one channel, twice per chart load, because the
-        variable list and the series are separate requests.
-
-        The schema is pinned here rather than inherited from the source, because the source
-        shapes disagree -- NetCDF yields a MultiIndex keyed on feature_id, csv a flat frame
-        with featureID and current_time -- and the readers used to branch on which. A
-        converted run matched neither branch and returned an empty chart with no error.
-        """
+        """Write t-route to parquet in the shape the readers pin."""
         from tethysapp.ngiab import utils as ngiab_utils
 
         troute_dir = os.path.join(run_path, "outputs", "troute")
@@ -139,11 +101,7 @@ class Command(BaseCommand):
         self.stdout.write(f"  troute: {len(frame)} rows from {sources[0]}")
 
     def _group_by_schema(self, outputs, csvs):
-        """Catchments keyed by their column set.
-
-        A run whose catchments came from one formulation -- the ordinary case -- produces a
-        single group and a single file. The grouping exists for the run that does not.
-        """
+        """Catchments keyed by their column set."""
         groups = {}
         for name in csvs:
             stem = name[: -len(".csv")]
@@ -155,16 +113,7 @@ class Command(BaseCommand):
         return groups
 
     def _write_group(self, outputs, destination, members, columns, compression):
-        """One parquet holding every catchment that shares this column set.
-
-        ``catchment_id`` is appended rather than prepended: the readers treat column 0 as the
-        step and column 1 as the timestamp, so putting it first would shift that contract.
-        Appended, it is excluded by name the way the synthesised ``filename`` column already
-        was.
-
-        Sorted by (catchment_id, time) so a single-catchment read hits contiguous row groups
-        and the value matrix still scans once.
-        """
+        """One parquet holding every catchment that shares this column set."""
         pattern = os.path.join(outputs, "cat-*.csv")
         selected = ", ".join(duckdb_conn.quote_identifier(column) for column in columns)
         members_list = ", ".join(duckdb_conn.quote(member) for member in members)

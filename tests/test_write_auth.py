@@ -1,13 +1,4 @@
-"""Reads stay open; writes require a login. And the image's shipped credentials do not ship.
-
-Read docs/plans/2026-08-22-001-feat-storage-backed-model-runs-plan.md, Unit 6.
-
-This lands before Unit 8 on purpose. Unit 8 makes removing a run delete its directory, and
-the ordering matters more than it looks: ``ENABLE_OPEN_PORTAL: true`` leaves every endpoint
-reachable by anyone, so shipping the destructive version first would open a window in which
-an anonymous POST irreversibly destroys someone's model output. Authentication first, then
-the thing worth authenticating.
-"""
+"""Reads stay open; writes require a login. And the image's shipped credentials do not ship."""
 
 
 import pytest
@@ -38,13 +29,7 @@ def signed_in_post(db, monkeypatch):
 
 
 def test_tethys_login_required_passes_anonymous_through_under_an_open_portal():
-    """The claim the whole design rests on, asserted rather than assumed.
-
-    conf/portal_config.yml says an open portal makes Tethys's login_required "pass straight
-    through", and tethys_apps/decorators.py checks the setting at call time. If that ever
-    stopped being true this design would be over-protecting rather than under-protecting,
-    but it is worth knowing either way.
-    """
+    """An open portal makes Tethys's login_required pass an anonymous caller straight through."""
     from django.conf import settings
     from tethys_apps.decorators import login_required as tethys_login_required
 
@@ -76,19 +61,13 @@ def test_our_decorator_refuses_the_same_request():
 
 @pytest.mark.parametrize("endpoint", ["removeModelRun"])
 def test_every_mutating_endpoint_refuses_an_anonymous_caller(endpoint, anonymous_post):
-    """One endpoint now. registerModelRun went with the importer -- presence in the storage
-    root is registration, so there is nothing left to register."""
+    """Every mutating endpoint refuses an anonymous caller."""
     response = getattr(controllers, endpoint)(anonymous_post)
     assert response.status_code == 401
 
 
 def test_the_refusal_says_what_to_do(anonymous_post):
-    """401 rather than 403 so api/client.js redirects to the login page with ?next=.
-
-    A 403 would surface a sentence and leave the user to work out where to sign in; a Django
-    redirect would be worse still, because fetch follows it and the client would receive the
-    login page's HTML with a 200 and report unreadable JSON.
-    """
+    """The refusal is 401, not 403, so api/client.js redirects to the login page with ?next=."""
     import json
 
     response = controllers.removeModelRun(anonymous_post)
@@ -96,12 +75,7 @@ def test_the_refusal_says_what_to_do(anonymous_post):
 
 
 def test_a_signed_in_caller_gets_past_the_decorator(signed_in_post, tmp_path, monkeypatch):
-    """Past authentication, the endpoint's own answer is what comes back.
-
-    404 here because the run named does not exist. The point is only that authentication is
-    not what stopped it -- and that a signed-in caller naming a run that is not there gets
-    told so, rather than deleting something else.
-    """
+    """Past authentication, the endpoint's own answer (404 for a run that does not exist) comes back."""
     from tethysapp.ngiab import run_store
 
     monkeypatch.delenv(run_store.duckdb_conn.STORAGE_BACKEND_ENV, raising=False)
@@ -174,11 +148,7 @@ def test_hosted_accepts_credentials_of_its_own(hosted, monkeypatch):
 
 
 def test_local_keeps_the_baked_defaults(local, monkeypatch):
-    """A laptop container must still start with no configuration at all.
-
-    The baked superuser exists so the image is usable the moment it runs, and on a machine
-    the user already controls that is a convenience rather than an exposure.
-    """
+    """A laptop container still starts with the baked superuser and no configuration at all."""
     monkeypatch.setenv("PORTAL_SUPERUSER_PASSWORD", ensure_superuser.BAKED_PASSWORD)
     monkeypatch.setenv("TETHYS_SECRET_KEY", ensure_superuser.BAKED_SECRET_KEY)
     call_command("ensure_superuser", "--check-only")
@@ -218,12 +188,7 @@ def test_no_credentials_leaves_the_database_alone(db, local, monkeypatch):
 
 
 def test_hosted_refuses_a_baked_key_that_only_reaches_settings(hosted, monkeypatch, settings):
-    """The environment and the key Django signs with can disagree.
-
-    The runtime stage sets the default through ENV and portal-config.sh merges it into the
-    rendered config. An operator who exports a good value that never reaches settings would
-    pass an environment-only check while still signing cookies with the published key.
-    """
+    """A hosted start is refused when the baked key reaches settings but not the environment check."""
     monkeypatch.setenv("PORTAL_SUPERUSER_PASSWORD", "chosen-by-the-operator")
     monkeypatch.setenv("TETHYS_SECRET_KEY", "chosen-by-the-operator")
     settings.SECRET_KEY = ensure_superuser.BAKED_SECRET_KEY

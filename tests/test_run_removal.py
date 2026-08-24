@@ -1,20 +1,5 @@
 """Removing a run now deletes it, and the migration that made that necessary.
-
-Read docs/plans/2026-08-22-001-feat-storage-backed-model-runs-plan.md, Unit 8.
-
-This reverses a decision the project made deliberately: commit 56532a9 removed the last
-``os.remove`` from the codebase, on the grounds that destroying someone's model output because
-they tidied a list was too much damage for an unregister action. It is reversed knowingly,
-because with the listing derived from storage a removal that does not delete cannot work --
-the run reappears on the next scan. That is not a theory: under the old JSON registry,
-deleting the sole run brought it back on the next request, which made unregistering look
-broken.
-
-Two things carry the weight the old separation used to: the endpoint is unreachable without
-signing in (Unit 6, which landed first for exactly this reason), and it takes a run *name*
-that the listing already returned rather than a path, so a caller cannot describe a directory
-of its own choosing at all.
-"""
+Signing in and resolving by listed name replace the separation the old no-op relied on."""
 
 import os
 
@@ -64,12 +49,7 @@ def test_removing_a_run_deletes_its_directory(populated_root):
 
 
 def test_the_run_does_not_come_back_on_the_next_listing(populated_root):
-    """The resurrection bug, asserted directly.
-
-    Under the JSON registry, deleting the sole run brought it back on the next request. Any
-    scheme where removal does not delete reintroduces it, which is why a hidden-marker file
-    was rejected in favour of this.
-    """
+    """A deleted run must not resurrect on the next listing, the way it did under the old registry."""
     run_store.delete("alpha")
     assert [entry["name"] for entry in run_store.list_runs()] == ["beta"]
 
@@ -85,13 +65,7 @@ def test_removing_the_only_run_leaves_an_empty_listing(populated_root):
     ["../beta", "../../etc", "alpha/../../beta", "/etc", "", "does-not-exist"],
 )
 def test_only_a_name_the_listing_returned_can_be_deleted(populated_root, name):
-    """The same invariant the old importer enforced from the other side.
-
-    registerModelRun accepted a path only if a fresh scan would offer that exact path, and
-    a978b2d verified it against ``../..`` and symlinks planted inside the root. Resolving
-    through the listing is the stronger version: a path is never accepted at all, so there is
-    no traversal to defend against.
-    """
+    """Only a name the listing actually returned can be deleted; a path is never accepted."""
     with pytest.raises(LookupError):
         run_store.delete(name)
     assert (populated_root / "alpha").exists()
@@ -143,12 +117,7 @@ def test_the_registry_table_is_dropped(db):
 
 
 def test_the_earlier_migrations_are_kept():
-    """Deleting 0001 and 0002 would orphan both the table and the history.
-
-    Every existing deployment has their rows in django_migrations and the table on a host
-    volume. Removing the files would leave the table on disk forever, with Django no longer
-    able to drop it.
-    """
+    """The earlier migrations are kept, so the table's history is not orphaned."""
     from tethysapp.ngiab import migrations
 
     directory = os.path.dirname(migrations.__file__)
@@ -159,12 +128,7 @@ def test_the_earlier_migrations_are_kept():
 
 
 def test_the_migration_is_a_pure_delete(db):
-    """The backfill is a command, run before migrate, not work done inside 0003.
-
-    Distilling a run reads its GeoPackage and a crosswalk of tens of thousands of rows.
-    Inside the migration that runs during `tethys db migrate` in the entrypoint, with no
-    progress output and no bound, and a container that never serves if it fails.
-    """
+    """The backfill runs as a command before migrate, not as work inside the migration itself."""
     from importlib import import_module
 
     module = import_module("tethysapp.ngiab.migrations.0003_delete_modelrun".replace("0003", "0003"))

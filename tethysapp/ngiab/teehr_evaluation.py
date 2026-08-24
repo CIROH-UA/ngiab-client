@@ -1,20 +1,6 @@
 """Read a TEEHR evaluation that lives inside a single model run.
 
-The visualizer was built against one Iceberg warehouse shared by every run, addressed by
-``TEEHR_WAREHOUSE_PATH`` and keyed by an ``ngen_<stem>`` configuration per run. That is not
-what the documented workflow produces. ``guide.sh`` -- and the equivalent
-``docker run -v <run>:/app/data awiciroh/ngiab-teehr:x86`` -- writes a self-contained
-evaluation into ``<run>/teehr``: hive-partitioned parquet under ``dataset/``, a
-``metrics.csv``, and no catalog at all. The app classified that as "legacy" and told the
-reader to re-run TEEHR with the current image, which is the image that wrote it.
-
-Reading it is simpler than reading the warehouse, because ``joined_timeseries`` is already
-joined: observed and simulated values share a row, so the crosswalk semi-joins the warehouse
-reader has to reconstruct are unnecessary here, and a location with no observation to compare
-against is absent rather than needing to be filtered out.
-
-Same method names and return shapes as ``teehr_warehouse.WarehouseReader``, so the
-controllers can hold either one.
+Same method names and return shapes as ``teehr_warehouse.WarehouseReader``.
 """
 
 import logging
@@ -41,16 +27,7 @@ _METRIC_COLUMNS = (
 
 
 def evaluation_dir(run_path, present=None):
-    """The evaluation directory inside a run, or None when it has none.
-
-    ``present`` comes from the manifest, because the probe this replaced -- os.path.isdir on
-    joined_timeseries -- is False for every ``s3://`` path regardless of what is in the
-    bucket. Without it every TEEHR endpoint on a hosted run reports "no evaluation" while the
-    parquet sits there.
-
-    Falls back to the filesystem check only when the caller has no manifest to offer, which
-    keeps this usable from a one-shot script against a local directory.
-    """
+    """The evaluation directory inside a run, or None when it has none."""
     if not run_path:
         return None
     dataset = posixpath.join(str(run_path).rstrip("/"), "teehr", "dataset")
@@ -128,11 +105,7 @@ class EvaluationReader:
         ]
 
     def list_location_pairs_for_run(self, config_name: str) -> List[tuple]:
-        """``(primary_location_id, secondary_location_id)`` pairs that can be compared.
-
-        Both sides are present by construction: a row in joined_timeseries carries an
-        observed and a simulated value, so anything reported here has something to plot.
-        """
+        """``(primary_location_id, secondary_location_id)`` pairs that can be compared."""
         try:
             return list(
                 self._query(
@@ -146,11 +119,7 @@ class EvaluationReader:
             return []
 
     def get_metrics_for_location(self, config_name: str, usgs_location_id: str) -> List[dict]:
-        """Metrics for one gauge, pivoted row-per-metric with a column per configuration.
-
-        Read from metrics.csv rather than recomputed: it is what teehr wrote for this
-        evaluation, and recomputing would risk disagreeing with the numbers on disk.
-        """
+        """Metrics for one gauge, pivoted row-per-metric with a column per configuration."""
         path = posixpath.join(posixpath.dirname(self._dir), "metrics.csv")
         try:
             frame = duckdb_conn.query(
@@ -183,12 +152,7 @@ class EvaluationReader:
     def get_joined_timeseries(
         self, config_name: str, variable_name: str, usgs_location_id: str
     ) -> List[dict]:
-        """Observed and simulated series for one gauge, ready for the chart.
-
-        value_time is cast to VARCHAR in SQL so the timestamps are the same strings the
-        catchment endpoints emit, rather than datetime objects the JSON encoder would have
-        to walk one by one.
-        """
+        """Observed and simulated series for one gauge, ready for the chart."""
         try:
             rows = self._query(
                 f"SELECT CAST(value_time AS VARCHAR), primary_value, secondary_value "

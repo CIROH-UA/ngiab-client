@@ -1,10 +1,5 @@
 """An uploaded archive is the first wholesale user input this app takes.
-
-Every other input is a name the listing just produced, or a path an operator placed. Here the
-bytes decide what gets written, where, how many times and how large. These tests are written
-as attacks rather than as coverage, because the interesting cases are the ones a well-formed
-archive never exercises.
-"""
+These tests attack it rather than merely cover it."""
 
 import io
 import os

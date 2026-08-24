@@ -1,18 +1,5 @@
 """Uploading an archive publishes a run, and only for people allowed to add one.
-
-The pipeline is one path for both backends -- extract, convert, distil, publish -- because
-convert_outputs needs a filesystem either way. What differs is only how the archive arrives.
-
-Two things here are load-bearing beyond "does it work":
-
-1. **The published run's id is the name it was published under.** Everywhere else the id is
-   positional, taken from the basename of whatever path distill was handed, and on object
-   storage the prefix and the id can drift apart until the picker offers an id that resolves
-   to nothing. Ingest controls both, so it is the one place they are made equal.
-
-2. **The job id reaches a storage key and a subprocess argument**, so it is validated as a
-   hex uuid rather than trusted.
-"""
+The published run's id is the name it was published under, and the job id is validated."""
 
 import json
 import os
@@ -257,8 +244,7 @@ def archive_post():
 
 def test_uploadRun_launches_the_child_with_the_archive(permitted, storage_root, archive_post,
                                                        monkeypatch):
-    """The success path. On its own this would have caught the bug: the handler raised before
-    reaching _launch at all."""
+    """uploadRun reaches _launch with the archive rather than raising before it gets there."""
     launched = []
     monkeypatch.setattr(controllers, "_launch", lambda args: launched.append(args))
 
@@ -272,8 +258,7 @@ def test_uploadRun_launches_the_child_with_the_archive(permitted, storage_root, 
 
 def test_uploadRun_leaves_no_archive_when_the_launch_fails(permitted, storage_root,
                                                            archive_post, monkeypatch):
-    """The reason the parameter exists. When the child never starts, nothing else removes the
-    temp file the handler wrote -- the child's own cleanup never runs."""
+    """When the child never starts, the handler's own temp archive is still removed."""
     import glob
 
     monkeypatch.setattr(controllers, "_launch",
@@ -299,11 +284,7 @@ def test_uploadRun_reports_a_failed_job_when_the_launch_fails(permitted, storage
 
 
 def _run_view(view, request):
-    """Call a view, turning an exception into the 500 Django would produce.
-
-    Without this the TypeError propagates out of the test as an error rather than a failure,
-    which reads as a broken test instead of a broken endpoint.
-    """
+    """Call a view, turning an exception into the 500 Django would produce."""
     from django.http import JsonResponse
 
     try:

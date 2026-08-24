@@ -1,17 +1,5 @@
 """Listing runs from a storage root, local or object store.
-
-Read docs/plans/2026-08-22-001-feat-storage-backed-model-runs-plan.md, Unit 4.
-
-The load-bearing claim is that the two backends are indistinguishable to everything above
-them, so most tests here run twice: once against a real ``FileSystemStorage`` over a
-temporary directory, and once against an in-memory fake standing in for S3. The fake is
-deliberately not a mock of boto3 -- what needs proving is that ``run_store`` depends on the
-Django storage interface and nothing else. Whether ``S3Storage`` itself works against a real
-bucket is an integration question this unit cannot answer offline, and the plan keeps it as a
-spike.
-
-Nothing here consults ``_get_list_model_runs``. Wiring this into the registry is Unit 5.
-"""
+Most tests run twice, against a real FileSystemStorage and an in-memory S3 stand-in."""
 
 import io
 import os
@@ -23,13 +11,7 @@ from tethysapp.ngiab import manifest, run_store
 
 
 class InMemoryStorage(Storage):
-    """The smallest thing that behaves like an object store for run_store's purposes.
-
-    Object stores have no directories -- ``listdir`` derives them from key prefixes, which is
-    exactly what ``Delimiter="/"`` does against S3. Modelling that here rather than faking a
-    filesystem is the point: a run_store that accidentally depends on real directories would
-    pass against FileSystemStorage and fail in a bucket.
-    """
+    """The smallest thing that behaves like an object store for run_store's purposes."""
 
     bucket_name = "runs-bucket"
     location = ""
@@ -118,13 +100,7 @@ def object_root(tmp_path, mini_run_factory, monkeypatch):
 
 
 def test_local_root_defaults_to_the_existing_run_mount(monkeypatch):
-    """Not MEDIA_ROOT.
-
-    MEDIA_ROOT resolves to an unmounted $TETHYS_PERSIST_PATH/media, while every existing run
-    lives in ngiab_visualizer, which viewOnTethys.sh already bind-mounts. Rooting the store
-    at MEDIA_ROOT would put every existing run outside the root -- an image upgrade that
-    empties the picker with no recovery path, since register_run is gone by Unit 8.
-    """
+    """The storage root defaults to the existing run mount, not to MEDIA_ROOT."""
     monkeypatch.delenv(run_store.MANAGED_ROOT_ENV, raising=False)
     assert run_store.local_root() == "/var/lib/tethys_persist/ngiab_visualizer"
 
@@ -145,11 +121,7 @@ def test_object_listing_returns_the_same_entries(object_root):
 
 
 def test_both_backends_order_newest_first(local_root):
-    """Meta.ordering was ["-created", "label"]; a listing is lexicographic.
-
-    Without this the default-selected run changes on every fresh visit, which is a
-    user-visible regression no payload-shape assertion would catch.
-    """
+    """Both backends order runs newest first, matching the old lexicographic listing."""
     assert [entry["name"] for entry in run_store.list_runs()] == ["beta", "alpha"]
 
 
@@ -173,9 +145,7 @@ def test_empty_root_returns_an_empty_list(tmp_path, monkeypatch):
 
 
 def test_directory_without_a_manifest_is_reported_not_hidden(local_root):
-    """Mirrors describe_importable_run: a directory the user can see on disk and cannot see
-    in the interface is indistinguishable from a bug.
-    """
+    """A directory without a manifest is reported, not hidden from the listing."""
     os.mkdir(os.path.join(local_root, "not-a-run"))
     run_store.clear_caches()
 
@@ -199,13 +169,7 @@ def test_run_without_outputs_is_reported_with_a_reason(local_root):
 
 
 def test_unreachable_backend_raises_rather_than_reporting_empty(monkeypatch):
-    """An auth failure must never look like "there are no runs".
-
-    The deleted datastream_utils.check_if_s3_file_exists swallowed every ClientError and
-    returned False, so a 403 reported the object simply did not exist. Harmless against a
-    public bucket; with real credentials it is a routine failure mode, and an empty picker
-    is the least actionable way to surface it.
-    """
+    """An unreachable backend raises rather than reporting that there are no runs."""
     storage = InMemoryStorage(fail_with=PermissionError("Access Denied"))
     monkeypatch.setenv(run_store.duckdb_conn.STORAGE_BACKEND_ENV, "s3")
     monkeypatch.setattr(run_store, "storage", lambda: storage)
@@ -243,11 +207,7 @@ def test_location_of_a_run_with_no_extra_parts(local_root):
 
 
 def test_a_listing_spanning_several_pages_returns_every_entry(monkeypatch):
-    """list_objects_v2 caps at 1000 keys per page, and a run is a prefix not a key.
-
-    Modelled here by a storage holding more prefixes than any single page would carry, to
-    pin that run_store never truncates a listing.
-    """
+    """A listing spanning several pages of list_objects_v2 still returns every entry."""
     objects = {f"run-{index:05d}/{manifest.MANIFEST_NAME}": b"{}" for index in range(1500)}
     storage = InMemoryStorage(objects)
     monkeypatch.setenv(run_store.duckdb_conn.STORAGE_BACKEND_ENV, "s3")
@@ -258,11 +218,7 @@ def test_a_listing_spanning_several_pages_returns_every_entry(monkeypatch):
 
 
 def test_the_listing_is_cached_between_calls(local_root, mocker):
-    """_get_list_model_runs is reached at least twice per data request in Unit 5.
-
-    Uncached against an object store that is two round trips per request before the endpoint
-    does any work of its own.
-    """
+    """The run listing is cached between calls, not fetched fresh from the backend each time."""
     run_store.list_runs()
     spy = mocker.spy(run_store, "_read_manifest")
     for _ in range(5):

@@ -1,15 +1,6 @@
 """A run appears in the picker whole, or it does not appear.
+A rename on a filesystem, and manifest-last ordering in a bucket, give that single visible moment."""
 
-Publishing is the one step that makes a directory visible, and it was not a step -- it was a
-recursive copy under the run's final name, or a stream of object PUTs with the manifest going
-up first. Either way the picker could see a run that was still being written.
-
-There is no transaction on either backend. What there is instead is a single visible moment:
-a rename on a filesystem, and manifest-last ordering in a bucket, since a directory is only a
-*registered* run once it has a manifest.
-"""
-
-import os
 import tarfile
 from types import SimpleNamespace
 
@@ -43,11 +34,7 @@ def archived(mini_run_factory, tmp_path):
 
 
 def test_the_workspace_lives_under_the_storage_root(storage_root):
-    """Publishing is only a rename if the scratch space is on the same filesystem.
-
-    From /tmp it was a cross-device shutil.move: a recursive copy, not atomic, and visible
-    under the run's final name while it ran.
-    """
+    """Publishing must be a rename, not a cross-device copy, so the scratch space shares its filesystem."""
     workspace = ingest._workspace()
     try:
         assert str(workspace).startswith(str(storage_root))
@@ -68,8 +55,7 @@ def test_the_workspace_is_not_listed_as_a_run(storage_root):
 
 
 def test_publishing_onto_an_existing_run_is_refused(storage_root, archived):
-    """Two uploads of one name can both pass publish()'s find() check before either writes;
-    the rename is what actually decides, and it must refuse rather than merge."""
+    """The rename, not the pre-flight existence check, is what must refuse a colliding name."""
     (storage_root / "taken").mkdir()
     (storage_root / "taken" / "sentinel").write_text("original")
 
@@ -100,14 +86,7 @@ def test_nothing_is_left_in_staging_after_a_publish(storage_root, archived):
 
 
 class _Recorder:
-    """A storage that records the order keys are written, and can fail on cue.
-
-    ``listdir`` models django-storages' contract rather than a convenient shortcut: it
-    returns (immediate subdirectory names, file names at this level), which is what makes
-    run_store._walk_keys actually recurse. A fake that flattened the tree would let the
-    recursive branch go unexercised while the tests still passed -- the shape of mistake
-    this project has been bitten by before.
-    """
+    """A storage that records the order keys are written, and can fail on cue."""
 
     def __init__(self, fail_on=None, client=None, bucket_name=None):
         self.saved = []
@@ -164,8 +143,7 @@ def _prepared(tmp_path):
 
 
 def test_the_manifest_is_uploaded_last(hosted, tmp_path, monkeypatch):
-    """A directory is only a registered run once it has a manifest, so it goes up last: a
-    crash partway then leaves a prefix the picker does not offer."""
+    """The manifest goes up last, so a crash partway never leaves a prefix the picker offers."""
     recorder = _Recorder()
     monkeypatch.setattr(run_store, "storage", lambda: recorder)
 

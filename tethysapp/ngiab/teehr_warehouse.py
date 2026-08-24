@@ -1,24 +1,6 @@
 """DuckDB-backed reader for a TEEHR Iceberg-on-SQLite-JDBC warehouse.
 
-The TEEHR producer (``ngiab-teehr``) writes a warehouse of the shape::
-
-    <warehouse_path>/local/
-    ├── local_catalog.db          # SQLite JDBC Iceberg catalog
-    ├── version                   # TEEHR semver
-    └── teehr/                    # Iceberg tables
-        ├── configurations/
-        ├── locations/
-        ├── location_crosswalks/
-        ├── primary_timeseries/
-        ├── secondary_timeseries/
-        ├── ngen_metrics/
-        └── ...
-
-This module reads those tables via DuckDB 1.5+ ``sqlite_scanner`` + ``iceberg_scan``.
-All format knowledge lives here so future teehr format shifts are localized.
-
-See ``docs/plans/2026-04-20-001-feat-teehr-warehouse-compatibility-plan.md`` for
-the full design rationale (OD1, OD2, FR3).
+Reads TEEHR's Iceberg tables via DuckDB's ``sqlite_scanner`` and ``iceberg_scan``.
 """
 
 import logging
@@ -59,19 +41,11 @@ class UnsupportedWarehouseVersion(TeehrWarehouseError):
 
 
 class WarehouseCatalogLocked(TeehrWarehouseError):
-    """The SQLite JDBC catalog cannot be attached read-only.
-
-    Usually means the teehr writer is still running or left the catalog in WAL
-    mode without a clean checkpoint.
-    """
+    """The SQLite JDBC catalog cannot be attached read-only."""
 
 
 class WarehouseMountMirrorBroken(TeehrWarehouseError):
-    """An absolute path recorded inside the catalog cannot be reached.
-
-    Most commonly: the warehouse bind-mount is not at the same absolute path
-    in this container as where teehr wrote the catalog.
-    """
+    """An absolute path recorded inside the catalog cannot be reached."""
 
 
 class ConfigurationNotFound(TeehrWarehouseError):
@@ -79,17 +53,7 @@ class ConfigurationNotFound(TeehrWarehouseError):
 
 
 class WarehouseReader:
-    """Read-only view of a TEEHR warehouse, backed by a DuckDB connection.
-
-    One reader per top-level public method call. The catalog (``iceberg_tables``)
-    is read *once per method call* and cached for the duration of that call so
-    joins across multiple Iceberg tables observe a consistent snapshot.
-
-    Usage::
-
-        with WarehouseReader("/path/to/teehr_evaluation_dir") as reader:
-            configs = reader.list_configurations_for_run("ngen_my_run")
-    """
+    """Read-only view of a TEEHR warehouse, backed by a DuckDB connection."""
 
     def __init__(self, warehouse_path):
         self.warehouse_path = Path(warehouse_path)
@@ -159,11 +123,7 @@ class WarehouseReader:
 
 
     def _freeze_catalog(self) -> Dict[str, str]:
-        """Read ``iceberg_tables`` and return ``{table_name: metadata_location}``.
-
-        Called once per public method so all queries within the method see the
-        same Iceberg snapshot.
-        """
+        """Read ``iceberg_tables`` and return ``{table_name: metadata_location}``."""
         rows = self._conn.execute(
             "SELECT table_name, metadata_location "
             "FROM cat.iceberg_tables "
@@ -202,12 +162,7 @@ class WarehouseReader:
         return row is not None
 
     def list_configurations_for_run(self, config_name: str) -> List[dict]:
-        """Return ``[{"value": "<cfg>-<var>", "label": "<cfg> <var>"}]`` for the run.
-
-        Scoped to the selected run's configuration plus ``nwm30_retrospective``
-        (see plan OD3). Shape matches what the existing React ``teehrSelect``
-        expects from ``getTeehrVariables``.
-        """
+        """Return ``[{"value": "<cfg>-<var>", "label": "<cfg> <var>"}]`` for the run."""
         catalog = self._freeze_catalog()
         sec_loc = catalog.get("secondary_timeseries")
         if sec_loc is None:
@@ -231,20 +186,7 @@ class WarehouseReader:
 
 
     def list_location_pairs_for_run(self, config_name: str) -> List[tuple]:
-        """Return (primary_location_id, secondary_location_id) pairs that can be compared.
-
-        Both sides are required. A simulation with no observation to compare against yields
-        no joined timeseries and no metrics, so reporting it as having TEEHR results sends
-        the user to a chart that can only say there is nothing here. Observed in the
-        gage-10154200 warehouse: three nexus have secondary timeseries, one gauge has
-        primary, so two of the three highlighted catchments were dead ends.
-
-        Like ``list_usgs_locations_for_run`` but keeps the ngen side too, so a caller can
-        map map-geometry ids to USGS gauge ids. One catalog freeze and one query, so every
-        table is read from the same Iceberg snapshot -- doing this as separate reader calls
-        joined in Python would risk a concurrent teehr write bumping one table's snapshot
-        pointer between them.
-        """
+        """Return (primary_location_id, secondary_location_id) pairs that can be compared."""
         catalog = self._freeze_catalog()
         xwalk_loc = catalog.get("location_crosswalks")
         sec_loc = catalog.get("secondary_timeseries")
@@ -272,17 +214,7 @@ class WarehouseReader:
     def get_metrics_for_location(
         self, config_name: str, usgs_location_id: str
     ) -> List[dict]:
-        """Return the ``ngen_metrics`` rows for this location, pivoted row-per-metric.
-
-        Output shape matches the legacy ``get_teehr_metrics`` in ``utils.py``::
-
-            [
-                {"metric": "kling_gupta_efficiency",
-                 "<config_name>": 0.79,
-                 "nwm30_retrospective": 0.81},
-                ...
-            ]
-        """
+        """Return the ``ngen_metrics`` rows for this location, pivoted row-per-metric."""
         catalog = self._freeze_catalog()
         metrics_loc = catalog.get("ngen_metrics")
         if metrics_loc is None:
@@ -319,17 +251,7 @@ class WarehouseReader:
         variable_name: str,
         usgs_location_id: str,
     ) -> List[dict]:
-        """Return paired (USGS, secondary) timeseries for plotting.
-
-        Re-implements teehr's ``joined_timeseries_view()`` join in DuckDB
-        (see plan OD2). Output shape is a list of series compatible with
-        the existing React chart consumer::
-
-            [
-                {"label": "USGS", "data": [{"x": ts, "y": val}, ...]},
-                {"label": "<cfg>", "data": [...]},
-            ]
-        """
+        """Return paired (USGS, secondary) timeseries for plotting."""
         catalog = self._freeze_catalog()
         pri_loc = catalog.get("primary_timeseries")
         sec_loc = catalog.get("secondary_timeseries")

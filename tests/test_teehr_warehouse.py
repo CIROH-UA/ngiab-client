@@ -1,18 +1,5 @@
-"""Tests for tethysapp.ngiab.teehr_warehouse.WarehouseReader.
-
-These tests run against a real TEEHR warehouse produced by ``ngiab-teehr``.
-The warehouse location is taken from the ``TEEHR_TEST_WAREHOUSE`` environment
-variable; tests are skipped if it is unset or the warehouse is not readable.
-
-Produce a fixture warehouse once with::
-
-    /home/aquagio/tethysdev/ciroh/ngen/ngiab-teehr/runTeehr.sh \\
-        -d /home/aquagio/ngiab/ -t local
-
-Then run tests::
-
-    TEEHR_TEST_WAREHOUSE=/home/aquagio/ngiab pytest tests/test_teehr_warehouse.py
-"""
+"""Tests for WarehouseReader, run against a real TEEHR warehouse.
+Skipped unless TEEHR_TEST_WAREHOUSE points at a readable warehouse; see runTeehr.sh."""
 
 import math
 import os
@@ -268,13 +255,7 @@ def test_get_joined_timeseries_unknown_location(reader):
 
 
 def test_get_joined_timeseries_x_values_are_chart_parseable(reader):
-    """x-values must be plain 'YYYY-MM-DD HH:MM:SS' strings with no tz suffix.
-
-    Regression guard: CAST(TIMESTAMPTZ AS VARCHAR) in DuckDB 1.5 appends a
-    truncated offset like '-07' that Plotly cannot parse, collapsing the
-    x-axis to today's date. strftime with an explicit format produces clean
-    output.
-    """
+    """x-values are plain 'YYYY-MM-DD HH:MM:SS' strings with no timezone suffix Plotly can't parse."""
     import re
     loc = _usgs_id_with_metrics(reader, "ngen_ngiab")
     series = reader.get_joined_timeseries(
@@ -354,13 +335,7 @@ def _root_mean_standard_deviation_ratio(primary, secondary):
 
 
 def test_joined_timeseries_matches_ngen_metrics_drift_guard(reader):
-    """Integration / drift guard (plan OD2).
-
-    Recompute the four metrics from our DuckDB join and assert they match the
-    ngen_metrics table that teehr itself wrote. This is the oracle for
-    get_joined_timeseries -- any semantic drift between our join and teehr's
-    joined_timeseries_view() will surface here.
-    """
+    """Metrics recomputed from our DuckDB join must match teehr's own ngen_metrics table."""
     loc = _usgs_id_with_metrics(reader, "ngen_ngiab")
 
     teehr_metrics = reader.get_metrics_for_location("ngen_ngiab", loc)

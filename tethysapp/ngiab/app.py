@@ -20,21 +20,7 @@ class App(TethysAppBase):
     feedback_emails = []
 
     def permissions(self):
-        """Who may destroy a model run.
-
-        Deleting is irreversible and, once runs live in a shared bucket, one user's mistake
-        is another user's lost output. Signing in was the whole gate before this; on a
-        portal shared by an institution "signed in" means everybody.
-
-        A Tethys permission rather than an ``is_staff`` check, because it is grantable: a
-        portal administrator can hand these to the people who curate runs without making
-        them staff. Superusers hold every app permission already, so an administrator needs
-        no grant.
-
-        Two permissions rather than one, so uploading and deleting can be granted apart.
-        Adding a run consumes shared storage; removing one destroys someone's output. The
-        second is the scarcer grant.
-        """
+        """Who may destroy a model run."""
         return (
             PermissionGroup(
                 name="run_managers",

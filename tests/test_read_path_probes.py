@@ -1,24 +1,5 @@
 """The read path no longer probes the filesystem to answer a request.
-
-Read docs/plans/2026-08-22-001-feat-storage-backed-model-runs-plan.md, Unit 9.
-
-This is the unit's actual claim, and it needs asserting rather than reasoning about, because
-every probe it removes is individually harmless and collectively the reason a hosted run
-cannot be served. Each one either does not work against an object store (``os.walk``,
-``os.listdir``, ``sqlite3`` on a GeoPackage) or silently returns the wrong answer there
-(``os.stat`` for a cache key returns None, so the key never changes and a re-ingested run
-serves stale bins forever).
-
-**What is allowed.** ``open()`` and ``os.path.exists`` are not banned: reading a manifest and
-its sidecars is what replaced the probes, and locally those are files. Under object storage
-they go through the storage interface instead. What is banned is the specific set of calls
-that have no object-store answer at all.
-
-**Troute is deliberately out of scope.** ``get_troute_df`` still globs and still opens a
-NetCDF; converting it is Unit 11, which is where the unrestricted version of this assertion
-belongs. Scoping it here rather than weakening it there is the difference between a check
-that means something and one that gets quietly relaxed.
-"""
+Only calls with no object-store answer are banned; open() and exists() still work."""
 
 import glob as glob_module
 import os
@@ -73,16 +54,7 @@ def probe_log(monkeypatch):
 
 
 def _inside_a_run(calls, storage_root):
-    """Calls that reach *into* a run directory, which is what this unit removed.
-
-    Listing the storage root itself is excluded deliberately. That is the registry operation
-    -- one LIST against an object store, through the storage interface -- and it is the thing
-    that replaced the database query, not a probe of a run's contents. What had to go is
-    everything below it: walking a run's config directory, listing its outputs, statting it
-    for a cache key, opening its GeoPackage.
-
-    Django and DuckDB stat plenty of their own files; only paths under the root count.
-    """
+    """Calls that reach *into* a run directory, which is what this unit removed."""
     root = str(storage_root).rstrip("/")
     inside = []
     for name, target in calls:
@@ -157,11 +129,7 @@ def test_the_flowpath_crosswalk_does_not_open_a_geopackage(ingest, probe_log):
 
 
 def test_many_features_do_not_reopen_anything(ingest, probe_log):
-    """The old reader was lru_cache(32) per feature, so the 33rd click re-opened the gpkg.
-
-    The crosswalk is cached whole now, keyed on the version token, so feature count stops
-    mattering.
-    """
+    """The crosswalk is cached whole, so reading many features does not reopen the GeoPackage."""
     run_id = ingest()
     ngiab_utils.describe_troute_feature(run_id, 100)
     probe_log.clear()
@@ -174,11 +142,7 @@ def test_many_features_do_not_reopen_anything(ingest, probe_log):
 
 
 def test_teehr_presence_comes_from_the_manifest(ingest, probe_log):
-    """evaluation_dir's os.path.isdir is False for every s3:// path, whatever is in the bucket.
-
-    Without the manifest answering this, a hosted run reports "no TEEHR evaluation" while its
-    parquet sits there readable.
-    """
+    """TEEHR presence is read from the manifest, not from os.path.isdir against an s3:// path."""
     run_id = ingest()
     probe_log.clear()
 
@@ -197,13 +161,7 @@ def test_reading_troute_probes_nothing(ingest, probe_log):
 
 
 def test_no_read_endpoint_probes_anything(ingest, probe_log):
-    """The unrestricted version, now that nothing is out of scope.
-
-    Every read a chart load makes, in one block: the run list, the catchment list, the
-    variable pickers, a catchment series, the value matrix, the map extent, the flowpath
-    pairing and the troute series. None of it reaches into a run directory with a call an
-    object store cannot answer.
-    """
+    """No read a chart load makes reaches into a run directory with a call an object store can't answer."""
     run_id = ingest()
     probe_log.clear()
 

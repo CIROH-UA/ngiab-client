@@ -1,18 +1,5 @@
 """The registry seam: _get_list_model_runs backed by manifests instead of the database.
-
-Read docs/plans/2026-08-22-001-feat-storage-backed-model-runs-plan.md, Unit 5.
-
-**These tests deliberately do not stub `_get_list_model_runs`.** Everything else in the suite
-does -- ``test_teehr_warehouse.py`` at six call sites, ``test_endpoint_parity.py`` throughout --
-and that is correct for those tests, but it means they pin the *consumer* side and would pass
-whatever the producer emitted. This file is the other half: it drives the real
-manifest-backed producer against a real storage root and asserts the readers above it work
-unchanged.
-
-When this was written the table still existed and simply went unread, which is what made the
-change revertible. Unit 8 has since dropped it, and the last test here now asserts that rather
-than spying on a model that no longer exists.
-"""
+Drives the real producer against a real storage root rather than stubbing it."""
 
 import json
 import os
@@ -54,12 +41,7 @@ def registry_root(tmp_path, mini_run_factory, monkeypatch):
 
 
 def test_the_producer_emits_every_key_the_consumers_read(registry_root):
-    """id, label, path, date, teehr_configuration_name -- the union of all four readers.
-
-    _resolve_configuration_name reads teehr_configuration_name and path;
-    get_model_runs_selectable reads id and label; scan_importable_runs reads path;
-    _get_model_run_path_by_id reads id and path.
-    """
+    """The producer emits id, label, path, date and teehr_configuration_name -- every key readers use."""
     entries = ngiab_utils._get_list_model_runs()["model_runs"]
     assert len(entries) == 2
     for entry in entries:
@@ -96,10 +78,7 @@ def test_a_legacy_uuid_resolves_to_its_run(registry_root):
 
 
 def test_every_legacy_uuid_on_one_directory_resolves(registry_root):
-    """ModelRun.path was deliberately not unique, so a directory could carry several rows.
-
-    A scalar legacy id would have resolved one of these and silently broken the other.
-    """
+    """Every legacy uuid on a shared directory resolves, not just the first one registered."""
     first = ngiab_utils._get_model_run_path_by_id(ALPHA_UUID)
     second = ngiab_utils._get_model_run_path_by_id(ALPHA_SECOND_UUID)
     assert first == second
@@ -114,11 +93,7 @@ def test_both_uuid_spellings_resolve(registry_root):
 
 
 def test_a_directory_without_a_manifest_is_not_listed_but_is_not_lost(registry_root):
-    """Preserves today's split: a directory the importer refused was never in the picker.
-
-    It is still visible through run_store with a reason, which is what Unit 8's interface
-    work needs -- hiding it outright is the failure describe_importable_run exists to avoid.
-    """
+    """A directory without a manifest is not listed, but is still visible through run_store with a reason."""
     os.mkdir(os.path.join(registry_root, "not-a-run"))
     run_store.clear_caches()
 
@@ -140,11 +115,7 @@ def test_a_corrupt_manifest_does_not_sink_the_whole_listing(registry_root):
 
 
 def test_an_unknown_schema_version_is_not_silently_trusted(registry_root):
-    """A future writer's manifest must not be read as if it were this schema.
-
-    Recorded as a reason rather than an exception: one run written by a newer image should
-    degrade to unusable, not take the portal's whole run list down with it.
-    """
+    """A manifest written by a newer schema version degrades to unusable, not silently trusted."""
     path = os.path.join(registry_root, "alpha", manifest.MANIFEST_NAME)
     with open(path) as handle:
         document = json.load(handle)
@@ -205,11 +176,7 @@ def test_an_unparseable_ttl_falls_back_rather_than_crashing(monkeypatch):
 
 
 def test_the_registry_table_is_gone(db, registry_root):
-    """Migration 0003 dropped it, and the listing never needed it.
-
-    Asserted against the live schema rather than by spying on a model, because the model no
-    longer exists to spy on -- which is the point.
-    """
+    """The registry table no longer exists, and the listing never needed it."""
     from django.db import connection
 
     assert "ngiab_modelrun" not in connection.introspection.table_names()

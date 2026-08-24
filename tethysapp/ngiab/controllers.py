@@ -58,27 +58,13 @@ UPLOAD_URL_TTL_SECONDS = 6 * 60 * 60
 
 
 def signed_in(request):
-    """Whether this request carries an authenticated user.
-
-    One question asked four ways before this -- twice in decorators, once in the permission
-    predicate, once for the template flag -- each spelling out the same getattr-and-truthiness
-    dance.
-    """
+    """Whether this request carries an authenticated user."""
     user = getattr(request, "user", None)
     return bool(user and user.is_authenticated)
 
 
 def _may(request, permission):
-    """Whether this request's user holds one app permission.
-
-    Superusers short-circuit rather than relying on ``has_permission``. Django grants a
-    superuser every permission anyway, but only once Tethys has resolved the request to an
-    installed app -- and that resolution reads the URL. Answering from the user object keeps
-    an administrator working regardless.
-
-    Fails closed. The actions behind these permissions destroy data or consume shared
-    storage, so a lookup that breaks should stop them rather than wave them through.
-    """
+    """Whether this request's user holds one app permission, failing closed on error."""
     if not signed_in(request):
         return False
     if getattr(request.user, "is_superuser", False):
@@ -101,11 +87,7 @@ def may_manage_runs(request):
 
 
 def upload_permission_required(view):
-    """Refuse an upload from anyone without the upload permission.
-
-    Separate from delete so the two can be granted apart: adding a run is additive, removing
-    one is not, and the destructive grant should stay the scarcer of the two.
-    """
+    """Refuse an upload from anyone without the upload permission."""
 
     @functools.wraps(view)
     def wrapped(request, *args, **kwargs):
@@ -121,26 +103,7 @@ def upload_permission_required(view):
 
 
 def write_login_required(view):
-    """Refuse a mutating request from an anonymous caller.
-
-    Django's own authentication, deliberately, not Tethys's. ``@controller(login_required=True)``
-    is inert here: ``tethys_apps/decorators.py`` checks ``ENABLE_OPEN_PORTAL`` at call time and
-    passes straight through when it is set, which it is. Verified both ways -- Tethys's decorator
-    answers 200 for an anonymous request under an open portal, Django's answers 302.
-
-    401 rather than 403, and rather than Django's redirect. The caller is not forbidden, it is
-    unauthenticated, and ``api/client.js`` already turns a 401 into a redirect to the login page
-    with ``?next=``, which is the behaviour wanted. A 302 would be worse than useless here: fetch
-    follows redirects, so the browser would receive the login page's HTML with a 200 and the
-    client would report unreadable JSON.
-
-    Reads stay open. This wraps only the endpoints that change something.
-
-    Two refusals, not one, because the client acts on them differently. An anonymous caller
-    gets 401 and ``api/client.js`` sends them to sign in. A signed-in caller without the
-    permission gets 403, which the same client renders as a message and does *not* redirect
-    -- sending them to a login page they are already past would be a loop.
-    """
+    """Refuse a mutating request from an anonymous caller (401) or unauthorized one (403)."""
 
     @functools.wraps(view)
     def wrapped(request, *args, **kwargs):
@@ -187,17 +150,7 @@ pyproj.network.set_network_enabled(False)
 
 
 def json_errors(view):
-    """Answer for a run that is not registered, rather than letting a path build from None.
-
-    A shared link outlives the run it names, and every data endpoint would otherwise raise
-    inside os.path.join and return a 500 the client can only describe as 'try again'.
-
-    Storage being unreachable answers 503 for the same reason it is now raised rather than
-    swallowed: the honest answer to "the bucket refused us" is to say so and invite a retry,
-    where the old empty result said "this run has no data" and the alternative -- letting it
-    out as a 500 -- says "this is broken, do not try again". 503 is in the client's retryable
-    set, so a momentary failure recovers instead of becoming a dead-looking map.
-    """
+    """Answer 404 for an unregistered run and 503 for unreachable storage, instead of a 500."""
 
     @functools.wraps(view)
     def wrapped(request, *args, **kwargs):
@@ -225,19 +178,7 @@ def json_errors(view):
 @controller
 @ensure_csrf_cookie
 def home(request):
-    """Render the map page.
-
-    index.html loads the build-less vanilla frontend from public/frontend/ and injects the
-    runtime config into window.__NGIAB__, which replaces the React build's compile-time
-    TETHYS_APP_ROOT_URL substitution.
-
-    ensure_csrf_cookie because the page renders no Django form: without it the token is
-    never handed out, document.cookie has no csrftoken, and every POST is rejected.
-
-    The two permission flags decide whether the page renders a delete control at all. They
-    are a courtesy, not a control: removeModelRun re-checks on every call, because anything
-    decided in a template can be edited in a console.
-    """
+    """Render the map page with the runtime config and permission flags it needs."""
     context = {
         "app_root_url": reverse(f"{App.package}:{App.index}"),
         "signed_in": signed_in(request),
@@ -260,20 +201,7 @@ def getModelRuns(request):
 @require_POST
 @write_login_required
 def removeModelRun(request):
-    """Delete a run and everything under it. Irreversible.
-
-    The run picker is derived from the storage root now, so removal has to delete: a removal
-    that only forgot would put the run back on the next listing. That resurrection is not
-    hypothetical -- under the old JSON registry, deleting the sole run brought it back on the
-    next request, which made unregistering look broken.
-
-    So this reverses a deliberate earlier decision that the app should contain no delete at
-    all. Two things carry the weight instead: it is unreachable without signing in, and the
-    interface names what is about to be destroyed before calling it.
-
-    Takes a run name, never a path. An unknown name is a 404 rather than a 400, because the
-    caller is naming something that is not there.
-    """
+    """Delete a run and everything under it. Irreversible."""
     name = (request.POST.get("model_run_id") or "").strip()
     if not name:
         return JsonResponse({"error": "model_run_id is required."}, status=400)
@@ -295,16 +223,7 @@ def removeModelRun(request):
 @require_POST
 @upload_permission_required
 def createUpload(request):
-    """Reserve a job and say how the archive should be sent.
-
-    Hosted, the answer is a presigned PUT straight into the bucket: the archive is the
-    largest thing this app handles, and routing gigabytes through one uvicorn worker would
-    stall the portal for every other user while it copied. Locally there is no bucket, so
-    the client posts the file here instead.
-
-    The name is validated now rather than after the transfer, because being told the name is
-    taken is worth much less once the user has already waited out a 6 GB upload.
-    """
+    """Reserve a job and say how the archive should be sent, after validating the name."""
     name = (request.POST.get("name") or "").strip()
     if not name:
         return JsonResponse({"error": "A name for the run is required."}, status=400)
@@ -339,14 +258,7 @@ def createUpload(request):
 
 
 def _presigned_put(key):
-    """A URL the browser can PUT the archive to, valid for long enough to send it.
-
-    NGIAB_S3_PUBLIC_ENDPOINT exists because the endpoint the server uses is not always the
-    one a browser can resolve -- a container talking to ``minio:9000`` presigns a host that
-    means nothing outside the container network, and the same split shows up wherever the
-    bucket has an internal service address. Signing is host-sensitive, so the substitution
-    happens before the signature rather than after.
-    """
+    """A URL the browser can PUT the archive to, valid for long enough to send it."""
     backend = run_store.storage()
     bucket = getattr(backend, "bucket_name", None)
     if not bucket:
@@ -379,11 +291,7 @@ def _presigned_put(key):
 @require_POST
 @upload_permission_required
 def startUpload(request):
-    """Begin preparing an archive that is already in storage.
-
-    Returns as soon as the job is launched. Extraction and conversion happen in another
-    process -- see the ingest_archive command for why a thread would not do.
-    """
+    """Begin preparing an archive that is already in storage."""
     job_id = (request.POST.get("job") or "").strip()
     name = (request.POST.get("name") or "").strip()
     if not job_id or not name:
@@ -400,11 +308,7 @@ def startUpload(request):
 @require_POST
 @upload_permission_required
 def uploadRun(request):
-    """Take the archive as a plain upload, for deployments with no bucket.
-
-    Written to a temporary file rather than held in memory: Django spills large uploads to
-    disk already, and the job needs a path it can hand to another process anyway.
-    """
+    """Take the archive as a plain upload, for deployments with no bucket."""
     job_id = (request.POST.get("job") or "").strip()
     name = (request.POST.get("name") or "").strip()
     upload = request.FILES.get("archive")
@@ -428,12 +332,7 @@ def uploadRun(request):
 
 @controller
 def uploadStatus(request):
-    """Where a job has got to. Polled until it reports a terminal state.
-
-    A storage failure answers 503 with ``terminal: false`` rather than 500. Letting it out
-    as a server error made the client report a job that was very likely still running as one
-    that had failed, because any error ends its poll loop.
-    """
+    """Where a job has got to. Polled until it reports a terminal state."""
     job_id = (request.GET.get("job") or "").strip()
     if not _is_job_id(job_id):
         return JsonResponse({"error": "That job id is not valid."}, status=400)
@@ -455,10 +354,7 @@ def uploadStatus(request):
 
 
 def _is_job_id(value):
-    """Job ids are hex uuids we minted; anything else is not one.
-
-    Checked because the id reaches a storage key and a subprocess argument.
-    """
+    """Job ids are hex uuids we minted; anything else is not one."""
     return bool(value) and len(value) == 32 and all(c in "0123456789abcdef" for c in value)
 
 
@@ -473,25 +369,13 @@ class IngestBusy(RuntimeError):
 
 
 def _reap():
-    """Drop finished children and return how many are still running.
-
-    Popen objects that are never waited on leave zombies until the worker exits. Nothing
-    here needs the exit status -- the job's own status object carries the outcome -- but
-    something has to call poll() or the process table fills with one entry per upload.
-    """
+    """Drop finished children and return how many are still running."""
     with _running_lock:
         return _reap_locked()
 
 
 def _reap_locked():
-    """The reaping itself, for callers that already hold the lock.
-
-    ``_launch`` is one: its count and its append have to be one step, so it cannot reap
-    through ``_reap`` and then take the lock again.
-
-    Mutates in place rather than rebinding, so a concurrent append cannot be overwritten by
-    a list this call built from an earlier read.
-    """
+    """The reaping itself, for callers that already hold the lock."""
     for child in list(_running):
         child.poll()
     _running[:] = [child for child in _running if child.returncode is None]
@@ -499,17 +383,7 @@ def _reap_locked():
 
 
 def _launch(arguments):
-    """Run ingest_archive in its own process.
-
-    django-admin rather than a located manage.py: the settings module is the same one this
-    process is running under, and resolving manage.py costs a subprocess of its own. The
-    child is deliberately not waited on -- it outlives this request by design, and its exit
-    status reaches the client through the job status rather than through the return code.
-
-    Raises IngestBusy rather than queueing. A queue would need to survive a restart to be
-    worth anything, and the honest answer to "the machine is already converting two runs" is
-    to say so now rather than accept work that will sit invisibly.
-    """
+    """Run ingest_archive in its own detached process, raising IngestBusy over queueing."""
     executable = os.path.join(os.path.dirname(sys.executable), "django-admin")
     command = [executable, "ingest_archive", *arguments]
     environment = dict(
@@ -537,19 +411,7 @@ def _launch(arguments):
 
 
 def _start_or_report(job_id, name, arguments, local_archive=None):
-    """Launch an ingest, turning a failure to launch into a job the client can see.
-
-    Without this a Popen that never starts -- a missing django-admin, a fork that fails
-    under memory pressure, too many already running -- raised out of the view after the
-    status was already written PENDING and, on the presigned path, after the archive was
-    already in the bucket. The client polled a job that would never move and the staged
-    archive was never discarded.
-
-    ``local_archive`` is the temp file uploadRun wrote before calling here. The ingest child
-    removes it once it starts; when the launch is what failed, the child never runs and
-    nothing else would. IngestBusy is routine rather than exceptional, so without this every
-    refusal left a whole archive on disk.
-    """
+    """Launch an ingest, turning a failure to launch into a job the client can see."""
     def abandon(message, status):
         ingest.write_status(job_id, state=ingest.FAILED, stage="failed",
                             message=message, run=name)
@@ -662,13 +524,7 @@ def getCatchmentValueMatrix(request):
 @controller
 @json_errors
 def getGeoSpatialData(request):
-    """The catchment ids in this run, and the extent to frame the map on.
-
-    Nothing else: the map draws its geometry from the hydrofabric pmtiles, not from this
-    response. It used to read the whole nexus layer into a GeoDataFrame, crosswalk every
-    feature against the TEEHR warehouse twice, and serialise the result as GeoJSON -- all of
-    which the frontend threw away.
-    """
+    """The catchment ids in this run, and the extent to frame the map on."""
     model_run_id = request.GET.get("model_run_id")
     bounds = run_bounds_4326(model_run_id)
     if bounds is None:
@@ -803,12 +659,7 @@ def _teehr_variables_for(model_run_id):
 @controller
 @json_errors
 def getTeehrTimeSeries(request):
-    """Observed and simulated series for one gauge, plus its metrics.
-
-    Takes model_run_id (the registered run), teehr_id (a USGS gauge such as
-    "usgs-02464000") and teehr_variable, which is "<configuration>-<variable>", for example
-    "ngen_ngiab-streamflow_hourly_inst".
-    """
+    """Observed and simulated series for one gauge, plus its metrics."""
     teehr_id = request.GET.get("teehr_id")
     model_run_id = request.GET.get("model_run_id")
 
@@ -919,11 +770,7 @@ def _empty_locations_response(status_message, status_severity):
 @controller
 @json_errors
 def getTeehrLocations(request):
-    """Return the nexus/USGS pairs that actually have TEEHR results for this run.
-
-    Lets the map colour geometry by TEEHR availability, filtered to this run's
-    configuration and to gauges that have something to compare against.
-    """
+    """Return the nexus/USGS pairs that actually have TEEHR results for this run."""
     model_run_id = request.GET.get("model_run_id")
 
     open_reader, config_name = teehr_source(model_run_id)

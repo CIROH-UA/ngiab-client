@@ -1,19 +1,5 @@
 """A refusal from storage must not read as a run with no data.
-
-This is the failure this project keeps rediscovering, written up in its own
-docs/solutions/best-practices/storage-backed-run-registry-2026-08-22.md as "a guard that is
-always false is worse than a missing one". The sidecar readers swallowed every exception into
-an empty dict and then cached it under the version token, so a 403, an expired credential or a
-dropped connection said "this run has no catchments" and kept saying it until the run was
-re-ingested or the worker restarted.
-
-An empty sidecar is a legitimate state, which is exactly what makes it the wrong thing to say
-when the truth is that the bucket refused.
-
-The classifier is told apart structurally where it can be: DuckDB's HTTPException carries the
-store's own status_code. These tests pin both directions -- absent stays absent, everything
-else is raised -- and the endpoint's answer, which is what a user actually sees.
-"""
+Absent stays absent; every other failure is raised rather than cached as empty."""
 
 import json
 
@@ -142,8 +128,7 @@ def test_recovery_needs_no_restart(monkeypatch):
 
 
 def test_an_endpoint_reports_unreachable_storage_as_retryable(ingest, monkeypatch):
-    """503, not 500 and not an empty map. 503 is in the client's retryable set, so a
-    momentary failure recovers instead of looking like a run with no data."""
+    """An endpoint reports unreachable storage as a retryable 503, not a 500 or an empty map."""
     run_id = ingest("alpha")
 
     def refuse(*args, **kwargs):

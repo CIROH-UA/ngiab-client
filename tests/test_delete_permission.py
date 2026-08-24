@@ -1,13 +1,5 @@
-"""Deleting a run takes a permission, not just a session.
-
-Signing in was the entire gate before this. That was proportionate while a deployment was one
-person's laptop and the storage root was their own directory. On a portal shared by an
-institution, and a bucket shared by everyone on it, "signed in" is not a meaningful
-restriction on an irreversible action: one user's misclick is another user's lost output.
-
-The permission is declared in App.permissions, so a portal administrator grants it through the
-same admin interface they already use. Superusers hold it implicitly.
-"""
+"""Deleting a run requires a granted permission, not just a signed-in session.
+The permission is declared in App.permissions and granted through the portal admin."""
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -127,12 +119,7 @@ def test_an_anonymous_visitor_is_marked_signed_out(refused, monkeypatch):
 
 @pytest.fixture
 def installed_app(db):
-    """The TethysApp row a real portal has, which is what has_permission resolves through.
-
-    Without it get_active_app returns None and every check denies. That is the correct
-    failure, but a gate that only ever says no is indistinguishable from a broken one, so
-    this exercises the real Tethys path rather than a stub.
-    """
+    """The TethysApp row a real portal has, which is what has_permission resolves through."""
     from tethys_apps.models import TethysApp
 
     return TethysApp.objects.create(
@@ -141,14 +128,7 @@ def installed_app(db):
 
 
 def _grant(user, app):
-    """Grant the app permission the way the Tethys admin does.
-
-    Object-level, through guardian, and not ``user_permissions.add``. Tethys checks
-    ``user.has_perm(perm, app)`` with the app as the object, and Django's ModelBackend
-    refuses any check that carries one -- so a model-level grant reads as no grant at all.
-    ``guardian.backends.ObjectPermissionBackend`` is the second backend in the portal's
-    settings and is what actually answers.
-    """
+    """Grant the app permission the way the Tethys admin does."""
     from django.contrib.auth.models import Permission
     from django.contrib.contenttypes.models import ContentType
     from guardian.shortcuts import assign_perm

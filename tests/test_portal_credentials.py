@@ -1,18 +1,5 @@
 """Run storage borrows the portal's media bucket, and DuckDB borrows its credentials.
-
-Two things reach the bucket by different routes: the Django storage interface reads the
-manifest and its sidecars, DuckDB reads the bulk. Only the first is configured by Django.
-
-Measured before writing any of this: with AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY and
-AWS_REGION all exported, ``SELECT * FROM duckdb_secrets()`` returns nothing -- DuckDB 1.5 does
-not consult the AWS environment. Every parquet read then fails, and the message names the
-wrong cause: with no region resolved it reports ``NoSuchBucket`` against the real AWS
-endpoint, which reads as "your bucket is missing" rather than "I have no credentials".
-
-So the secret is built from the same storage object django-storages resolved. One source for
-both halves, because the failure when they disagree is a 403 that the run listing reports as
-an empty picker.
-"""
+Both must come from the same storage object, or a mismatch reads as an empty picker."""
 
 import pytest
 from django.test import override_settings

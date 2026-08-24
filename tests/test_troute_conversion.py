@@ -1,18 +1,5 @@
 """T-route served from parquet, through one pinned shape instead of two.
-
-Read docs/plans/2026-08-22-001-feat-storage-backed-model-runs-plan.md, Unit 11.
-
-The bug this closes was latent rather than hypothetical. ``getTrouteTimeSeries`` branched on
-``isinstance(df.index, pd.MultiIndex)``: a NetCDF run took the MultiIndex slice, a csv run the
-``featureID`` filter. Parquet has no MultiIndex and its column is ``feature_id``, so a
-converted run matched **neither** branch, fell into the except, and returned an empty chart
-with no error anywhere -- the failure would have looked like a run with no data.
-
-So the shape is normalised in the reader rather than branched on at the endpoint, which makes
-conversion an optimisation instead of a change of contract. These tests assert the endpoint's
-own response is identical across all three sources, because that is the thing users see;
-frame internals are not a contract anybody depends on.
-"""
+The endpoint's response must be identical across NetCDF, csv, and parquet sources."""
 
 import json
 import os
@@ -95,11 +82,7 @@ def test_the_series_has_data_after_conversion(converted):
 
 
 def test_variable_labels_survive_conversion(converted):
-    """Parquet has no netCDF attributes and DuckDB does not expose its key-value metadata.
-
-    get_troute_vars builds every picker label from long_name and units, so they are read out
-    of the source NetCDF at ingest and stored in the manifest.
-    """
+    """Variable labels built from NetCDF long_name and units survive conversion to parquet."""
     labels = {v["value"]: v["label"] for v in _series(converted())["troute_variables"]}
     assert labels["flow"] == "streamflow (m³/s)"
     assert labels["nudge"] == "streamflow nudge value (m³/s)"
@@ -119,10 +102,7 @@ def test_the_nudge_caveat_survives_conversion(converted):
 
 
 def test_the_frame_is_read_once_per_run_not_once_per_request(converted, mocker):
-    """A chart load is two requests -- the variable list and the series -- and each used to
-    read the whole file. Converting makes that read cheaper; only caching stops it happening
-    twice.
-    """
+    """A converted t-route frame is read once per run and cached, not once per request."""
     run_id = converted()
     ngiab_utils.get_troute_df(run_id)
 

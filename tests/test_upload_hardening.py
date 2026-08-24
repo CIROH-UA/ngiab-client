@@ -1,11 +1,4 @@
-"""The defects a code review found in the upload path, each pinned by the attack that proved it.
-
-Uploading made two kinds of input attacker-controlled for the first time: the bytes of an
-archive, and the *names* inside it -- CSV headers and realization.json's output_root. Both
-reached SQL and filesystem joins that had been safe only because an operator placed the files.
-
-Each test here reproduces a verified exploit or defect rather than describing one.
-"""
+"""The defects a code review found in the upload path, each pinned by the attack that proved it."""
 
 import csv
 import io
@@ -34,11 +27,7 @@ def _run_with_header(tmp_path, columns, name="attack"):
 
 
 def test_a_csv_header_cannot_execute_sql(tmp_path):
-    """Verified exploit: this header ran (SELECT 31337) AS pwned on the shared connection.
-
-    That connection holds the run bucket's credentials when hosted, so a caller with only
-    upload_model_runs could read them out into their own published run.
-    """
+    """A csv header crafted as SQL must not execute on the shared, credential-holding connection."""
     evil = 'Q_OUT" AS orig, (SELECT 31337) AS pwned, "Time'
     run = _run_with_header(tmp_path, ["Time Step", "Time", evil])
 
@@ -143,11 +132,7 @@ def _tar_with_special(path, kind):
 
 @pytest.mark.parametrize("kind", ["chardev", "blockdev", "fifo"])
 def test_a_device_or_fifo_member_is_refused_as_archive_rejected(tmp_path, kind):
-    """It used to pass inspect() and then escape extract() as tarfile.SpecialFileError.
-
-    Not merely a missed refusal: an exception outside ArchiveRejected is one the caller has
-    no contract for, so it surfaced as a 500 rather than a message the user could act on.
-    """
+    """A device or fifo archive member is refused as ArchiveRejected, not an unhandled exception."""
     path = _tar_with_special(tmp_path / "a.tar", kind)
 
     with pytest.raises(archive.ArchiveRejected, match="link or device node"):
@@ -180,8 +165,7 @@ def hosted(monkeypatch):
 
 
 def test_a_hosted_start_with_no_superuser_is_refused(hosted, db):
-    """The gate only fired on a password supplied *and wrong*; none supplied sailed through,
-    leaving the image's baked admin/pass account live behind a public URL."""
+    """A hosted start with no superuser password supplied is refused, not let through."""
     with pytest.raises(CommandError, match="no superuser configured"):
         call_command("ensure_superuser")
 
@@ -210,11 +194,7 @@ def test_a_local_start_with_no_superuser_is_still_fine(db, monkeypatch):
 
 
 def test_the_sidecar_cache_keys_on_the_token_it_is_given():
-    """_version_of reads through a filesystem open(), which an s3:// path can never satisfy.
-
-    Every hosted run therefore keyed on "" and the cache never invalidated -- the same
-    stale-forever failure the token was introduced to replace os.stat for.
-    """
+    """The sidecar cache keys on the version token it is given, not on a filesystem open()."""
     calls = []
     real = manifest._catchments_cached
 

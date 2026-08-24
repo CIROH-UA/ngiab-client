@@ -1,21 +1,5 @@
-"""Fixtures for the endpoint-parity suite.
-
-The mini run is *generated*, not committed. A real NGIAB run is gigabytes, so the only
-committable alternative is a hand-trimmed binary GeoPackage and a scattering of csv, which
-nobody can review in a diff and which goes stale silently. A generator is reviewable code,
-and it fails loudly: if it cannot build a run, every test that needs one errors rather than
-skipping. That distinction is the whole point of this file -- the existing suite in
-test_teehr_warehouse.py skips 19 of its 28 tests when its fixture warehouse is absent, which
-is indistinguishable from passing.
-
-Nothing here reads the app. The fixtures write what ngen, t-route and the hydrofabric write,
-so a test can assert that the readers interpret real-shaped input correctly rather than
-asserting that the readers agree with themselves.
-
-Run these inside the image (`docker build --target test`), not against a local conda
-environment: the base image installs tethys-platform from git main, so a locally built
-environment is a different Tethys than the one that ships.
-"""
+"""Fixtures for the endpoint-parity suite: a generated NGIAB run, not a committed fixture.
+Run inside the image (docker build --target test), not a local conda environment."""
 
 import json
 import os
@@ -37,12 +21,7 @@ def _timestamps(count, start="2017-01-01 00:00:00", freq="h"):
 
 
 def _catchment_frame(index, times, variables):
-    """One catchment's output, with values that differ per catchment and per variable.
-
-    Deterministic rather than random: a parity baseline that changes between runs is not a
-    baseline. The arithmetic only has to produce a spread wide enough that quantile class
-    breaks do not collapse into a single class.
-    """
+    """One catchment's output, with values that differ per catchment and per variable."""
     frame = pd.DataFrame(
         {
             STEP_COLUMN: np.arange(len(times), dtype="int64"),
@@ -56,14 +35,7 @@ def _catchment_frame(index, times, variables):
 
 
 def _csv_to_parquet(src, dst):
-    """Convert with DuckDB, the way the shipped converter does.
-
-    Not pandas.to_parquet: pyarrow is deliberately absent from the image, which the converter
-    at tethysapp/ngiab/management/commands/convert_outputs.py records as the reason it uses
-    DuckDB. Producing the fixture the same way means the parquet under test has the same
-    types and compression as a real converted run, rather than whatever a different writer
-    would have chosen.
-    """
+    """Convert with DuckDB, the way the shipped converter does."""
     import duckdb
 
     escaped_src = src.replace("'", "''")
@@ -75,13 +47,7 @@ def _csv_to_parquet(src, dst):
 
 
 def _write_gpkg(path, catchment_ids):
-    """A hydrofabric-shaped GeoPackage: divides, nexus, and the flowpaths crosswalk.
-
-    Three layers because three different readers want three different things -- extent from
-    divides or nexus (pyogrio.read_info), and the flowpath-to-divide pairing from flowpaths
-    read as plain SQLite. Written with geopandas so the file is a genuine GeoPackage rather
-    than a SQLite database that merely resembles one.
-    """
+    """A hydrofabric-shaped GeoPackage: divides, nexus, and the flowpaths crosswalk."""
     import geopandas as gpd
     from shapely.geometry import Point, Polygon
 
@@ -111,13 +77,7 @@ def _write_gpkg(path, catchment_ids):
 
 
 def _write_troute_netcdf(path, feature_ids, times):
-    """T-route's NetCDF shape: a (feature_id, time) frame carrying CF metadata.
-
-    The metadata is not decoration. get_troute_vars builds its picker labels from long_name
-    and units, and to_dataframe() on this produces the MultiIndex that getTrouteTimeSeries
-    slices with df.xs(..., level="feature_id"). Both are contracts a parquet conversion has
-    to answer for.
-    """
+    """T-route's NetCDF shape: a (feature_id, time) frame carrying CF metadata."""
     import xarray as xr
 
     shape = (len(feature_ids), len(times))
@@ -137,13 +97,7 @@ def _write_troute_netcdf(path, feature_ids, times):
 
 
 def _write_troute_csv(path, feature_ids, times):
-    """T-route's flat csv shape, which the reader reaches by a different branch.
-
-    get_troute_df prefers csv over NetCDF, and getTrouteTimeSeries falls back to a featureID
-    column when the frame has no MultiIndex. Capitalisation differs from the NetCDF path's
-    feature_id on purpose: that mismatch is real, and a converter that unifies the two has to
-    decide which one wins.
-    """
+    """T-route's flat csv shape, which the reader reaches by a different branch."""
     rows = []
     for index, feature_id in enumerate(feature_ids):
         for step, moment in enumerate(times):
@@ -169,16 +123,7 @@ def build_mini_run(
     troute="nc",
     realization=True,
 ):
-    """Write one NGIAB-shaped run directory and return its path.
-
-    ``narrow_last`` gives the final catchment a shorter variable list, reproducing the
-    heterogeneous-formulation case that ``_output_glob``'s ``union_by_name=true`` exists to
-    handle. Consolidating per-catchment files threatens exactly this, so the parity baseline
-    has to contain one.
-
-    ``output_format`` writes csv, parquet, or ``"both"``. The reader prefers parquet when
-    both are present, and the two must produce identical responses.
-    """
+    """Write one NGIAB-shaped run directory and return its path."""
     root = str(root)
     config_dir = os.path.join(root, "config")
     ngen_dir = os.path.join(root, "outputs", "ngen")
@@ -238,16 +183,7 @@ def mini_run(mini_run_factory):
 
 @pytest.fixture
 def ingest(tmp_path, mini_run_factory, monkeypatch):
-    """Put generated runs under a storage root and distill them, as ingest would.
-
-    Returns a factory taking the run's name and whatever ``build_mini_run`` accepts. The name
-    is the run id, because a directory under the storage root *is* a registered run.
-
-    Tests that previously stubbed ``_get_list_model_runs`` with a hand-written dict use this
-    instead. The assertions are unchanged; only the plumbing is, and it is more faithful --
-    the stub could not carry a manifest, and the manifest is where every fact the read path
-    needs now lives.
-    """
+    """Put generated runs under a storage root and distill them, as ingest would."""
     from tethysapp.ngiab import duckdb_conn, manifest, run_store
     from tethysapp.ngiab import utils as ngiab_utils
 

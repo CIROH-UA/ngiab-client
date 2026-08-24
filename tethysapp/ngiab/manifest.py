@@ -1,24 +1,6 @@
 """What ingest distills from a run so the read path never probes the filesystem.
 
-Every fact here replaces a probe that works on a local disk and does not work, or does not
-exist, on an object store: ``os.stat`` for a cache key, ``open()`` on realization.json,
-``os.walk`` for the GeoPackage, ``os.listdir`` for the catchment list, ``os.path.isdir`` for
-the TEEHR evaluation. The manifest is not a new source of truth -- it is the same truth,
-computed once while the run is unpacked and reachable, and stored beside the data it
-describes.
-
-**Hot document, cold sidecars.** ``manifest.json`` holds only what the run picker needs, and
-the picker is reached on essentially every request through ``_get_list_model_runs()``, which
-reads *every* registered run's manifest. The catchment list and the flowpath crosswalk both
-scale with run size -- tens of thousands of entries is ordinary -- so embedding them would
-put megabytes of JSON parsing on that path. They go in sidecars, loaded only by the endpoints
-that need them, and loaded whole: ``describe_troute_feature`` looks up an arbitrary feature
-id, so a per-feature read over object storage would simply move the per-feature cost from
-SQLite to S3.
-
-**The manifest is per-run, not a registry.** It lives inside the run directory, so a run is
-self-describing and portable, backup is ``cp -r``, and there is no row that can point at a
-prefix that no longer exists.
+Computes and stores a per-run manifest plus sidecars, so the run picker never touches disk.
 """
 
 import functools
@@ -51,30 +33,13 @@ _UUID_CHARS = re.compile(r"[0-9a-f]{32}\Z")
 
 
 def normalize_uuid(value):
-    """Reduce either UUID spelling to the 32-character undashed form Django stores.
-
-    Django writes a UUIDField to SQLite as 32 hex characters with no dashes and builds its
-    lookups the same way. A row inserted by anything else -- a hand-edited database, a raw
-    INSERT, an import script -- can hold the 36-character dashed form instead, read back
-    correctly, appear in the picker, and never match ``filter(id=...)``. That is what
-    ``migrations/0002_normalize_model_run_ids`` had to repair, and resolving a run by
-    manifest must not reimport it.
-
-    Returns the input lowercased and stripped of dashes when it looks like a UUID, and
-    unchanged otherwise -- a directory name is a legitimate run id too.
-    """
+    """Reduce either UUID spelling to the 32-character undashed form Django stores."""
     candidate = str(value or "").strip().lower().replace("-", "")
     return candidate if _UUID_CHARS.match(candidate) else str(value or "").strip()
 
 
 def _read_realization_output_dir(run_path):
-    """The run-relative output directory, from realization.json's ``output_root``.
-
-    A run without the file, or with one that does not declare the key, uses ``outputs/ngen``
-    rather than raising. Such runs exist, and treating them as an error was a 500 on every
-    output endpoint. The result is passed through ``contained_output_dir``, because this
-    value comes out of an uploaded archive.
-    """
+    """The run-relative output directory, from realization.json's ``output_root``."""
     path = os.path.join(run_path, "config", "realization.json")
     try:
         with open(path, "r") as handle:
@@ -92,20 +57,7 @@ def _read_realization_output_dir(run_path):
 
 
 def contained_output_dir(candidate):
-    """``candidate`` if it stays inside the run, the default otherwise.
-
-    ``realization.json`` arrives inside the archive, so ``output_root`` is user input. The
-    split above neutralises anything containing the literal ``outputs`` -- but a value
-    without it passed through raw, and ``output_root: "../../../../../../etc"`` became an
-    ``output_dir`` of ``outputs/../../../../../../etc``. That is written into the manifest and
-    joined onto the run's location by the read path, which then served ``/etc`` to any caller.
-    Reads are open, so that was an anonymous arbitrary-directory read.
-
-    Normalising and refusing to leave the run is the same containment rule ``archive.py`` and
-    ``run_store._contained_directory`` already apply; this was the one path that skipped it.
-    Falls back rather than raising, because a run with a strange ``output_root`` should read
-    from its own outputs, not fail to load at all.
-    """
+    """``candidate`` if it stays inside the run, the default otherwise."""
     if not candidate:
         return _DEFAULT_OUTPUT_SUBDIR
     normalised = posixpath.normpath(str(candidate).replace(os.sep, "/"))
@@ -126,12 +78,7 @@ def _find_gpkg(run_path):
 
 
 def _bounds(gpkg_path, layers=("divides", "nexus")):
-    """[west, south, east, north] in EPSG:4326, from the first readable layer header.
-
-    Same approach as utils.gpkg_layer_bounds_4326: read_info reads the header rather than the
-    features, and transform_bounds densifies the edges so a box in a projected CRS does not
-    shrink when the projection curves it.
-    """
+    """[west, south, east, north] in EPSG:4326, from the first readable layer header."""
     import pyogrio
     from pyproj import Transformer
 
@@ -158,14 +105,7 @@ def _bounds(gpkg_path, layers=("divides", "nexus")):
 
 
 def _crosswalk_rows(gpkg_path):
-    """(flowpath id, divide id) pairs, read out of the GeoPackage's flowpaths table.
-
-    Read verbatim rather than derived. This hydrofabric numbers flowpaths and divides alike,
-    so wb-2863630 pairs with cat-2863630 -- but describe_troute_feature reads the pairing
-    instead of assuming it, because that is a convention of the fabric and not a guarantee.
-    Deriving one id from the other here would reintroduce the assumption the incumbent code
-    deliberately avoids.
-    """
+    """(flowpath id, divide id) pairs, read out of the GeoPackage's flowpaths table."""
     try:
         with sqlite3.connect(f"file:{gpkg_path}?mode=ro", uri=True) as connection:
             return connection.execute("SELECT id, divide_id FROM flowpaths").fetchall()
@@ -193,13 +133,7 @@ def _catchment_ids(output_dir):
 
 
 def _output_layout(output_dir):
-    """How this run's catchment outputs are arranged, and in what format.
-
-    Three states, because a run on disk today may be in any of them: consolidated parquet
-    (what convert_outputs now writes), per-catchment parquet (what it used to write), or
-    per-catchment csv (what ngen writes). Recorded rather than rediscovered, since a glob is
-    a filesystem call with no object-store equivalent.
-    """
+    """How this run's catchment outputs are arranged, and in what format."""
     try:
         names = os.listdir(output_dir)
     except OSError:
@@ -216,16 +150,7 @@ def _output_layout(output_dir):
 
 
 def _consolidated_catchments(output_dir, groups):
-    """Which consolidated group holds each catchment: ``{"cat-100": 0, ...}``.
-
-    Filenames no longer answer this once a file holds many catchments, so the ids come out of
-    the data. The *group* is recorded alongside because reading one catchment has to read only
-    its own group -- scanning all of them under ``union_by_name`` pads a narrow catchment with
-    NULL columns it never wrote, which is exactly what grouping by schema was for.
-
-    Cheaper than the alternative: probing each group per request would be a query per group on
-    the hot path to avoid a lookup that is already cached.
-    """
+    """Which consolidated group holds each catchment: ``{"cat-100": 0, ...}``."""
     membership = {}
     for index, name in enumerate(groups):
         path = os.path.join(output_dir, name)
@@ -242,13 +167,7 @@ def _consolidated_catchments(output_dir, groups):
 
 
 def _troute(run_path):
-    """The t-route source file and its per-variable CF metadata, or None.
-
-    The metadata is the part that cannot survive a naive conversion: parquet carries no
-    netCDF attributes and ``duckdb.query(...).df()`` does not expose parquet key-value
-    metadata either, while get_troute_vars builds every picker label from long_name and
-    units. Capturing it here is what lets Unit 11 convert at all.
-    """
+    """The t-route source file and its per-variable CF metadata, or None."""
     troute_dir = os.path.join(run_path, _TROUTE_SUBDIR)
     try:
         names = sorted(os.listdir(troute_dir))
@@ -273,13 +192,7 @@ def _troute(run_path):
 
 
 def _troute_meta_from_source(troute_dir, names):
-    """CF metadata for a converted run, read from the NetCDF it was converted from.
-
-    Parquet carries no netCDF attributes and DuckDB does not surface parquet key-value
-    metadata either, while get_troute_vars builds every picker label from long_name and
-    units. The source file is left in place by the converter, so the labels survive
-    conversion by being read from it here, once, at ingest.
-    """
+    """CF metadata for a converted run, read from the NetCDF it was converted from."""
     for name in names:
         if name.endswith(".nc"):
             return _netcdf_variable_meta(os.path.join(troute_dir, name))
@@ -306,22 +219,7 @@ def _netcdf_variable_meta(path):
 
 
 def _teehr(run_path, fallback_configuration_name=""):
-    """Whether this run carries its own TEEHR evaluation, and the producer's config name.
-
-    ``present`` replaces evaluation_dir's ``os.path.isdir``, which is False for every
-    ``s3://`` path regardless of what is actually there -- so without this every TEEHR
-    endpoint on a hosted run reports "no evaluation" while the parquet sits in the bucket.
-
-    The configuration name is read from the producer's manifest under the key
-    ``teehr_configuration_name``. Reading the unprefixed ``configuration_name`` returned
-    empty for every real manifest, which is the bug commit b80395b fixed.
-
-    ``fallback_configuration_name`` is what the registry row held, and it is used only when
-    the run carries no producer manifest to read. That case is not hypothetical: the value
-    was captured at registration from a manifest that may since have been removed, or the run
-    may have been registered by hand -- and without the fallback the backfill would drop it,
-    which is the one TEEHR fact this app cannot re-derive from the run directory.
-    """
+    """Whether this run carries its own TEEHR evaluation, and the producer's config name."""
     joined = os.path.join(run_path, "teehr", "dataset", "joined_timeseries")
     present = os.path.isdir(joined)
 
@@ -340,16 +238,7 @@ def _teehr(run_path, fallback_configuration_name=""):
 
 
 def _version_token(run_path, output_dir, catchments, gpkg_relative):
-    """A content-derived key that changes when the run's outputs do.
-
-    Replaces ``_output_fingerprint``, which is ``os.stat(directory)`` and returns None for an
-    S3 prefix -- leaving the cache key constant, so a re-ingested run would serve stale bins
-    forever.
-
-    Derived from content rather than minted randomly because Unit 7's backfill runs on every
-    container start and must be idempotent: a random token would rewrite every manifest each
-    time and invalidate every cache with it.
-    """
+    """A content-derived key that changes when the run's outputs do."""
     digest = hashlib.sha256()
     for name in sorted(os.listdir(output_dir)) if os.path.isdir(output_dir) else []:
         full = os.path.join(output_dir, name)
@@ -378,13 +267,7 @@ def distill(
     legacy_uuids=(),
     teehr_configuration_name="",
 ):
-    """Read a run directory and return its manifest document.
-
-    Pure with respect to the run: it reads, it does not write. ``write`` puts the result on
-    disk. Splitting them keeps the expensive, failure-prone part testable without a
-    filesystem round trip, and lets the backfill compare a freshly distilled document against
-    one already stored.
-    """
+    """Read a run directory and return its manifest document."""
     run_path = str(run_path).rstrip(os.sep)
     output_relative = _read_realization_output_dir(run_path)
     output_dir = os.path.join(run_path, output_relative)
@@ -419,12 +302,7 @@ def distill(
 
 
 def write(run_path, document):
-    """Write the hot manifest and its sidecars into the run directory.
-
-    The two underscore-prefixed keys carry the bulk out of ``distill`` and are stripped here:
-    they belong in sidecars, not in the document the run picker parses for every run on every
-    request.
-    """
+    """Write the hot manifest and its sidecars into the run directory."""
     run_path = str(run_path).rstrip(os.sep)
     catchments = document.get("_catchments", {})
     crosswalk = document.get("_crosswalk", [])
@@ -442,13 +320,7 @@ def write(run_path, document):
 
 
 def _write_catchments(path, membership):
-    """The catchment-to-group mapping, as parquet.
-
-    Parquet rather than JSON for the same reason the sidecars are read through DuckDB at all:
-    ``read_parquet`` takes an ``s3://`` URI and ``open()`` does not. A JSON sidecar read with
-    open() works perfectly on a laptop and silently returns nothing in a bucket, which is the
-    failure mode this whole plan exists to remove.
-    """
+    """The catchment-to-group mapping, as parquet."""
     import pandas as pd
 
     frame = pd.DataFrame(
@@ -458,11 +330,7 @@ def _write_catchments(path, membership):
 
 
 def _copy_frame_to_parquet(frame, name, path):
-    """Write one small frame through an isolated connection.
-
-    Isolated because register() puts a name in the catalog, and cursors on the shared
-    connection share it.
-    """
+    """Write one small frame through an isolated connection."""
     connection = duckdb_conn.connect_isolated()
     try:
         connection.register(name, frame)
@@ -475,12 +343,7 @@ def _copy_frame_to_parquet(frame, name, path):
 
 
 def _write_crosswalk(path, rows):
-    """Write the crosswalk as parquet, via DuckDB.
-
-    Parquet rather than JSON because this is the field that grows without bound -- one row
-    per flowpath -- and DuckDB rather than pandas because pyarrow is deliberately absent from
-    the image, the same reason convert_outputs.py gives.
-    """
+    """Write the crosswalk as parquet, via DuckDB."""
     import pandas as pd
 
     frame = pd.DataFrame(
@@ -491,12 +354,7 @@ def _write_crosswalk(path, rows):
 
 
 def child(base, *parts):
-    """Join below a run's location, whether that is a path or an ``s3://`` URI.
-
-    posixpath rather than os.path because the separator has to stay ``/`` for a URI, and this
-    only ever runs on Linux where the two agree for filesystem paths anyway. One join for
-    both callers: the sidecars here, and the run-relative locations the read path builds.
-    """
+    """Join below a run's location, whether that is a path or an ``s3://`` URI."""
     return posixpath.join(str(base), *[str(part).strip("/") for part in parts if part])
 
 
@@ -532,18 +390,7 @@ def _catchments_cached(run_path, version_token):
 
 
 def _read_sidecar(path):
-    """One sidecar as a frame, or None when the run simply has not got one.
-
-    Everything that is not "no such object" is raised. It used to be swallowed into an empty
-    result, which is the failure this project keeps rediscovering: a 403, an expired
-    credential or a dropped connection read as "this run has no catchments", and the empty
-    answer was then cached under the version token, so it persisted until the run was
-    re-ingested or the worker restarted. An empty sidecar is a legitimate state, which is
-    exactly why it is the wrong thing to say when the truth is that storage refused.
-
-    A missing sidecar really is ordinary -- a run distilled before the sidecars existed, or
-    one with no GeoPackage and so no crosswalk -- so that case still answers empty.
-    """
+    """One sidecar as a frame, or None when the run simply has not got one."""
     try:
         return duckdb_conn.query(f"SELECT * FROM read_parquet({duckdb_conn.quote(path)})")
     except Exception as exc:  # noqa: BLE001 - re-raised below unless it means "not there"
@@ -555,18 +402,7 @@ def _read_sidecar(path):
 
 
 def catchments(run_path, version_token=None):
-    """The run's catchment ids, from the sidecar.
-
-    Cached on the version token rather than on mtime, because an object-store prefix has no
-    mtime -- that is the whole reason the token exists.
-
-    Callers pass the token they already read off the manifest. Recomputing it here was the
-    bug: ``_version_of`` goes through ``read``, which opens a filesystem path, and an
-    ``s3://`` location can never satisfy that -- so the key was the empty string for every
-    hosted run and the cache was never invalidated. That is precisely the stale-forever
-    failure the token replaced ``os.stat`` to avoid, reintroduced on the backend that needed
-    it most.
-    """
+    """The run's catchment ids, from the sidecar."""
     run_path = str(run_path).rstrip(os.sep)
     return sorted(_catchments_cached(run_path, _token(run_path, version_token)))
 
@@ -578,23 +414,13 @@ def catchment_group(run_path, stem, version_token=None):
 
 
 def _token(run_path, supplied):
-    """The caller's token, or a filesystem read when there is none to supply.
-
-    The fallback keeps a local one-shot script working without a manifest in hand; it is
-    useless against object storage, which is why every request-path caller passes one.
-    """
+    """The caller's token, or a filesystem read when there is none to supply."""
     return supplied if supplied is not None else _version_of(run_path)
 
 
 @functools.lru_cache(maxsize=32)
 def _crosswalk_cached(run_path, version_token):
-    """Read through DuckDB, and without an os.path.exists guard.
-
-    That guard was false for every ``s3://`` path regardless of what the bucket held, so a
-    hosted run would have reported an empty crosswalk and every troute chart would have lost
-    its flowpath pairing -- silently, because an empty crosswalk is a legitimate state. The
-    same reasoning is why _read_sidecar no longer swallows a refusal into that state either.
-    """
+    """Read the crosswalk sidecar through DuckDB, without an os.path.exists guard."""
     frame = _read_sidecar(child(run_path, CROSSWALK_SIDECAR))
     if frame is None:
         return {}
@@ -602,24 +428,13 @@ def _crosswalk_cached(run_path, version_token):
 
 
 def divide_for(run_path, flowpath_id, version_token=None):
-    """The divide a single flowpath maps to, or None.
-
-    What the one caller actually wants. ``crosswalk`` hands back a copy of the whole mapping,
-    which for a 10,000-flowpath run is a dict rebuilt per request to answer one lookup.
-    """
+    """The divide a single flowpath maps to, or None."""
     run_path = str(run_path).rstrip(os.sep)
     return _crosswalk_cached(run_path, _token(run_path, version_token)).get(flowpath_id)
 
 
 def crosswalk(run_path, version_token=None):
-    """The whole flowpath-to-divide mapping, as a dict.
-
-    Loaded whole rather than filtered per feature, and cached, because both halves matter.
-    describe_troute_feature looks up an arbitrary feature id behind an lru_cache of 32, so a
-    per-feature read would move the per-feature cost from SQLite to a parquet scan rather
-    than remove it -- measured at 80 ms for a 10,000-flowpath run, which is a fifth of a
-    second of clicking around the map. Cached whole it is paid once per run per ingest.
-    """
+    """The whole flowpath-to-divide mapping, as a dict."""
     run_path = str(run_path).rstrip(os.sep)
     return dict(_crosswalk_cached(run_path, _token(run_path, version_token)))
 

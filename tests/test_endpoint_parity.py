@@ -1,26 +1,5 @@
 """Reference payloads for every read endpoint, captured before the storage refactor.
-
-Read docs/plans/2026-08-22-001-feat-storage-backed-model-runs-plan.md, Unit 1. This suite is
-the verification substrate for the eleven units that follow: each of them removes a
-filesystem probe, changes an on-disk layout, or rewrites a reader, and each one's stated
-verification is "parity holds".
-
-Two properties matter more than coverage:
-
-1. **It cannot skip.** conftest generates its own run, so an absent fixture is an error, not
-   a silent pass. The existing test_teehr_warehouse.py suite skips 19 of 28 tests without its
-   fixture warehouse, which in CI is indistinguishable from green.
-2. **It separates "must not change" from "changes deliberately".** Units 10 and 11 alter what
-   the readers see on purpose. A blanket byte-identical assertion across every endpoint would
-   be unsatisfiable, and an unsatisfiable assertion gets relaxed during implementation --
-   which is when a silent regression ships. Endpoints are marked below.
-
-Originally these stubbed the registry with hand-written dicts. Unit 9 moved them onto the
-``ingest`` fixture, which puts a real run under a real storage root and distils it, because a
-stub cannot carry a manifest and the manifest is where every fact the read path needs now
-lives. The assertions did not change -- only what stands behind them, and it is more faithful
-than what it replaced.
-"""
+Must not skip, and must separate changes made on purpose from accidental drift."""
 
 import pytest
 
@@ -89,13 +68,7 @@ def test_csv_and_parquet_agree_on_a_series(ingest):
 
 
 def test_narrow_catchment_reports_only_its_own_variables(ingest):
-    """What union_by_name=true protects, and what Unit 10's consolidation threatens.
-
-    The run-wide variable list is the union across catchments, but a single catchment's own
-    series must report only the columns that catchment actually wrote. Consolidating every
-    catchment into one parquet object makes the union the only answer available unless the
-    layout is chosen to prevent it.
-    """
+    """A single catchment's series reports only the columns that catchment actually wrote."""
     run_id = ingest(narrow_last=True)
 
     union = ngiab_utils.get_catchment_variables(run_id)["variables"]
@@ -109,12 +82,7 @@ def test_narrow_catchment_reports_only_its_own_variables(ingest):
 
 
 def test_unknown_catchment_raises_rather_than_returning_empty(ingest):
-    """_find_output_file's FileNotFoundError is what becomes the endpoint's 404.
-
-    Unit 10 replaces file-per-catchment lookup with a filtered scan, which returns an empty
-    result for an id that was never written. Preserving this distinction is the difference
-    between "this run has no output for cat-999" and a blank chart.
-    """
+    """An unknown catchment id raises FileNotFoundError rather than returning an empty result."""
     outputs = ngiab_utils.run_outputs(ingest())
 
     with pytest.raises(FileNotFoundError):
@@ -122,12 +90,7 @@ def test_unknown_catchment_raises_rather_than_returning_empty(ingest):
 
 
 def test_unknown_run_id_raises_unknown_model_run(ingest):
-    """Every path build funnels through _require_run_entry; keep the funnel.
-
-    It used to name _require_model_run_path, which the manifest-backed lookup replaced and
-    left with no production caller -- so the assertion still passed while the funnel it
-    claimed to guard was no longer the one in use.
-    """
+    """Every path build funnels through _require_run_entry, which raises for an unknown run id."""
     ingest()
     with pytest.raises(ngiab_utils.UnknownModelRun):
         ngiab_utils._require_run_entry("22222222-2222-2222-2222-222222222222")
@@ -146,13 +109,7 @@ def test_missing_realization_falls_back_to_outputs_ngen(ingest):
 
 
 def test_both_troute_sources_now_yield_the_same_shape(ingest):
-    """This test replaces the one that recorded the divergence, and closes it.
-
-    Before Unit 11 the NetCDF path yielded a MultiIndex keyed on feature_id and the csv path
-    a flat frame with featureID and current_time, and getTrouteTimeSeries branched on which.
-    That branching is what a converted run fell between, matching neither and returning an
-    empty chart without raising. Both are normalised now.
-    """
+    """NetCDF and csv t-route sources now yield the same normalised shape."""
     nc_frame = ngiab_utils.get_troute_df(ingest("as-nc", troute="nc"))
     csv_frame = ngiab_utils.get_troute_df(ingest("as-csv", troute="csv"))
 

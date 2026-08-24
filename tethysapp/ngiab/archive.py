@@ -1,38 +1,6 @@
 """Unpack an uploaded run archive, refusing everything that is not a run.
 
-An archive is the first thing in this app that a user supplies wholesale. Every other input
-is a name the listing just produced, or a value from a directory an operator placed. So the
-threat model changes here rather than gradually: the bytes decide what paths get written, how
-many, and how large, and all three are attacker-controlled.
-
-Three refusals, each for a different failure:
-
-0. **Members that are not files.** Devices, FIFOs and links have no place in a model run,
-   and each is a way to make extraction do something other than write bytes. tarfile's
-   ``data`` filter refuses them at extract time, but by raising ``SpecialFileError`` -- not
-   ``ArchiveRejected`` -- so the contract this module promises was broken for exactly the
-   inputs it exists to refuse. They are rejected during ``inspect`` instead.
-
-1. **Paths that escape.** ``../../etc/cron.d/x`` and ``/etc/cron.d/x`` both name a
-   destination outside the extraction directory, and a symlink member can redirect a later
-   write after the fact. tarfile's ``data`` filter (PEP 706) covers the tar side and is used
-   rather than reimplemented; zipfile has no equivalent, so the same rules are applied by
-   hand. Every member is checked against the realpath of the destination, which is what
-   catches the symlink case that a string comparison misses.
-
-2. **Archives that expand without bound.** A few hundred kilobytes of zeros expands to
-   gigabytes, and the process that notices is the one that fills the disk the portal runs
-   on. Both the declared total and the running total are capped, because a declared size is
-   a claim and the running total is the fact.
-
-3. **Archives that are not runs.** A run has a realization and an output directory. Checking
-   before extraction means an archive of something else costs a header read rather than a
-   full unpack, and the user gets told what was missing instead of watching a conversion fail
-   on an empty directory.
-
-Nothing here writes into the storage root. Extraction goes to a caller-supplied directory,
-and publishing is a separate step, so a rejected archive cannot leave a partial run where the
-picker would list it.
+Refuses special files, escaping paths, unbounded expansion, and archives that are not runs.
 """
 
 import logging
@@ -52,11 +20,7 @@ REQUIRED_DIRS = ("outputs",)
 
 
 class ArchiveRejected(ValueError):
-    """The archive is malformed, unsafe, or not a model run.
-
-    Its own class so a caller can answer 400 with the reason rather than 500 with a
-    traceback: every case this covers is something the user can act on.
-    """
+    """The archive is malformed, unsafe, or not a model run."""
 
 
 def _members_tar(handle):
@@ -71,11 +35,7 @@ def _members_zip(handle):
 
 
 def open_archive(path):
-    """Open ``path`` as tar or zip, whichever it is, or refuse it.
-
-    Sniffed rather than taken from the filename, because the filename is supplied by the
-    same person as the bytes.
-    """
+    """Open ``path`` as tar or zip, whichever it is, or refuse it."""
     if tarfile.is_tarfile(path):
         return tarfile.open(path, "r:*"), _members_tar, "tar"
     if zipfile.is_zipfile(path):
@@ -87,11 +47,7 @@ def open_archive(path):
 
 
 def _normalise(name):
-    """The member's path relative to the archive root, or None if it escapes.
-
-    Rejects absolute paths, drive letters, and any traversal. Returns a posix-style relative
-    path with no leading separator, which is what the containment check below compares.
-    """
+    """The member's path relative to the archive root, or None if it escapes."""
     if not name or name in (".", "/"):
         return None
     cleaned = name.replace("\\", "/")
@@ -108,12 +64,7 @@ def _normalise(name):
 
 
 def inspect(path, *, max_bytes=DEFAULT_MAX_BYTES, max_members=DEFAULT_MAX_MEMBERS):
-    """Read the archive's index and return (root, entries) without extracting anything.
-
-    ``root`` is the single top-level directory the run lives under, which is what an archive
-    made with ``tar -czf run.tar.gz myrun`` produces. An archive holding the run's contents
-    at the top level is accepted too, with a root of "".
-    """
+    """Read the archive's index and return (root, entries) without extracting anything."""
     handle, members, kind = open_archive(path)
     entries = []
     declared = 0
@@ -179,12 +130,7 @@ def _require_run_shape(entries, root):
 
 def extract(path, destination, *, max_bytes=DEFAULT_MAX_BYTES,
             max_members=DEFAULT_MAX_MEMBERS):
-    """Unpack the run into ``destination`` and return the directory holding it.
-
-    ``inspect`` runs first, so an archive that would be refused costs a header read rather
-    than a partial unpack. The running byte total is enforced during extraction as well,
-    because a member's declared size is a claim made by the archive.
-    """
+    """Unpack the run into ``destination`` and return the directory holding it."""
     root, _ = inspect(path, max_bytes=max_bytes, max_members=max_members)
     os.makedirs(destination, exist_ok=True)
     real_destination = os.path.realpath(destination)

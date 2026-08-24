@@ -1,27 +1,6 @@
 """Write a manifest for every run the database still registers.
 
-    tethys manage backfill_manifests
-
-Runs from the entrypoint on every start, before ``tethys db migrate``, because migration
-0003 drops the table this reads. Idempotent by construction: the version token is derived
-from a run's own outputs rather than minted, so an unchanged run rewrites byte-identical
-files and a second start does nothing.
-
-**Reads the table with raw SQL, not the ORM.** The model is deleted in the same release that
-drops the table, and an operator upgrading from a pre-manifest image straight to a
-post-removal one is exactly the person who needs this to work -- an ``ImportError`` on
-``models.ModelRun`` would lose every registration they had, silently, in the one upgrade path
-that cannot be retried. Raw SQL also means the command keeps working when the app is not in
-INSTALLED_APPS.
-
-**Not migration code.** Distilling a run reads its GeoPackage and a crosswalk of tens of
-thousands of rows; inside 0003 that would execute during ``tethys db migrate`` in the
-entrypoint, blocking startup with no progress output and no bound, and leaving a container
-that never serves if any of it failed.
-
-Failure is non-fatal on purpose, with one exception. A run that cannot be distilled is
-reported and skipped so the rest still land; an unwritable storage root aborts, because
-continuing would drop the table in Unit 8 with nothing written to replace it.
+Runs from the entrypoint before ``tethys db migrate``, since migration 0003 drops the table.
 """
 
 import os
@@ -102,12 +81,7 @@ class Command(BaseCommand):
         self._report(written, skipped, outside, missing)
 
     def _registry_rows(self):
-        """Every registry row, or None when the table is gone.
-
-        Raw SQL: see the module docstring. ``created`` is selected because the run picker
-        ordered by it and a storage listing is lexicographic, so losing it would change which
-        run loads by default.
-        """
+        """Every registry row, or None when the table is gone."""
         if REGISTRY_TABLE not in connection.introspection.table_names():
             return None
 
@@ -120,13 +94,7 @@ class Command(BaseCommand):
             return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
     def _group_by_directory(self, rows):
-        """Collapse rows onto directories, keeping every id each directory answered to.
-
-        ``ModelRun.path`` was deliberately not unique -- its own comment records that the same
-        directory is legitimately registered more than once, once per import. Several rows
-        therefore become one manifest, and every one of their UUIDs has to survive or the
-        share links minted against the others break.
-        """
+        """Collapse rows onto directories, keeping every id each directory answered to."""
         root = os.path.realpath(run_store.local_root())
         grouped = {}
         for row in rows:
@@ -143,22 +111,7 @@ class Command(BaseCommand):
         return grouped
 
     def _resolve(self, stored, root):
-        """Where a registered run actually is now, which may not be where the row says.
-
-        A registry row holds whatever path was passed at registration, and that path can be
-        stale in two ordinary ways: it may be a *host* path that never existed inside the
-        container, or the runs may since have been mounted somewhere else. Both leave a row
-        pointing at nothing while the run itself sits in the storage root under the same
-        name.
-
-        Found by running the real upgrade against a real database: all five rows held host
-        paths, every one was reported missing, and the migration then dropped the table --
-        losing the ids that keep shared links working, for runs that were present the whole
-        time. Matching on the directory name inside the root recovers them.
-
-        The stored path still wins when it resolves, so a deployment whose paths are correct
-        is unaffected.
-        """
+        """Where a registered run actually is now, which may not be where the row says."""
         stored_real = os.path.realpath(stored)
         if os.path.isdir(stored_real):
             return stored_real
@@ -173,21 +126,11 @@ class Command(BaseCommand):
         return stored_real
 
     def _inside_root(self, directory, root):
-        """Whether a registered directory is somewhere the listing will ever look.
-
-        Not an exotic case. ``NGIAB_SCAN_ROOTS`` exists so a deployment can register runs from
-        other mounts, so an upgrading install may well have several -- and after the registry
-        is dropped, a directory outside the root is a run that simply stops appearing.
-        """
+        """Whether a registered directory is somewhere the listing will ever look."""
         return directory == root or directory.startswith(root + os.sep)
 
     def _write_one(self, directory, entry):
-        """Distil one run, preserving anything an existing manifest already knows.
-
-        A manifest may already be present -- ingest writes one, and this command may have run
-        before. Merging rather than overwriting means a re-run cannot narrow what is known:
-        ids accumulate, and the earliest ``created`` wins so ordering does not drift.
-        """
+        """Distil one run, preserving anything an existing manifest already knows."""
         existing = manifest.read(directory) or {}
         uuids = list(dict.fromkeys(list(existing.get("legacy_uuids") or []) + entry["uuids"]))
 

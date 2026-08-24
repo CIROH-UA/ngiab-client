@@ -1,17 +1,5 @@
 """Two uploads of one name cannot publish into the same prefix.
-
-The local backend never needed this: ``os.rename`` onto an existing directory fails, so the
-move that publishes a run is itself the claim. Object storage has no such move, and the
-pre-flight "does this run exist" check cannot stand in for one -- two uploads can both pass it
-before either writes, then interleave their objects under one prefix and leave a run made of
-two.
-
-The plan that deferred this recorded that MinIO could not be relied on for the conditional
-write a claim needs. That was measured rather than believed: eight threads released by a
-barrier, twelve rounds, exactly one winner every time, and the stored body always the
-winner's. So the claim is a conditional PutObject, and these tests pin the behaviour around it
--- including that a store which does not implement the condition still publishes.
-"""
+The claim is a conditional PutObject, pinned even on a store that cannot enforce the condition."""
 
 import json
 import time

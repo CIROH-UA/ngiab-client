@@ -1,12 +1,5 @@
 """The shared DuckDB connection: configuration, extensions, and literal escaping.
-
-Read docs/plans/2026-08-22-001-feat-storage-backed-model-runs-plan.md, Unit 2.
-
-These run inside the image and assert against the extension directory the build actually
-populated, rather than mocking DuckDB. The whole point of the unit is that the connection is
-configured correctly in the environment that ships, and a mocked connection cannot tell us
-that.
-"""
+Runs inside the image, against the extension directory the build actually populated."""
 
 import os
 
@@ -78,11 +71,7 @@ def test_object_storage_backend_loads_httpfs_and_aws(s3_backend):
 
 
 def test_autoinstall_is_disabled(local_backend):
-    """A missing extension must fail loudly, not reach for extensions.duckdb.org.
-
-    The container has no route to the extension repository and the extension directory is
-    read-only, so an autoinstall attempt is a hang followed by a confusing error.
-    """
+    """A missing extension must fail loudly, not reach for extensions.duckdb.org."""
     cursor = duckdb_conn.connect()
     try:
         autoinstall = cursor.execute(
@@ -107,12 +96,7 @@ def test_missing_extension_directory_raises_extension_unavailable(monkeypatch, t
 
 
 def test_default_extension_home_matches_the_image(monkeypatch):
-    """The fallback has to be the path the build actually installs into.
-
-    It previously pointed at /usr/lib/tethys/duckdb_extensions, which does not exist in the
-    image. That was invisible because DUCKDB_HOME is always set in the container -- and would
-    have surfaced in the first process that lost the variable.
-    """
+    """The fallback has to be the path the build actually installs into."""
     monkeypatch.delenv("DUCKDB_HOME", raising=False)
     assert duckdb_conn.duckdb_home() == duckdb_conn.DEFAULT_DUCKDB_HOME
     assert os.path.isdir(duckdb_conn.DEFAULT_DUCKDB_HOME)
@@ -124,11 +108,7 @@ def test_quote_wraps_and_doubles_internal_quotes():
 
 
 def test_quote_neutralises_a_statement_break_attempt(local_backend, tmp_path):
-    """A path crafted to close the literal and append SQL stays one literal.
-
-    Not theoretical from Unit 5 onward: the output directory is read out of a run's
-    realization.json, which in the hosted deployment arrives inside a user-supplied archive.
-    """
+    """A path crafted to close the literal and append SQL stays one literal."""
     hostile = "/runs/x'; SELECT 42; --"
     cursor = duckdb_conn.connect()
     try:
@@ -173,14 +153,7 @@ def test_the_connection_is_shared_not_reopened(local_backend, mocker):
 
 @pytest.fixture
 def awkward_run(ingest):
-    """A run whose directory name contains a single quote, in both output formats.
-
-    Every interpolation site below took its path raw before this unit. That was safe only
-    because paths came from operator-controlled directory scans. From Unit 5 the output
-    directory is read out of a run's realization.json, which in the hosted deployment arrives
-    inside a user-supplied archive -- so these become input-handling paths, and a quote in a
-    directory name is the mildest thing that can appear in one.
-    """
+    """A run whose directory name contains a single quote, in both output formats."""
     return ingest("o'brien run", output_format="both")
 
 

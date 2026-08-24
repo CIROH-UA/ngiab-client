@@ -1,20 +1,6 @@
 """Publish an uploaded archive as a run, out of process.
 
-    tethys manage ingest_archive --job <id> --name <run-name>
-    tethys manage ingest_archive --archive /path/to/run.tar.gz --name <run-name>
-
-The controller launches the first form with subprocess and returns immediately. It has to be
-out of process rather than a thread: the image serves on one uvicorn worker by default, and
-converting an 8,105-catchment run holds the GIL through DuckDB and pandas long enough that
-the portal would stop answering. A separate process also means a conversion that dies takes
-its own memory with it.
-
-The second form is here because the same pipeline is worth having from a shell -- an operator
-with the archive already on the machine should not have to round-trip it through the bucket.
-
-Every exit path writes a terminal status, including the unexpected ones. A job whose status
-stays "running" forever is indistinguishable to the client from one that is genuinely slow,
-and the client polls until it sees a terminal state.
+Runs conversion in a separate process so a large run cannot block the portal's one worker.
 """
 
 import logging
@@ -86,12 +72,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"published {published}"))
 
     def _discard_local(self, path):
-        """Remove a temp archive. Every upload wrote one and nothing removed it.
-
-        discard_staged only deletes the object in storage; the local copy -- downloaded by
-        _staged, or written directly by controllers.uploadRun -- stayed on disk for the life
-        of the container, one full archive per upload.
-        """
+        """Remove a temp archive that the upload left behind on disk."""
         try:
             os.remove(path)
         except OSError:

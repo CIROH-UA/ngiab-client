@@ -1,19 +1,5 @@
 """The run manifest: what ingest distills so the read path never probes the filesystem.
-
-Read docs/plans/2026-08-22-001-feat-storage-backed-model-runs-plan.md, Unit 3.
-
-Every assertion here is of the form "the distilled fact equals what the live probe returns
-today". That is the only useful bar: the manifest is not a new source of truth, it is the same
-truth moved somewhere an object store can serve. Where a test compares against
-``gpkg_layer_bounds_4326`` or ``describe_troute_feature`` directly, that is deliberate --
-those functions are the incumbent, and Unit 9 deletes them only once these agree.
-
-The hot/sidecar split is load-bearing rather than tidiness. ``_get_list_model_runs()`` is
-reached on essentially every request and reads *every* run's manifest, while the catchment
-list and the flowpath crosswalk both scale with run size -- tens of thousands of entries is
-normal. Embedding those would put megabytes of JSON parsing on the hot path, so they live in
-sidecars that only the endpoints needing them load.
-"""
+Hot listing fields and per-run sidecars are split so the hot path stays cheap."""
 
 import json
 import os
@@ -32,12 +18,7 @@ def distilled(mini_run):
 
 
 def test_bounds_are_reprojected_to_4326(distilled):
-    """R8: the extent the map frames on, read from the layer header at ingest.
-
-    Compared against gpkg_layer_bounds_4326 when this was written. That probe is gone as of
-    Unit 9 -- the manifest is the only source now -- so this asserts the values, which is what
-    the comparison established in the first place.
-    """
+    """The map's extent, read from the layer header at ingest, is reprojected to EPSG:4326."""
     _, document = distilled
     west, south, east, north = document["bounds"]
     assert -130 < west < east < -60
@@ -129,12 +110,7 @@ def test_run_without_troute_records_absence(mini_run_factory):
 
 
 def test_unconventional_flowpath_ids_are_carried_verbatim(mini_run_factory):
-    """The wb-/cat- numbering is a convention of the fabric, not a guarantee.
-
-    describe_troute_feature's docstring says exactly this, which is why it reads the pairing
-    out of the gpkg rather than assuming it. The manifest must not re-introduce the
-    assumption by deriving one id from the other.
-    """
+    """The wb-/cat- numbering is a convention of the fabric, not a guarantee the manifest assumes."""
     import geopandas as gpd
     from shapely.geometry import Point
 
@@ -164,12 +140,7 @@ def test_teehr_configuration_name_read_from_the_producer_manifest(mini_run_facto
 
 
 def test_legacy_uuids_is_a_list(mini_run):
-    """ModelRun.path is deliberately not unique, so one directory can carry several ids.
-
-    The model's own comment: "the same directory is legitimately registered more than once
-    today, once per import, and de-duplicating would silently drop rows on migration." A
-    scalar field here would break every share link but one.
-    """
+    """ModelRun.path is deliberately not unique, so one directory can carry several legacy ids."""
     document = manifest.distill(
         mini_run,
         legacy_uuids=["11111111-1111-1111-1111-111111111111", "22222222222222222222222222222222"],
@@ -179,12 +150,7 @@ def test_legacy_uuids_is_a_list(mini_run):
 
 
 def test_both_uuid_forms_normalise_to_the_same_value():
-    """Django stores UUIDField in SQLite as 32 undashed hex and builds lookups that way.
-
-    migrations/0002_normalize_model_run_ids exists because a row holding the 36-character
-    dashed form reads back fine, shows up in the picker, and can never be matched by
-    filter(id=...). Resolving by manifest must not reimport that.
-    """
+    """Both the dashed and undashed uuid spellings must resolve to the same manifest."""
     dashed = "11111111-1111-1111-1111-111111111111"
     undashed = "11111111111111111111111111111111"
     assert manifest.normalize_uuid(dashed) == manifest.normalize_uuid(undashed)
@@ -198,11 +164,7 @@ def test_legacy_uuids_are_stored_normalised(mini_run):
 
 
 def test_created_is_captured(mini_run):
-    """Meta.ordering was ["-created", "label"]; a directory listing is lexicographic.
-
-    Without a recorded timestamp the picker reorders and a different run loads by default on
-    every fresh visit, which no parity test on payload *shape* would catch.
-    """
+    """The creation timestamp is captured, since a directory listing alone is only lexicographic."""
     document = manifest.distill(mini_run, created="2026-08-22T10:00:00+00:00")
     assert document["created"] == "2026-08-22T10:00:00+00:00"
 
@@ -215,10 +177,7 @@ def test_version_token_is_stable_for_unchanged_content(mini_run):
 
 
 def test_version_token_changes_when_outputs_change(mini_run):
-    """It replaces os.stat's mtime as the cache key, which returns None on an S3 prefix.
-
-    If the key never changes, a re-ingested run serves stale bins forever.
-    """
+    """The version token must change when a run's outputs change, or stale bins serve forever."""
     before = manifest.distill(mini_run)["version_token"]
     output_dir = os.path.join(mini_run, "outputs", "ngen")
     with open(os.path.join(output_dir, "cat-100.csv"), "a") as handle:
@@ -235,11 +194,7 @@ def test_version_token_changes_when_a_catchment_is_added(mini_run):
 
 
 def test_hot_manifest_does_not_embed_the_bulk(distilled):
-    """The listing reads every run's manifest on nearly every request.
-
-    Embedding the catchment list and crosswalk would put megabytes of JSON parsing on that
-    path for a large run. Counts live in the hot document; the entries do not.
-    """
+    """The hot manifest carries counts only; the catchment list and crosswalk live in sidecars."""
     run, _ = distilled
     with open(os.path.join(run, manifest.MANIFEST_NAME)) as handle:
         raw = json.load(handle)
@@ -280,11 +235,7 @@ def test_writing_twice_is_idempotent(mini_run):
 
 
 def test_manifest_alone_answers_every_probe(distilled):
-    """The claim Unit 9 depends on, stated as one assertion.
-
-    If this passes, no read-path request needs to stat, walk, list, or open a GeoPackage --
-    which is what makes the hosted read path parquet-only.
-    """
+    """The manifest alone answers every probe the read path used to make against the filesystem."""
     run, document = distilled
 
     assert document["output_dir"] and document["output_format"]
@@ -297,11 +248,7 @@ def test_manifest_alone_answers_every_probe(distilled):
 
 
 def test_crosswalk_is_cached_between_calls(distilled, mocker):
-    """80 ms for a 10,000-flowpath run, measured. Per feature click that is unusable.
-
-    describe_troute_feature is keyed per feature behind an lru_cache of 32, so Unit 9 must
-    load the crosswalk whole and keep it, not read it once per lookup.
-    """
+    """The flowpath crosswalk is loaded once and kept, not re-read on every feature lookup."""
     run, _ = distilled
     from tethysapp.ngiab import duckdb_conn
 
@@ -314,11 +261,7 @@ def test_crosswalk_is_cached_between_calls(distilled, mocker):
 
 
 def test_changing_the_gpkg_invalidates_the_crosswalk_cache(mini_run_factory):
-    """The version token has to cover every distilled input, not just the outputs.
-
-    Derived from the output directory alone, a gpkg edit would leave the token unchanged and
-    the cached crosswalk stale -- serving the previous fabric's pairings indefinitely.
-    """
+    """The version token must cover the GeoPackage too, or an edited fabric serves a stale crosswalk."""
     import geopandas as gpd
     from shapely.geometry import Point
 
