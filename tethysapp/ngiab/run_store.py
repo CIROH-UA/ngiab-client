@@ -26,6 +26,7 @@ bucket. With real credentials it is a routine failure mode, and an empty picker 
 actionable way to show it.
 """
 
+import contextlib
 import functools
 import logging
 import os
@@ -412,6 +413,9 @@ def is_reserved(name):
 #: Where an uploaded archive waits before it is a run, and where job status is written.
 STAGING_DIR = "_uploads"
 
+#: Where a run name being published is held, so two uploads cannot claim it at once.
+CLAIM_DIR = posixpath.join(STAGING_DIR, "claims")
+
 
 def list_runs():
     """Every run under the storage root, newest first, unusable ones included.
@@ -568,6 +572,131 @@ def _walk_keys(backend, prefix):
         yield posixpath.join(prefix, name)
     for name in directories:
         yield from _walk_keys(backend, posixpath.join(prefix, name))
+
+
+@contextlib.contextmanager
+def claimed(name):
+    """Hold ``name`` for the duration, so a second publisher cannot use it concurrently.
+
+    The filesystem backend needs nothing: ``os.rename`` onto an existing directory fails, so
+    the move that publishes a run *is* the claim. Object storage has no such move, and the
+    pre-flight "does this run exist" check cannot substitute -- two uploads can both pass it
+    before either writes, then interleave their objects under one prefix.
+
+    A conditional ``PutObject`` with ``If-None-Match: *`` is the claim. Measured against the
+    MinIO this deploys beside rather than assumed, because the plan that deferred this work
+    recorded the opposite: eight threads released by a barrier, twelve rounds, exactly one
+    winner every time, and the stored body always the winner's. AWS supports it natively.
+
+    A store that does not support the condition is not made to fail. It falls back to
+    publishing without a claim, which is where this was before, and says so in the log --
+    degrading is better than refusing to publish at all on a store that is otherwise fine.
+
+    A crashed publisher leaves its claim behind. Rather than blocking the name forever, a
+    claim older than the job-staleness window is treated the way a job that old is treated:
+    presumed dead, removed, and the claim retried once.
+    """
+    if not duckdb_conn.is_object_storage():
+        yield
+        return
+
+    backend = storage()
+    client, bucket = _s3_client(backend)
+    if client is None:
+        logger.warning("No S3 client for %s; publishing without a claim", name)
+        yield
+        return
+
+    key = _claim_key(backend, name)
+    if not _take_claim(client, bucket, key, name):
+        raise ClaimHeld(
+            f"Another upload is already publishing a run called {name!r}. Wait for it to "
+            "finish, or upload under a different name."
+        )
+    try:
+        yield
+    finally:
+        try:
+            client.delete_object(Bucket=bucket, Key=key)
+        except Exception:  # noqa: BLE001 - a stale claim expires; failing here helps nobody
+            logger.warning("Could not release the claim on %s", name, exc_info=True)
+
+
+class ClaimHeld(RuntimeError):
+    """Raised when another publisher holds the run name."""
+
+
+def _s3_client(backend):
+    """The backend's boto3 client and bucket, or (None, None) when it has none."""
+    meta = getattr(getattr(backend, "connection", None), "meta", None)
+    return getattr(meta, "client", None), getattr(backend, "bucket_name", None)
+
+
+def _claim_key(backend, name):
+    location = (getattr(backend, "location", "") or "").strip("/")
+    key = posixpath.join(CLAIM_DIR, name)
+    return posixpath.join(location, key) if location else key
+
+
+def _take_claim(client, bucket, key, name):
+    """Write the claim, or report that someone else holds it.
+
+    Returns False only for a genuine collision. Anything else -- including a store that does
+    not implement the condition -- returns True, because the alternative is refusing to
+    publish on a store that works fine for everything else.
+    """
+    import json
+    import time
+
+    body = json.dumps({"run": name, "claimed": time.time()}).encode("utf-8")
+    try:
+        client.put_object(Bucket=bucket, Key=key, Body=body, IfNoneMatch="*")
+        return True
+    except Exception as exc:  # noqa: BLE001 - classified below
+        if not _is_precondition_failure(exc):
+            logger.warning(
+                "Conditional claim unsupported or failed for %s; publishing without one",
+                name, exc_info=True,
+            )
+            return True
+
+    if not _claim_is_stale(client, bucket, key):
+        return False
+
+    logger.warning("Breaking a stale claim on %s", name)
+    try:
+        client.delete_object(Bucket=bucket, Key=key)
+        client.put_object(Bucket=bucket, Key=key, Body=body, IfNoneMatch="*")
+        return True
+    except Exception:  # noqa: BLE001 - lost the race to break it, which is a collision
+        return False
+
+
+def _is_precondition_failure(exc):
+    """Whether the store refused the write because the key already existed."""
+    response = getattr(exc, "response", None)
+    if not isinstance(response, dict):
+        return False
+    error = response.get("Error") or {}
+    status = (response.get("ResponseMetadata") or {}).get("HTTPStatusCode")
+    return str(error.get("Code")) == "PreconditionFailed" or status == 412
+
+
+def _claim_is_stale(client, bucket, key):
+    """Whether an existing claim is old enough that its publisher is presumed gone."""
+    import json
+    import time
+
+    from .ingest import STALE_AFTER_SECONDS
+
+    try:
+        body = client.get_object(Bucket=bucket, Key=key)["Body"].read()
+        claimed_at = json.loads(body).get("claimed")
+    except Exception:  # noqa: BLE001 - unreadable claim is not evidence it is abandoned
+        return False
+    if not isinstance(claimed_at, (int, float)):
+        return False
+    return (time.time() - claimed_at) > STALE_AFTER_SECONDS
 
 
 def clear_caches():

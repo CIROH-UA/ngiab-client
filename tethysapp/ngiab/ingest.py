@@ -328,16 +328,24 @@ def publish(archive_path, run_name, *, job_id=None, progress=None):
             f"{run_name!r} is not a usable run name. Use letters, numbers, dots, dashes and "
             "underscores, starting with a letter or a digit."
         )
-    if run_store.find(run_name) is not None:
-        raise archive.ArchiveRejected(
-            f"A run called {run_name!r} already exists. Delete it first, or upload under "
-            "another name."
-        )
+    try:
+        claim = run_store.claimed(run_name)
+    except run_store.ClaimHeld as exc:
+        raise archive.ArchiveRejected(str(exc)) from exc
 
     workspace = _workspace()
     try:
-        with _heartbeat(job_id, lambda: at["fields"]):
-            return _run_stages(archive_path, run_name, workspace, say)
+        # Taken before the existence check, so the pair cannot be straddled.
+        with claim:
+            if run_store.find(run_name) is not None:
+                raise archive.ArchiveRejected(
+                    f"A run called {run_name!r} already exists. Delete it first, or upload "
+                    "under another name."
+                )
+            with _heartbeat(job_id, lambda: at["fields"]):
+                return _run_stages(archive_path, run_name, workspace, say)
+    except run_store.ClaimHeld as exc:
+        raise archive.ArchiveRejected(str(exc)) from exc
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
 
@@ -437,14 +445,10 @@ def _upload_directory(source, run_name):
     Re-listing would also sweep whatever a *concurrent* upload of the same name had put
     there, turning one job's failure into another's corruption.
 
-    **Two uploads of the same name are still not mutually exclusive here.** The local path
-    gets that from ``os.rename``; object storage has no equivalent, and the conditional PUT
-    that would provide one (``If-None-Match: *``) is not dependable across the stores this
-    has to run against -- which is a decision that was deferred and never made. What this
-    does instead is check for the manifest immediately before writing it, which narrows the
-    window from the whole upload to the gap between that check and one PUT. The names are
-    operator-chosen and the bound on concurrent ingests is small, so the residual race is
-    unlikely rather than impossible; it is written down here because it is not closed.
+    Mutual exclusion between two uploads of one name is ``run_store.claimed``'s job, not
+    this function's. The manifest check just below is kept anyway: it is the only protection
+    left on a store that does not implement the conditional write the claim relies on, where
+    claiming degrades to a no-op.
     """
     from concurrent.futures import ThreadPoolExecutor
     from django.core.files.base import File
