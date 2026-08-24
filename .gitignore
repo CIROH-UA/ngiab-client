@@ -53,3 +53,8 @@ coverage
 docs/brainstorms/
 docs/plans/
 docs/solutions/
+docs/superpowers/
+
+# Assistant working notes: review findings, run artifacts, scratch analysis. Useful while
+# the work is happening, noise in the history afterwards, and none of it is the codebase.
+.context/
