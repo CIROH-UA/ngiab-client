@@ -550,7 +550,7 @@ def _launch(arguments):
         )
 
 
-def _start_or_report(job_id, name, arguments):
+def _start_or_report(job_id, name, arguments, local_archive=None):
     """Launch an ingest, turning a failure to launch into a job the client can see.
 
     Without this a Popen that never starts -- a missing django-admin, a fork that fails
@@ -558,24 +558,37 @@ def _start_or_report(job_id, name, arguments):
     status was already written PENDING and, on the presigned path, after the archive was
     already in the bucket. The client polled a job that would never move and the staged
     archive was never discarded.
+
+    ``local_archive`` is the temp file uploadRun wrote before calling here. The ingest child
+    removes it once it starts; when the launch is what failed, the child never runs and
+    nothing else would. IngestBusy is routine rather than exceptional, so without this every
+    refusal left a whole archive on disk.
     """
+    def abandon(message, status):
+        ingest.write_status(job_id, state=ingest.FAILED, stage="failed",
+                            message=message, run=name)
+        ingest.discard_staged(job_id)
+        _discard_local(local_archive)
+        return JsonResponse({"error": message}, status=status)
+
     try:
         _launch(arguments)
     except IngestBusy as exc:
-        ingest.write_status(job_id, state=ingest.FAILED, stage="failed",
-                            message=str(exc), run=name)
-        ingest.discard_staged(job_id)
-        return JsonResponse({"error": str(exc)}, status=503)
+        return abandon(str(exc), 503)
     except Exception:  # noqa: BLE001 - any launch failure must become a visible job
         logger.exception("Could not launch the ingest for job %s", job_id)
-        ingest.write_status(job_id, state=ingest.FAILED, stage="failed",
-                            message="The server could not start preparing this upload.",
-                            run=name)
-        ingest.discard_staged(job_id)
-        return JsonResponse(
-            {"error": "The server could not start preparing this upload."}, status=500
-        )
+        return abandon("The server could not start preparing this upload.", 500)
     return JsonResponse({"job": job_id, "state": ingest.PENDING})
+
+
+def _discard_local(path):
+    """Remove a temp archive this process wrote, if there is one."""
+    if not path:
+        return
+    try:
+        os.remove(path)
+    except OSError:
+        logger.warning("Could not remove the temporary archive %s", path, exc_info=True)
 
 
 @controller

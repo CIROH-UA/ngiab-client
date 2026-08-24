@@ -247,3 +247,84 @@ def test_the_app_declares_the_upload_permission():
     names = [p.name for g in App().permissions() for p in g.permissions]
     assert controllers.UPLOAD_PERMISSION in names
     assert controllers.DELETE_PERMISSION in names
+
+
+# ---- uploadRun: the endpoint no test reached --------------------------------
+#
+# Every test above posts to createUpload, startUpload or uploadStatus. Nothing posted here,
+# which is how a TypeError in this handler stayed green through 411 tests and three reviews.
+
+
+@pytest.fixture
+def archive_post():
+    """A multipart POST of a small archive, as the browser sends on a bucketless deployment."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    def _post(job, name="gage-99"):
+        request = RequestFactory().post("/uploadRun/", {
+            "job": job,
+            "name": name,
+            "archive": SimpleUploadedFile("run.tar.gz", b"x" * 64,
+                                          content_type="application/gzip"),
+        })
+        request.user = get_user_model()(username="curator", is_active=True)
+        return request
+
+    return _post
+
+
+def test_uploadRun_launches_the_child_with_the_archive(permitted, storage_root, archive_post,
+                                                       monkeypatch):
+    """The success path. On its own this would have caught the bug: the handler raised before
+    reaching _launch at all."""
+    launched = []
+    monkeypatch.setattr(controllers, "_launch", lambda args: launched.append(args))
+
+    response = _run_view(controllers.uploadRun, archive_post("a" * 32))
+
+    assert response.status_code == 200
+    assert launched, "the ingest child was never launched"
+    assert "--archive" in launched[0]
+    assert "--job" in launched[0]
+
+
+def test_uploadRun_leaves_no_archive_when_the_launch_fails(permitted, storage_root,
+                                                           archive_post, monkeypatch):
+    """The reason the parameter exists. When the child never starts, nothing else removes the
+    temp file the handler wrote -- the child's own cleanup never runs."""
+    import glob
+
+    monkeypatch.setattr(controllers, "_launch",
+                        lambda args: (_ for _ in ()).throw(controllers.IngestBusy("busy")))
+    before = set(glob.glob("/tmp/ngiab-*.archive"))
+
+    response = _run_view(controllers.uploadRun, archive_post("b" * 32))
+
+    assert response.status_code == 503
+    assert set(glob.glob("/tmp/ngiab-*.archive")) - before == set()
+
+
+def test_uploadRun_reports_a_failed_job_when_the_launch_fails(permitted, storage_root,
+                                                              archive_post, monkeypatch):
+    """A status left at PENDING is polled until the staleness window elapses."""
+    monkeypatch.setattr(controllers, "_launch",
+                        lambda args: (_ for _ in ()).throw(RuntimeError("no django-admin")))
+
+    response = _run_view(controllers.uploadRun, archive_post("c" * 32))
+
+    assert response.status_code == 500
+    assert ingest.read_status("c" * 32)["state"] == ingest.FAILED
+
+
+def _run_view(view, request):
+    """Call a view, turning an exception into the 500 Django would produce.
+
+    Without this the TypeError propagates out of the test as an error rather than a failure,
+    which reads as a broken test instead of a broken endpoint.
+    """
+    from django.http import JsonResponse
+
+    try:
+        return view(request)
+    except Exception as exc:  # noqa: BLE001 - the bug under test is an unhandled raise
+        return JsonResponse({"error": f"{type(exc).__name__}: {exc}"}, status=500)
