@@ -284,9 +284,10 @@ def _upload_directory(source, run_name):
             backend.save(key, File(handle))
         return key
 
+    document = manifest.read(source) or {}
     body = {
         relative: path
-        for relative, path in _files_under(source).items()
+        for relative, path in _publishable(_files_under(source), document).items()
         if relative != manifest.MANIFEST_NAME
     }
 
@@ -321,6 +322,49 @@ def _files_under(source):
             path = os.path.join(root, name)
             found[os.path.relpath(path, source).replace(os.sep, "/")] = path
     return found
+
+
+def superseded(document):
+    """Run-relative paths a converted run no longer needs published.
+
+    Conversion writes parquet beside the source and removes nothing, so a published run
+    carried both copies. Storage is the smaller half of that: the catchment CSVs go up as one
+    object each, so an 8,105-catchment run spent 8,105 extra objects on data nothing reads --
+    against the one parquet per schema group that consolidating produced. Object count is
+    what the listing and the delete pay for.
+
+    Only what the manifest says has a replacement. A run whose outputs are still csv, or whose
+    t-route is still netCDF, has one copy and it goes up untouched.
+    """
+    replaced = set()
+    output_dir = document.get("output_dir") or ""
+
+    if document.get("output_format") == ".parquet" and document.get("output_groups"):
+        replaced.add(("csv", output_dir))
+
+    troute = document.get("troute") or {}
+    if troute.get("format") == ".parquet" and troute.get("file"):
+        replaced.add(("troute", troute["file"]))
+    return replaced
+
+
+def _publishable(files, document):
+    """``files`` without the sources conversion has already replaced."""
+    replaced = superseded(document)
+    csv_dir = next((d for kind, d in replaced if kind == "csv"), None)
+    troute_keep = next((f for kind, f in replaced if kind == "troute"), None)
+    troute_dir = posixpath.dirname(troute_keep) if troute_keep else None
+
+    keep = {}
+    for relative, path in files.items():
+        if (csv_dir is not None and relative.endswith(".csv")
+                and posixpath.dirname(relative) == csv_dir):
+            continue
+        if (troute_dir is not None and posixpath.dirname(relative) == troute_dir
+                and relative != troute_keep and not relative.endswith(".parquet")):
+            continue
+        keep[relative] = path
+    return keep
 
 
 def _upload_all(put, items):
