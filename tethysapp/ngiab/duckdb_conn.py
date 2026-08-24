@@ -108,6 +108,30 @@ def quote_identifier(name):
     return '"' + str(name).replace('"', '""') + '"'
 
 
+def is_missing_error(exc):
+    """Whether a failed read means the object is not there, rather than unreachable.
+
+    Told apart structurally where possible: DuckDB's ``HTTPException`` carries the store's
+    own ``status_code``, so a 404 is a missing object and a 403 is a refusal -- no message
+    parsing, and no chance of a wording change turning "denied" into "absent". Measured
+    against MinIO: a missing key and a missing bucket both answer 404 with a
+    ``X-Minio-Error-Code`` of NoSuchKey / NoSuchBucket, and bad credentials answer 403.
+
+    The local backend has no status code, so the filesystem case falls back to DuckDB's
+    phrasing for a glob that matched nothing. That is a message match and it is fragile, but
+    it fails in the safe direction: an unrecognised message reads as unreachable, which is
+    reported, rather than as absent, which is not.
+
+    A missing *bucket* also answers 404 and so reads as "no sidecar". The run listing has
+    already enumerated that bucket by the time any sidecar is read, so it would have failed
+    loudly first.
+    """
+    status = getattr(exc, "status_code", None)
+    if status is not None:
+        return status == 404
+    return "no files found" in str(exc).lower()
+
+
 def _configure(connection):
     """Apply the settings every connection needs, in the order DuckDB requires them."""
     home = duckdb_home()

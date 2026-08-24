@@ -525,17 +525,37 @@ def _version_of(run_path):
 @functools.lru_cache(maxsize=32)
 def _catchments_cached(run_path, version_token):
     """The id-to-group mapping, read through DuckDB so an s3:// path works."""
-    path = _child(run_path, CATCHMENTS_SIDECAR)
-    try:
-        frame = duckdb_conn.query(
-            f"SELECT * FROM read_parquet({duckdb_conn.quote(path)})"
-        )
-    except Exception:  # noqa: BLE001 - an undistilled run has no sidecar, which is not an error
+    frame = _read_sidecar(_child(run_path, CATCHMENTS_SIDECAR))
+    if frame is None:
         return {}
     return {
         str(cid): int(group)
         for cid, group in zip(frame["catchment_id"], frame["group_index"])
     }
+
+
+def _read_sidecar(path):
+    """One sidecar as a frame, or None when the run simply has not got one.
+
+    Everything that is not "no such object" is raised. It used to be swallowed into an empty
+    result, which is the failure this project keeps rediscovering: a 403, an expired
+    credential or a dropped connection read as "this run has no catchments", and the empty
+    answer was then cached under the version token, so it persisted until the run was
+    re-ingested or the worker restarted. An empty sidecar is a legitimate state, which is
+    exactly why it is the wrong thing to say when the truth is that storage refused.
+
+    A missing sidecar really is ordinary -- a run distilled before the sidecars existed, or
+    one with no GeoPackage and so no crosswalk -- so that case still answers empty.
+    """
+    try:
+        return duckdb_conn.query(f"SELECT * FROM read_parquet({duckdb_conn.quote(path)})")
+    except Exception as exc:  # noqa: BLE001 - re-raised below unless it means "not there"
+        if duckdb_conn.is_missing_error(exc):
+            return None
+        # Deferred: run_store imports this module, so it cannot be imported at the top.
+        from .run_store import StorageUnreachable
+
+        raise StorageUnreachable(f"Could not read {path}: {exc}") from exc
 
 
 def catchments(run_path, version_token=None):
@@ -576,14 +596,11 @@ def _crosswalk_cached(run_path, version_token):
 
     That guard was false for every ``s3://`` path regardless of what the bucket held, so a
     hosted run would have reported an empty crosswalk and every troute chart would have lost
-    its flowpath pairing -- silently, because an empty crosswalk is a legitimate state.
+    its flowpath pairing -- silently, because an empty crosswalk is a legitimate state. The
+    same reasoning is why _read_sidecar no longer swallows a refusal into that state either.
     """
-    path = _child(run_path, CROSSWALK_SIDECAR)
-    try:
-        frame = duckdb_conn.query(
-            f"SELECT * FROM read_parquet({duckdb_conn.quote(path)})"
-        )
-    except Exception:  # noqa: BLE001 - a run with no GeoPackage has no crosswalk
+    frame = _read_sidecar(_child(run_path, CROSSWALK_SIDECAR))
+    if frame is None:
         return {}
     return dict(zip(frame["flowpath_id"], frame["divide_id"]))
 

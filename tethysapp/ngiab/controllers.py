@@ -190,22 +190,34 @@ def json_errors(view):
 
     A shared link outlives the run it names, and every data endpoint would otherwise raise
     inside os.path.join and return a 500 the client can only describe as 'try again'.
+
+    Storage being unreachable answers 503 for the same reason it is now raised rather than
+    swallowed: the honest answer to "the bucket refused us" is to say so and invite a retry,
+    where the old empty result said "this run has no data" and the alternative -- letting it
+    out as a 500 -- says "this is broken, do not try again". 503 is in the client's retryable
+    set, so a momentary failure recovers instead of becoming a dead-looking map.
     """
 
     @functools.wraps(view)
     def wrapped(request, *args, **kwargs):
         model_run_id = request.GET.get("model_run_id")
 
-        # Up front, so the warehouse-backed TEEHR endpoints answer like the rest.
-        if model_run_id and not model_run_exists(model_run_id):
-            logger.info("Request for unregistered model run: %s", model_run_id)
-            return JsonResponse({"error": "No such model run."}, status=404)
-
         try:
+            # Up front, so the warehouse-backed TEEHR endpoints answer like the rest.
+            if model_run_id and not model_run_exists(model_run_id):
+                logger.info("Request for unregistered model run: %s", model_run_id)
+                return JsonResponse({"error": "No such model run."}, status=404)
             return view(request, *args, **kwargs)
         except UnknownModelRun:
             logger.info("Model run went missing mid-request: %s", model_run_id)
             return JsonResponse({"error": "No such model run."}, status=404)
+        except run_store.StorageUnreachable:
+            logger.warning("Storage unreachable serving %s", model_run_id, exc_info=True)
+            return JsonResponse(
+                {"error": "Storage for this run is not reachable right now. "
+                          "This is usually momentary -- try again."},
+                status=503,
+            )
 
     return wrapped
 
