@@ -45,9 +45,6 @@ def media_storages(**options):
     }
 
 
-# ---- Borrowing the portal's storage -----------------------------------------
-
-
 def test_the_run_store_uses_the_portal_media_bucket(hosted):
     """No second alias to configure, so there is nothing for an administrator to mistype."""
     with override_settings(STORAGES=media_storages()):
@@ -95,9 +92,6 @@ def test_local_deployments_are_untouched(monkeypatch):
     monkeypatch.delenv("NGIAB_STORAGE_BACKEND", raising=False)
     monkeypatch.setenv("NGIAB_MANAGED_ROOT", "/tmp/runs")
     assert run_store.location("alpha") == "/tmp/runs/alpha"
-
-
-# ---- The DuckDB secret ------------------------------------------------------
 
 
 def test_no_secret_is_built_for_a_local_deployment(monkeypatch):

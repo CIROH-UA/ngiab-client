@@ -33,5 +33,4 @@ def normalize(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [("ngiab", "0001_initial")]
 
-    # Reverse would put the dashes back, which is the broken state.
     operations = [migrations.RunPython(normalize, migrations.RunPython.noop)]

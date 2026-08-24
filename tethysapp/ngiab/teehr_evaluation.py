@@ -28,11 +28,8 @@ from . import duckdb_conn
 
 logger = logging.getLogger(__name__)
 
-# The configuration name teehr writes for the run's own simulation. The warehouse needs
-# ngen_<stem> to tell many runs apart inside one catalog; a per-run evaluation holds one.
 RUN_CONFIGURATION = "ngen"
 
-# The reference the run is compared against, shown alongside it in the picker and metrics.
 REFERENCE_CONFIGURATION = "nwm30_retrospective"
 
 _METRIC_COLUMNS = (
@@ -119,7 +116,6 @@ class EvaluationReader:
             logger.warning("Could not list configurations in %s: %s", self._dir, exc)
             return []
 
-        # No rows for the run itself means no evaluation of it, whatever else is present.
         if not any(cfg == config_name for cfg, _ in rows):
             return []
 

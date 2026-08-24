@@ -29,7 +29,6 @@ describe('ngiab-legend', () => {
     expect(el.querySelector('.legend-note').textContent).to.contain('3 quantile classes');
   });
 
-  // A constant variable collapses to one class, where the plural read as a rendering bug.
   it('explains a single class instead of printing "1 quantile classes"', () => {
     actions.setMapVariable('SOIL_TO_GW_FLUX');
     el = mount();
@@ -46,14 +45,12 @@ describe('ngiab-legend', () => {
     expect(el.querySelectorAll('.legend-scale li').length).to.be.greaterThan(0);
   });
 
-  // A key to a map with nothing on it explains nothing.
   it('renders nothing at all when no run is loaded', () => {
     actions.setModelRun(null);
     el = mount();
     expect(el.innerHTML.trim()).to.equal('');
   });
 
-  // Every mount subscribes, so a missed unsubscribe leaks a repaint per removed legend.
   it('stops repainting from the store once removed', () => {
     actions.setMapVariable('SOIL_STORAGE');
     el = mount();

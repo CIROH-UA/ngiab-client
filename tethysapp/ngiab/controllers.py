@@ -51,12 +51,9 @@ from .teehr_warehouse import (
 logger = logging.getLogger(__name__)
 
 
-#: Granted through the ``run_managers`` group; see App.permissions.
 DELETE_PERMISSION = "delete_model_runs"
 UPLOAD_PERMISSION = "upload_model_runs"
 
-#: How long a presigned upload URL stays valid. Six hours, because the ceiling on what
-#: can be uploaded is the user's link rather than anything this app controls.
 UPLOAD_URL_TTL_SECONDS = 6 * 60 * 60
 
 
@@ -162,8 +159,6 @@ def write_login_required(view):
     return wrapped
 
 
-# Map warehouse exception → user-facing (status_message, severity) string pair.
-# See plan FR6 for the full state table.
 def _teehr_status_for(exc: TeehrWarehouseError):
     if isinstance(exc, UnsupportedWarehouseVersion):
         return (
@@ -182,13 +177,10 @@ def _teehr_status_for(exc: TeehrWarehouseError):
         )
     if isinstance(exc, WarehouseUnreachable):
         return ("TEEHR warehouse appears empty. Run TEEHR to populate it.", "info")
-    # Generic fallback
     return ("TEEHR warehouse could not be read.", "error")
 
 from .app import App
 
-# the following error is fixed with this lines
-# https://stackoverflow.com/a/79163867
 import pyproj
 
 pyproj.network.set_network_enabled(False)
@@ -212,7 +204,6 @@ def json_errors(view):
         model_run_id = request.GET.get("model_run_id")
 
         try:
-            # Up front, so the warehouse-backed TEEHR endpoints answer like the rest.
             if model_run_id and not model_run_exists(model_run_id):
                 logger.info("Request for unregistered model run: %s", model_run_id)
                 return JsonResponse({"error": "No such model run."}, status=404)
@@ -247,7 +238,6 @@ def home(request):
     are a courtesy, not a control: removeModelRun re-checks on every call, because anything
     decided in a template can be edited in a console.
     """
-    # reverse(), not "/apps/<root>/": MULTIPLE_APP_MODE false mounts the app at "/".
     context = {
         "app_root_url": reverse(f"{App.package}:{App.index}"),
         "signed_in": signed_in(request),
@@ -451,7 +441,6 @@ def uploadStatus(request):
     try:
         status = ingest.read_status(job_id)
     except run_store.StorageUnreachable:
-        # Explicitly not terminal: the client stops polling on a terminal answer.
         logger.warning("Could not read status for job %s", job_id, exc_info=True)
         return JsonResponse(
             {"error": "Could not reach storage to check on this upload. Retrying.",
@@ -473,18 +462,8 @@ def _is_job_id(value):
     return bool(value) and len(value) == 32 and all(c in "0123456789abcdef" for c in value)
 
 
-#: Ingests allowed to run at once. Each holds the GIL through DuckDB and pandas for the
-#: length of a conversion, and the image serves on one uvicorn worker by default, so an
-#: unbounded fan-out starves the portal and can exhaust memory. Per worker process, which is
-#: the same granularity the rest of this module's process-local state already has.
 MAX_CONCURRENT_INGESTS = int(os.environ.get("NGIAB_MAX_CONCURRENT_INGESTS", "2"))
 
-#: Handles for launched ingests, kept only so they can be reaped. Nothing waits on these.
-#:
-#: Guarded by a lock because the check and the append are not one step: two requests arriving
-#: together -- the case the bound exists to police -- could both read a count under the limit
-#: before either appended, and one thread's rebuild of the list could drop the other's handle,
-#: leaving a child untracked, never reaped, and never counted against the bound.
 _running = []
 _running_lock = threading.Lock()
 
@@ -609,7 +588,6 @@ def getCatchmentTimeSeries(request):
     variable_column = request.GET.get("variable_column")
     outputs = run_outputs(model_run_id)
 
-    # The manifest lists what this run wrote, so an id it never wrote is a 404, not a 500.
     try:
         all_columns = _read_output_columns(outputs, catchment_id)
     except FileNotFoundError:
@@ -618,7 +596,7 @@ def getCatchmentTimeSeries(request):
         )
 
     time_name = all_columns[1]
-    list_variables = all_columns[2:]  # drop time step and time
+    list_variables = all_columns[2:]
 
     selected = variable_column if variable_column in list_variables else list_variables[0]
 
@@ -626,7 +604,6 @@ def getCatchmentTimeSeries(request):
         outputs, catchment_id, columns=[time_name, selected], time_column=time_name
     )
 
-    # Columnar and thinned; ?max_points=0 asks for the full series. See the frontend README.
     try:
         max_points = int(request.GET.get("max_points", _DEFAULT_MAX_POINTS))
     except (TypeError, ValueError):
@@ -725,7 +702,6 @@ def getTrouteVariables(request):
     if df is None or feature_id is None:
         return JsonResponse({"troute_variables": []})
 
-    # Narrow, so a bug in here stops masquerading as a run without routing output.
     try:
         present = check_troute_id(df, feature_id)
     except (KeyError, ValueError, TypeError):
@@ -746,14 +722,12 @@ def getTrouteTimeSeries(request):
 
     df = get_troute_df(model_run_id)
 
-    # The client omits a null variable on first load, so the server picks one.
     available = [variable["value"] for variable in get_troute_vars(df)]
     requested = request.GET.get("troute_variable")
     variable_column = requested if requested in available else (available[0] if available else None)
     if variable_column is None:
         return JsonResponse({"error": "This model run has no plottable troute variables."})
 
-    # One shape reaches here now; see utils._normalised_troute_frame for what it replaced.
     try:
         selected = df[df[TROUTE_FEATURE_COLUMN] == clean_troute_id]
         data = [
@@ -800,7 +774,6 @@ def _empty_ts_response(variable, status_message, status_severity, variables=None
         {
             "metrics": [],
             "data": [],
-            # Always carried, so the picker can populate even when there is nothing to plot.
             "teehr_variables": variables or [],
             "variable": variable,
             "layout": {
@@ -843,7 +816,6 @@ def getTeehrTimeSeries(request):
     if open_reader is None:
         return _empty_ts_response(None, "No TEEHR evaluation found for this run.", "info")
 
-    # The client omits a null variable on first load, so the server picks one.
     available = _teehr_variables_for(model_run_id)
     options = [entry["value"] for entry in available]
     requested = request.GET.get("teehr_variable")
@@ -969,7 +941,6 @@ def getTeehrLocations(request):
         logger.warning("getTeehrLocations warehouse error: %s", exc)
         return _empty_locations_response(msg, severity)
 
-    # secondary_location_id is "ngen-XXXXX"; the gpkg/map nexus ids are "nex-XXXXX".
     locations = [
         {"nexus_id": ngen_id.replace("ngen-", "nex-", 1), "usgs_id": usgs_id}
         for usgs_id, ngen_id in pairs

@@ -1,8 +1,6 @@
 import { getPortalHost } from '../config.js';
 
-// A thin fetch wrapper standing in for the React app's axios client.
 
-// `message` is for the console; only `userMessage` may reach the interface.
 export class ApiError extends Error {
   constructor(message, {
     status = null, body = null, userMessage = null, retryable = false,
@@ -32,12 +30,8 @@ const STATUS_MESSAGES = {
 
 const messageForStatus = (status) => STATUS_MESSAGES[status] ?? GENERIC_MESSAGE;
 
-// Statuses that mean "ask again", not "give up". A poller that treats every failure as final
-// turns a momentary blip into a reported failure for work that is still running -- and the
-// blip need not even reach the server, so keying off a response body would not be enough.
 const RETRYABLE_STATUSES = new Set([408, 429, 502, 503, 504]);
 
-// Only short single-line text is a user-facing sentence; tracebacks and HTML are not.
 function usableServerMessage(text) {
   if (typeof text !== 'string') return null;
   const trimmed = text.trim();
@@ -46,7 +40,6 @@ function usableServerMessage(text) {
   return trimmed;
 }
 
-// Must never throw, or a parse error would replace the real failure.
 async function readErrorDetail(response) {
   try {
     const text = await response.text();
@@ -67,15 +60,11 @@ function loginRedirect() {
   window.location.assign(`${host}/accounts/login?next=${window.location.pathname}`);
 }
 
-// Django sets this cookie on any rendered page; a mutating request must echo it back.
-// Exported because the upload path sends its body through XMLHttpRequest, which needs the
-// same token and has no business parsing the cookie a second time.
 export function csrfToken() {
   const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
   return match ? decodeURIComponent(match[1]) : '';
 }
 
-// Shared by both verbs, so a POST reports failure exactly as a GET does.
 async function handle(response, path) {
   if (response.status === 401) {
     loginRedirect();
@@ -98,14 +87,12 @@ async function handle(response, path) {
   try {
     body = await response.json();
   } catch (cause) {
-    // 200 with a non-JSON body: a proxy or login page standing in for the endpoint.
     throw new ApiError(`Malformed JSON from ${path}`, {
       body: String(cause),
       userMessage: 'The server sent back something unreadable.',
     });
   }
 
-  // Some controllers report failure as HTTP 200 plus an 'error' key, written for the user.
   if (body && body.error) {
     throw new ApiError(body.error, {
       status: response.status,
@@ -117,13 +104,11 @@ async function handle(response, path) {
   return body;
 }
 
-// One send for both verbs: the network-failure branch was copied between them.
 async function send(url, init, path) {
   let response;
   try {
     response = await fetch(url, init);
   } catch (cause) {
-    // Network-level failure: there is no response object to inspect.
     throw new ApiError(`Network request to ${path} failed`, {
       body: String(cause),
       userMessage: 'Could not reach the server. Check your connection and try again.',

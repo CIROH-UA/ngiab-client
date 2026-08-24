@@ -40,9 +40,6 @@ def write_zip(path, files):
     return str(path)
 
 
-# ---- Paths that escape --------------------------------------------------------
-
-
 @pytest.mark.parametrize("evil", [
     "../../etc/cron.d/pwn",
     "/etc/cron.d/pwn",
@@ -125,9 +122,6 @@ def test_nothing_lands_outside_the_destination(tmp_path):
     assert os.listdir(outside) == []
 
 
-# ---- Archives that expand without bound ---------------------------------------
-
-
 def test_a_declared_size_over_the_cap_is_refused(tmp_path):
     files = _run_files()
     files["myrun/outputs/big"] = b"0" * 4096
@@ -153,9 +147,6 @@ def test_a_zip_that_lies_about_its_size_is_stopped_while_writing(tmp_path):
     write_zip(path, files)
     with pytest.raises(archive.ArchiveRejected, match="unpacks to more than"):
         archive.extract(str(path), str(tmp_path / "dest"), max_bytes=50_000)
-
-
-# ---- Archives that are not runs -----------------------------------------------
 
 
 def test_an_archive_with_no_realization_is_refused(tmp_path):
@@ -188,9 +179,6 @@ def test_the_kind_is_sniffed_not_taken_from_the_name(tmp_path):
     write_tar(path, _run_files())
     root, entries = archive.inspect(str(path))
     assert root == "myrun"
-
-
-# ---- Well-formed archives still work ------------------------------------------
 
 
 def test_a_tar_run_extracts(tmp_path):

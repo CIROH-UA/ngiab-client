@@ -1,10 +1,7 @@
-// Converts the API's time-series payloads into the column-oriented arrays uPlot wants.
-
 export function toEpochSeconds(x) {
   if (x === null || x === undefined) return null;
 
   if (typeof x === 'number' && Number.isFinite(x)) {
-    // Heuristic: anything past ~5138 AD in seconds is far more likely milliseconds.
     return x > 1e11 ? x / 1000 : x;
   }
 
@@ -13,7 +10,6 @@ export function toEpochSeconds(x) {
   const trimmed = x.trim();
   if (!trimmed) return null;
 
-  // A space-separated timestamp is not valid ISO 8601; normalise it to local time.
   const iso = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(trimmed)
     ? trimmed.replace(' ', 'T')
     : trimmed;
@@ -22,7 +18,6 @@ export function toEpochSeconds(x) {
   return Number.isNaN(ms) ? null : ms / 1000;
 }
 
-// A gap must become null, never 0: Number(null), Number('') and Number([]) are all 0.
 const toFiniteNumber = (y) => {
   if (typeof y === 'number') return Number.isFinite(y) ? y : null;
   if (typeof y !== 'string') return null;
@@ -32,12 +27,6 @@ const toFiniteNumber = (y) => {
   return Number.isFinite(n) ? n : null;
 };
 
-// Three wire shapes reach this function, so they are flattened to (times, values) first:
-//   {data: [{x, y}]}      one object per point, from troute and teehr
-//   {t: [...], v: [...]}  columnar, when the time axis is irregular
-//   {t0, dt, n, v: [...]} columnar with the time axis implied, when it is regular
-// The last two exist because a run's chart is tens of thousands of points and the keys cost
-// more than the numbers; see the frontend README.
 export function toColumns(s) {
   if (!s) return { times: [], values: [] };
 
@@ -80,7 +69,6 @@ export function toUplotData(apiSeries) {
   const series = Array.isArray(apiSeries) ? apiSeries.filter(hasSeriesData) : [];
   if (!series.length) return { data: [[]], labels: [], points: 0 };
 
-  // Map of epoch-second -> per-series value, built in one pass.
   const byTime = new Map();
   series.forEach((s, seriesIndex) => {
     const { times, values } = toColumns(s);

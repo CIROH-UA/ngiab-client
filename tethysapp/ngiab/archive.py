@@ -43,13 +43,10 @@ import zipfile
 
 logger = logging.getLogger(__name__)
 
-#: Ceiling on the unpacked size of one archive. Generous: gage-01570500 is 6 GB unpacked.
 DEFAULT_MAX_BYTES = 32 * 1024 * 1024 * 1024
 
-#: Ceiling on member count. A 8,105-catchment run holds ~36,000 files.
 DEFAULT_MAX_MEMBERS = 500_000
 
-#: What makes a directory a run, checked before anything is written.
 REALIZATION = "realization.json"
 REQUIRED_DIRS = ("outputs",)
 
@@ -195,7 +192,6 @@ def extract(path, destination, *, max_bytes=DEFAULT_MAX_BYTES,
     handle, _members, kind = open_archive(path)
     try:
         if kind == "tar":
-            # PEP 706: strips absolute paths, refuses traversal, drops devices and setuid.
             handle.extractall(destination, filter="data")
         else:
             _extract_zip(handle, destination, real_destination, max_bytes)
@@ -217,7 +213,6 @@ def _extract_zip(handle, destination, real_destination, max_bytes):
             raise ArchiveRejected(f"Unsafe path in archive: {info.filename!r}")
 
         target = os.path.join(destination, relative)
-        # realpath, so a symlink from an earlier member cannot redirect this write out.
         if os.path.commonpath(
             [os.path.realpath(os.path.dirname(target)), real_destination]
         ) != real_destination:

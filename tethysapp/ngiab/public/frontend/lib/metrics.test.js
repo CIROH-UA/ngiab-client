@@ -1,7 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { toMetricsTable, metricLabel, configLabel, formatMetric } from './metrics.js';
 
-// The real payload, copied from a live getTeehrTimeSeries response.
 const REAL = [
   { metric: 'root_mean_standard_deviation_ratio', ngen_gage_10154200: 0.7245604395866394, nwm30_retrospective: 0.6264227032661438 },
   { metric: 'relative_bias', ngen_gage_10154200: -0.26382875442504883, nwm30_retrospective: 0.05937769263982773 },
@@ -17,7 +16,6 @@ describe('metricLabel', () => {
     expect(metricLabel('root_mean_standard_deviation_ratio')).to.equal('RMSDR');
   });
 
-  // teehr adding a metric must not make it invisible.
   it('title-cases anything unrecognised rather than dropping it', () => {
     expect(metricLabel('some_new_metric')).to.equal('Some New Metric');
   });
@@ -40,7 +38,6 @@ describe('formatMetric', () => {
     expect(formatMetric(0)).to.equal('0.000');
   });
 
-  // An absent metric must be visibly absent, not rendered as 0.000.
   it('shows a dash for anything non-numeric', () => {
     for (const bad of [null, undefined, '', 'n/a', NaN, Infinity, {}]) {
       expect(formatMetric(bad), String(bad)).to.equal('-');
@@ -67,7 +64,6 @@ describe('toMetricsTable', () => {
     expect(toMetricsTable(REAL).rows.map((r) => r.key)).to.deep.equal(REAL.map((r) => r.metric));
   });
 
-  // A configuration missing from the first row must not lose its column for the rest.
   it('unions columns across all rows', () => {
     const { columns, rows } = toMetricsTable([
       { metric: 'a', only_in_first: 1 },

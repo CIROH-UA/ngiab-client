@@ -1,4 +1,3 @@
-// Minimal observable store: get / set (shallow merge) / subscribe.
 export function createStore(initialState) {
   let state = { ...initialState };
   const subscribers = new Set();
@@ -10,7 +9,6 @@ export function createStore(initialState) {
 
     set(patch) {
       state = { ...state, ...patch };
-      // Iterate a copy: a subscriber may unsubscribe mid-notification.
       for (const fn of [...subscribers]) fn(state);
     },
 

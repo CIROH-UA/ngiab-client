@@ -1,17 +1,14 @@
 import { expect } from '@esm-bundle/chai';
 import { toEpochSeconds, toUplotData, toColumns } from './series.js';
 
-// Local-time epoch seconds, so assertions hold in any timezone.
 const localSeconds = (y, mo, d, h = 0, mi = 0, s = 0) =>
   new Date(y, mo - 1, d, h, mi, s).getTime() / 1000;
 
 describe('toEpochSeconds', () => {
-  // getTrouteTimeSeries formats with strftime, which is not valid ISO 8601.
   it('parses the space-separated strftime format', () => {
     expect(toEpochSeconds('2024-01-01 06:30:00')).to.equal(localSeconds(2024, 1, 1, 6, 30));
   });
 
-  // getTeehrTimeSeries arrives as Django's datetime serialization.
   it('parses the ISO format', () => {
     expect(toEpochSeconds('2024-01-01T06:30:00')).to.equal(localSeconds(2024, 1, 1, 6, 30));
   });
@@ -58,7 +55,6 @@ describe('toUplotData', () => {
     expect(out.data[0][0]).to.be.lessThan(out.data[0][1]);
   });
 
-  // Series can cover different spans, so misaligning them plots wrong times.
   it('aligns series with differing timestamps, leaving gaps null', () => {
     const out = toUplotData([
       { label: 'a', data: [{ x: '2024-01-01 00:00:00', y: 1 }] },
@@ -77,7 +73,6 @@ describe('toUplotData', () => {
     expect(out.data[1]).to.deep.equal([2]);
   });
 
-  // A null y is a real gap in the record; NaN would blank the series in uPlot.
   it('normalises non-numeric values to null', () => {
     const out = toUplotData([
       { label: 'a', data: [{ x: '2024-01-01 00:00:00', y: null }, { x: '2024-01-01 01:00:00', y: 'nope' }] },
@@ -103,7 +98,6 @@ describe('toUplotData', () => {
   });
 });
 
-// Number(null), Number('') and Number([]) are all 0: each would plot as zero flow.
 describe('toUplotData zero-coercion guards', () => {
   it('never turns a gap into zero', () => {
     const out = toUplotData([
@@ -115,7 +109,6 @@ describe('toUplotData zero-coercion guards', () => {
         { x: '2024-01-01 04:00:00', y: 0 },
       ] },
     ]);
-    // Only the genuine zero survives as zero.
     expect(out.data[1]).to.deep.equal([null, null, null, null, 0]);
   });
 });
@@ -133,14 +126,12 @@ describe('toColumns', () => {
     expect(values).to.deep.equal([1, 2, 3]);
   });
 
-  // Three numbers instead of a timestamp per point is most of the payload saving.
   it('expands an implied time axis', () => {
     const { times, values } = toColumns({ t0: 1000, dt: 60, v: [1, 2, 3] });
     expect(times).to.deep.equal([1000, 1060, 1120]);
     expect(values).to.deep.equal([1, 2, 3]);
   });
 
-  // The Number(null) trap, one shape further along: a gap must survive as a gap.
   it('keeps nulls as nulls rather than zero', () => {
     const { values } = toColumns({ t0: 0, dt: 1, v: [1, null, 3] });
     expect(values).to.deep.equal([1, null, 3]);
@@ -153,7 +144,6 @@ describe('toColumns', () => {
 });
 
 describe('toUplotData with mixed shapes', () => {
-  // troute and teehr still send {x, y} while the catchment endpoint sends columnar.
   it('unions a columnar series with an {x, y} series', () => {
     const { data, points } = toUplotData([
       { label: 'columnar', t0: 0, dt: 100, v: [1, 2] },

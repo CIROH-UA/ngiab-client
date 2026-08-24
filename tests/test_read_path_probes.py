@@ -29,7 +29,6 @@ import pytest
 
 from tethysapp.ngiab import utils as ngiab_utils
 
-# Calls with no object-store equivalent. Each was on a request path before this unit.
 BANNED = ("stat", "listdir", "scandir", "walk")
 
 
@@ -94,9 +93,6 @@ def _inside_a_run(calls, storage_root):
     return inside
 
 
-# ---- The catchment endpoints ------------------------------------------------
-
-
 def test_listing_catchments_probes_nothing(ingest, probe_log):
     run_id = ingest()
     probe_log.clear()
@@ -143,9 +139,6 @@ def test_the_cache_key_is_not_an_os_stat(ingest, probe_log):
     assert [name for name, _ in _inside_a_run(probe_log, ingest.root) if name == "stat"] == []
 
 
-# ---- The GeoPackage is never opened -----------------------------------------
-
-
 def test_map_bounds_do_not_open_a_geopackage(ingest, probe_log):
     """A GeoPackage is SQLite, so this is not an optimisation -- it cannot be read on S3."""
     run_id = ingest()
@@ -180,9 +173,6 @@ def test_many_features_do_not_reopen_anything(ingest, probe_log):
     assert [name for name, _ in probe_log if name in ("sqlite3", "pyogrio")] == []
 
 
-# ---- TEEHR --------------------------------------------------------------------
-
-
 def test_teehr_presence_comes_from_the_manifest(ingest, probe_log):
     """evaluation_dir's os.path.isdir is False for every s3:// path, whatever is in the bucket.
 
@@ -195,9 +185,6 @@ def test_teehr_presence_comes_from_the_manifest(ingest, probe_log):
     reader, _config = ngiab_utils.teehr_source(run_id)
     assert reader is None
     assert _inside_a_run(probe_log, ingest.root) == []
-
-
-# ---- Troute, which Unit 9 scoped out and Unit 11 closed ---------------------
 
 
 def test_reading_troute_probes_nothing(ingest, probe_log):

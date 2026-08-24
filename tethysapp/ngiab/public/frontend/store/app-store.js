@@ -1,18 +1,14 @@
 import { createStore } from './store.js';
 import { applyTheme } from '../lib/theme.js';
 
-// The single app-wide store.
 export const store = createStore({
   modelRunId: null,
 
-  // `type` is always 'catchment'; kept for shape stability if another type is added.
   selection: { type: null, id: null, label: null },
 
-  // Ids for the time-series endpoints, derived from the selection.
   trouteId: null,
   teehrId: null,
 
-  // Which series the chart is showing. Null means "the endpoint's first variable".
   variable: null,
   teehrVariable: null,
   trouteVariable: null,
@@ -20,14 +16,12 @@ export const store = createStore({
   theme: 'light', // 'light' | 'dark'
   layers: { catchmentHidden: false, showTeehr: true },
 
-  // Which variable shades the map, and where the timeline sits. Null means no choropleth.
   mapVariable: null,
   frameIndex: 0,
   frameCount: 0,
   playing: false,
 });
 
-// Named mutators keep the legal state transitions in one readable place.
 export const actions = {
   setModelRun(modelRunId) {
     store.set({
@@ -45,7 +39,6 @@ export const actions = {
     });
   },
 
-  // Clears the chosen variables: they may not exist on the new feature's endpoint.
   selectCatchment({ id, label, trouteId, teehrId }) {
     store.set({
       selection: { type: 'catchment', id, label: label ?? String(id) },
@@ -68,7 +61,6 @@ export const actions = {
     });
   },
 
-  // A different run has its own variables, axis and range: nothing may carry over.
   setMapVariable: (mapVariable) =>
     store.set({ mapVariable, frameIndex: 0, frameCount: 0, playing: false }),
 
@@ -87,7 +79,6 @@ export const actions = {
     store.set({ frameIndex: Math.min(Math.max(frameIndex, 0), last) });
   },
 
-  // Wraps, so playback loops rather than stopping dead at the last frame.
   stepFrame(delta) {
     const { frameIndex, frameCount } = store.get();
     if (frameCount < 1) return;
@@ -100,13 +91,11 @@ export const actions = {
   setTeehrVariable: (teehrVariable) => store.set({ teehrVariable }),
   setTrouteVariable: (trouteVariable) => store.set({ trouteVariable }),
 
-  // Attribute first: a subscriber reading CSS variables would otherwise be one theme behind.
   setTheme(theme) {
     applyTheme(theme);
     store.set({ theme });
   },
 
-  // Layers is a nested object, so patch it whole rather than relying on the shallow merge.
   setLayer(name, value) {
     store.set({ layers: { ...store.get().layers, [name]: value } });
   },

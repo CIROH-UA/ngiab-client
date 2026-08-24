@@ -36,18 +36,10 @@ import duckdb
 
 logger = logging.getLogger(__name__)
 
-# Matches the path the Dockerfile and apptainer/ngiab.def install into. The previous default
-# in teehr_warehouse.py pointed at /usr/lib/tethys/duckdb_extensions, which does not exist in
-# the image -- it worked only because DUCKDB_HOME is always set, and would have failed in any
-# process that lost the variable.
 DEFAULT_DUCKDB_HOME = "/opt/duckdb_extensions"
 
-# Loaded for every connection. sqlite and iceberg are what the TEEHR warehouse reader needs;
-# avro is pulled in by iceberg at query time and is listed so it never autoloads.
 _BASE_EXTENSIONS = ("sqlite", "iceberg", "avro")
 
-# Loaded only against object storage. aws travels with httpfs because PROVIDER
-# credential_chain autoloads it over the network otherwise, which fails offline.
 _OBJECT_STORAGE_EXTENSIONS = ("httpfs", "aws")
 
 STORAGE_BACKEND_ENV = "NGIAB_STORAGE_BACKEND"
@@ -246,9 +238,6 @@ def _query_once(sql, parameters=None):
         cursor.close()
 
 
-#: Substrings that mark a DuckDB S3 failure as "these credentials are no longer good"
-#: rather than "this object is missing". Matched on the message because httpfs reports the
-#: store's HTTP status in prose rather than through a typed exception.
 _AUTH_FAILURE_MARKERS = (
     "http 401", "http 403", "expiredtoken", "invalidaccesskeyid",
     "signaturedoesnotmatch", "access denied",

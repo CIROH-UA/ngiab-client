@@ -24,14 +24,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-# The positional contract every catchment reader depends on: column 0 is the step, column 1
-# is the timestamp, and everything after is a plottable variable. See
-# tethysapp/ngiab/utils.py get_catchment_variables.
 STEP_COLUMN = "Time Step"
 TIME_COLUMN = "Time"
 
-# A projected CRS, as real hydrofabric GeoPackages use, so gpkg_layer_bounds_4326's
-# transform_bounds path is exercised rather than trivially skipped.
 FABRIC_CRS = "EPSG:5070"
 
 DEFAULT_VARIABLES = ("RAIN_RATE", "Q_OUT", "SOIL_STORAGE")

@@ -7,8 +7,6 @@ function mount() {
   return el;
 }
 
-// The T-Route tab plots a channel while the map selected a polygon, and the note is the
-// only thing on screen that says so.
 describe('ngiab-chart note', () => {
   let el;
 

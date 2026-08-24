@@ -23,7 +23,6 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
-# What the image ships. Matching either of these in a hosted deployment is the failure.
 BAKED_PASSWORD = "pass"
 BAKED_SECRET_KEY = "ngiab-local-default-override-in-any-shared-deployment"
 

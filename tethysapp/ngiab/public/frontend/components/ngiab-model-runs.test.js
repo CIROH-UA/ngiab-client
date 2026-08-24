@@ -3,10 +3,6 @@ import { actions } from '../store/app-store.js';
 import appAPI from '../api/app.js';
 import './ngiab-model-runs.js';
 
-// Deleting a run destroys its outputs and cannot be undone, and window.confirm is the only
-// thing between a misclick and a user's model output. That guard had no test at all until
-// this file: the component's other behaviour is visible the moment you open the page, and
-// this one is visible only when it is too late.
 
 function mount() {
   const el = document.createElement('ngiab-model-runs');
@@ -82,7 +78,6 @@ describe('ngiab-model-runs', () => {
     expect(removeCalls).to.deep.equal([{ model_run_id: 'preproc-test' }]);
   });
 
-  // It used to promise the opposite, until removal became destructive in the same change.
   it('says the outputs are deleted, because they are', async () => {
     let asked = '';
     window.confirm = (message) => {
@@ -116,7 +111,6 @@ describe('ngiab-model-runs', () => {
     expect(asked).to.contain('preproc-test');
   });
 
-  // Deleting takes a permission now, not just a session; these cover what the user is shown.
   describe('the delete control', () => {
     afterEach(() => { delete window.__NGIAB__; });
 

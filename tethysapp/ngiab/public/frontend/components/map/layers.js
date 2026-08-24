@@ -41,7 +41,6 @@ export const flowPathsFilter = (view) =>
     ? ['in', ['get', 'divide_id'], ['literal', view.catchmentIds]]
     : ['==', ['get', 'divide_id'], -1];
 
-// The flowpath tiles carry the divide they drain, so the selected reach needs no lookup.
 export const flowPathHighlightFilter = (view) =>
   view.selectedCatchmentId == null
     ? ['==', ['get', 'divide_id'], -1]
@@ -63,7 +62,6 @@ const teehrAware = (view, teehrColor, plainColor) =>
     ? ['case', hasTeehrNexus(view), themed(view, teehrColor), themed(view, plainColor)]
     : themed(view, plainColor);
 
-// Feature-state, not a filter: the bin changes every frame. See README.
 export const choroplethFillColor = (view) => {
   const ramp = RAMP[view.theme === 'dark' ? 'dark' : 'light'];
   const cases = [];
@@ -75,11 +73,6 @@ export const catchmentFillColor = (view) =>
   view.choropleth ? choroplethFillColor(view) : teehrAware(view, TEEHR_FILL, PLAIN_FILL);
 export const flowPathsLineColor = (view) => teehrAware(view, TEEHR_LINE, PLAIN_LINE);
 
-// Visible at the zoom a run is framed at. The old default faded from nothing at zoom 7,
-// which is where "Zoom to run extent" lands a large basin: the Susquehanna run fits at 6.88
-// and drew nothing at all until the user zoomed in. Fading by zoom would make sense for the
-// whole national fabric, but this layer is filtered to one run's catchments, so there is no
-// mass to thin out -- which is why choropleth mode already had this exception.
 export const catchmentFillOpacity = () => ({ stops: [[4, 0.85], [9, 0.9]] });
 
 export const catchmentOutlineColor = (view) => {
@@ -129,15 +122,11 @@ export function flowPathsSpec(view) {
     paint: {
       'line-color': flowPathsLineColor(view),
       'line-width': { stops: [[7, 1], [10, 2]] },
-      // Unchanged: the tiles drop divide_id below zoom 8, so no opacity can reveal a run.
       'line-opacity': { stops: [[7, 0], [11, 1]] },
     },
   };
 }
 
-// Two of the three chart tabs describe this reach rather than the polygon, so selecting a
-// catchment draws the flowpath it routes through. Fades in a zoom earlier than the network
-// it belongs to: one line reads at a zoom where the whole network is still clutter.
 export function flowPathHighlightSpec(view) {
   return {
     id: 'flowpath-highlight',

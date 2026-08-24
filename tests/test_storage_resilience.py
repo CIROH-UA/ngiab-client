@@ -28,9 +28,6 @@ def local(monkeypatch):
     monkeypatch.delenv(duckdb_conn.STORAGE_BACKEND_ENV, raising=False)
 
 
-# ---- Credentials that expire --------------------------------------------------
-
-
 def _raiser(message, times=1):
     """A callable that fails with a DuckDB error the first `times` calls, then succeeds."""
     state = {"n": 0}
@@ -98,9 +95,6 @@ def test_it_retries_only_once(hosted, monkeypatch):
     assert run.calls() == 2
 
 
-# ---- Missing versus unreachable -----------------------------------------------
-
-
 def _client_error(code):
     """Shaped like a botocore ClientError, which is what S3 raises for a missing key."""
     return SimpleNamespace(response={"Error": {"Code": code}})
@@ -125,9 +119,6 @@ def test_an_error_with_no_response_does_not_read_as_missing():
     assert run_store._is_missing(RuntimeError("connection reset")) is False
 
 
-# ---- T-route that cannot be read from a bucket --------------------------------
-
-
 def test_parquet_troute_is_readable_anywhere(hosted):
     assert ngiab_utils.troute_readable_here(".parquet") is True
 
@@ -150,9 +141,6 @@ def test_an_unconverted_run_returns_no_frame_instead_of_raising(ingest, monkeypa
     run_store.clear_caches()
 
     assert ngiab_utils.get_troute_df(run_id) is None
-
-
-# ---- Batched deletion ----------------------------------------------------------
 
 
 class _Client:

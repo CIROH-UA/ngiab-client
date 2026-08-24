@@ -9,7 +9,6 @@ export function toNumericIds(ids) {
     }
     if (typeof raw !== 'string') continue;
 
-    // Require digits after stripping the prefix: Number('') is 0, not NaN.
     const digits = raw.replace(/^\D+/, '');
     if (!/^\d/.test(digits)) continue;
 

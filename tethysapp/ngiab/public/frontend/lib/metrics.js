@@ -1,6 +1,3 @@
-// Shapes the TEEHR metrics payload for display.
-
-// teehr's four metrics; anything unrecognised falls back to title case.
 const METRIC_LABELS = {
   kling_gupta_efficiency: 'KGE',
   nash_sutcliffe_efficiency: 'NSE',
@@ -32,7 +29,6 @@ export function toMetricsTable(metrics) {
   const source = Array.isArray(metrics) ? metrics.filter((r) => r && typeof r === 'object') : [];
   if (!source.length) return { columns: [], rows: [] };
 
-  // Union columns across rows so a configuration missing from row one is kept.
   const keys = [];
   for (const row of source) {
     for (const key of Object.keys(row)) {

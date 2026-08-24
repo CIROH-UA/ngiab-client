@@ -3,9 +3,6 @@ import appAPI from '../api/app.js';
 import transfer from '../lib/upload.js';
 import './ngiab-upload-run.js';
 
-// The upload panel's job is to keep a three-step transfer legible: reserve, send, wait. The
-// waiting is the part worth testing -- unpacking outlives the request that starts it, so the
-// outcome only ever arrives by polling, and a poll that stops early looks like a hung upload.
 
 function mount() {
   const el = document.createElement('ngiab-upload-run');
@@ -19,7 +16,6 @@ function file(name = 'gage-99.tar.gz') {
   return new File([new Uint8Array([1, 2, 3])], name, { type: 'application/gzip' });
 }
 
-// The panel reads .files, which cannot be assigned; a DataTransfer builds a real FileList.
 function attach(el, f) {
   const dt = new DataTransfer();
   dt.items.add(f);
@@ -34,7 +30,6 @@ describe('ngiab-upload-run', () => {
   beforeEach(() => {
     real = { ...appAPI };
     realTransfer = { ...transfer };
-    // No server here to receive the bytes; these tests are about the steps around them.
     transfer.putPresigned = async () => ({ status: 200 });
     transfer.postToPortal = async () => ({ status: 200 });
     window.__NGIAB__ = { CAN_UPLOAD: true, SIGNED_IN: true };
@@ -137,7 +132,6 @@ describe('ngiab-upload-run', () => {
     attach(el, file());
     el.querySelector('#upload-start').click();
 
-    // Two polls at 2s apiece; the fake transfer resolves immediately.
     await new Promise((resolve) => setTimeout(resolve, 4600));
     expect(polls).to.be.greaterThan(1);
     expect(announced).to.equal('gage-99');
@@ -164,7 +158,6 @@ describe('ngiab-upload-run', () => {
     expect(el.querySelector('#upload-status').textContent).to.contain('still going');
   }).timeout(10000);
 
-  // A poll that stops on the first hiccup reports still-running work as failed.
   it('keeps polling through a retryable failure instead of giving up', async () => {
     appAPI.createUpload = async () => ({ job: 'g'.repeat(32), mode: 'direct', name: 'g' });
     appAPI.uploadRunUrl = () => '/uploadRun/';

@@ -37,9 +37,6 @@ def signed_in_post(db, monkeypatch):
     return request
 
 
-# ---- Tethys's decorator is inert here; Django's is not ---------------------
-
-
 def test_tethys_login_required_passes_anonymous_through_under_an_open_portal():
     """The claim the whole design rests on, asserted rather than assumed.
 
@@ -75,9 +72,6 @@ def test_our_decorator_refuses_the_same_request():
     request = RequestFactory().post("/x/")
     request.user = AnonymousUser()
     assert view(request).status_code == 401
-
-
-# ---- The endpoints themselves ----------------------------------------------
 
 
 @pytest.mark.parametrize("endpoint", ["removeModelRun"])
@@ -135,9 +129,6 @@ def test_reads_are_untouched():
         assert "write_login_required" not in getattr(view, "__qualname__", ""), name
 
 
-# ---- Shipped credentials --------------------------------------------------
-
-
 @pytest.fixture
 def hosted(monkeypatch):
     monkeypatch.setenv("NGIAB_STORAGE_BACKEND", "s3")
@@ -191,9 +182,6 @@ def test_local_keeps_the_baked_defaults(local, monkeypatch):
     monkeypatch.setenv("PORTAL_SUPERUSER_PASSWORD", ensure_superuser.BAKED_PASSWORD)
     monkeypatch.setenv("TETHYS_SECRET_KEY", ensure_superuser.BAKED_SECRET_KEY)
     call_command("ensure_superuser", "--check-only")
-
-
-# ---- Provisioning ----------------------------------------------------------
 
 
 def test_a_superuser_is_created_from_the_environment(db, local, monkeypatch):

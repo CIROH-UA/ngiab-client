@@ -31,8 +31,6 @@ from django.conf import settings
 from django.urls import re_path
 from django.views.static import serve as django_serve
 
-# STATIC_URL is "/static/" by default but may be prefixed; strip the leading slash so the
-# pattern is relative to the root urlconf, and escape it so a dot cannot become a wildcard.
 _prefix = re.escape((settings.STATIC_URL or "/static/").lstrip("/"))
 
 def serve(request, path, document_root=None, show_indexes=False):

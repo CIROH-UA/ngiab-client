@@ -7,7 +7,6 @@ export class NgiabSearch extends HTMLElement {
 
     this._matches = [];
     this._activeIndex = -1;
-    // True only when a search really matched nothing, not when a result was picked.
     this._noMatches = false;
 
     this._input = this.querySelector('#map-search');
@@ -37,7 +36,6 @@ export class NgiabSearch extends HTMLElement {
           break;
         case 'Enter':
           event.preventDefault();
-          // Enter with one match and no explicit highlight should still pick it.
           this._choose(this._activeIndex >= 0 ? this._activeIndex : 0);
           break;
         case 'Escape':
@@ -48,7 +46,6 @@ export class NgiabSearch extends HTMLElement {
       }
     };
 
-    // Re-open the list when returning to a non-empty box.
     this._onFocus = () => {
       if (this._input.value.trim() && !this._matches.length) this._onInput();
     };
@@ -97,7 +94,6 @@ export class NgiabSearch extends HTMLElement {
       id.textContent = entry.label;
       li.append(id);
 
-      // Positive-only: absence could mean 'no gauge' or 'tile not loaded'.
       if (this._hasTeehr(entry.numeric)) {
         const badge = document.createElement('span');
         badge.className = 'teehr';

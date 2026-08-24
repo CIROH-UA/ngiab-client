@@ -42,9 +42,6 @@ def archived(mini_run_factory, tmp_path):
     return _archived
 
 
-# ---- The staging directory is on the same filesystem -------------------------
-
-
 def test_the_workspace_lives_under_the_storage_root(storage_root):
     """Publishing is only a rename if the scratch space is on the same filesystem.
 
@@ -68,9 +65,6 @@ def test_the_workspace_is_not_listed_as_a_run(storage_root):
     finally:
         import shutil
         shutil.rmtree(workspace, ignore_errors=True)
-
-
-# ---- The name is claimed by the rename, not by the check ---------------------
 
 
 def test_publishing_onto_an_existing_run_is_refused(storage_root, archived):
@@ -103,9 +97,6 @@ def test_nothing_is_left_in_staging_after_a_publish(storage_root, archived):
     leftovers = [p for p in staging.iterdir() if p.name.startswith("ingest-")] \
         if staging.exists() else []
     assert leftovers == []
-
-
-# ---- Object storage: manifest last, and clean up a partial run ---------------
 
 
 class _Recorder:

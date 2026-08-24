@@ -1,9 +1,3 @@
-// Sending an archive, with progress, to wherever the server says it should go.
-//
-// XMLHttpRequest rather than fetch, for one reason: fetch reports no upload progress. A
-// multi-gigabyte transfer with no indication of movement is indistinguishable from a hung
-// one, and the whole point of the presigned route is that the archive can be that large.
-
 import { csrfToken } from '../api/client.js';
 
 function send(request, body, onProgress) {
@@ -21,8 +15,6 @@ function send(request, body, onProgress) {
   });
 }
 
-// Straight into the bucket. The archive never passes through the portal, so a large upload
-// does not occupy the single worker that is also serving every other request.
 function putPresigned(url, file, onProgress) {
   const request = new XMLHttpRequest();
   request.open('PUT', url, true);
@@ -30,7 +22,6 @@ function putPresigned(url, file, onProgress) {
   return send(request, file, onProgress);
 }
 
-// No bucket configured, so the portal takes the bytes itself.
 function postToPortal(url, { job, name, file }, onProgress) {
   const body = new FormData();
   body.append('job', job);
@@ -44,8 +35,6 @@ function postToPortal(url, { job, name, file }, onProgress) {
   return send(request, body, onProgress);
 }
 
-// An object rather than bare exports, so a test can replace a transfer without a server to
-// receive it. Same shape as appAPI, and swapped the same way.
 const transfer = { putPresigned, postToPortal };
 
 export default transfer;

@@ -26,7 +26,6 @@ import { userMessage } from '../../lib/errors.js';
 const escapeHtml = (value) =>
   String(value).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-// Global, not per-map: registering per render would re-register on every change.
 maplibregl.addProtocol('pmtiles', new Protocol({ metadata: true }).tile);
 
 export class NgiabMap extends HTMLElement {
@@ -39,7 +38,6 @@ export class NgiabMap extends HTMLElement {
     };
     this._nexusIndex = new CatchmentNexusIndex();
 
-    // undefined, not null: starting equal to a legitimate "no run" skipped the first sync.
     this._loadedRunId = undefined;
 
     this._statusEl = document.getElementById('map-status');
@@ -59,7 +57,6 @@ export class NgiabMap extends HTMLElement {
     this._searchInputEl = document.getElementById('map-search');
     this._loadedVariableKey = null;
 
-    // Seed from the URL so a shared link opens the right run.
     actions.setModelRun(getModelRunId() || null);
 
     this._createMap();
@@ -67,7 +64,6 @@ export class NgiabMap extends HTMLElement {
 
     this._unsubscribe = store.subscribe(() => this._onStoreChange());
 
-    // The chart pane is resizable, and MapLibre does not observe container size changes.
     this._onPaneResize = () => this._map?.resize();
     window.addEventListener('ngiab-pane-resize', this._onPaneResize);
   }
@@ -114,24 +110,19 @@ export class NgiabMap extends HTMLElement {
 
     map.on('click', (event) => this._handleClick(event));
 
-    // 'idle' means tiles settled, and is the only event that fires with the style ready.
     map.on('idle', () => {
       this._ensureLayers();
       this._nexusIndex.reindex(map);
       this._choropleth.reapply();
 
-      // The initial state, which no store change announces; guarded by _loadedRunId.
       this._syncModelRun();
     });
 
-    // Harmless today, but reinstalls sooner if a future version fires this when loaded.
     map.on('styledata', () => this._ensureLayers());
 
-    // Surface tile/source failures rather than leaving a silently empty map.
     map.on('error', (event) => console.error('[map] maplibre error', event.error ?? event));
   }
 
-  // setStyle() wipes our sources and layers; reinstall from 'idle'. See README.
   _ensureLayers() {
     const map = this._map;
     if (!map?.isStyleLoaded()) return; // addSource throws while a style is loading
@@ -151,7 +142,6 @@ export class NgiabMap extends HTMLElement {
     this._syncChartPane();
   }
 
-  // Reloads only when the run or the chosen variable changes; scrubbing must not refetch.
   _syncMapVariable() {
     const { modelRunId, mapVariable } = store.get();
     const key = `${modelRunId}::${mapVariable ?? ''}`;
@@ -177,7 +167,6 @@ export class NgiabMap extends HTMLElement {
         variable,
       });
 
-      // A slow response for a variable the user already moved on from must not paint.
       if (this._loadedVariableKey !== `${runId}::${variable}`) return;
 
       this._choropleth.load(matrix);
@@ -213,7 +202,6 @@ export class NgiabMap extends HTMLElement {
     if (this._chartPaneEl.hidden !== shouldShow) return; // already correct
 
     this._chartPaneEl.hidden = !shouldShow;
-    // MapLibre does not observe container resizes, so tell it explicitly.
     this._map.resize();
   }
 
@@ -224,7 +212,6 @@ export class NgiabMap extends HTMLElement {
     const hit = catchmentAtPoint(this._map, event);
     if (!hit) return;
 
-    // The gauge for a catchment is whichever one sits on its downstream `toid`.
     this._select({
       numeric: hit.numeric,
       label: this._labelFor(hit.numeric),
@@ -240,7 +227,6 @@ export class NgiabMap extends HTMLElement {
         ? (this._local.teehrUsgsByNexus.get(nexusId) ?? null)
         : this._lookupTeehrId(numeric);
 
-    // troute wants the prefixed label ('cat-1015'), not the bare numeric tile id.
     actions.selectCatchment({
       id: numeric,
       label: catchmentLabel,
@@ -258,7 +244,6 @@ export class NgiabMap extends HTMLElement {
     this._reportSelection({ label: catchmentLabel, teehrId, located });
   }
 
-  // Only catchments in this run get a tip; the tile layer covers all of CONUS.
   _describeCatchment(numeric) {
     if (!this._local.catchmentIds.includes(numeric)) return '';
 
@@ -270,7 +255,6 @@ export class NgiabMap extends HTMLElement {
     const { mapVariable, frameIndex } = store.get();
     if (mapVariable && this._choropleth.isLoaded) {
       const bin = this._choropleth.binAt(numeric, frameIndex);
-      // Bin 0 is no-data, which is a different statement from "the lowest class".
       const entry = legendEntries(this._choropleth.breaks, store.get().theme)[bin - 1];
       const value = bin && entry ? legendLabel(entry) : 'no value at this timestep';
       rows.push(`<span class="tip-value">${escapeHtml(mapVariable)}: ${escapeHtml(value)}</span>`);
@@ -342,7 +326,6 @@ export class NgiabMap extends HTMLElement {
     this._searchEl?.setIndex(this._local.catchmentIndex, (n) => this._lookupTeehrId(n) != null);
     this._legendEl?.setTeehrCount(teehr?.count ?? 0);
 
-    // Say this out loud: an empty run looks identical to a broken map otherwise.
     if (!geo.catchments) {
       this._setEmptyState(
         'Nothing to draw for this model run',
@@ -361,7 +344,6 @@ export class NgiabMap extends HTMLElement {
   }
 
   async _loadGeoSpatial(runId) {
-    // getJSON raises on a bad status and on the HTTP-200-plus-error-key shape.
     const body = await appAPI.getGeoSpatialData({ model_run_id: runId });
 
     const catchments = Array.isArray(body.catchments) ? body.catchments : [];
@@ -371,7 +353,6 @@ export class NgiabMap extends HTMLElement {
 
     refresh(this._map, this._view);
 
-    // bounds is a flat [west, south, east, north] from gdf.total_bounds.tolist().
     this._local.bounds = body.bounds ?? null;
     if (body.bounds) this._map.fitBounds(body.bounds, { padding: 20, duration: 1000 });
 
@@ -394,7 +375,6 @@ export class NgiabMap extends HTMLElement {
   }
 
 
-  // A title hides the overlay when null, and names which of the two empty cases this is.
   _setEmptyState(title, body = '') {
     if (!this._emptyEl) return;
     this._emptyEl.hidden = !title;
@@ -403,7 +383,6 @@ export class NgiabMap extends HTMLElement {
       this._emptyBodyEl.textContent = body;
     }
 
-    // Disabled rather than hidden, matching the shading select beside them.
     const usable = !title;
     if (this._searchInputEl) this._searchInputEl.disabled = !usable;
     if (this._resetViewEl) this._resetViewEl.disabled = !usable;
@@ -442,10 +421,8 @@ export class NgiabMap extends HTMLElement {
 
     bind('toggle-theme', (on) => {
       actions.setTheme(on ? 'dark' : 'light');
-      // The styledata handler reinstalls the layers once the new style is ready.
       this._map.setStyle(STYLE_URLS[on ? 'dark' : 'light']);
     });
-    // Phrased positively, like the others; the store still stores the negation.
     bind('toggle-catchments', (shown) => actions.setLayer('catchmentHidden', !shown));
     bind('toggle-teehr', (show) => actions.setLayer('showTeehr', show));
 
@@ -467,7 +444,6 @@ export class NgiabMap extends HTMLElement {
     if (this._local.bounds) this._map.fitBounds(this._local.bounds, { padding: 20, duration: 800 });
   }
 
-  // Populated per run: a different run wrote different variables.
   async _loadVariables(runId) {
     if (!this._mapVariableEl) return;
     try {

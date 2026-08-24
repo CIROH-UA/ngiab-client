@@ -34,9 +34,6 @@ def refused(monkeypatch):
     monkeypatch.setattr(controllers, "has_permission", lambda request, perm: False)
 
 
-# ---- The three answers ------------------------------------------------------
-
-
 def test_anonymous_is_told_to_sign_in(refused):
     """401, so api/client.js redirects to the login page rather than showing a message."""
     response = controllers.removeModelRun(_post(AnonymousUser()))
@@ -65,9 +62,6 @@ def test_a_superuser_needs_no_grant(db, refused):
     assert controllers.removeModelRun(_post(user)).status_code == 404
 
 
-# ---- Failure denies ---------------------------------------------------------
-
-
 def test_a_broken_permission_lookup_denies(db, monkeypatch):
     """The only action behind this destroys data, so an unanswerable question is a no."""
     def explode(request, perm):
@@ -83,9 +77,6 @@ def test_an_inactive_session_is_not_authenticated(refused):
     assert controllers.may_manage_runs(_post(AnonymousUser())) is False
 
 
-# ---- The declaration itself -------------------------------------------------
-
-
 def test_the_app_declares_the_permission():
     """A permission the app never declares cannot be granted in the admin."""
     from tethysapp.ngiab.app import App
@@ -93,9 +84,6 @@ def test_the_app_declares_the_permission():
     groups = App().permissions()
     names = [p.name for group in groups for p in group.permissions]
     assert controllers.DELETE_PERMISSION in names
-
-
-# ---- The page tells the frontend what to render -----------------------------
 
 
 def _home_context(user, monkeypatch):
@@ -137,9 +125,6 @@ def test_an_anonymous_visitor_is_marked_signed_out(refused, monkeypatch):
     assert context["can_delete"] is False
 
 
-# ---- Not merely failing closed ----------------------------------------------
-
-
 @pytest.fixture
 def installed_app(db):
     """The TethysApp row a real portal has, which is what has_permission resolves through.
@@ -176,7 +161,6 @@ def _grant(user, app):
         defaults={"name": "Delete model runs"},
     )
     assign_perm(f"tethys_apps.{codename}", user, app)
-    # has_perm caches on the user instance, so re-read rather than reuse.
     return get_user_model().objects.get(pk=user.pk)
 
 

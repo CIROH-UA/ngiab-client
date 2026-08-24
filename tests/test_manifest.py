@@ -31,9 +31,6 @@ def distilled(mini_run):
     return mini_run, document
 
 
-# ---- Distilled facts match the probes they replace -------------------------
-
-
 def test_bounds_are_reprojected_to_4326(distilled):
     """R8: the extent the map frames on, read from the layer header at ingest.
 
@@ -99,9 +96,6 @@ def test_troute_variable_metadata_survives(distilled):
     assert variables["nudge"]["long_name"] == "streamflow nudge value"
 
 
-# ---- Degrading, rather than raising ----------------------------------------
-
-
 def test_run_without_a_gpkg_records_absence(mini_run_factory):
     """A run whose config holds no GeoPackage is a real case, not an error."""
     run = mini_run_factory()
@@ -155,9 +149,6 @@ def test_unconventional_flowpath_ids_are_carried_verbatim(mini_run_factory):
     assert manifest.crosswalk(run) == {"link-7": "cat-100"}
 
 
-# ---- TEEHR presence and configuration --------------------------------------
-
-
 def test_teehr_absence_is_recorded(distilled):
     """R15: evaluation_dir's os.path.isdir returns False for an s3:// path regardless."""
     _, document = distilled
@@ -170,9 +161,6 @@ def test_teehr_configuration_name_read_from_the_producer_manifest(mini_run_facto
     with open(os.path.join(run, "teehr_run_manifest.json"), "w") as handle:
         json.dump({"teehr_configuration_name": "ngen_mini"}, handle)
     assert manifest.distill(run)["teehr"]["configuration_name"] == "ngen_mini"
-
-
-# ---- Identity: R14 ---------------------------------------------------------
 
 
 def test_legacy_uuids_is_a_list(mini_run):
@@ -219,9 +207,6 @@ def test_created_is_captured(mini_run):
     assert document["created"] == "2026-08-22T10:00:00+00:00"
 
 
-# ---- Version token ---------------------------------------------------------
-
-
 def test_version_token_is_stable_for_unchanged_content(mini_run):
     """Unit 7's backfill must be idempotent, so the token cannot be random."""
     first = manifest.distill(mini_run, created="2026-08-22T10:00:00+00:00")
@@ -247,9 +232,6 @@ def test_version_token_changes_when_a_catchment_is_added(mini_run):
     with open(os.path.join(output_dir, "cat-999.csv"), "w") as handle:
         handle.write("Time Step,Time,RAIN_RATE\n0,2017-01-01 00:00:00,0.0\n")
     assert manifest.distill(mini_run)["version_token"] != before
-
-
-# ---- Hot manifest stays small ----------------------------------------------
 
 
 def test_hot_manifest_does_not_embed_the_bulk(distilled):
@@ -297,9 +279,6 @@ def test_writing_twice_is_idempotent(mini_run):
     assert first == second
 
 
-# ---- Integration: the manifest answers what the probes answer --------------
-
-
 def test_manifest_alone_answers_every_probe(distilled):
     """The claim Unit 9 depends on, stated as one assertion.
 
@@ -315,9 +294,6 @@ def test_manifest_alone_answers_every_probe(distilled):
     assert manifest.catchments(run)
     assert manifest.crosswalk(run)
     assert document["troute"]["variables"]
-
-
-# ---- Sidecar caching -------------------------------------------------------
 
 
 def test_crosswalk_is_cached_between_calls(distilled, mocker):

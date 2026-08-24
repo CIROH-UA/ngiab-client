@@ -41,9 +41,6 @@ def _loaded_extensions(cursor):
     return {row[0] for row in rows}
 
 
-# ---- Backend predicate -----------------------------------------------------
-
-
 def test_backend_defaults_to_local(local_backend):
     assert duckdb_conn.storage_backend() == "local"
     assert duckdb_conn.is_object_storage() is False
@@ -58,9 +55,6 @@ def test_unrecognised_backend_stays_local(monkeypatch):
     """A misspelling must not silently reach for a bucket this deployment cannot reach."""
     monkeypatch.setenv(duckdb_conn.STORAGE_BACKEND_ENV, "s33")
     assert duckdb_conn.storage_backend() == "local"
-
-
-# ---- Extensions ------------------------------------------------------------
 
 
 def test_local_backend_does_not_load_httpfs(local_backend):
@@ -124,9 +118,6 @@ def test_default_extension_home_matches_the_image(monkeypatch):
     assert os.path.isdir(duckdb_conn.DEFAULT_DUCKDB_HOME)
 
 
-# ---- Literal escaping ------------------------------------------------------
-
-
 def test_quote_wraps_and_doubles_internal_quotes():
     assert duckdb_conn.quote("/runs/plain") == "'/runs/plain'"
     assert duckdb_conn.quote("/runs/o'brien") == "'/runs/o''brien'"
@@ -160,9 +151,6 @@ def test_quoted_path_survives_a_real_read(local_backend, tmp_path):
     assert frame["Q_OUT"].tolist() == [1.5]
 
 
-# ---- Connection behaviour --------------------------------------------------
-
-
 def test_connect_returns_independent_cursors(local_backend):
     """Separate handles, so one caller closing does not disturb another."""
     first = duckdb_conn.connect()
@@ -181,9 +169,6 @@ def test_the_connection_is_shared_not_reopened(local_backend, mocker):
     for _ in range(5):
         duckdb_conn.connect().close()
     assert spy.call_count == 1
-
-
-# ---- The five call sites that never escaped, driven for real -----------------
 
 
 @pytest.fixture
@@ -252,6 +237,5 @@ def test_warehouse_attach_path_is_quoted(tmp_path):
     (warehouse / "local").mkdir(parents=True)
     (warehouse / "local" / "version").write_text("0.6.2")
 
-    # No catalog file, so this must fail as unreachable -- not as a SQL syntax error.
     with pytest.raises(teehr_warehouse.WarehouseUnreachable):
         teehr_warehouse.WarehouseReader(str(warehouse))

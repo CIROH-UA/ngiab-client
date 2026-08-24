@@ -1,7 +1,6 @@
 import { store } from '../store/app-store.js';
 import { legendEntries, legendLabel } from '../lib/choropleth.js';
 
-// Explains whatever the catchment colours currently mean. Without it the map is decorative.
 export class NgiabLegend extends HTMLElement {
   connectedCallback() {
     this._breaks = [];
@@ -23,7 +22,6 @@ export class NgiabLegend extends HTMLElement {
   render() {
     const { theme, mapVariable, layers, modelRunId } = store.get();
 
-    // Nothing is drawn without a run, and a key to an empty map explains nothing.
     if (!modelRunId) {
       this.innerHTML = '';
       return;
@@ -38,7 +36,6 @@ export class NgiabLegend extends HTMLElement {
     this.render();
   }
 
-  // A strip, not a row per class: eight rows pushed the card stack past the map height.
   _renderGraduated(theme) {
     const entries = legendEntries(this._breaks, theme);
     const segments = entries
@@ -51,13 +48,11 @@ export class NgiabLegend extends HTMLElement {
     const low = entries.length ? legendLabel(entries[0]) : '';
     const high = entries.length > 1 ? legendLabel(entries[entries.length - 1]) : '';
 
-    // A variable that never varies produces one class, and "1 quantile classes" reads as a bug.
     const note =
       entries.length > 1
         ? `${entries.length} quantile classes, this run only`
         : 'constant across every catchment in this run';
 
-    // No units: nothing in the run's config declares them, so inventing one would be a lie.
     this.innerHTML = `
       <div class="legend-title" title="${this._variable}">${this._variable}</div>
       <div class="legend-ramp">${segments}</div>

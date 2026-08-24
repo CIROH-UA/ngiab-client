@@ -52,9 +52,6 @@ def _series(run_id, feature="cat-100"):
     return json.loads(controllers.getTrouteTimeSeries(request).content)
 
 
-# ---- Conversion happens -----------------------------------------------------
-
-
 def test_conversion_writes_a_troute_parquet(converted, ingest):
     run_id = converted()
     troute_dir = ingest.root / run_id / "outputs" / "troute"
@@ -69,9 +66,6 @@ def test_the_source_file_is_left_in_place(converted, ingest):
     run_id = converted()
     names = os.listdir(ingest.root / run_id / "outputs" / "troute")
     assert any(name.endswith(".nc") for name in names)
-
-
-# ---- The response is what must not change -----------------------------------
 
 
 def test_the_response_is_identical_before_and_after_conversion(ingest, converted):
@@ -100,9 +94,6 @@ def test_the_series_has_data_after_conversion(converted):
     assert all(point["x"] and point["y"] is not None for point in points)
 
 
-# ---- CF metadata survives a format that cannot carry it ---------------------
-
-
 def test_variable_labels_survive_conversion(converted):
     """Parquet has no netCDF attributes and DuckDB does not expose its key-value metadata.
 
@@ -125,9 +116,6 @@ def test_the_nudge_caveat_survives_conversion(converted):
     request.user = AnonymousUser()
     nudged = json.loads(controllers.getTrouteTimeSeries(request).content)
     assert "assimilation" in (nudged["note"] or "")
-
-
-# ---- Read once, not twice ---------------------------------------------------
 
 
 def test_the_frame_is_read_once_per_run_not_once_per_request(converted, mocker):
@@ -161,9 +149,6 @@ def test_a_reconverted_run_is_not_served_from_the_old_cache(converted, ingest):
     manifest.clear_caches()
 
     assert ngiab_utils.get_troute_df(run_id) is None
-
-
-# ---- Edges ------------------------------------------------------------------
 
 
 def test_a_feature_absent_from_troute_output_answers_rather_than_crashing(converted):

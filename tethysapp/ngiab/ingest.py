@@ -40,29 +40,14 @@ from . import archive, duckdb_conn, manifest, run_store
 
 logger = logging.getLogger(__name__)
 
-#: Job states. TERMINAL ones stop the client polling.
 PENDING = "pending"
 RUNNING = "running"
 DONE = "done"
 FAILED = "failed"
 TERMINAL = (DONE, FAILED)
 
-#: Objects uploaded at once when publishing a run. Bounded because this shares a host with
-#: the portal; concurrent because each PUT is a round trip and a run is many small objects.
-#: Ten, not more: botocore's default max_pool_connections is 10, and going past it makes
-#: urllib3 discard and reopen connections, spending in handshakes what concurrency saves.
 UPLOAD_CONCURRENCY = int(os.environ.get("NGIAB_UPLOAD_CONCURRENCY", "10"))
 
-#: How long a job may go without a status update before it is presumed dead.
-#:
-#: A SIGKILL -- an OOM kill is the likely one, since conversion is the memory-hungry part --
-#: skips the command's except and finally, so nothing writes a terminal status and the client
-#: polls a job that will never move. Nothing supervises the child, so staleness is the only
-#: signal available.
-#:
-#: A live job is no longer quiet between stages -- the heartbeat re-stamps throughout one --
-#: so this window is now sized for how long a client should wait before believing a job that
-#: has genuinely stopped reporting, not for how long a slow stage might legitimately take.
 STALE_AFTER_SECONDS = float(os.environ.get("NGIAB_JOB_STALE_SECONDS", 30 * 60))
 
 
@@ -83,12 +68,6 @@ def heartbeat_seconds():
     return min(60.0, max(0.05, STALE_AFTER_SECONDS / 4))
 
 
-#: What a newly published run may be called.
-#:
-#: Stricter than run_store._is_plain_name, deliberately. That guard exists to refuse a name
-#: that is not one path component, and it has to keep accepting whatever an operator already
-#: named a directory. Uploading *chooses* the name, so it can insist on one that reads well
-#: in a URL and an object key: no spaces, no leading dot, nothing that needs escaping.
 NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 
@@ -112,9 +91,6 @@ def staging_key(job_id):
 
 def status_key(job_id):
     return _key(job_id, "status.json")
-
-
-# ---- Status, readable from a process that is not doing the work -------------
 
 
 def write_status(job_id, *, only_if_running=False, **fields):
@@ -254,9 +230,6 @@ def _fail_if_stale(document):
     }
 
 
-# ---- The pipeline -----------------------------------------------------------
-
-
 @contextlib.contextmanager
 def _heartbeat(job_id, snapshot):
     """Keep a working job's ``updated`` advancing while a stage is in progress.
@@ -320,7 +293,6 @@ def publish(archive_path, run_name, *, job_id=None, progress=None):
     at = {"fields": {"stage": "starting", "message": "preparing the upload", "run": run_name}}
 
     def say(stage, message):
-        # One assignment, so the heartbeat thread cannot read a half-updated pair.
         at["fields"] = {"stage": stage, "message": message, "run": run_name}
 
         logger.info("[ingest %s] %s", job_id or "-", message)
@@ -334,7 +306,6 @@ def publish(archive_path, run_name, *, job_id=None, progress=None):
         )
     workspace = _workspace()
     try:
-        # Taken before the existence check, so the pair cannot be straddled.
         with run_store.claimed(run_name):
             if run_store.find(run_name) is not None:
                 raise archive.ArchiveRejected(
@@ -468,7 +439,6 @@ def _upload_directory(source, run_name):
         if failure is not None:
             raise failure
 
-        # Last check before the object that makes this a run; see the docstring.
         if backend.exists(manifest_key):
             raise archive.ArchiveRejected(
                 f"A run called {run_name!r} was published while this one was uploading."

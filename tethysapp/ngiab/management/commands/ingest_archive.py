@@ -28,8 +28,6 @@ from tethysapp.ngiab import archive, ingest
 
 logger = logging.getLogger(__name__)
 
-#: Prefix every archive this app writes to disk carries, so cleanup can tell it from a file
-#: an operator named on the command line and still owns.
 _UPLOAD_TEMP_PREFIX = "ngiab-"
 
 
@@ -79,7 +77,6 @@ class Command(BaseCommand):
         finally:
             if job_id:
                 ingest.discard_staged(job_id)
-                # A bare --archive names a file the operator still owns; ours to remove.
                 if path and (path != local_archive or _is_upload_temp(path)):
                     self._discard_local(path)
 

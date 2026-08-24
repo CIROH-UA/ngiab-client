@@ -35,10 +35,7 @@ logger = logging.getLogger(__name__)
 
 SUPPORTED_TEEHR_VERSIONS = SpecifierSet(">=0.6.0,<0.7.0")
 
-# Connection setup moved to duckdb_conn, which every DuckDB caller now shares. The path this
-# module used to default to did not exist in the image; see duckdb_conn.DEFAULT_DUCKDB_HOME.
 
-# Iceberg tables under the `teehr` namespace that the visualizer reads.
 _REQUIRED_TABLES = (
     "configurations",
     "locations",
@@ -102,7 +99,6 @@ class WarehouseReader:
         self._conn: Optional[duckdb.DuckDBPyConnection] = None
         self._open()
 
-    # ---- Lifecycle -------------------------------------------------------
 
     def _open(self):
         if not self._catalog_path.exists():
@@ -111,7 +107,6 @@ class WarehouseReader:
             )
         self._check_version()
         try:
-            # Its own connection: ATTACH mutates the catalog two readers would share.
             self._conn = duckdb_conn.connect_isolated()
             self._conn.execute(
                 f"ATTACH {duckdb_conn.quote(self._catalog_path)} AS cat (TYPE sqlite, READ_ONLY)"
@@ -162,7 +157,6 @@ class WarehouseReader:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    # ---- Catalog snapshot ------------------------------------------------
 
     def _freeze_catalog(self) -> Dict[str, str]:
         """Read ``iceberg_tables`` and return ``{table_name: metadata_location}``.
@@ -177,7 +171,6 @@ class WarehouseReader:
         ).fetchall()
         return {name: location for name, location in rows}
 
-    # ---- Query helper ----------------------------------------------------
 
     def _execute(self, sql: str, params=None):
         """Execute a query, mapping Iceberg path errors to WarehouseMountMirrorBroken."""
@@ -195,7 +188,6 @@ class WarehouseReader:
                 ) from exc
             raise
 
-    # ---- Public API (FR3) -----------------------------------------------
 
     def configuration_exists(self, config_name: str) -> bool:
         """Return True if ``config_name`` is present in the ``configurations`` table."""
@@ -227,7 +219,6 @@ class WarehouseReader:
             f"ORDER BY configuration_name, variable_name",
             [config_name, "nwm30_retrospective"],
         ).fetchall()
-        # Absent configuration returns [], so the frontend says "no evaluation".
         if not any(cfg == config_name for cfg, _ in rows):
             return []
         return [
@@ -261,7 +252,6 @@ class WarehouseReader:
             return []
 
         prim_loc = catalog.get("primary_timeseries")
-        # Semi-joins, not a join plus DISTINCT: only existence matters here.
         observed = (
             f" AND EXISTS (SELECT 1 FROM iceberg_scan('{prim_loc}') p "
             f"             WHERE p.location_id = x.primary_location_id)"
@@ -297,7 +287,6 @@ class WarehouseReader:
         metrics_loc = catalog.get("ngen_metrics")
         if metrics_loc is None:
             return []
-        # Pull the metric columns; ignore timestamp columns that require pytz.
         metric_cols = [
             "root_mean_standard_deviation_ratio",
             "relative_bias",
@@ -314,7 +303,6 @@ class WarehouseReader:
         ).fetchall()
         if not rows:
             return []
-        # Pivot: rows = [(cfg, metric1_val, metric2_val, ...)] -> per-metric dicts.
         by_cfg = {r[0]: r[1:] for r in rows}
         out = []
         for i, metric in enumerate(metric_cols):
@@ -348,10 +336,8 @@ class WarehouseReader:
         xwalk_loc = catalog.get("location_crosswalks")
         if pri_loc is None or sec_loc is None or xwalk_loc is None:
             return []
-        # Re-implements teehr 0.6.2's joined_timeseries_view; the drift test tracks it.
         sql = (
             f"SELECT "
-            # strftime, not CAST AS VARCHAR: that appends an unparseable '-07' offset.
             f"  strftime(p.value_time, '%Y-%m-%d %H:%M:%S') AS value_time, "
             f"  p.value AS primary_value, "
             f"  s.value AS secondary_value "

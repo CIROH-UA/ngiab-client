@@ -30,7 +30,6 @@ describe('filters', () => {
     expect(catchmentSetFilter(view())).to.deep.equal(['in', ['id'], ['literal', [1, 2, 3]]]);
   });
 
-  // An empty set must match nothing: matching everything would draw all of CONUS.
   it('matches nothing when the run has no catchments', () => {
     expect(catchmentSetFilter(view({ catchmentIds: [] }))).to.deep.equal(['==', ['id'], -1]);
     expect(flowPathsFilter(view({ catchmentIds: [] }))).to.deep.equal([
@@ -48,14 +47,12 @@ describe('filters', () => {
     ]);
   });
 
-  // Catchment 0 is falsy; a truthiness check here would refuse to highlight it.
   it('highlights catchment id 0', () => {
     expect(catchmentHighlightFilter(view({ selectedCatchmentId: 0 }))).to.deep.equal([
       '==', ['id'], 0,
     ]);
   });
 
-  // Flowpaths carry divide_id as a real property; divides do not.
   it('filters flowpaths by the divide_id property, not the feature id', () => {
     expect(flowPathsFilter(view())).to.deep.equal([
       'in', ['get', 'divide_id'], ['literal', [1, 2, 3]],
@@ -86,7 +83,6 @@ describe('TEEHR colouring', () => {
 });
 
 describe('layer specs', () => {
-  // The React configs named a source react-map-gl silently overwrote at runtime.
   it('bind to the real source ids', () => {
     expect(catchmentsSpec(view()).source).to.equal(SRC_DIVIDES);
     expect(catchmentHighlightSpec(view()).source).to.equal(SRC_DIVIDES);
@@ -107,7 +103,6 @@ describe('layer specs', () => {
   });
 });
 
-// Minimal stand-in for a MapLibre map: enough to observe what installLayers adds.
 function fakeMap() {
   const sources = new Map();
   const layers = new Map();
@@ -122,7 +117,6 @@ function fakeMap() {
     setFilter: () => {},
     setPaintProperty: () => {},
     setLayoutProperty: () => {},
-    // What setStyle() does to everything we added.
     wipeStyle() {
       sources.clear();
       layers.clear();
@@ -149,7 +143,6 @@ describe('installLayers', () => {
     expect(map.layers.get('catchments-layer')).to.equal(first);
   });
 
-  // The dark-mode regression: setStyle wipes everything and the reinstall must restore it.
   it('restores everything after a style swap wipes it', () => {
     const map = fakeMap();
     installLayers(map, view());
@@ -171,7 +164,6 @@ describe('flowPathHighlightFilter', () => {
     ]);
   });
 
-  // -1 is never a divide id, so nothing is drawn rather than everything.
   it('matches nothing when there is no selection', () => {
     expect(flowPathHighlightFilter({ selectedCatchmentId: null })).to.deep.equal([
       '==',

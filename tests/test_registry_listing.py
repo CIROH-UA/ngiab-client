@@ -53,9 +53,6 @@ def registry_root(tmp_path, mini_run_factory, monkeypatch):
     return str(root)
 
 
-# ---- The contract the four consumers depend on -----------------------------
-
-
 def test_the_producer_emits_every_key_the_consumers_read(registry_root):
     """id, label, path, date, teehr_configuration_name -- the union of all four readers.
 
@@ -94,9 +91,6 @@ def test_unknown_id_still_raises_unknown_model_run(registry_root):
         ngiab_utils._require_run_entry("nope")
 
 
-# ---- R14: links minted before the manifest keep working --------------------
-
-
 def test_a_legacy_uuid_resolves_to_its_run(registry_root):
     assert ngiab_utils._get_model_run_path_by_id(ALPHA_UUID).endswith("/alpha")
 
@@ -117,9 +111,6 @@ def test_both_uuid_spellings_resolve(registry_root):
     assert ngiab_utils._get_model_run_path_by_id(undashed) == (
         ngiab_utils._get_model_run_path_by_id(ALPHA_UUID)
     )
-
-
-# ---- Unusable runs -----------------------------------------------------------
 
 
 def test_a_directory_without_a_manifest_is_not_listed_but_is_not_lost(registry_root):
@@ -167,9 +158,6 @@ def test_an_unknown_schema_version_is_not_silently_trusted(registry_root):
     assert "schema" in reported["alpha"]["reason"].lower()
 
 
-# ---- Reading a run end to end, with nothing stubbed ------------------------
-
-
 def test_endpoints_read_a_run_through_the_manifest_backed_registry(registry_root):
     """The integration claim: a run resolved by directory name serves real data."""
     assert ngiab_utils.getCatchmentsList("alpha") == ["cat-100", "cat-101", "cat-102"]
@@ -187,9 +175,6 @@ def test_endpoints_read_a_run_through_the_manifest_backed_registry(registry_root
 def test_a_run_reached_by_its_legacy_uuid_serves_the_same_data(registry_root):
     """A shared link minted before the manifest must still render its run."""
     assert ngiab_utils.getCatchmentsList(ALPHA_UUID) == ngiab_utils.getCatchmentsList("alpha")
-
-
-# ---- Caching and staleness -------------------------------------------------
 
 
 def test_a_new_run_appears_once_the_window_passes(registry_root, mini_run_factory, monkeypatch):
@@ -217,9 +202,6 @@ def test_the_default_window_is_ten_seconds(monkeypatch):
 def test_an_unparseable_ttl_falls_back_rather_than_crashing(monkeypatch):
     monkeypatch.setenv(run_store.LISTING_TTL_ENV, "soon")
     assert run_store.listing_ttl_seconds() == run_store.DEFAULT_LISTING_TTL_SECONDS
-
-
-# ---- The database is present and unread ------------------------------------
 
 
 def test_the_registry_table_is_gone(db, registry_root):

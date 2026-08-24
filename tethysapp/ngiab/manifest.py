@@ -40,11 +40,8 @@ MANIFEST_NAME = "manifest.json"
 CATCHMENTS_SIDECAR = "manifest_catchments.parquet"
 CROSSWALK_SIDECAR = "manifest_crosswalk.parquet"
 
-# What convert_outputs writes: one parquet per schema group, holding a catchment_id column.
 CONSOLIDATED_PREFIX = "catchments-"
 
-# Mirrors utils._OUTPUT_SUFFIXES: parquet first, because the reader prefers it when both are
-# present and the manifest has to record the one that will actually be read.
 _OUTPUT_SUFFIXES = (".parquet", ".csv")
 
 _DEFAULT_OUTPUT_SUBDIR = os.path.join("outputs", "ngen")
@@ -258,7 +255,6 @@ def _troute(run_path):
     except OSError:
         return None
 
-    # Converted parquet first: it is the pinned shape, and the others are what it came from.
     for suffix in (".parquet", ".csv", ".nc"):
         for name in names:
             if not name.endswith(suffix):
@@ -363,7 +359,6 @@ def _version_token(run_path, output_dir, catchments, gpkg_relative):
             digest.update(f"{name}:?".encode())
     digest.update(f"|catchments:{len(catchments)}".encode())
 
-    # The gpkg counts too; it is the only source for both the crosswalk and the bounds.
     if gpkg_relative:
         full = os.path.join(run_path, gpkg_relative)
         try:
@@ -442,7 +437,6 @@ def write(run_path, document):
     _write_catchments(os.path.join(run_path, CATCHMENTS_SIDECAR), catchments)
     _write_crosswalk(os.path.join(run_path, CROSSWALK_SIDECAR), crosswalk)
 
-    # A rewritten run in this process must not keep serving the previous sidecars.
     clear_caches()
     return hot
 
@@ -555,7 +549,6 @@ def _read_sidecar(path):
     except Exception as exc:  # noqa: BLE001 - re-raised below unless it means "not there"
         if duckdb_conn.is_missing_error(exc):
             return None
-        # Deferred: run_store imports this module, so it cannot be imported at the top.
         from .run_store import StorageUnreachable
 
         raise StorageUnreachable(f"Could not read {path}: {exc}") from exc

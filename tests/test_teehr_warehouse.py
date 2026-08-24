@@ -33,14 +33,6 @@ from tethysapp.ngiab import utils as ngiab_utils
 WAREHOUSE_ENV = "TEEHR_TEST_WAREHOUSE"
 
 
-# The session fixture that used to live here pointed DUCKDB_HOME at a temp directory and
-# reinstalled two extensions into it, because the reader's default path
-# (/usr/lib/tethys/duckdb_extensions) existed only inside the image. Unit 2 corrected that
-# default to the path the build actually installs into, and the suite runs in the image now,
-# so redirecting DUCKDB_HOME served only to hide the real extension directory -- and to make
-# the tests need a network.
-
-
 def _fixture_path():
     path = os.environ.get(WAREHOUSE_ENV)
     if not path:
@@ -71,9 +63,6 @@ def _usgs_id_with_metrics(reader, config_name):
         if reader.get_metrics_for_location(config_name, usgs):
             return usgs
     pytest.skip(f"no USGS location with metrics in fixture warehouse for {config_name}")
-
-
-# ---- Lifecycle / version check ------------------------------------------
 
 
 def test_opens_real_warehouse(warehouse_path):
@@ -128,18 +117,12 @@ def test_context_manager_closes_connection(warehouse_path):
 
 def test_two_readers_are_independent(warehouse_path, tmp_path):
     """Two readers against the same warehouse get isolated connections."""
-    # Simulate a second warehouse by copying the real one to a temp path.
     other = tmp_path / "warehouse_copy"
     shutil.copytree(warehouse_path / "local", other / "local")
     with WarehouseReader(warehouse_path) as a, WarehouseReader(other) as b:
         assert a._conn is not b._conn
-        # Both work independently.
         assert a.list_configurations_for_run("nwm30_retrospective") is not None
         assert b.list_configurations_for_run("nwm30_retrospective") is not None
-    # Closing one must not affect the other (already closed by __exit__).
-
-
-# ---- configuration_exists -----------------------------------------------
 
 
 def test_configuration_exists_for_real_config(reader):
@@ -151,19 +134,14 @@ def test_configuration_exists_returns_false_for_missing(reader):
     assert reader.configuration_exists("ngen_definitely_not_a_real_run_xyz") is False
 
 
-# ---- list_configurations_for_run ----------------------------------------
-
-
 def test_list_configurations_scoped_to_run(reader):
     """Should return entries only for the named run + nwm30_retrospective."""
-    # The fixture warehouse was built with --data_folder_stem ngiab.
     result = reader.list_configurations_for_run("ngen_ngiab")
     assert result, "expected at least the two scoped configurations"
     configs = {entry["value"].split("-")[0] for entry in result}
     assert configs == {"ngen_ngiab", "nwm30_retrospective"}, (
         f"unexpected configurations surfaced: {configs}"
     )
-    # Each entry should have both 'value' and 'label' keys (React contract).
     for entry in result:
         assert set(entry.keys()) == {"value", "label"}
 
@@ -173,15 +151,10 @@ def test_list_configurations_for_unknown_run_is_empty(reader):
     assert reader.list_configurations_for_run("ngen_not_real") == []
 
 
-# ---- list_usgs_locations_for_run ----------------------------------------
-
-
 def test_list_usgs_locations_returns_primary_ids(reader):
     ids = reader.list_usgs_locations_for_run("ngen_ngiab")
-    # Every returned id should start with usgs-
     assert ids
     assert all(i.startswith("usgs-") for i in ids)
-
 
 
 def test_list_crosswalks_returns_all_pairs(reader):
@@ -197,9 +170,6 @@ def test_list_crosswalks_prefix_filter(reader):
     nwm_pairs = reader.list_crosswalks(secondary_prefix="nwm30")
     assert all(p[1].startswith("ngen-") for p in ngen_pairs)
     assert all(p[1].startswith("nwm30-") for p in nwm_pairs)
-
-
-# ---- utils.py integration helpers ---------------------------------------
 
 
 def test_sanitize_stem_rules():
@@ -240,7 +210,6 @@ def test_resolve_configuration_name_falls_back_to_derivation(
             ]
         },
     )
-    # Fixture warehouse was built with --data_folder_stem ngiab.
     assert ngiab_utils._resolve_configuration_name("my_run") == "ngen_ngiab"
 
 
@@ -268,9 +237,6 @@ def test_resolve_configuration_name_unknown_run_id_returns_none(monkeypatch):
     assert ngiab_utils._resolve_configuration_name("nothing") is None
 
 
-# ---- get_metrics_for_location -------------------------------------------
-
-
 def test_get_metrics_for_location_pivoted_shape(reader):
     """Row-per-metric shape with one column per configuration."""
     loc = _usgs_id_with_metrics(reader, "ngen_ngiab")
@@ -283,17 +249,12 @@ def test_get_metrics_for_location_pivoted_shape(reader):
         "nash_sutcliffe_efficiency",
         "kling_gupta_efficiency",
     }
-    # Every row must at least have an ngen_ngiab key (nwm30_retrospective
-    # is expected but may be absent if warehouse data is partial).
     for row in metrics:
         assert "ngen_ngiab" in row
 
 
 def test_get_metrics_for_location_unknown_location_returns_empty(reader):
     assert reader.get_metrics_for_location("ngen_ngiab", "usgs-not-real") == []
-
-
-# ---- get_joined_timeseries (drift guard) --------------------------------
 
 
 def test_get_joined_timeseries_unknown_location(reader):
@@ -321,7 +282,7 @@ def test_get_joined_timeseries_x_values_are_chart_parseable(reader):
     )
     iso_noisy = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$")
     for s in series:
-        for pt in s["data"][:5]:  # spot-check first few points
+        for pt in s["data"][:5]:
             assert isinstance(pt["x"], str), f"expected str, got {type(pt['x'])}"
             assert iso_noisy.match(pt["x"]), (
                 f"x value {pt['x']!r} has unexpected shape; must be "
@@ -331,10 +292,6 @@ def test_get_joined_timeseries_x_values_are_chart_parseable(reader):
 
 def test_get_joined_timeseries_returns_two_series(reader):
     """Known location returns a USGS series and a secondary series, paired by time."""
-    # list_usgs_locations_for_run returns every USGS id in the crosswalk for
-    # the run, including gauges that have no USGS observations. For this test
-    # we want one we know has data: pull from ngen_metrics (which is only
-    # populated for gauges with complete observation coverage).
     loc = _usgs_id_with_metrics(reader, "ngen_ngiab")
     series = reader.get_joined_timeseries(
         "ngen_ngiab", "streamflow_hourly_inst", loc
@@ -342,21 +299,13 @@ def test_get_joined_timeseries_returns_two_series(reader):
     assert len(series) == 2
     assert series[0]["label"] == "USGS"
     assert series[1]["label"].lower().startswith("ngen")
-    # Both series have the same number of points (inner join).
     assert len(series[0]["data"]) == len(series[1]["data"])
     assert series[0]["data"], "expected at least one joined point"
-    # Each point has x/y keys.
     for s in series:
         for pt in s["data"]:
             assert set(pt.keys()) == {"x", "y"}
 
 
-# ---- Drift guard: recompute metrics from our join and compare ----------
-
-# Tolerance rationale: Spark (teehr side) and DuckDB + pandas (our side) accumulate
-# floating-point sums in different orders. Empirically, KGE and NSE drift by
-# 1e-5 to 1e-4 on timeseries of this size. We set rtol=1e-3 / atol=1e-5 to stay
-# well above noise while still catching semantic drift (wrong join, dropped rows).
 METRIC_RTOL = 1e-3
 METRIC_ATOL = 1e-5
 
@@ -414,13 +363,11 @@ def test_joined_timeseries_matches_ngen_metrics_drift_guard(reader):
     """
     loc = _usgs_id_with_metrics(reader, "ngen_ngiab")
 
-    # Authoritative: teehr-computed metrics in ngen_metrics.
     teehr_metrics = reader.get_metrics_for_location("ngen_ngiab", loc)
     by_name = {row["metric"]: row for row in teehr_metrics}
     if "ngen_ngiab" not in next(iter(by_name.values()), {}):
         pytest.skip("ngen_metrics does not contain ngen_ngiab row")
 
-    # Our side: pull the joined timeseries and recompute.
     series = reader.get_joined_timeseries(
         "ngen_ngiab", "streamflow_hourly_inst", loc
     )

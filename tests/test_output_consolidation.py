@@ -43,9 +43,6 @@ def consolidate(ingest):
     return _consolidate
 
 
-# ---- The layout actually changes --------------------------------------------
-
-
 def test_consolidation_produces_one_object_not_one_per_catchment(consolidate, ingest):
     run_id = consolidate()
     outputs_dir = ingest.root / run_id / "outputs" / "ngen"
@@ -61,9 +58,6 @@ def test_the_manifest_still_lists_every_catchment(consolidate, ingest):
     """Filenames no longer answer this, so the ids are read out of the data at ingest."""
     run_id = consolidate()
     assert ngiab_utils.getCatchmentsList(run_id) == ["cat-100", "cat-101", "cat-102"]
-
-
-# ---- Contract 1: the catchment id survives ----------------------------------
 
 
 def test_the_value_matrix_still_identifies_catchments(consolidate):
@@ -100,9 +94,6 @@ def test_one_catchment_series_matches_the_per_catchment_layout(ingest, consolida
     assert per_file["Q_OUT"].tolist() == grouped["Q_OUT"].tolist()
 
 
-# ---- Contract 2: the positional contract holds ------------------------------
-
-
 def test_catchment_id_is_never_offered_as_a_variable(consolidate):
     """Column 0 is the step and column 1 the timestamp; everything after is plottable.
 
@@ -122,9 +113,6 @@ def test_catchment_id_is_never_offered_as_a_variable(consolidate):
     assert "filename" not in columns
 
 
-# ---- Contract 3: an unknown catchment still 404s ----------------------------
-
-
 def test_an_unknown_catchment_still_raises(consolidate):
     """A filtered scan returns nothing for an id that was never written.
 
@@ -138,9 +126,6 @@ def test_an_unknown_catchment_still_raises(consolidate):
         ngiab_utils._read_output_columns(outputs, "cat-999")
     with pytest.raises(FileNotFoundError):
         ngiab_utils._read_output_frame(outputs, "cat-999", ["Time"], time_column="Time")
-
-
-# ---- Heterogeneous runs: grouped, not merged --------------------------------
 
 
 def test_catchments_with_different_columns_go_in_different_groups(consolidate, ingest):
@@ -180,9 +165,6 @@ def test_a_narrow_catchment_series_omits_columns_it_never_wrote(consolidate):
     )
     assert "Q_OUT" not in frame.columns
     assert len(frame) == 6
-
-
-# ---- The count, which is the point on object storage ------------------------
 
 
 def test_a_value_matrix_read_touches_one_object(consolidate, ingest):

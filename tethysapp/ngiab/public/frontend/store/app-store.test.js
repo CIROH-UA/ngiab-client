@@ -1,7 +1,6 @@
 import { expect } from '@esm-bundle/chai';
 import { store, actions } from './app-store.js';
 
-// The store is a shared singleton, so each case sets what it depends on.
 beforeEach(() => {
   actions.setModelRun('run-1');
   actions.setTheme('light');
@@ -51,7 +50,6 @@ describe('choropleth state', () => {
     expect(store.get().frameIndex).to.equal(9);
   });
 
-  // A shorter run must not leave the slider parked past its own last frame.
   it('pulls the frame back when a new run has fewer frames', () => {
     actions.setFrame(9);
     actions.setFrameCount(3);
@@ -64,7 +62,6 @@ describe('choropleth state', () => {
     expect(store.get().playing).to.equal(false);
   });
 
-  // Runs differ in variables, time axis and value range, so none of it may carry over.
   it('drops the choropleth entirely when the run changes', () => {
     actions.setFrame(5);
     actions.setPlaying(true);
@@ -84,7 +81,6 @@ describe('choropleth state', () => {
   });
 });
 
-// The old variable may not exist on the new feature, so selecting must reset it.
 it('selecting a new catchment clears the chosen variables', () => {
   actions.selectCatchment({ id: 1 });
   actions.setVariable('streamflow');
@@ -117,7 +113,6 @@ it('setTheme changes only the theme', () => {
   expect(store.get().selection.id).to.equal(3);
 });
 
-// layers is nested, so a naive store.set({layers:{...}}) would drop sibling keys.
 it('setLayer patches one layer flag without dropping the others', () => {
   actions.setLayer('showTeehr', false);
   actions.setLayer('catchmentHidden', true);

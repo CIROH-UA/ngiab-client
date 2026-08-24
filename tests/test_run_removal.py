@@ -57,9 +57,6 @@ def signed_in(db, monkeypatch):
     return get_user_model()(username="operator", is_active=True)
 
 
-# ---- It actually deletes ----------------------------------------------------
-
-
 def test_removing_a_run_deletes_its_directory(populated_root):
     run_store.delete("alpha")
     assert not (populated_root / "alpha").exists()
@@ -81,9 +78,6 @@ def test_removing_the_only_run_leaves_an_empty_listing(populated_root):
     run_store.delete("alpha")
     run_store.delete("beta")
     assert run_store.list_runs() == []
-
-
-# ---- It cannot be pointed at anything else ----------------------------------
 
 
 @pytest.mark.parametrize(
@@ -117,9 +111,6 @@ def test_a_symlink_planted_in_the_root_is_not_followed_out(populated_root, tmp_p
     assert (outside / "keep.txt").exists()
 
 
-# ---- Through the endpoint ---------------------------------------------------
-
-
 def test_an_anonymous_caller_cannot_delete(populated_root):
     assert controllers.removeModelRun(_post("alpha")).status_code == 401
     assert (populated_root / "alpha").exists()
@@ -143,9 +134,6 @@ def test_the_importer_endpoints_are_gone():
     """Presence in the storage root is registration; there is nothing left to register."""
     assert not hasattr(controllers, "scanModelRuns")
     assert not hasattr(controllers, "registerModelRun")
-
-
-# ---- The migration ----------------------------------------------------------
 
 
 def test_the_registry_table_is_dropped(db):

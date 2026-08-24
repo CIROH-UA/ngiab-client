@@ -1,15 +1,10 @@
-// Drag-to-resize and collapse for the chart pane.
-
-// Different questions want different amounts of chart, so the height is the user's.
 const MIN_HEIGHT = 120;
 const KEYBOARD_STEP = 24;
 
-// Leaves room for the map above; a chart taller than this is a chart with no context.
 const maxHeight = () => Math.max(MIN_HEIGHT, Math.round(window.innerHeight * 0.7));
 
 const clamp = (value) => Math.min(Math.max(value, MIN_HEIGHT), maxHeight());
 
-// MapLibre does not observe container resizes, so the pane announces the change.
 const announce = () => window.dispatchEvent(new Event('ngiab-pane-resize'));
 
 export function attachPaneResize({ paneEl, handleEl, collapseEl }) {
@@ -37,7 +32,6 @@ export function attachPaneResize({ paneEl, handleEl, collapseEl }) {
 
   const onPointerMove = (event) => {
     if (!dragging) return;
-    // Dragging up grows the pane, so the delta is inverted.
     applyHeight(window.innerHeight - event.clientY);
   };
 
@@ -49,7 +43,6 @@ export function attachPaneResize({ paneEl, handleEl, collapseEl }) {
   };
 
   const onPointerDown = (event) => {
-    // Ignore the collapse button living inside the handle.
     if (event.target.closest('button')) return;
     dragging = true;
     handleEl.setPointerCapture?.(event.pointerId);
@@ -68,7 +61,6 @@ export function attachPaneResize({ paneEl, handleEl, collapseEl }) {
 
   const onCollapse = () => setCollapsed(!paneEl.classList.contains('is-collapsed'));
 
-  // A window that shrank below the old height would otherwise leave no map visible.
   const onWindowResize = () => {
     if (height > maxHeight()) applyHeight(height);
   };

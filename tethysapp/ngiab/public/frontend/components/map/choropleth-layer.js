@@ -1,7 +1,6 @@
 import { SRC_DIVIDES, LAYER_DIVIDES } from './layers.js';
 import { decodeBins, frameAt, diffFrames } from '../../lib/choropleth.js';
 
-// Applies the value matrix to the map as feature-state, one frame at a time.
 export class ChoroplethState {
   constructor(map) {
     this._map = map;
@@ -55,7 +54,6 @@ export class ChoroplethState {
     return frame.length ? frame[column] : null;
   }
 
-  // Only changed classes are written, so scrubbing costs a handful of updates.
   show(frameIndex) {
     if (!this.isLoaded) return;
     const frame = frameAt(this._bins, this.frameCount, this._ids.length, frameIndex);
@@ -69,7 +67,6 @@ export class ChoroplethState {
     this._applied = Uint8Array.from(frame);
   }
 
-  // Late tiles arrive with no feature-state, so the current frame is written again.
   reapply() {
     if (!this.isLoaded || this._frame < 0) return;
     const frame = frameAt(this._bins, this.frameCount, this._ids.length, this._frame);

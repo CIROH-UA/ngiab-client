@@ -54,9 +54,6 @@ def _post(view, user, **data):
     return view(request)
 
 
-# ---- A launch that never happens --------------------------------------------
-
-
 def test_a_failed_launch_reports_a_failed_job(permitted, user, storage_root, monkeypatch):
     """It used to raise out of the view, after the status said PENDING and, on the presigned
     path, after the archive was already in the bucket. The client then polled forever."""
@@ -81,9 +78,6 @@ def test_a_failed_launch_discards_the_staged_archive(permitted, user, storage_ro
     job = "b" * 32
     _post(controllers.startUpload, user, job=job, name="gage-99")
     assert discarded == [job]
-
-
-# ---- More work than the machine can take ------------------------------------
 
 
 def test_ingests_are_bounded(permitted, user, storage_root, monkeypatch):
@@ -119,9 +113,6 @@ def test_finished_children_are_reaped_and_free_a_slot(storage_root, monkeypatch)
     assert controllers._running == []
 
 
-# ---- A job that stops reporting ---------------------------------------------
-
-
 def test_a_job_that_went_quiet_is_reported_failed(storage_root, monkeypatch):
     """A SIGKILL -- an OOM kill during conversion is the likely one -- skips the command's
     except and finally, so nothing ever writes a terminal status."""
@@ -147,9 +138,6 @@ def test_a_finished_job_is_never_rewritten_as_stale(storage_root, monkeypatch):
     monkeypatch.setattr(ingest, "STALE_AFTER_SECONDS", 0.0)
     time.sleep(0.01)
     assert ingest.read_status(job)["state"] == ingest.DONE
-
-
-# ---- Storage that blinks ------------------------------------------------------
 
 
 def test_a_storage_failure_is_retryable_not_terminal(permitted, user, storage_root,

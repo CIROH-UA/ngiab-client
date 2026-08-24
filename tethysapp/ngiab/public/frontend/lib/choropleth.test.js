@@ -52,7 +52,6 @@ describe('diffFrames', () => {
 });
 
 describe('binColor', () => {
-  // The whole point of reserving bin 0: no-data must not read as the lowest class.
   it('renders no-data transparent, not as the first class', () => {
     expect(binColor(NO_DATA_BIN, 'light')).to.equal('rgba(0,0,0,0)');
     expect(binColor(1, 'light')).to.not.equal(binColor(NO_DATA_BIN, 'light'));
@@ -69,7 +68,6 @@ describe('binColor', () => {
 });
 
 describe('legendEntries', () => {
-  // A zero-heavy variable collapses to few classes; eight would invent impossible ones.
   it('draws one swatch per class the backend actually produced', () => {
     expect(legendEntries([1, 2], 'light')).to.have.length(3);
     expect(legendEntries([1, 2, 3, 4, 5, 6, 7], 'light')).to.have.length(8);
@@ -92,7 +90,6 @@ describe('legendLabel', () => {
 });
 
 describe('formatBreak', () => {
-  // Values differ by orders of magnitude, so fixed decimals are unreadable at one end.
   it('uses exponential notation for very small values', () => {
     expect(formatBreak(0.0000287)).to.equal('2.87e-5');
   });
@@ -121,7 +118,6 @@ describe('formatFrameTime', () => {
     expect(formatFrameTime('2017-01-01 06:00:00')).to.equal('2017-01-01 06:00');
   });
 
-  // The displayed hour must match the string byte for byte, whatever the viewer's zone.
   it('does not shift the stamp into the viewer timezone', () => {
     expect(formatFrameTime('2017-06-15T06:00:00')).to.contain('06:00');
     expect(formatFrameTime('2017-06-15T23:00:00')).to.equal('2017-06-15 23:00');

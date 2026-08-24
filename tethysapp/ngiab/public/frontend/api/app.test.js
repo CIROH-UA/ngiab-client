@@ -2,7 +2,6 @@ import { expect } from '@esm-bundle/chai';
 import appAPI from './app.js';
 import { getJSON, ApiError } from './client.js';
 
-// Stub fetch, not the client, so URL building and response handling both run.
 function withStubbedFetch(handler, run) {
   const original = window.fetch;
   const calls = [];
@@ -61,7 +60,6 @@ it('omits empty params rather than sending blanks', () =>
     },
   ));
 
-// Some controllers report failure as HTTP 200 plus an 'error' key.
 it('raises on an error key returned with HTTP 200', () =>
   withStubbedFetch(
     () => jsonResponse({ error: 'Failed to read GeoPackage file.' }),
@@ -92,7 +90,6 @@ it('raises on a non-ok status', () =>
     },
   ));
 
-// A network-level failure has no response object to inspect.
 it('raises a useful error when the request never completes', () => {
   const original = window.fetch;
   window.fetch = () => Promise.reject(new TypeError('Failed to fetch'));
@@ -132,7 +129,6 @@ it('exposes exactly the in-scope viewer endpoints', () => {
 });
 
 describe('mutating endpoints', () => {
-  // A GET here would be one link prefetch away from deleting a run's outputs.
   it('sends removal as POST, not in the query string', () =>
     withStubbedFetch(
       () => jsonResponse({ removed: 'abc' }),
@@ -156,7 +152,6 @@ describe('mutating endpoints', () => {
     );
   });
 
-  // Failure has to read the same whichever verb produced it.
   it('reports a failed POST the way it reports a failed GET', () =>
     withStubbedFetch(
       () => jsonResponse({ error: 'No such model run.' }, 404),
@@ -169,7 +164,6 @@ describe('mutating endpoints', () => {
     ));
 });
 
-// What the user is shown must never contain a status code, a URL, or a traceback.
 const noTechnicalDetail = (text) => {
   expect(text).to.be.a('string').and.not.equal('');
   expect(text).to.not.match(/HTTP \d|[45]\d\d|\/apps\/|Traceback|<html/i);
@@ -185,7 +179,6 @@ describe('user-facing error messages', () => {
         let caught = null;
         try { await appAPI.getCatchmentValueMatrix({ model_run_id: 'r' }); } catch (e) { caught = e; }
         noTechnicalDetail(caught.userMessage);
-        // The technical detail still exists for the console.
         expect(caught.message).to.contain('500');
         expect(caught.status).to.equal(500);
       },
@@ -215,7 +208,6 @@ describe('user-facing error messages', () => {
       },
     ));
 
-  // The generic 404 text invites a retry that cannot work for an unregistered run.
   it('shows the server sentence on a 404, not the generic status text', () =>
     withStubbedFetch(
       () => jsonResponse({ error: 'No such model run.' }, 404),
@@ -228,7 +220,6 @@ describe('user-facing error messages', () => {
       },
     ));
 
-  // A traceback is a sentence-shaped trap: it would sail through a length check alone.
   it('refuses a traceback or HTML as a user message', () =>
     withStubbedFetch(
       () => jsonResponse({ error: 'Traceback (most recent call last):\n  File "x.py"' }),

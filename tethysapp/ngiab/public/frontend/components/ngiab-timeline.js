@@ -1,10 +1,8 @@
 import { store, actions } from '../store/app-store.js';
 import { formatFrameTime } from '../lib/choropleth.js';
 
-// Frames per second at 1x, slow enough that a step's writes land inside one interval.
 const BASE_FPS = 6;
 
-// Capped at 8x: past roughly 50 fps the map lags the slider instead of going faster.
 const SPEEDS = [0.5, 1, 2, 4, 8];
 
 export class NgiabTimeline extends HTMLElement {
@@ -34,7 +32,6 @@ export class NgiabTimeline extends HTMLElement {
     this._onPlay = () => actions.setPlaying(!store.get().playing);
     this._onSpeed = () => {
       this._speed = Number(this._speedEl.value) || 1;
-      // Restart so a rate change takes effect now rather than after the current interval.
       this._stop();
       if (store.get().playing) this._start();
     };
@@ -71,7 +68,6 @@ export class NgiabTimeline extends HTMLElement {
     }
 
     this._rangeEl.max = String(frameCount - 1);
-    // Guarded: writing .value on every store change would fight the user mid-drag.
     if (Number(this._rangeEl.value) !== frameIndex) this._rangeEl.value = String(frameIndex);
 
     this._playEl.textContent = playing ? '⏸' : '▶';

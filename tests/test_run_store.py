@@ -31,8 +31,6 @@ class InMemoryStorage(Storage):
     pass against FileSystemStorage and fail in a bucket.
     """
 
-    #: A real S3Storage always names a bucket, so the fake does too -- run_store builds a
-    #: run's s3:// location from it, and a fake without one is not faking the same thing.
     bucket_name = "runs-bucket"
     location = ""
 
@@ -119,9 +117,6 @@ def object_root(tmp_path, mini_run_factory, monkeypatch):
     return storage
 
 
-# ---- The local root is the mount that already exists -----------------------
-
-
 def test_local_root_defaults_to_the_existing_run_mount(monkeypatch):
     """Not MEDIA_ROOT.
 
@@ -137,9 +132,6 @@ def test_local_root_defaults_to_the_existing_run_mount(monkeypatch):
 def test_local_root_is_overridable(monkeypatch):
     monkeypatch.setenv(run_store.MANAGED_ROOT_ENV, "/somewhere/else")
     assert run_store.local_root() == "/somewhere/else"
-
-
-# ---- Listing behaves the same either way -----------------------------------
 
 
 def test_local_listing_returns_one_entry_per_run(local_root):
@@ -171,9 +163,6 @@ def test_entries_carry_the_hot_manifest(local_root):
     assert entry["manifest"]["catchment_count"] == 3
     assert entry["usable"] is True
     assert entry["reason"] is None
-
-
-# ---- Empty and unusable ----------------------------------------------------
 
 
 def test_empty_root_returns_an_empty_list(tmp_path, monkeypatch):
@@ -209,9 +198,6 @@ def test_run_without_outputs_is_reported_with_a_reason(local_root):
     assert "nothing to plot" in entries["alpha"]["reason"]
 
 
-# ---- Failures are distinguishable from emptiness ---------------------------
-
-
 def test_unreachable_backend_raises_rather_than_reporting_empty(monkeypatch):
     """An auth failure must never look like "there are no runs".
 
@@ -241,9 +227,6 @@ def test_a_single_unreadable_manifest_does_not_sink_the_listing(local_root):
     assert entries["alpha"]["usable"] is False
 
 
-# ---- Locations DuckDB can consume ------------------------------------------
-
-
 def test_local_location_is_a_filesystem_path(local_root):
     location = run_store.location("alpha", "outputs", "ngen")
     assert location == os.path.join(local_root, "alpha", "outputs", "ngen")
@@ -259,9 +242,6 @@ def test_location_of_a_run_with_no_extra_parts(local_root):
     assert run_store.location("beta") == os.path.join(local_root, "beta")
 
 
-# ---- Pagination ------------------------------------------------------------
-
-
 def test_a_listing_spanning_several_pages_returns_every_entry(monkeypatch):
     """list_objects_v2 caps at 1000 keys per page, and a run is a prefix not a key.
 
@@ -275,9 +255,6 @@ def test_a_listing_spanning_several_pages_returns_every_entry(monkeypatch):
     run_store.clear_caches()
 
     assert len(run_store.list_runs()) == 1500
-
-
-# ---- Caching ---------------------------------------------------------------
 
 
 def test_the_listing_is_cached_between_calls(local_root, mocker):

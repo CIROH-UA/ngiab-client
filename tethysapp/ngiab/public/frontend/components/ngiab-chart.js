@@ -6,10 +6,8 @@ import { toUplotData } from '../lib/series.js';
 import { toMetricsTable } from '../lib/metrics.js';
 import { userMessage } from '../lib/errors.js';
 
-// First-draw estimate for uPlot's legend row, before it exists to measure.
 const LEGEND_ROW = 22;
 
-// <ngiab-chart> -- the time-series panel.
 
 const SOURCES = [
   { key: 'catchment', label: 'Catchment' },
@@ -55,7 +53,6 @@ export class NgiabChart extends HTMLElement {
       this.load();
     });
 
-    // Redraw on container resize; uPlot needs explicit pixel sizes.
     this._resizeObserver = new ResizeObserver(() => this._resizePlot());
     this._resizeObserver.observe(this._canvasEl);
 
@@ -73,7 +70,6 @@ export class NgiabChart extends HTMLElement {
   _onStoreChange() {
     const { selection, teehrId, theme } = store.get();
 
-    // uPlot bakes colours in at construction, so a theme change repaints from the last data.
     if (theme !== this._lastTheme) {
       this._lastTheme = theme;
       if (this._lastDraw) {
@@ -82,7 +78,6 @@ export class NgiabChart extends HTMLElement {
       }
     }
 
-    // Refetch only on a real feature change; the store also fires for theme and layers.
     const key = `${selection.type}:${selection.id}:${teehrId}`;
     if (key === this._lastSelectionKey) return;
     this._lastSelectionKey = key;
@@ -97,7 +92,6 @@ export class NgiabChart extends HTMLElement {
       return;
     }
 
-    // TEEHR is only meaningful where a gauge is crosswalked.
     if (this._source === 'teehr' && !teehrId) this._source = 'catchment';
 
     this.load();
@@ -108,7 +102,6 @@ export class NgiabChart extends HTMLElement {
     if (this._source === 'teehr') actions.setTeehrVariable(v);
     else if (this._source === 'troute') actions.setTrouteVariable(v);
     else actions.setVariable(v);
-    // Keep the key in step so our own notification is not read as a new feature.
     const { selection, teehrId } = store.get();
     this._lastSelectionKey = `${selection.type}:${selection.id}:${teehrId}`;
   }
@@ -131,7 +124,6 @@ export class NgiabChart extends HTMLElement {
 
     try {
       const payload = await this._fetchSource({ selection, modelRunId, trouteId, teehrId });
-      // A slower earlier request must not overwrite a newer one.
       if (seq !== this._requestSeq) return;
       this._renderPayload(payload);
     } catch (error) {
@@ -173,7 +165,6 @@ export class NgiabChart extends HTMLElement {
   }
 
 
-  // What the series actually is, when that differs from what was clicked on the map.
   _setNote(note) {
     this._noteEl.textContent = note ?? '';
     this._noteEl.hidden = !note;
@@ -182,7 +173,6 @@ export class NgiabChart extends HTMLElement {
   _renderPayload(payload) {
     this._setNote(payload.note);
 
-    // TEEHR reports 'cannot answer' as a status with a severity, not as an error.
     if (payload.teehr_status) {
       this._destroyPlot();
       this._renderMetrics(null);
@@ -206,7 +196,6 @@ export class NgiabChart extends HTMLElement {
   }
 
   _renderVariableOptions(payload) {
-    // Each endpoint names its variable list differently.
     const raw =
       payload.variables ?? payload.troute_variables ?? payload.teehr_variables ?? null;
 
@@ -255,7 +244,6 @@ export class NgiabChart extends HTMLElement {
   _draw(data, labels, layout) {
     this._destroyPlot();
 
-    // Set after _destroyPlot, which clears it: a repaint must not wipe its own source.
     this._lastDraw = { data, labels, layout };
 
     const token = (name) => getComputedStyle(this).getPropertyValue(name).trim();
@@ -267,7 +255,6 @@ export class NgiabChart extends HTMLElement {
       {
         width: this._canvasEl.clientWidth || 600,
         height: Math.max((this._canvasEl.clientHeight || 260) - LEGEND_ROW, 80),
-        // uPlot's built-in cursor replaces the separate @visx tooltip component.
         cursor: { drag: { x: true, y: false } },
         axes: [
           { stroke, grid: { show: true, stroke: grid } },
@@ -279,7 +266,6 @@ export class NgiabChart extends HTMLElement {
             label,
             stroke: palette[i % palette.length],
             width: 1.5,
-            // Do not bridge nulls: a gap in the record should read as a gap.
             spanGaps: false,
           })),
         ],
@@ -288,20 +274,11 @@ export class NgiabChart extends HTMLElement {
       this._canvasEl,
     );
 
-    // Now that the legend exists, size the plot to what it actually left behind.
     this._resizePlot();
 
     this._settleSize();
   }
 
-  /**
-   * Re-measure until the plot matches the box that holds it.
-   *
-   * A theme repaint recreates the plot while the restyle is still in flight, so the height
-   * read at construction can be the 80px floor. One frame is not reliably enough -- the
-   * second toggle still landed short -- and nothing corrects it afterwards, because
-   * #chart-canvas keeps its flex height throughout and the ResizeObserver never fires.
-   */
   _settleSize(attempts = 8) {
     if (this._pendingResize) cancelAnimationFrame(this._pendingResize);
 
@@ -315,12 +292,10 @@ export class NgiabChart extends HTMLElement {
     });
   }
 
-  // uPlot sizes only the canvas, so the plot takes the height left after its legend.
   _plotHeight() {
     const total = this._canvasEl.clientHeight || 260;
     const measured = this._plot?.root?.querySelector('.u-legend')?.offsetHeight ?? 0;
 
-    // Measured mid-layout the legend reads 173px inside a 154px box; past half is not real.
     const legend = measured < total / 2 ? measured : LEGEND_ROW;
     return Math.max(total - legend, 80);
   }
@@ -345,7 +320,6 @@ export class NgiabChart extends HTMLElement {
     }
   }
 
-  // Columns come from the payload: configuration names are run-specific.
   _renderMetrics(metrics) {
     const { columns, rows } = toMetricsTable(metrics);
     this._metricsEl.textContent = '';
@@ -381,7 +355,6 @@ export class NgiabChart extends HTMLElement {
     this._metricsEl.hidden = false;
   }
 
-  // Disable controls in flight so clicks cannot queue out-of-order requests.
   _setBusy(busy) {
     this.classList.toggle('is-busy', busy);
     this._variableEl.disabled = busy;

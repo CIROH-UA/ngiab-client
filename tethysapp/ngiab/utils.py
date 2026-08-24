@@ -19,8 +19,6 @@ from .teehr_warehouse import (
 
 logger = logging.getLogger(__name__)
 
-# ---- TEEHR warehouse integration helpers ----------------------------------
-
 
 def _teehr_warehouse_path():
     """Return the configured TEEHR warehouse path (from env), or None."""
@@ -167,13 +165,6 @@ def get_model_runs_selectable():
         for model_run in _get_list_model_runs()["model_runs"]
     ]
 
-# The importer is gone. scan_roots, is_scannable, describe_importable_run,
-# scan_importable_runs, _has_catchment_output and MANAGED_ROOT went with it: a run is a
-# directory under the storage root now, so being present and being registered are the same
-# thing and there is nothing left to offer or refuse. run_store.list_runs still reports a
-# directory it cannot use, with the reason, which is the part of describe_importable_run
-# worth keeping -- a directory a user can see and the interface cannot is a bug either way.
-
 
 class UnknownModelRun(Exception):
     """Raised when a request names a model run that is not registered.
@@ -250,12 +241,6 @@ def run_bounds_4326(model_run_id):
     return _run_manifest(model_run_id).get("bounds")
 
 
-
-
-
-
-
-# Stands in for NaN between reading the file and serialising the response.
 TROUTE_MISSING = -9999
 
 
@@ -264,8 +249,6 @@ _TROUTE_SUBDIR = os.path.join("outputs", "troute")
 TROUTE_FEATURE_COLUMN = "feature_id"
 TROUTE_TIME_COLUMN = "time"
 
-# Identifier and coordinate columns across every troute source shape, so the picker never
-# offers one as something to plot.
 _TROUTE_NON_VARIABLES = frozenset(
     {"type", "time", "current_time", "feature_id", "featureid"}
 )
@@ -323,7 +306,6 @@ def _normalised_troute_frame(source, source_format):
             frame[TROUTE_FEATURE_COLUMN], errors="coerce"
         ).astype("Int64")
 
-    # A bare NaN is invalid JSON, so gaps travel as a sentinel and come back null.
     return frame.fillna(TROUTE_MISSING)
 
 
@@ -334,13 +316,6 @@ def _troute_time_string(value):
     return str(value)
 
 
-#: Formats the t-route reader can open from wherever the run lives.
-#:
-#: netCDF is read with xarray, which takes a filesystem path -- it cannot open an ``s3://``
-#: URI at all. An unconverted run published to a bucket therefore serves its catchment data
-#: (DuckDB globs csv over s3 happily) and then raised inside xarray on every routing chart.
-#: Conversion is the hosted workflow, so the honest answer is "no routing output here" plus
-#: a log line naming the fix, rather than a traceback the user cannot act on.
 _TROUTE_OBJECT_STORAGE_FORMATS = (".parquet",)
 
 
@@ -380,8 +355,6 @@ def get_troute_df(model_id):
     return frame
 
 
-
-
 def get_base_output(model_id):
     """Where this run's catchment outputs live.
 
@@ -391,13 +364,8 @@ def get_base_output(model_id):
     return run_outputs(model_id).directory
 
 
-# Output files may be csv (as ngen writes them) or parquet (as viewOnTethys.sh rewrites
-# them at import). Parquet first: when both exist it is the cheaper read.
 _OUTPUT_SUFFIXES = (".parquet", ".csv")
 
-# Columns no catchment wrote. ``filename`` is synthesised by DuckDB's filename=true;
-# ``catchment_id`` is written by the consolidator. Offering either as a plottable variable
-# would put a file path or an id in the chart's variable picker.
 _SYNTHETIC_COLUMNS = ("filename", "catchment_id")
 
 
@@ -491,15 +459,11 @@ def _projection(columns, time_column, available=None):
     return ", ".join(parts)
 
 
-# Frames the map animation may hold, and cells the response may carry. Both are ceilings on
-# the payload, not on the data: exceeding either coarsens the time step, it never truncates.
 _MAX_FRAMES = 2000
 _MAX_CELLS = 4_000_000
 
-# Coarsening ladder in hours, ending at roughly a month.
 _BUCKET_HOURS = (1, 3, 6, 12, 24, 48, 168, 720)
 
-# Bin 0 is reserved for no-data, so a missing value never renders as the lowest class.
 _NO_DATA_BIN = 0
 _CLASS_COUNT = 8
 
@@ -624,7 +588,6 @@ def _class_breaks(values):
     breaks = np.quantile(finite, quantiles)
     lowest = float(finite.min())
 
-    # A break at the minimum leaves the first class unreachable, so drop those.
     unique = []
     for value in breaks:
         value = float(value)
@@ -708,7 +671,6 @@ def get_catchment_variables(model_run_id):
     if columns is None or len(columns) < 3:
         return {"variables": [], "time_column": None}
 
-    # Same positional contract as getCatchmentTimeSeries: 0 is the step, 1 is the timestamp.
     return {"variables": list(columns[2:]), "time_column": columns[1]}
 
 
@@ -782,7 +744,6 @@ def _build_value_matrix(table, variable=None, consolidated=False, catchment_coun
         else f"time_bucket(INTERVAL '{bucket_hours} hours', {time_expr})"
     )
 
-    # Consolidated rows carry the id; per-catchment rows do not, so it comes from the path.
     id_source = "catchment_id" if consolidated else "filename"
     id_expr = f"regexp_extract({id_source}, 'cat-(\\d+)', 1)"
     frame = duckdb_conn.query(
@@ -815,7 +776,6 @@ def _build_value_matrix(table, variable=None, consolidated=False, catchment_coun
 
     breaks = _class_breaks(grid)
 
-    # searchsorted gives the class index; +1 keeps 0 free for no-data.
     bins = np.searchsorted(np.asarray(breaks), grid, side="right").astype(np.uint8) + 1
     bins[~np.isfinite(grid)] = _NO_DATA_BIN
 
@@ -831,9 +791,6 @@ def _build_value_matrix(table, variable=None, consolidated=False, catchment_coun
     }
 
 
-# A chart canvas is about a thousand pixels wide, so sending one point per model timestep
-# means roughly forty points per pixel. This is the default ceiling; ?max_points=0 asks for
-# the full series.
 _DEFAULT_MAX_POINTS = 2000
 
 
@@ -878,7 +835,7 @@ def decimate_min_max(times, values, max_points=_DEFAULT_MAX_POINTS):
         lowest = highest = None
         for index in range(low, high):
             value = values[index]
-            if value is None or value != value:  # None or NaN
+            if value is None or value != value:
                 continue
             if lowest is None or value < values[lowest]:
                 lowest = index
@@ -944,12 +901,6 @@ def getCatchmentsList(model_id):
     return manifest.catchments(entry["path"], document.get("version_token", ""))
 
 
-
-
-
-
-
-
 def parse_troute_feature_id(troute_id):
     """Pull the numeric feature id out of 'cat-2863630', 'wb-2863630' or a bare '2863630'.
 
@@ -960,12 +911,8 @@ def parse_troute_feature_id(troute_id):
     return int(match.group()) if match else None
 
 
-# T-Route writes CF units, which read badly in a picker. Anything not listed passes through
-# verbatim rather than being guessed at.
 _UNIT_LABELS = {"m3 s-1": "m\u00b3/s", "m s-1": "m/s"}
 
-# The one T-Route output that is not a model state. Left selectable, because someone tuning
-# assimilation wants it, but not silently ranked beside flow and depth.
 _TROUTE_VARIABLE_NOTES = {
     "nudge": "Nudge is the data-assimilation adjustment applied to flow, not a routed state."
 }

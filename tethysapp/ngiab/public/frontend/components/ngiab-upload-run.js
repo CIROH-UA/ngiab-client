@@ -3,28 +3,15 @@ import { userMessage } from '../lib/errors.js';
 import transfer from '../lib/upload.js';
 import { canUpload } from '../config.js';
 
-// <ngiab-upload-run> -- add a run by uploading its archive.
-//
-// Three steps, because the bytes do not come through the portal when it has a bucket:
-// reserve a job and get somewhere to send the archive, send it, then ask the server to
-// unpack it. Unpacking is another process and takes minutes on a large run, so the last
-// step is a poll rather than a response.
 
 const POLL_MS = 2000;
 
-// A ceiling so a job that never reaches a terminal state stops being reported as 'Working…'
-// forever. Generous: the server reports a stale job as failed well before this, and this is
-// only the backstop for a status object that cannot be read at all.
 const POLL_CEILING_MS = 60 * 60 * 1000;
 
-// Consecutive failed status checks tolerated before the loop gives up. The server answers a
-// storage failure with a retryable status precisely so polling continues, but a dropped
-// connection never reaches it -- so the loop counts failures rather than reading a body.
 const POLL_MAX_CONSECUTIVE_FAILURES = 5;
 
 export class NgiabUploadRun extends HTMLElement {
   connectedCallback() {
-    // Reset, so a moved element is not left inert by its own disconnectedCallback.
     this._stopped = false;
     if (!canUpload()) return;
 
@@ -51,12 +38,10 @@ export class NgiabUploadRun extends HTMLElement {
     this._fileEl.addEventListener('change', () => this._suggestName());
   }
 
-  // Else the poll loop outlives the element, firing run-published from a detached node.
   disconnectedCallback() {
     this._stopped = true;
   }
 
-  // A run is usually archived under its own name, so offer that rather than nothing.
   _suggestName() {
     if (this._nameEl.value.trim()) return;
     const file = this._fileEl.files?.[0];
@@ -119,7 +104,6 @@ export class NgiabUploadRun extends HTMLElement {
     await this._await(ticket.job);
   }
 
-  // Unpacking outlives the request that started it, so its outcome arrives by polling.
   async _await(job) {
     const started = Date.now();
     let failures = 0;
@@ -142,7 +126,6 @@ export class NgiabUploadRun extends HTMLElement {
         status = await appAPI.uploadStatus({ job });
         failures = 0;
       } catch (error) {
-        // Re-checked: the element can be removed while the request is in flight.
         if (this._stopped || !this.isConnected) return undefined;
 
         failures += 1;
@@ -165,7 +148,6 @@ export class NgiabUploadRun extends HTMLElement {
       this._say(`${status.run} is ready.`, 'info');
       this._nameEl.value = '';
       this._fileEl.value = '';
-      // The picker is derived from storage, so it only has to be asked again.
       this.dispatchEvent(new CustomEvent('run-published', {
         bubbles: true,
         detail: { run: status.run },

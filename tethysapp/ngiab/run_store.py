@@ -39,33 +39,16 @@ from . import duckdb_conn, manifest
 
 logger = logging.getLogger(__name__)
 
-# Overridable so a deployment can mount runs elsewhere, and so tests need no container.
 MANAGED_ROOT_ENV = "NGIAB_MANAGED_ROOT"
 DEFAULT_MANAGED_ROOT = "/var/lib/tethys_persist/ngiab_visualizer"
 
-# The named entry in Django's STORAGES setting that addresses the run bucket. Only consulted
-# when the backend is object storage; the local backend needs no configuration at all.
-#
-# Optional. A portal that already stores its media in a bucket has the credentials, the
-# endpoint and the bucket configured once, under ``default``; asking an administrator to
-# repeat all of it under a second alias invites the two to drift, and the failure when they
-# do is a 403 that this code reports as an empty run list. With no ``ngiab_runs`` entry the
-# run store borrows ``default`` and keeps its runs under a prefix of their own.
 STORAGE_ALIAS = "ngiab_runs"
 
-# Where runs live inside the portal's media bucket when the alias above is absent. A prefix
-# rather than the bucket root, so run directories do not interleave with uploaded media.
 RUNS_PREFIX_ENV = "NGIAB_RUNS_PREFIX"
 DEFAULT_RUNS_PREFIX = "ngiab_visualizer"
 
-# Manifests fetched at once when building a listing. Bounded so a bucket with many runs does
-# not open a connection per run against a portal that also has pages to serve.
-# Ten, not more: botocore's default max_pool_connections is 10, and exceeding it makes
-# urllib3 discard and reopen connections, spending in handshakes what the concurrency saves.
 LISTING_CONCURRENCY = int(os.environ.get("NGIAB_LISTING_CONCURRENCY", "10"))
 
-# How long a listing may be stale. See _time_bucket for why this is a window rather than an
-# invalidation signal, and why 10 seconds.
 LISTING_TTL_ENV = "NGIAB_LISTING_TTL_SECONDS"
 DEFAULT_LISTING_TTL_SECONDS = 10.0
 
@@ -373,7 +356,6 @@ def _cached_listing(root_key, time_bucket):
     try:
         directories, _files = backend.listdir("")
     except FileNotFoundError:
-        # A root that does not exist yet is a fresh install, not a failure.
         return ()
     except StorageUnreachable:
         raise
@@ -384,7 +366,6 @@ def _cached_listing(root_key, time_bucket):
     if len(names) <= 1:
         return tuple(_ordered([_describe(name) for name in names]))
 
-    # Independent reads, paid on the request path every time the TTL rolls over.
     from concurrent.futures import ThreadPoolExecutor
 
     with ThreadPoolExecutor(max_workers=min(LISTING_CONCURRENCY, len(names))) as pool:
@@ -405,10 +386,8 @@ def is_reserved(name):
     return name.startswith("_")
 
 
-#: Where an uploaded archive waits before it is a run, and where job status is written.
 STAGING_DIR = "_uploads"
 
-#: Where a run name being published is held, so two uploads cannot claim it at once.
 CLAIM_DIR = posixpath.join(STAGING_DIR, "claims")
 
 

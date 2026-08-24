@@ -85,9 +85,6 @@ def run_in_root(registry, mini_run_factory):
     return make
 
 
-# ---- The ordinary upgrade ---------------------------------------------------
-
-
 def test_each_registered_directory_gets_a_manifest(registry, run_in_root):
     alpha, beta = run_in_root("alpha"), run_in_root("beta")
     _insert(alpha, label="alpha")
@@ -163,9 +160,6 @@ def test_the_producer_manifest_still_wins_over_the_registry_row(registry, run_in
     assert manifest.read(alpha)["teehr"]["configuration_name"] == "ngen_from_producer"
 
 
-# ---- R14: several rows, one directory ---------------------------------------
-
-
 def test_every_uuid_on_a_shared_directory_survives(registry, run_in_root):
     """ModelRun.path was deliberately not unique -- once per import, says its own comment.
 
@@ -210,9 +204,6 @@ def test_an_existing_manifest_gains_ids_rather_than_losing_them(registry, run_in
     stored = set(manifest.read(alpha)["legacy_uuids"])
     assert "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" in stored
     assert fresh in stored
-
-
-# ---- The cases that lose data if handled badly ------------------------------
 
 
 def test_a_directory_outside_the_storage_root_is_reported_not_dropped(
@@ -283,9 +274,6 @@ def test_an_unwritable_root_aborts_rather_than_half_finishing(
     with pytest.raises(CommandError) as excinfo:
         call_command("backfill_manifests")
     assert "would lose these runs" in str(excinfo.value)
-
-
-# ---- Before and after the table exists --------------------------------------
 
 
 def test_no_registry_table_is_not_an_error(db, tmp_path, monkeypatch):

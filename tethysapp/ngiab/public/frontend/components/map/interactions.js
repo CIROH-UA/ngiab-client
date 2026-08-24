@@ -14,7 +14,6 @@ export function attachHoverCursor(map) {
 export const featureCatchmentId = (feature) =>
   (CATCHMENT_KEY === 'id' ? feature?.id : feature?.properties?.[CATCHMENT_KEY]);
 
-// Attach once: layer-scoped listeners outlive setStyle, so re-attaching duplicates them.
 export function attachMapTip(map, describe) {
   const popup = new maplibregl.Popup({
     closeButton: false,

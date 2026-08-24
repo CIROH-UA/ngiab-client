@@ -1,14 +1,11 @@
 import { getJSON, postJSON } from './client.js';
 import { getConfig } from '../config.js';
 
-// Built at call time: getConfig() reads window.__NGIAB__, which tests reassign.
 const url = (name) => `${getConfig().APP_ROOT_URL}${name}/`;
 
-// Viewer endpoints only.
 const appAPI = {
   getModelRuns: () => getJSON(url('getModelRuns')),
 
-  // Mutations, so POST: a GET here is one prefetch away from deleting a run's outputs.
   removeModelRun: (params) => postJSON(url('removeModelRun'), params),
 
   getGeoSpatialData: (params) => getJSON(url('getGeoSpatialData'), params),
@@ -24,7 +21,6 @@ const appAPI = {
   getTeehrVariables: (params) => getJSON(url('getTeehrVariables'), params),
   getTeehrTimeSeries: (params) => getJSON(url('getTeehrTimeSeries'), params),
 
-  // Upload is three calls: reserve a job, send the bytes (elsewhere), then start the work.
   createUpload: (params) => postJSON(url('createUpload'), params),
   startUpload: (params) => postJSON(url('startUpload'), params),
   uploadStatus: (params) => getJSON(url('uploadStatus'), params),

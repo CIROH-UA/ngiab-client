@@ -20,9 +20,6 @@ from django.core.management.base import CommandError
 from tethysapp.ngiab import archive, duckdb_conn, manifest, run_store
 
 
-# ---- SQL injection through CSV column names ---------------------------------
-
-
 def _run_with_header(tmp_path, columns, name="attack"):
     run = tmp_path / name
     outputs = run / "outputs" / "ngen"
@@ -95,9 +92,6 @@ def test_a_malicious_header_cannot_reach_the_read_path(tmp_path, monkeypatch):
     assert "pwned" not in columns
 
 
-# ---- Path traversal through realization.json --------------------------------
-
-
 @pytest.mark.parametrize("payload", [
     "../../../../../../etc",
     "../../victim/ngen",
@@ -128,9 +122,6 @@ def test_an_ordinary_output_root_still_works(tmp_path):
 def test_a_manifest_already_holding_an_escape_is_contained_on_read(stored):
     """Manifests written before the fix still carry the bad value, so the read path guards too."""
     assert manifest.contained_output_dir(stored) == "outputs/ngen"
-
-
-# ---- Archive members that are not files -------------------------------------
 
 
 def _tar_with_special(path, kind):
@@ -180,9 +171,6 @@ def test_the_member_cap_is_not_off_by_one(tmp_path):
         archive.inspect(str(tmp_path / "a.tar"), max_members=5)
 
 
-# ---- A hosted start with no superuser ---------------------------------------
-
-
 @pytest.fixture
 def hosted(monkeypatch):
     monkeypatch.setenv("NGIAB_STORAGE_BACKEND", "s3")
@@ -219,9 +207,6 @@ def test_a_local_start_with_no_superuser_is_still_fine(db, monkeypatch):
     monkeypatch.delenv("PORTAL_SUPERUSER_NAME", raising=False)
     monkeypatch.delenv("PORTAL_SUPERUSER_PASSWORD", raising=False)
     call_command("ensure_superuser")
-
-
-# ---- The version token that was always empty --------------------------------
 
 
 def test_the_sidecar_cache_keys_on_the_token_it_is_given():

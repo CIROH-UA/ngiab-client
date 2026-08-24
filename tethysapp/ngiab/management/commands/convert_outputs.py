@@ -30,10 +30,8 @@ from django.core.management.base import BaseCommand, CommandError
 
 from tethysapp.ngiab import duckdb_conn
 
-# Written beside the per-catchment files. The reader picks the layout off the manifest.
 CONSOLIDATED_PREFIX = "catchments-"
 
-# T-route lands in one parquet with a pinned schema; see utils._normalised_troute_frame.
 TROUTE_PARQUET = "troute.parquet"
 
 

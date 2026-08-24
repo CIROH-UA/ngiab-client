@@ -49,7 +49,6 @@ it('replaces state rather than mutating it, so snapshots stay stable', () => {
   expect(s.get()).to.not.equal(before);
 });
 
-// Guards the copy-before-iterate above: without it this throws or skips a listener.
 it('tolerates a subscriber unsubscribing during notification', () => {
   const s = createStore({ a: 1 });
   let second = 0;

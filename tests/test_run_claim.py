@@ -96,9 +96,6 @@ def _backend(client, location=""):
     )
 
 
-# ---- Holding the name ----------------------------------------------------------
-
-
 def test_a_free_name_is_claimed_and_released(hosted, monkeypatch):
     client = _Client()
     monkeypatch.setattr(run_store, "storage", lambda: _backend(client))
@@ -155,16 +152,13 @@ def test_a_claim_is_not_listed_as_a_run(hosted):
     assert run_store.is_reserved(run_store.CLAIM_DIR.split("/")[0]) is True
 
 
-# ---- Stores that cannot do it ---------------------------------------------------
-
-
 def test_a_store_without_conditional_writes_still_publishes(hosted, monkeypatch):
     """Degrading is better than refusing to publish on a store that works otherwise."""
     client = _Client(supports_condition=False)
     monkeypatch.setattr(run_store, "storage", lambda: _backend(client))
 
     with run_store.claimed("gage-99"):
-        pass  # no exception is the assertion
+        pass
 
 
 def test_a_backend_with_no_client_still_publishes(hosted, monkeypatch):
@@ -183,9 +177,6 @@ def test_the_filesystem_backend_needs_no_claim(local, monkeypatch):
     monkeypatch.setattr(run_store, "storage", explode)
     with run_store.claimed("gage-99"):
         pass
-
-
-# ---- Claims left by a publisher that died ---------------------------------------
 
 
 def test_a_stale_claim_is_broken(hosted, monkeypatch):
@@ -219,9 +210,6 @@ def test_an_unreadable_claim_is_not_assumed_abandoned(hosted, monkeypatch):
     with pytest.raises(run_store.ClaimHeld):
         with run_store.claimed("gage-99"):
             pass
-
-
-# ---- Through publish -------------------------------------------------------------
 
 
 def test_publish_refuses_a_name_another_upload_holds(hosted, monkeypatch, tmp_path):

@@ -66,9 +66,6 @@ def storage_root(tmp_path, monkeypatch):
     run_store.clear_caches()
 
 
-# ---- The pipeline -----------------------------------------------------------
-
-
 def test_an_archive_becomes_a_listed_run(archived, storage_root):
     ingest.publish(archived(), "gage-99")
     assert [entry["name"] for entry in run_store.list_runs()] == ["gage-99"]
@@ -108,9 +105,6 @@ def test_the_workspace_is_cleaned_up(archived, storage_root, tmp_path):
     assert leaked - before == set()
 
 
-# ---- Refusals ----------------------------------------------------------------
-
-
 def test_a_name_that_is_not_plain_is_refused(archived, storage_root):
     with pytest.raises(archive.ArchiveRejected, match="not a usable run name"):
         ingest.publish(archived(), "../escape")
@@ -131,9 +125,6 @@ def test_nothing_is_published_when_the_archive_is_rejected(storage_root, tmp_pat
     assert run_store.list_runs() == []
 
 
-# ---- Staging is not a run ----------------------------------------------------
-
-
 def test_the_staging_directory_is_not_listed_as_a_run(storage_root):
     """It lives under the same root, so without the reserved-name rule it would be."""
     (storage_root / run_store.STAGING_DIR).mkdir()
@@ -151,9 +142,6 @@ def test_status_survives_a_round_trip(storage_root):
 
 def test_an_unknown_job_has_no_status(storage_root):
     assert ingest.read_status("b" * 32) is None
-
-
-# ---- The endpoints -----------------------------------------------------------
 
 
 def _post(view, user, **data):
@@ -176,7 +164,7 @@ def test_a_permitted_user_gets_a_job(permitted, user, storage_root):
     response = _post(controllers.createUpload, user, name="gage-99")
     assert response.status_code == 200
     body = json.loads(response.content)
-    assert body["mode"] == "direct"          # no bucket configured in this test
+    assert body["mode"] == "direct"
     assert len(body["job"]) == 32
 
 
@@ -247,12 +235,6 @@ def test_the_app_declares_the_upload_permission():
     names = [p.name for g in App().permissions() for p in g.permissions]
     assert controllers.UPLOAD_PERMISSION in names
     assert controllers.DELETE_PERMISSION in names
-
-
-# ---- uploadRun: the endpoint no test reached --------------------------------
-#
-# Every test above posts to createUpload, startUpload or uploadStatus. Nothing posted here,
-# which is how a TypeError in this handler stayed green through 411 tests and three reviews.
 
 
 @pytest.fixture

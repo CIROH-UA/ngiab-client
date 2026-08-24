@@ -32,9 +32,6 @@ def _http(status, reason="Forbidden"):
     return exc
 
 
-# ---- Classifying the failure ---------------------------------------------------
-
-
 def test_a_404_is_a_missing_object():
     assert duckdb_conn.is_missing_error(_http(404, "Not Found")) is True
 
@@ -56,9 +53,6 @@ def test_an_unrecognised_local_error_is_not_missing():
     """Fails in the safe direction: reported, rather than silently empty."""
     exc = duckdb.IOException("IO Error: Could not resolve hostname for HTTP HEAD")
     assert duckdb_conn.is_missing_error(exc) is False
-
-
-# ---- The readers ---------------------------------------------------------------
 
 
 @pytest.fixture
@@ -145,9 +139,6 @@ def test_recovery_needs_no_restart(monkeypatch):
     state["broken"] = False
     assert manifest.catchments("s3://bucket/prefix/run", "token") == ["cat-1"]
     manifest.clear_caches()
-
-
-# ---- What the user sees --------------------------------------------------------
 
 
 def test_an_endpoint_reports_unreachable_storage_as_retryable(ingest, monkeypatch):

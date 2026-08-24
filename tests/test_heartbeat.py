@@ -40,9 +40,6 @@ def brisk(monkeypatch):
     monkeypatch.setattr(ingest, "heartbeat_seconds", lambda: 0.05)
 
 
-# ---- A working job stays alive ------------------------------------------------
-
-
 def test_a_slow_stage_keeps_the_timestamp_moving(storage_root, brisk):
     """The whole point: without this, work longer than the window reads as death."""
     job = "a" * 32
@@ -82,9 +79,6 @@ def test_the_beat_reports_the_stage_the_job_has_reached(storage_root, brisk):
         time.sleep(0.15)
 
     assert ingest.read_status(job)["stage"] == "publishing"
-
-
-# ---- A dead job still dies ----------------------------------------------------
 
 
 def test_staleness_still_fires_once_the_beat_stops(storage_root, brisk):
@@ -150,9 +144,6 @@ def test_no_job_id_means_no_thread(storage_root):
         assert threading.active_count() == before
 
 
-# ---- Status writes leave no gap ------------------------------------------------
-
-
 def test_a_status_update_is_never_momentarily_absent(storage_root):
     """delete-then-save left a window in which a poll read 'no such upload job'.
 
@@ -207,9 +198,6 @@ def test_the_written_status_is_always_complete_json(storage_root):
         assert json.load(handle)["stage"] == "converting"
 
 
-# ---- Wired into the pipeline, not just available ------------------------------
-
-
 def test_publish_beats_while_a_stage_is_slow(storage_root, brisk, monkeypatch):
     """The helper working proves nothing if publish does not wrap the stages in it.
 
@@ -244,11 +232,6 @@ def test_publish_without_a_job_still_works(storage_root, brisk, monkeypatch):
     assert ingest.publish("ignored.tar", "gage-99") == "gage-99"
 
 
-# ---- The interval formula itself ----------------------------------------------
-
-# Every test above replaces heartbeat_seconds, so without these the real body is never run.
-
-
 @pytest.mark.parametrize("stale,expected", [
     (0.2, 0.05), (1, 0.25), (2, 0.5), (60, 15.0), (240, 60.0), (1800, 60.0), (7200, 60.0),
 ])
@@ -264,9 +247,6 @@ def test_the_beat_always_fits_several_times_into_the_window(monkeypatch, stale):
     configuration that most wants it -- which a whole-second floor used to do."""
     monkeypatch.setattr(ingest, "STALE_AFTER_SECONDS", float(stale))
     assert stale / ingest.heartbeat_seconds() >= 4
-
-
-# ---- A beat that cannot report ------------------------------------------------
 
 
 def test_a_raising_snapshot_does_not_kill_the_beat(storage_root, brisk):
@@ -306,9 +286,6 @@ def test_a_failing_write_does_not_kill_the_beat(storage_root, brisk, monkeypatch
     assert calls["n"] > 3
 
 
-# ---- The object-storage branch of _replace -------------------------------------
-
-
 def test_a_backend_without_a_filesystem_path_is_saved_through_the_storage_api():
     """S3Storage.path raises NotImplementedError -- every Storage defines path(), so that
     raise is the discrimination, not a hasattr check."""
@@ -341,9 +318,6 @@ def test_a_write_failure_leaves_no_temporary_file(storage_root, monkeypatch):
         ingest._replace(run_store.storage(), ingest.status_key(job), b"{}")
 
     assert [n for n in os.listdir(directory) if n.endswith(".tmp")] == []
-
-
-# ---- A stage that fails while the beat runs -------------------------------------
 
 
 def test_a_failing_stage_still_stops_the_beat(storage_root, brisk, monkeypatch):
