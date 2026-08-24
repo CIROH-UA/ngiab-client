@@ -1,0 +1,50 @@
+{
+  "reviewer": "kieran-python",
+  "summary": "Reviewed the storage-backed run registry rewrite (archive.py, ingest.py, run_store.py, manifest.py, duckdb_conn.py, ingest_archive command) plus the heavily changed controllers.py and utils.py. The new modules are unusually well-disciplined for a from-scratch rewrite: docstrings explain tradeoffs with measured numbers, broad except blocks are almost all annotated with a noqa and a one-line reason, permission checks fail closed with clear rationale, and the archive/extraction path has a thought-out threat model (path traversal, zip-bomb ceilings, link rejection). No instances were found of the private cross-module attribute access the task brief called out as a risk to check (run_store._is_plain_name etc. only appears in comments, never as an actual call from ingest.py or controllers.py). Findings below are a small set of concrete, verifiable issues: a genuinely dead function left behind by the importer removal, a private helper duplicated with diverging semantics across two modules, and a stale test that calls a method removed from both TEEHR reader classes in this diff.",
+  "findings": [
+    {
+      "title": "resolve_output_dir is dead code with a docstring that misdescribes the current codebase",
+      "severity": "P3",
+      "file": "tethysapp/ngiab/utils.py",
+      "line": 381,
+      "confidence": 0.75,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "Delete resolve_output_dir (and get_output_path if nothing else calls it -- check first). Grep confirms zero callers in tethysapp/ or tests/: run_outputs() and get_base_output() both go through the manifest's output_dir field instead. Its docstring still claims it is 'Shared with the importer's scan' and that 'get_base_output used to call' it, both of which describe the pre-manifest importer that utils.py's own comment block (lines 171-176) says is fully gone. Leaving it creates a false lead for the next reader trying to find where output_dir resolution actually happens on the read path."
+    },
+    {
+      "title": "_child path-join helper duplicated across manifest.py and utils.py with different semantics",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/manifest.py",
+      "line": 473,
+      "confidence": 0.65,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "Move one _child implementation into a shared location (e.g. duckdb_conn.py, which both manifest.py and utils.py already import) and have both modules call it. As written, utils._child(base, *parts) (utils.py:232) strips leading/trailing '/' from every part and silently drops falsy parts, while manifest._child(base, *parts) (manifest.py:473) only rstrips the base and joins parts verbatim -- so a caller that migrates a call from one module to the other, or copies a snippet between them, gets silently different path-joining behaviour. manifest._child also does a function-local `import posixpath` on every call instead of importing it at module scope like every other import in the file."
+    },
+    {
+      "title": "Stale test calls a method removed from both TEEHR reader classes in this diff",
+      "severity": "P2",
+      "file": "tests/test_teehr_warehouse.py",
+      "line": 187,
+      "confidence": 0.8,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "test_usgs_for_ngen_unknown_returns_none calls reader.usgs_for_ngen('ngen_ngiab', 'ngen-0000000'), but this diff deletes WarehouseReader.usgs_for_ngen from teehr_warehouse.py and the matching EvaluationReader.usgs_for_ngen from teehr_evaluation.py. The test only skips (rather than erroring) because it needs TEEHR_TEST_WAREHOUSE set, which CI's docker run does not set -- so it is currently silently skipped, but will raise AttributeError instead of passing or failing meaningfully the moment anyone runs it against a real warehouse fixture (which the test file's own module docstring instructs local developers to do). The author did clean up other stale tests in the same file (test_detect_legacy_teehr_layout_*) but missed this one. Remove the test (and its section header comment) along with the method, or restore the method if it's still needed."
+    }
+  ],
+  "residual_risks": [
+    "TOCTOU race in the run-name uniqueness check: createUpload and ingest.publish() both call run_store.find(name) to reject a duplicate name, but nothing locks between the check and the eventual _publish_directory() write. Two concurrent uploads under the same name could both pass the check and race to publish, with the object-storage path (per-file backend.save loop) most exposed to interleaving. Low likelihood given this is an operator-driven upload flow, but worth a test if concurrent uploads are a supported scenario.",
+    "run_store.duckdb_secret_sql() and controllers._presigned_put() each independently reach into django-storages backend internals (access_key, secret_key, security_token, connection.meta.client) to bridge Django's storage config into DuckDB/boto3. Both are well-documented, but the two code paths for deriving S3 credentials from the same backend object could drift out of sync if one is updated without the other."
+  ],
+  "testing_gaps": [
+    "No test exercises the object-storage branch of ingest._publish_directory (the per-file backend.save loop) or run_store._delete_prefix's recursive depth-first deletion against a real or mocked S3 backend with nested prefixes -- the local-filesystem branches of both appear well covered (test_run_store.py, test_upload.py) but the S3 branches rely more on code inspection than executable coverage from what the diff shows.",
+    "The stale test_usgs_for_ngen_unknown_returns_none (see finding above) means the removal of usgs_for_ngen from both TEEHR reader classes has no passing regression coverage confirming callers that used to depend on it (if any existed outside this codebase) are truly gone."
+  ]
+}

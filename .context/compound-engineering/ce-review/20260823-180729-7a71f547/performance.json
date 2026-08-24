@@ -1,0 +1,61 @@
+{
+  "reviewer": "performance",
+  "findings": [
+    {
+      "title": "Cold run listing is O(2N) sequential storage round trips on the request path",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/run_store.py",
+      "line": 359,
+      "confidence": 0.85,
+      "autofix_class": "gated_auto",
+      "owner": "downstream-resolver",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "In _cached_listing (line 346-361), _describe() (251) is called once per directory in a plain list comprehension with no concurrency, and each call goes through _read_manifest() (224-248) which does backend.exists() (235) then backend.open() (237) -- two blocking network round trips per run against S3, not the one the module docstring accounts for (line 336: 'one LIST plus one GET per run'). For 50 runs a cold listing (any request after the 10s TTL window rolls over) is 1 LIST + 50 HEAD + 50 GET = 101 sequential round trips, executed synchronously inside getModelRuns/home on the app's single uvicorn worker -- at typical S3 latency (50-150ms) that is 5-15s of blocking work repeating on every TTL rollover regardless of request rate. Fix in two parts: (1) collapse _read_manifest's exists()+open() into a single open() guarded by except FileNotFoundError, halving round trips; (2) run per-run _describe() calls concurrently (ThreadPoolExecutor or asyncio.gather via to_thread) since they are independent and I/O-bound."
+    },
+    {
+      "title": "Run publish uploads every file in the run tree with one blocking backend.save() per file, serially",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/ingest.py",
+      "line": 192,
+      "confidence": 0.8,
+      "autofix_class": "gated_auto",
+      "owner": "downstream-resolver",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "_publish_directory (175-197) walks the entire unpacked run with os.walk(source) and calls backend.save() once per file with no concurrency (lines 192-197). convert_outputs only consolidates outputs/ngen and outputs/troute (tethysapp/ngiab/management/commands/convert_outputs.py handle(), lines 47-78); everything else under the run -- config/, forcing inputs, restart files, the GeoPackage -- is uploaded as-is, one PUT per file. For an 8,105-catchment run those subtrees are typically also on the order of thousands of small per-catchment files, so this loop's cost is not bounded by the consolidation the docstring credits (line 181: 'this uploads tens of objects... rather than one per catchment' only holds for outputs). At a conservative 50-150ms per PUT, thousands of sequential PUTs is many minutes of wall clock for a single ingest job, with only a single coarse 'publishing' status message shown for the whole duration. This runs in the background subprocess (ingest_archive), so the fix has no request-thread safety concern: upload with bounded concurrency (e.g. a ThreadPoolExecutor of 16-32 workers over the file list) rather than one file at a time."
+    },
+    {
+      "title": "Run deletion recurses through object storage with one synchronous backend.delete() per object, inside the HTTP request",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/run_store.py",
+      "line": 472,
+      "confidence": 0.75,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "_delete_prefix (472-482) lists and deletes one object at a time, recursing per subdirectory, and is invoked synchronously from removeModelRun (controllers.py 251-280) via run_store.delete() (414-441) -- unlike ingest, there is no background job here, so the HTTP request blocks for the full deletion. For a run whose config/forcing/restart subtrees were never consolidated (same file counts as the publish finding above), deleting an 8,105-catchment run over S3 could be thousands of sequential DELETE calls within one request, risking a gateway/proxy timeout well before completion and blocking the app's one worker for the duration. Batch the deletes (S3's delete_objects accepts up to 1000 keys per call where the backend exposes it) and/or move deletion to the same background-job-plus-poll pattern already used for ingest, since this is not a place a request should block for minutes."
+    },
+    {
+      "title": "Sidecar lru_cache sizes (maxsize=8) thrash on a portal with more than 8 actively-viewed runs",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/manifest.py",
+      "line": 531,
+      "confidence": 0.62,
+      "autofix_class": "safe_auto",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "_crosswalk_cached (manifest.py, maxsize=8, line 531) and, in utils.py, _cached_troute_frame (maxsize=8, line 292) and _cached_value_matrix (maxsize=8, line 764) are keyed per-run. A deployment with more than 8 runs where users move between runs (e.g. comparing scenarios, or several concurrent sessions on different runs) will evict and recompute on every switch back to a previously-viewed run: the crosswalk read is a whole-file parquet scan the docstring itself measures at ~80ms per 10,000-flowpath run (manifest.py line 555-556), and the value matrix rebuild repeats a full GROUP BY scan (utils.py _build_value_matrix, 790-848). _catchments_cached (maxsize=32, manifest.py line 499) and _cached_catchment_variables (maxsize=32, utils.py line 690) are sized more generously for the same access pattern. Raise the maxsize=8 caches to something proportional to expected concurrent-run activity (e.g. 32, matching the other sidecar caches), or make the size configurable the way the listing TTL already is."
+    }
+  ],
+  "residual_risks": [
+    "duckdb_conn.py routes every read through cursors on one shared, lazily-created connection; queries issued through separate cursors serialize on the underlying connection (module docstring, lines 19-28). This is a deliberate, measured tradeoff (7.5ms/21.3ms full-connection setup vs 0.005ms per cursor) and is explicitly flagged in the code as needing a small connection pool 'if serialization ever becomes the bottleneck.' Under one uvicorn worker with Django's sync views run through a thread pool, concurrent chart/map requests (the frontend issues several in parallel per interaction) will queue on this single connection; each parquet read is short (~9ms) so this is unlikely to be the dominant cost today, but it is worth watching as concurrent usage or the run count grows, since it is a single global point of query serialization for the whole app.",
+    "The upload pipeline (createUpload/startUpload/uploadRun) writes the archive to local temp disk and, for the S3 case, fetch_staged() streams it back down again before conversion (ingest.py fetch_staged, lines 200-214) because convert_outputs needs a real filesystem. For very large archives (the stated range goes up to 6GB) this doubles the transfer and requires that much transient local disk on the container running the ingest subprocess; not flagged as a finding because it is an explicit, documented architectural constraint (ingest.py module docstring, lines 10-13) rather than an oversight, but it bounds how much local disk the ingest host needs to reserve as run sizes grow."
+  ],
+  "testing_gaps": [
+    "No test appears to exercise _cached_listing / list_runs() against a storage backend with a realistic run count (e.g. 50+) to characterize cold-listing latency or to verify a bound on round trips per run; test_registry_listing.py and test_run_store.py should be checked for a case that asserts the number of storage calls made per listing, not just correctness of the result.",
+    "No test exercises _publish_directory or _delete_prefix against an object-storage backend with a large synthetic file count (hundreds to thousands of files) to catch a regression in upload/delete concurrency once one is added, or to establish a wall-clock budget/alarm for large ingests."
+  ]
+}

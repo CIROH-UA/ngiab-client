@@ -1,0 +1,93 @@
+{
+  "reviewer": "testing",
+  "findings": [
+    {
+      "title": "A tar member of a device/FIFO type breaks the ArchiveRejected contract archive.py promises",
+      "detail": "archive._members_tar (lines 59-61) only flags a member as a link when info.issym() or info.islnk() is true. A character/block device or FIFO member passes inspect() untouched (verified: inspect() returns normally for a tar containing a CHRTYPE member). extract() then calls handle.extractall(destination, filter='data') (line 191), and PEP 706's 'data' filter raises tarfile.SpecialFileError for exactly this case -- a subclass of tarfile.TarError, NOT of archive.ArchiveRejected. Reproduced locally: inspect() succeeds, extract() raises 'tarfile.SpecialFileError: ... is a special file' uncaught. ingest.publish() does not wrap archive.extract() in a try/except either (only the convert_outputs call is wrapped, ingest.py lines 148 vs 151-154), so this exception propagates all the way out of the ingest_archive subprocess as an unhandled traceback instead of the 400-with-reason the module's own docstring describes ('Its own class so a caller can answer 400 with the reason rather than 500 with a traceback'). No test in test_archive.py constructs a tar with a CHRTYPE/BLKTYPE/FIFOTYPE member, so this contract break is invisible to the suite.",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/archive.py",
+      "line": 59,
+      "confidence": 0.9,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "In _members_tar, also yield is_link=True (or a new is_special flag) for info.isdev() / info.isfifo() members so inspect() refuses them with ArchiveRejected before extract() ever calls extractall. Add a test asserting a tar with a TarInfo(type=tarfile.CHRTYPE) or FIFOTYPE member raises archive.ArchiveRejected from both inspect() and extract()."
+    },
+    {
+      "title": "ingest.publish()'s only two failure branches (IngestError, zero-catchment rejection) are never exercised",
+      "detail": "publish() has two behavior-changing branches with no covering test: (1) lines 151-154, the try/except around call_command('convert_outputs', ...) that wraps any conversion exception into IngestError -- no test makes convert_outputs raise and asserts IngestError propagates with the archive still cleaned up; (2) lines 158-161, `if not document.get('catchment_count'): raise archive.ArchiveRejected(...)` -- no test publishes an archive that extracts and converts successfully but yields zero catchments. test_upload.py's 'nothing_is_published_when_the_archive_is_rejected' test only covers the case where the archive itself is not a valid archive (fails in archive.extract, before conversion), which is a different branch than either of these two.",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/ingest.py",
+      "line": 151,
+      "confidence": 0.85,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Add a test that monkeypatches django.core.management.call_command (or convert_outputs directly) to raise, asserting ingest.publish() raises IngestError and that run_store.list_runs() stays empty and the workspace tmp dir is removed. Add a second test using a mini_run_factory variant with zero catchment outputs, asserting ArchiveRejected('no catchment outputs') and that nothing is published."
+    },
+    {
+      "title": "controllers._launch and the success paths of startUpload/uploadRun that call it are never tested",
+      "detail": "_launch (lines 440-463) spawns subprocess.Popen fire-and-forget and is called from startUpload (line 386) and uploadRun (line 414). Grepping tests/test_upload.py shows every call to controllers.startUpload passes only invalid job ids (test_a_job_id_that_we_did_not_mint_is_refused, line 208-211), which return 400 before reaching _launch -- so the success path that writes status and calls _launch is never reached. controllers.uploadRun (the direct-upload endpoint, used when no bucket is configured, which the suite's default storage_root fixture implies is the common path) is not referenced anywhere in tests/*.py at all -- not even its validation-failure branches. No test mocks subprocess.Popen or _launch to verify the child is invoked with the arguments the request implies (job id, name, archive path), or that write_status(PENDING) happens before _launch is called.",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/controllers.py",
+      "line": 440,
+      "confidence": 0.88,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Add tests that monkeypatch controllers._launch (or subprocess.Popen) to a recording stub and POST valid data to startUpload and uploadRun, asserting: (a) a PENDING status was written before the call, (b) _launch received the expected --job/--name/--archive arguments, (c) the temp file written by uploadRun exists and holds the uploaded bytes, and (d) the response is 200 with the job id. This is the only way the fire-and-forget subprocess boundary gets any coverage without actually spawning django-admin in the test run."
+    },
+    {
+      "title": "run_store.delete()'s object-storage branch (_delete_prefix) has zero coverage, and the suite's own fake cannot even run it",
+      "detail": "run_store.delete() branches on duckdb_conn.is_object_storage() (line 436): local goes through shutil.rmtree, object storage goes through _delete_prefix (lines 472-482), a hand-rolled recursive listdir+delete over object keys. tests/test_run_removal.py and tests/test_delete_permission.py only ever set up a local filesystem root (populated_root fixture deletes STORAGE_BACKEND_ENV) -- there is no test that calls run_store.delete() against the object_root fixture from test_run_store.py. Worse, InMemoryStorage in tests/test_run_store.py (lines 25-73) implements listdir/exists/_open/_save but never overrides delete(), so Django's base Storage.delete() (NotImplementedError) would fire if anyone tried -- the fake used everywhere else in the suite for S3 parity cannot exercise this new destructive code path at all. Given the delete feature is one of the two headline changes in this diff (permission-gated deletes on either backend), this is a meaningful gap beyond the already-accepted 'no real S3 endpoint' limitation: it's untested even against the project's own fake.",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/run_store.py",
+      "line": 472,
+      "confidence": 0.85,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Add a delete() method to InMemoryStorage in tests/test_run_store.py that pops the key from self._objects, then add tests against the object_root fixture: deleting a run removes every key under its prefix (including nested 'directories'), leaves sibling runs' keys intact, and that _delete_prefix correctly recurses through the directories listdir returns rather than only the top-level files."
+    },
+    {
+      "title": "The upload panel's poll loop has no shutdown, and the 'keeps polling' JS test leaves it running past the test",
+      "detail": "NgiabUploadRun._await (ngiab-upload-run.js lines 106-135) is an unconditional `for (;;)` loop with no disconnectedCallback and no abort signal anywhere in the component. In ngiab-upload-run.test.js, the test 'keeps polling past a non-terminal status rather than declaring success' (lines 146-165) starts an upload whose appAPI.uploadStatus always resolves {terminal:false}, so the loop never exits; the test only awaits 4600ms and asserts state at that point, then afterEach() does el?.remove() and restores the real appAPI object. Removing the element does not stop the loop (no disconnectedCallback exists to check), so the loop keeps firing every POLL_MS=2000ms after the test finishes, now calling the *real* appAPI.uploadStatus (since afterEach restored it) for the remainder of the test run -- a genuine timer leak that can produce network calls or unhandled promise rejections attributed to later, unrelated tests. Separately, the two 4600ms-based tests ('announces the run once unpacking finishes' and this one) hardcode a 600ms margin over two 2000ms poll intervals, which is tight enough to be flaky under a loaded CI runner.",
+      "severity": "P2",
+      "file": "tethysapp/ngiab/public/frontend/components/ngiab-upload-run.test.js",
+      "line": 146,
+      "confidence": 0.78,
+      "autofix_class": "manual",
+      "owner": "review-fixer",
+      "requires_verification": true,
+      "pre_existing": false,
+      "suggested_fix": "Give NgiabUploadRun a disconnectedCallback (or an internal AbortController) that _await checks each iteration, and call it from the test's afterEach before removing the element. Prefer a fake/injectable timer (sinon fake timers or a mockable POLL_MS) over real 4-6s waits so the poll tests are both deterministic and terminate their loops instead of leaking into subsequent tests."
+    },
+    {
+      "title": "is_reserved() is only exercised through the literal STAGING_DIR name, not the general leading-underscore rule",
+      "detail": "run_store.is_reserved (lines 364-374) hides any directory name starting with '_' from list_runs, not just '_uploads'. Every test that touches this (test_upload.py's test_the_staging_directory_is_not_listed_as_a_run, line 137-142; test_a_reserved_name_cannot_be_claimed, line 203-205) only checks the STAGING_DIR constant itself -- there is no test with an arbitrary underscore-prefixed directory (e.g. '_baseline' or '_archive') placed directly under the storage root (as an operator might, since is_reserved applies to any pre-existing directory, not just ones created through the upload flow) confirming it is silently hidden from the listing with no error surfaced to the operator.",
+      "severity": "P3",
+      "file": "tethysapp/ngiab/run_store.py",
+      "line": 364,
+      "confidence": 0.62,
+      "autofix_class": "advisory",
+      "owner": "review-fixer",
+      "requires_verification": false,
+      "pre_existing": false,
+      "suggested_fix": "Add a unit test calling run_store.is_reserved directly with a handful of names ('_uploads', '_anything', 'alpha', '') and a listing test that places an arbitrary underscore-prefixed directory (not '_uploads') under the root and asserts it is excluded, documenting that the rule is general rather than special-cased to staging."
+    }
+  ],
+  "residual_risks": [
+    "ingest.publish() has a check-then-act race between run_store.find(run_name) (line 139) and the later shutil.move/backend.save in _publish_directory (lines 184-197): nothing stops two concurrent publish() calls for the same run_name from both passing the existence check before either writes. This does not require a real S3 endpoint to test -- it is pure Python control flow -- but no test in test_upload.py exercises two overlapping publish() calls for the same name.",
+    "_publish_directory's object-storage branch (ingest.py lines 189-197) uploads files one at a time in a loop with no test for a mid-loop failure (e.g. the Nth backend.save raising): a partially uploaded run could become visible to run_store.list_runs() with some files present and others missing, since nothing marks the run as complete only after every object lands. This is a design question (should publish stage under an unlisted key and rename/copy at the end?) as much as a test gap."
+  ],
+  "testing_gaps": [
+    "write_status's swallowed exception path (ingest.py lines 89-94, `except Exception: logger.warning(...)`) is untested: no test makes backend.save/backend.exists raise inside write_status to confirm a lost status update does not propagate and kill the caller.",
+    "read_status's two divergent failure paths are untested at the ingest.py call site itself: the StorageUnreachable re-raise on a backend.open failure (lines 106-108) and the `return None` on invalid JSON (lines 112-115). The StorageUnreachable mechanism is proven elsewhere (test_run_store.py:215, for list_runs), but never through ingest.read_status directly, and the corrupt-JSON fallback has no test at all.",
+    "discard_staged's swallowed exception path (ingest.py lines 217-225) is untested: no test makes backend.delete raise to confirm a failed staging cleanup does not fail the caller.",
+    "fetch_staged's IngestError branch when the staged archive is missing (ingest.py lines 206-211, `if not backend.exists(key): raise IngestError(...)`) is untested."
+  ]
+}

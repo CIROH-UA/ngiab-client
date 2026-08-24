@@ -17,11 +17,26 @@ stays "running" forever is indistinguishable to the client from one that is genu
 and the client polls until it sees a terminal state.
 """
 
+import logging
+import os
+import tempfile
 import traceback
 
 from django.core.management.base import BaseCommand, CommandError
 
 from tethysapp.ngiab import archive, ingest
+
+logger = logging.getLogger(__name__)
+
+#: Prefix every archive this app writes to disk carries, so cleanup can tell it from a file
+#: an operator named on the command line and still owns.
+_UPLOAD_TEMP_PREFIX = "ngiab-"
+
+
+def _is_upload_temp(path):
+    base = os.path.basename(path or "")
+    return base.startswith(_UPLOAD_TEMP_PREFIX) and base.endswith(".archive") \
+        and os.path.dirname(path or "") == tempfile.gettempdir()
 
 
 class Command(BaseCommand):
@@ -50,6 +65,7 @@ class Command(BaseCommand):
             ingest.write_status(job_id, state=ingest.RUNNING, stage="starting",
                                 message="preparing the upload", run=run_name)
 
+        path = None
         try:
             path = local_archive or self._staged(job_id)
             published = ingest.publish(path, run_name, job_id=job_id, progress=progress)
@@ -63,11 +79,28 @@ class Command(BaseCommand):
         finally:
             if job_id:
                 ingest.discard_staged(job_id)
+                # A bare --archive names a file the operator still owns; ours to remove.
+                if path and (path != local_archive or _is_upload_temp(path)):
+                    self._discard_local(path)
 
         if job_id:
             ingest.write_status(job_id, state=ingest.DONE, stage="done",
                                 message=f"{published} is ready", run=published)
         self.stdout.write(self.style.SUCCESS(f"published {published}"))
+
+    def _discard_local(self, path):
+        """Remove a temp archive. Every upload wrote one and nothing removed it.
+
+        discard_staged only deletes the object in storage; the local copy -- downloaded by
+        _staged, or written directly by controllers.uploadRun -- stayed on disk for the life
+        of the container, one full archive per upload.
+        """
+        import os
+
+        try:
+            os.remove(path)
+        except OSError:
+            logger.warning("Could not remove the temporary archive %s", path, exc_info=True)
 
     def _staged(self, job_id):
         import os

@@ -1,5 +1,4 @@
 import os
-import json
 import re
 import math
 import functools
@@ -378,22 +377,6 @@ def get_troute_df(model_id):
 _DEFAULT_OUTPUT_SUBDIR = "ngen"
 
 
-def resolve_output_dir(base_path):
-    """Where this run's catchment outputs live, from a run directory.
-
-    realization.json names it with ``output_root``. A run without that file, or with one
-    that does not declare it, falls back to ``outputs/ngen`` rather than raising: such runs
-    exist, and get_base_output used to call .split on the None and return a 500 for every
-    output endpoint.
-
-    Shared with the importer's scan so the reader and the scan cannot disagree about
-    whether a directory has outputs worth registering.
-    """
-    declared = get_output_path(base_path)
-    relative = declared.split("outputs")[-1].strip("/") if declared else ""
-    return os.path.join(base_path, "outputs", relative or _DEFAULT_OUTPUT_SUBDIR)
-
-
 def get_base_output(model_id):
     """Where this run's catchment outputs live.
 
@@ -402,34 +385,10 @@ def get_base_output(model_id):
     """
     entry = _require_run_entry(model_id)
     document = entry["manifest"] or {}
-    return _child(entry["path"], document.get("output_dir") or _DEFAULT_OUTPUT_SUBDIR)
-
-def get_output_path(base_path):
-    """
-    Retrieve the value of the 'output_root' key from a JSON file.
-
-    Args:
-    json_filepath (str): The file path of the JSON file.
-
-    Returns:
-    str: The value of the 'output_root' key or None if the key doesn't exist.
-    """
-    
-    realizations_output_path = os.path.join(
-        base_path, "config", "realization.json"
+    return _child(
+        entry["path"],
+        manifest.contained_output_dir(document.get("output_dir")),
     )
-
-    try:
-        with open(realizations_output_path, "r") as file:
-            data = json.load(file)
-        return data.get("output_root", None)
-    except FileNotFoundError:
-        logger.info("No realization.json in %s; using the default output directory", base_path)
-        return None
-    except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("Could not read %s: %s", realizations_output_path, exc)
-        return None
-
 
 # Output files may be csv (as ngen writes them) or parquet (as viewOnTethys.sh rewrites
 # them at import). Parquet first: when both exist it is the cheaper read.
@@ -514,7 +473,7 @@ def _read_output_frame(outputs, stem, columns=None, time_column=None):
             elif time_column and column == time_column:
                 parts.append(f'CAST("{column}" AS VARCHAR) AS "{column}"')
             else:
-                parts.append(f'"{column}"')
+                parts.append(duckdb_conn.quote_identifier(column))
         return duckdb_conn.query(
             f"SELECT {', '.join(parts)} FROM read_parquet({duckdb_conn.quote(path)})"
         )
@@ -527,7 +486,7 @@ def _read_output_frame(outputs, stem, columns=None, time_column=None):
         elif time_column and column == time_column:
             parts.append(f'CAST("{column}" AS VARCHAR) AS "{column}"')
         else:
-            parts.append(f'"{column}"')
+            parts.append(duckdb_conn.quote_identifier(column))
     return duckdb_conn.query(
         f"SELECT {', '.join(parts)} FROM read_csv_auto({duckdb_conn.quote(path)})"
     )
@@ -555,7 +514,7 @@ def _group_table_for(outputs, stem):
     The group index comes from the manifest, so this costs a cached lookup rather than a
     probe per group per request.
     """
-    index = manifest.catchment_group(outputs.run_path, stem)
+    index = manifest.catchment_group(outputs.run_path, stem, outputs.version)
     if index is None:
         raise FileNotFoundError(f"No output for {stem!r} in {outputs.directory}")
 
@@ -591,7 +550,7 @@ def _read_from_group(outputs, stem, columns, time_column):
         elif time_column and column == time_column:
             parts.append(f'CAST("{column}" AS VARCHAR) AS "{column}"')
         else:
-            parts.append(f'"{column}"')
+            parts.append(duckdb_conn.quote_identifier(column))
 
     return duckdb_conn.query(f"SELECT {', '.join(parts)} FROM {table}")
 
@@ -720,11 +679,16 @@ def run_outputs(model_run_id):
     """The output context for a run."""
     entry = _require_run_entry(model_run_id)
     document = entry["manifest"] or {}
-    directory = _child(entry["path"], document.get("output_dir") or _DEFAULT_OUTPUT_SUBDIR)
+    directory = _child(
+        entry["path"],
+        manifest.contained_output_dir(document.get("output_dir")),
+    )
     return RunOutputs(
         directory=directory,
         suffix=document.get("output_format") or "",
-        catchments=tuple(manifest.catchments(entry["path"])),
+        catchments=tuple(
+            manifest.catchments(entry["path"], document.get("version_token", ""))
+        ),
         version=document.get("version_token", ""),
         groups=tuple(document.get("output_groups") or ()),
         run_path=entry["path"],
@@ -988,7 +952,9 @@ def getCatchmentsIds(model_run_id):
 
 def getCatchmentsList(model_id):
     """The run's catchment ids, from the manifest sidecar rather than a directory listing."""
-    return manifest.catchments(_require_run_entry(model_id)["path"])
+    entry = _require_run_entry(model_id)
+    document = entry.get("manifest") or {}
+    return manifest.catchments(entry["path"], document.get("version_token", ""))
 
 
 
@@ -1072,7 +1038,10 @@ def describe_troute_feature(model_run_id, feature_id):
         return None, None
 
     flowpath_id = f"wb-{feature_id}"
-    divide_id = manifest.crosswalk(entry["path"]).get(flowpath_id)
+    document = entry.get("manifest") or {}
+    divide_id = manifest.crosswalk(
+        entry["path"], document.get("version_token", "")
+    ).get(flowpath_id)
     return (flowpath_id, divide_id) if divide_id is not None else (None, None)
 
 

@@ -7,6 +7,12 @@ many, and how large, and all three are attacker-controlled.
 
 Three refusals, each for a different failure:
 
+0. **Members that are not files.** Devices, FIFOs and links have no place in a model run,
+   and each is a way to make extraction do something other than write bytes. tarfile's
+   ``data`` filter refuses them at extract time, but by raising ``SpecialFileError`` -- not
+   ``ArchiveRejected`` -- so the contract this module promises was broken for exactly the
+   inputs it exists to refuse. They are rejected during ``inspect`` instead.
+
 1. **Paths that escape.** ``../../etc/cron.d/x`` and ``/etc/cron.d/x`` both name a
    destination outside the extraction directory, and a symlink member can redirect a later
    write after the fact. tarfile's ``data`` filter (PEP 706) covers the tar side and is used
@@ -58,7 +64,8 @@ class ArchiveRejected(ValueError):
 
 def _members_tar(handle):
     for info in handle.getmembers():
-        yield info.name, info.size, info.isdir(), (info.issym() or info.islnk())
+        special = info.issym() or info.islnk() or info.isdev()
+        yield info.name, info.size, info.isdir(), special
 
 
 def _members_zip(handle):
@@ -116,11 +123,12 @@ def inspect(path, *, max_bytes=DEFAULT_MAX_BYTES, max_members=DEFAULT_MAX_MEMBER
     roots = set()
 
     try:
-        for name, size, is_dir, is_link in members(handle):
-            if is_link:
+        for name, size, is_dir, is_special in members(handle):
+            if is_special:
                 raise ArchiveRejected(
-                    f"The archive contains a link ({name!r}). Links can redirect a write "
-                    "outside the run, so archives containing them are refused."
+                    f"The archive contains a link or device node ({name!r}). A link can "
+                    "redirect a write outside the run, and neither belongs in a model run, "
+                    "so archives containing them are refused."
                 )
             relative = _normalise(name)
             if relative is None:
@@ -133,11 +141,11 @@ def inspect(path, *, max_bytes=DEFAULT_MAX_BYTES, max_members=DEFAULT_MAX_MEMBER
                 raise ArchiveRejected(
                     f"The archive unpacks to more than {max_bytes // (1024 ** 3)} GiB."
                 )
+            entries.append((relative, size, is_dir))
             if len(entries) > max_members:
                 raise ArchiveRejected(
                     f"The archive holds more than {max_members} entries."
                 )
-            entries.append((relative, size, is_dir))
             head = relative.split("/")[0]
             if "/" in relative or is_dir:
                 roots.add(head)

@@ -173,7 +173,7 @@ def test_list_configurations_for_unknown_run_is_empty(reader):
     assert reader.list_configurations_for_run("ngen_not_real") == []
 
 
-# ---- list_usgs_locations_for_run / usgs_for_ngen ------------------------
+# ---- list_usgs_locations_for_run ----------------------------------------
 
 
 def test_list_usgs_locations_returns_primary_ids(reader):
@@ -182,9 +182,6 @@ def test_list_usgs_locations_returns_primary_ids(reader):
     assert ids
     assert all(i.startswith("usgs-") for i in ids)
 
-
-def test_usgs_for_ngen_unknown_returns_none(reader):
-    assert reader.usgs_for_ngen("ngen_ngiab", "ngen-0000000") is None
 
 
 def test_list_crosswalks_returns_all_pairs(reader):

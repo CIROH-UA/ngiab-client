@@ -47,6 +47,7 @@ class Command(BaseCommand):
 
         if hosted:
             self._refuse_shipped_defaults(password, secret_key)
+            self._require_credentials(name, password)
 
         if options["check_only"]:
             self.stdout.write("no shipped defaults in use")
@@ -68,6 +69,27 @@ class Command(BaseCommand):
 
         verb = "created" if created else "updated"
         self.stdout.write(self.style.SUCCESS(f"{verb} superuser {name}"))
+
+    def _require_credentials(self, name, password):
+        """Refuse a hosted start that supplies no superuser at all.
+
+        _refuse_shipped_defaults only fires on a password that is *supplied and wrong*. With
+        none supplied the command fell through to "leaving the database alone" and started
+        anyway -- on the baked admin/pass account, which is in a public image and which an
+        ephemeral database restores on every restart. The gate was checking the lock and
+        ignoring the open window.
+        """
+        if name and password:
+            return
+        missing = " and ".join(
+            filter(None, [None if name else "PORTAL_SUPERUSER_NAME",
+                          None if password else "PORTAL_SUPERUSER_PASSWORD"])
+        )
+        raise CommandError(
+            "Refusing to start a hosted deployment with no superuser configured:\n"
+            f"  - {missing} is not set, so the image's baked admin account stays active.\n"
+            "Set both, or run with NGIAB_STORAGE_BACKEND unset for a local deployment."
+        )
 
     def _refuse_shipped_defaults(self, password, secret_key):
         """Fail closed. Both of these are published in a public image.

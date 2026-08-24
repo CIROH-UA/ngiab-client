@@ -26,6 +26,7 @@ import hashlib
 import json
 import logging
 import os
+import posixpath
 import re
 import sqlite3
 
@@ -72,9 +73,10 @@ def normalize_uuid(value):
 def _read_realization_output_dir(run_path):
     """The run-relative output directory, from realization.json's ``output_root``.
 
-    Mirrors utils.resolve_output_dir, including its fallback: a run without the file, or
-    with one that does not declare the key, uses ``outputs/ngen`` rather than raising. Such
-    runs exist, and treating them as an error was a 500 on every output endpoint.
+    A run without the file, or with one that does not declare the key, uses ``outputs/ngen``
+    rather than raising. Such runs exist, and treating them as an error was a 500 on every
+    output endpoint. The result is passed through ``contained_output_dir``, because this
+    value comes out of an uploaded archive.
     """
     path = os.path.join(run_path, "config", "realization.json")
     try:
@@ -88,8 +90,32 @@ def _read_realization_output_dir(run_path):
 
     if not declared:
         return _DEFAULT_OUTPUT_SUBDIR
-    relative = declared.split("outputs")[-1].strip("/")
-    return os.path.join("outputs", relative or "ngen")
+    relative = str(declared).split("outputs")[-1].strip("/")
+    return contained_output_dir(os.path.join("outputs", relative or "ngen"))
+
+
+def contained_output_dir(candidate):
+    """``candidate`` if it stays inside the run, the default otherwise.
+
+    ``realization.json`` arrives inside the archive, so ``output_root`` is user input. The
+    split above neutralises anything containing the literal ``outputs`` -- but a value
+    without it passed through raw, and ``output_root: "../../../../../../etc"`` became an
+    ``output_dir`` of ``outputs/../../../../../../etc``. That is written into the manifest and
+    joined onto the run's location by the read path, which then served ``/etc`` to any caller.
+    Reads are open, so that was an anonymous arbitrary-directory read.
+
+    Normalising and refusing to leave the run is the same containment rule ``archive.py`` and
+    ``run_store._contained_directory`` already apply; this was the one path that skipped it.
+    Falls back rather than raising, because a run with a strange ``output_root`` should read
+    from its own outputs, not fail to load at all.
+    """
+    if not candidate:
+        return _DEFAULT_OUTPUT_SUBDIR
+    normalised = posixpath.normpath(str(candidate).replace(os.sep, "/"))
+    if normalised.startswith(("/", "../")) or normalised in ("..", "."):
+        logger.warning("Refusing an output_root that leaves the run: %r", candidate)
+        return _DEFAULT_OUTPUT_SUBDIR
+    return normalised
 
 
 def _find_gpkg(run_path):
@@ -512,20 +538,36 @@ def _catchments_cached(run_path, version_token):
     }
 
 
-def catchments(run_path):
+def catchments(run_path, version_token=None):
     """The run's catchment ids, from the sidecar.
 
     Cached on the version token rather than on mtime, because an object-store prefix has no
     mtime -- that is the whole reason the token exists.
+
+    Callers pass the token they already read off the manifest. Recomputing it here was the
+    bug: ``_version_of`` goes through ``read``, which opens a filesystem path, and an
+    ``s3://`` location can never satisfy that -- so the key was the empty string for every
+    hosted run and the cache was never invalidated. That is precisely the stale-forever
+    failure the token replaced ``os.stat`` to avoid, reintroduced on the backend that needed
+    it most.
     """
     run_path = str(run_path).rstrip(os.sep)
-    return sorted(_catchments_cached(run_path, _version_of(run_path)))
+    return sorted(_catchments_cached(run_path, _token(run_path, version_token)))
 
 
-def catchment_group(run_path, stem):
+def catchment_group(run_path, stem, version_token=None):
     """Which consolidated group holds one catchment, or None when it is not this run's."""
     run_path = str(run_path).rstrip(os.sep)
-    return _catchments_cached(run_path, _version_of(run_path)).get(stem)
+    return _catchments_cached(run_path, _token(run_path, version_token)).get(stem)
+
+
+def _token(run_path, supplied):
+    """The caller's token, or a filesystem read when there is none to supply.
+
+    The fallback keeps a local one-shot script working without a manifest in hand; it is
+    useless against object storage, which is why every request-path caller passes one.
+    """
+    return supplied if supplied is not None else _version_of(run_path)
 
 
 @functools.lru_cache(maxsize=8)
@@ -546,7 +588,7 @@ def _crosswalk_cached(run_path, version_token):
     return dict(zip(frame["flowpath_id"], frame["divide_id"]))
 
 
-def crosswalk(run_path):
+def crosswalk(run_path, version_token=None):
     """The whole flowpath-to-divide mapping, as a dict.
 
     Loaded whole rather than filtered per feature, and cached, because both halves matter.
@@ -556,7 +598,7 @@ def crosswalk(run_path):
     second of clicking around the map. Cached whole it is paid once per run per ingest.
     """
     run_path = str(run_path).rstrip(os.sep)
-    return dict(_crosswalk_cached(run_path, _version_of(run_path)))
+    return dict(_crosswalk_cached(run_path, _token(run_path, version_token)))
 
 
 def clear_caches():

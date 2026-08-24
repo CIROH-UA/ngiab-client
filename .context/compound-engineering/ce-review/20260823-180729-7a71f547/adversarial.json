@@ -1,0 +1,93 @@
+{
+  "reviewer": "adversarial",
+  "findings": [
+    {
+      "title": "Two uploads racing the same run name publish concurrently, corrupting or silently discarding one run",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/ingest.py",
+      "line": 139,
+      "confidence": 0.85,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "scenario": "createUpload/startUpload check run_store.find(name) only in the web worker's request thread (controllers.py:296-327, 371-387). Two browsers reserve the same run name in the same short window; both checks pass because nothing exists yet in storage. Each POST launches an independent `ingest_archive` subprocess (controllers.py._launch, no locking, no queue). Both subprocesses independently re-check run_store.find(run_name) at ingest.py:139 -- each is a fresh cold process with its own empty lru_cache, so both see 'no such run' and both proceed through extract/convert/publish concurrently for the same run_name. On the local backend, _publish_directory (ingest.py:183-187) calls shutil.move(source, destination); whichever process wins the race creates the destination directory first, and the second call to shutil.move sees an *existing* directory at destination and (per shutil.move semantics) nests its own source directory inside it using the source's basename instead of overwriting or raising -- so the second job's manifest/catchment files land at e.g. `<root>/<name>/run/manifest.json`, a path run_store never reads. That job still returns DONE / '<name> is ready' to its own poller: silent total data loss for the loser, with no error surfaced anywhere. On the object-storage backend, _publish_directory (ingest.py:189-197) instead uploads each file under an identical set of keys (`<name>/...`) from both processes with no coordination; the interleaved PutObject calls can produce a single published run whose manifest.json belongs to one upload while some catchment parquet objects were overwritten by the other, both jobs reporting DONE. No test in tests/test_upload.py or tests/test_run_store.py exercises two ingests of the same name racing.",
+      "suggested_fix": "Give ingest.publish an exclusive claim step at the top -- e.g. an atomic 'create-if-absent' marker object/file for the run name (S3 conditional PUT / local O_EXCL) held for the duration of the job -- so the second racer fails fast with ArchiveRejected instead of writing into the same destination."
+    },
+    {
+      "title": "Cross-filesystem shutil.move is not atomic, contradicting the docstring, and exposes a partially-copied run to the picker",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/ingest.py",
+      "line": 184,
+      "confidence": 0.8,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "scenario": "_publish_directory's docstring (ingest.py:176-181) asserts the local publish 'is atomic within a filesystem and costs nothing.' The extraction workspace comes from tempfile.mkdtemp() (ingest.py:145), which resolves to the container's default /tmp unless TMPDIR is overridden -- and nothing in Dockerfile/apptainer sets TMPDIR to live under the bind-mounted persist volume (Dockerfile only sets TETHYS_PERSIST=/var/lib/tethys_persist; run_store.DEFAULT_MANAGED_ROOT is /var/lib/tethys_persist/ngiab_visualizer, a separate mount per run_store.py's own module docstring). When workspace and local_root are on different filesystems/mounts, shutil.move(source, destination) at ingest.py:186 silently falls back to copytree+rmtree instead of os.rename, which is not atomic. Because copytree creates the destination directory near the start of the copy and (like os.walk) tends to copy top-level files -- including the just-written manifest.json -- before descending into output subdirectories, a run of several GB can sit in the storage root, visible to run_store._describe (run_store.py:251-286) as a directory whose manifest already parses and whose output_format is already set (usable=True) minutes before the catchment data finishes copying. Any request to that run in that window gets 404/500s from the data endpoints despite the picker showing it as a normal, loadable run. A crash mid-copy (OOM, disk full, container restart) leaves a half-copied, undeletable-by-retry-under-same-name orphan in the persist volume.",
+      "suggested_fix": "Publish to a hidden/staging path inside the destination filesystem first (e.g. `<root>/_uploads/<job>/<name>` on the same volume as local_root) and only os.rename() the fully-written directory into its final <root>/<name> location, so the visible name only ever appears once it is complete."
+    },
+    {
+      "title": "Mid-publish crash on object storage leaves a manifest-only run that lists as usable and blocks re-upload under the same name",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/ingest.py",
+      "line": 189,
+      "confidence": 0.75,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "scenario": "manifest.write(unpacked, document) (ingest.py:162) writes manifest.json to the top level of the local `unpacked` directory before _publish_directory runs. On the S3 branch, _publish_directory (ingest.py:191-197) walks the tree with os.walk, whose default top-down traversal yields the root directory's own files (including manifest.json) before descending into subdirectories such as outputs/ or the converted parquet directories -- so manifest.json is very likely one of the first objects PUT to the bucket. If the ingest_archive subprocess dies partway through this loop (OOM kill, container redeploy, transient S3 error not caught by the per-object backend.save call, disk pressure from concurrent jobs per the disk-exhaustion cascade below), the bucket is left with a complete, parseable manifest.json (schema_version set, output_format truthy) and no or partial catchment objects. run_store._describe (run_store.py:251-286) only inspects the manifest fields, never checks that the referenced output objects exist, so this run reports usable=True and appears in the picker as normal. Every data endpoint that reads catchment output for it then fails at read time. Worse, run_store.find(name) (run_store.py:391-396) matches this entry too (it doesn't filter on `usable`), so ingest.publish's own duplicate-name guard (ingest.py:139-143) refuses a retry upload under the same name -- the user must first discover and delete the broken run before they can re-upload.",
+      "suggested_fix": "Publish manifest.json last (after every other object has been uploaded successfully), or write a distinct '.pending' marker key that _describe treats as not-yet-ingested until a final commit step renames/writes the real manifest."
+    },
+    {
+      "title": "Cascade: unbounded upload subprocesses can OOM the container and leave jobs stuck 'running' forever with a client that polls indefinitely",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/controllers.py",
+      "line": 440,
+      "confidence": 0.75,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "scenario": "_launch (controllers.py:440-463) spawns a bare subprocess.Popen with start_new_session=True for every startUpload/uploadRun call, with no concurrency limit, no queue, and nothing that reaps or bounds the children. Each child extracts an archive (up to 32 GiB per archive.DEFAULT_MAX_BYTES, archive.py:41) into a fresh tempdir and runs DuckDB/pandas conversion in-process. A handful of legitimate near-simultaneous uploads (e.g. several users each adding a 6 GB run, per run_store.py's own '6 GB unpacked' example) can push the container over its memory or disk limit. When the OOM killer sends SIGKILL to an ingest_archive child, Python cannot run any exception handler -- the `except Exception` in management/commands/ingest_archive.py:59-62 and the `finally: ingest.discard_staged` (line 64-65) never execute, so the job's last written status stays 'running' (written at ingest_archive.py:50-51 or via progress() at ingest.py:129-133) forever, and the extraction workspace (ingest.py:145, cleaned only by the `finally: shutil.rmtree(workspace, ...)` at ingest.py:171-172, which also never runs) leaks on disk. On the client, ngiab-upload-run.js's `_await` loop (lines 106-135) polls uploadStatus every 2s with no maximum attempt count or timeout -- `for (;;)` -- so the UI is stuck showing 'Working…' indefinitely with no way for the user to know the job is dead, and uploadStatus (controllers.py:418-429) has no server-side staleness check (e.g. comparing `updated` to now) to ever flip a stuck job to failed.",
+      "suggested_fix": "Bound concurrent ingest subprocesses (a semaphore/queue in _launch, or a job table checked before spawning), and add a staleness check in uploadStatus/read_status that reports a job as failed if `updated` is older than some generous ceiling with no further progress, so the client-side poll loop has a way to terminate."
+    },
+    {
+      "title": "DuckDB's cached S3 secret is created once per worker process and never refreshed when portal-sourced credentials rotate or expire",
+      "severity": "P1",
+      "file": "tethysapp/ngiab/duckdb_conn.py",
+      "line": 159,
+      "confidence": 0.8,
+      "autofix_class": "manual",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "scenario": "_base_connection (duckdb_conn.py:159-169) is an lru_cache(maxsize=1) that lives for the lifetime of the worker process; _authenticate (duckdb_conn.py:122-149) runs exactly once, when the connection is first configured, executing a CREATE SECRET statement built from run_store.duckdb_secret_sql() at that instant. duckdb_secret_sql() explicitly supports the case where the storage backend carries no static key and falls back to `PROVIDER credential_chain` (run_store.py:195-196) -- the shape used for instance-role/workload-identity credentials, which by design are short-lived and rotate (typically on the order of minutes to hours for STS-issued tokens). Once the credential DuckDB captured at startup expires, every subsequent read of run data through duckdb_conn.query/fetchone (used by every catchment/timeseries endpoint) starts failing with an S3 auth error, indistinguishable at the call site from a real outage. reset() (duckdb_conn.py:214-216) is the only way to force reconfiguration and its docstring says 'Tests only' -- nothing in the request-serving code path calls it, so recovery requires restarting the worker process entirely.",
+      "suggested_fix": "Detect S3 auth failures on a DuckDB S3 read, call duckdb_conn.reset() and retry once, or proactively rebuild the secret on a timer shorter than the credential's typical lifetime."
+    },
+    {
+      "title": "Concurrent double-delete of the same run can surface a transient 500 instead of the expected 404",
+      "severity": "P3",
+      "file": "tethysapp/ngiab/run_store.py",
+      "line": 449,
+      "confidence": 0.6,
+      "autofix_class": "advisory",
+      "owner": "human",
+      "requires_verification": true,
+      "pre_existing": false,
+      "scenario": "Two delete requests for the same run name, issued close enough together to both pass run_store.find(name) before either clears the cache (delete() at run_store.py:414-441 only calls clear_caches() after removal completes, line 441). Both proceed to _contained_directory(name) (run_store.py:449-469) and shutil.rmtree. Whichever runs second can lose the race mid-walk if the first has already unlinked entries shutil.rmtree is currently iterating, raising a FileNotFoundError (an OSError subclass). removeModelRun (controllers.py:270-278) catches OSError generically and returns a 500 'Could not delete that run' rather than the 404 a user would expect for 'already gone'.",
+      "suggested_fix": "Catch FileNotFoundError specifically in removeModelRun (or inside run_store.delete) and treat it the same as LookupError -> 404, since the end state (the run is gone) is the one the caller wanted."
+    }
+  ],
+  "residual_risks": [
+    "run_store.clear_caches() is invoked from the ingest_archive subprocess (ingest.py:167-168), a different OS process from any uvicorn worker serving the picker. Because functools.lru_cache is per-process, this call has no effect on any web worker's in-memory listing cache -- the TTL window in _time_bucket (run_store.py:320-343) is what actually bounds staleness for a newly published run (up to DEFAULT_LISTING_TTL_SECONDS, default 10s per worker). This matches the module's own docstring reasoning about cross-process convergence, so it is working as designed rather than a bug, but the clear_caches() call after publish is effectively dead code from the perspective of the web-facing cache and only helps same-process callers (tests, CLI).",
+    "write_status (ingest.py:82-95) swallows any exception from writing the status object and only logs a warning. Combined with no server-side staleness detection on read_status, a storage-layer failure at exactly the moment a terminal status would be written can leave a job permanently unresolvable from the client's point of view even when the underlying subprocess exited cleanly."
+  ],
+  "testing_gaps": [
+    "No test in tests/test_upload.py or tests/test_run_store.py exercises two ingest jobs racing to publish the same run name concurrently on either backend.",
+    "No test exercises ingest.publish crashing partway through _publish_directory (simulated by raising mid-loop) to verify what run_store reports for the partially-published run and whether it can be deleted or re-uploaded.",
+    "No test exercises duckdb_conn behavior when the configured S3 credentials change after _base_connection has already been created (credential rotation / expiry).",
+    "No test exercises shutil.move's cross-filesystem fallback path in _publish_directory (workspace and local_root pointed at different filesystems), which is the actual condition in the containerized deployment."
+  ]
+}

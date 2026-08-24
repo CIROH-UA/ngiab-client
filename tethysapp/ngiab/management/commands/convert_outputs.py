@@ -168,7 +168,7 @@ class Command(BaseCommand):
         and the value matrix still scans once.
         """
         pattern = os.path.join(outputs, "cat-*.csv")
-        selected = ", ".join(f'"{column}"' for column in columns)
+        selected = ", ".join(duckdb_conn.quote_identifier(column) for column in columns)
         members_list = ", ".join(duckdb_conn.quote(member) for member in members)
         time_column = columns[1] if len(columns) > 1 else columns[0]
 
@@ -179,7 +179,7 @@ class Command(BaseCommand):
                        regexp_extract(filename, '(cat-[0-9]+)', 1) AS catchment_id
                 FROM read_csv_auto({duckdb_conn.quote(pattern)}, filename=true, union_by_name=true)
                 WHERE regexp_extract(filename, '(cat-[0-9]+)', 1) IN ({members_list})
-                ORDER BY catchment_id, "{time_column}"
+                ORDER BY catchment_id, {duckdb_conn.quote_identifier(time_column)}
             ) TO {duckdb_conn.quote(destination)}
             (FORMAT PARQUET, COMPRESSION {compression})
             """

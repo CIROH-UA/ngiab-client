@@ -92,6 +92,22 @@ def quote(value):
     return "'" + str(value).replace("'", "''") + "'"
 
 
+def quote_identifier(name):
+    """Return ``name`` as a SQL identifier, double quotes included and internal ones doubled.
+
+    The identifier counterpart to ``quote``, and it exists for the same reason: there is one
+    correct way to interpolate a name and this is it.
+
+    Column names became attacker-controlled the moment a run could arrive as an uploaded
+    archive. ``read_csv_auto`` takes the header verbatim, and a CSV header may contain a
+    double quote, so ``f'"{column}"'`` let a crafted header close the identifier and splice
+    arbitrary SQL into the statement -- demonstrated running ``(SELECT 31337) AS pwned`` and
+    reading ``current_setting('extension_directory')`` on the shared connection, which is the
+    connection holding the run bucket's credentials.
+    """
+    return '"' + str(name).replace('"', '""') + '"'
+
+
 def _configure(connection):
     """Apply the settings every connection needs, in the order DuckDB requires them."""
     home = duckdb_home()
