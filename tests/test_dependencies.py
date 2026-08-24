@@ -1,19 +1,29 @@
 """Guards on dependency choices that took research to make and look wrong at a glance."""
 
 import importlib.metadata as metadata
-import json
 
 import pytest
+from packaging.version import Version
 
 
-def test_django_storages_is_installed_from_git_not_pypi():
-    """The released 1.14.6 does not declare support for the Django this image ships."""
-    raw = metadata.distribution("django-storages").read_text("direct_url.json")
-    assert raw is not None, (
-        "django-storages appears to be installed from PyPI. pyproject.toml pins a git commit "
-        "because no release declares Django 5.2 support."
-    )
-    assert json.loads(raw)["vcs_info"]["vcs"] == "git"
+def test_django_storages_takes_the_django_this_image_ships():
+    """1.14.6 lists no Django 5.2 classifier, which reads as a block and is not one.
+
+    The classifiers are informational; the requirement is Django>=4.2 with no ceiling, so the
+    release installs and the S3 backend loads. This app was pinned to a git commit over that
+    misreading, which made every build of it fetch from GitHub. The portal already runs the
+    release.
+    """
+    requires = metadata.metadata("django-storages").get_all("Requires-Dist") or []
+    django_requirement = next(r for r in requires if r.lower().startswith("django"))
+    assert ">=" in django_requirement and "<" not in django_requirement, django_requirement
+
+    import django
+    from storages.backends.s3 import S3Storage
+
+    floor = Version(django_requirement.split(">=", 1)[1].strip())
+    assert Version(django.__version__) >= floor
+    assert S3Storage is not None
 
 
 def test_duckdb_is_pinned_exactly():
