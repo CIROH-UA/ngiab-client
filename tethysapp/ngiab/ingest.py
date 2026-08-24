@@ -25,6 +25,7 @@ objects are small and are not swept up: a few hundred bytes per upload, under a 
 prefix the run listing skips.
 """
 
+import contextlib
 import json
 import logging
 import os
@@ -32,6 +33,7 @@ import posixpath
 import re
 import shutil
 import tempfile
+import threading
 import time
 
 from . import archive, duckdb_conn, manifest, run_store
@@ -59,6 +61,17 @@ UPLOAD_CONCURRENCY = int(os.environ.get("NGIAB_UPLOAD_CONCURRENCY", "10"))
 #: signal available. Generous, because a large conversion is legitimately quiet for minutes:
 #: progress is reported per stage, not per catchment.
 STALE_AFTER_SECONDS = float(os.environ.get("NGIAB_JOB_STALE_SECONDS", 30 * 60))
+
+
+def heartbeat_seconds():
+    """How often a working job re-stamps its status.
+
+    Derived from the staleness window rather than configured separately, because the only
+    thing that matters is that it is comfortably shorter: a quarter of the window means three
+    beats can be lost before a live job looks dead. Capped at a minute so a job is not writing
+    to storage more often than a person would refresh.
+    """
+    return max(1.0, min(60.0, STALE_AFTER_SECONDS / 4))
 
 
 #: What a newly published run may be called.
@@ -96,19 +109,58 @@ def status_key(job_id):
 
 
 def write_status(job_id, **fields):
-    """Record where a job has got to. Last write wins; there is one writer."""
-    from django.core.files.base import ContentFile
+    """Record where a job has got to. Last write wins.
 
+    Two writers now, not one: the stage transitions in ``publish`` and the heartbeat that
+    runs beside them. Both go through here, and the reader is a third process entirely.
+    """
     payload = {"job": job_id, "updated": time.time(), **fields}
-    backend = run_store.storage()
-    key = status_key(job_id)
     try:
-        if backend.exists(key):
-            backend.delete(key)
-        backend.save(key, ContentFile(json.dumps(payload).encode("utf-8")))
+        _replace(run_store.storage(), status_key(job_id),
+                 json.dumps(payload).encode("utf-8"))
     except Exception:  # noqa: BLE001 - a lost status update must not kill the job
         logger.warning("Could not write status for job %s", job_id, exc_info=True)
     return payload
+
+
+def _replace(backend, key, body):
+    """Put ``body`` at ``key``, with no moment where nothing is there.
+
+    This used to delete and then save, which left a window -- short, but real, and entered
+    on every single status update -- in which a poll arriving between the two read no status
+    at all and was answered "no such upload job". A heartbeat multiplies the number of writes
+    by the length of the job, so it would have turned a rare wrong answer into a common one.
+
+    ``S3Storage`` overwrites on save, so the delete was never needed there.
+    ``FileSystemStorage`` refuses to, inventing ``status_a1b2c3.json`` beside the original --
+    which is why the delete existed. The local path writes a temporary file in the same
+    directory and ``os.replace``s it over the target instead: atomic within a filesystem, and
+    a reader sees either the old bytes or the new ones.
+    """
+    target = None
+    if hasattr(backend, "path"):
+        try:
+            target = backend.path(key)
+        except (NotImplementedError, ValueError, AttributeError):
+            target = None
+
+    if target is None:
+        from django.core.files.base import ContentFile
+
+        backend.save(key, ContentFile(body))
+        return
+
+    directory = os.path.dirname(target)
+    os.makedirs(directory, exist_ok=True)
+    handle, temporary = tempfile.mkstemp(dir=directory, suffix=".tmp")
+    try:
+        with os.fdopen(handle, "wb") as sink:
+            sink.write(body)
+        os.replace(temporary, target)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.remove(temporary)
+        raise
 
 
 def read_status(job_id):
@@ -164,15 +216,61 @@ def _fail_if_stale(document):
 # ---- The pipeline -----------------------------------------------------------
 
 
+@contextlib.contextmanager
+def _heartbeat(job_id, snapshot):
+    """Keep a working job's ``updated`` advancing while a stage is in progress.
+
+    Staleness is the only evidence available that a job died: nothing supervises the child,
+    and a SIGKILL writes no status. But it was measuring the wrong thing. Status was written
+    only at stage boundaries, and ``convert_outputs`` is one blocking call -- so a run large
+    enough to convert for longer than the window was declared dead *while it was working*.
+    The client stopped polling and reported failure; the job then published anyway, so the
+    run appeared after the interface said it had not. A user who reacted by uploading again
+    under the same name put two ingests on one destination.
+
+    The beat says nothing new. It rewrites the stage the job is already in, so the only field
+    that changes is the timestamp, and staleness goes back to meaning what it claims to:
+    nothing is running any more.
+
+    A daemon thread rather than progress reporting inside the conversion, because this has to
+    hold for every long step -- including the object-by-object upload, and whichever step
+    turns out to be slow next -- rather than only the one that is slow today.
+
+    The thread is joined rather than merely signalled on the way out: a beat already in
+    flight has to land before the caller writes its terminal status, or it would put RUNNING
+    back over DONE.
+    """
+    if not job_id:
+        yield
+        return
+
+    stop = threading.Event()
+
+    def beat():
+        while not stop.wait(heartbeat_seconds()):
+            stage, message = snapshot()
+            write_status(job_id, state=RUNNING, stage=stage, message=message)
+
+    thread = threading.Thread(target=beat, name=f"ngiab-heartbeat-{job_id}", daemon=True)
+    thread.start()
+    try:
+        yield
+    finally:
+        # Joined, not just signalled; see the docstring.
+        stop.set()
+        thread.join(timeout=heartbeat_seconds() + 5)
+
+
 def publish(archive_path, run_name, *, job_id=None, progress=None):
     """Extract, convert, distil and publish one archive as ``run_name``.
 
     Returns the published run's name. Raises ArchiveRejected for anything the user can fix
     and IngestError for anything they cannot.
     """
-    from django.core.management import call_command
+    at = {"stage": "starting", "message": "preparing the upload"}
 
     def say(stage, message):
+        at.update(stage=stage, message=message)
         logger.info("[ingest %s] %s", job_id or "-", message)
         if progress:
             progress(stage, message)
@@ -190,32 +288,40 @@ def publish(archive_path, run_name, *, job_id=None, progress=None):
 
     workspace = _workspace()
     try:
-        say("extracting", "unpacking the archive")
-        unpacked = archive.extract(archive_path, os.path.join(workspace, "run"))
-
-        say("converting", "converting outputs to parquet")
-        try:
-            call_command("convert_outputs", "--path", unpacked)
-        except Exception as exc:  # noqa: BLE001
-            raise IngestError(f"The run's outputs could not be converted: {exc}") from exc
-
-        say("describing", "writing the manifest")
-        document = manifest.distill(unpacked, run_id=run_name, label=run_name)
-        if not document.get("catchment_count"):
-            raise archive.ArchiveRejected(
-                "The run has no catchment outputs, so there would be nothing to plot."
-            )
-        manifest.write(unpacked, document)
-
-        say("publishing", f"copying {document['catchment_count']} catchments into storage")
-        _publish_directory(unpacked, run_name)
-
-        run_store.clear_caches()
-        manifest.clear_caches()
-        say("done", f"{run_name} is ready")
-        return run_name
+        with _heartbeat(job_id, lambda: (at["stage"], at["message"])):
+            return _run(archive_path, run_name, workspace, say)
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
+
+
+def _run(archive_path, run_name, workspace, say):
+    """The stages themselves, lifted out so publish can wrap them in one heartbeat."""
+    from django.core.management import call_command
+
+    say("extracting", "unpacking the archive")
+    unpacked = archive.extract(archive_path, os.path.join(workspace, "run"))
+
+    say("converting", "converting outputs to parquet")
+    try:
+        call_command("convert_outputs", "--path", unpacked)
+    except Exception as exc:  # noqa: BLE001
+        raise IngestError(f"The run's outputs could not be converted: {exc}") from exc
+
+    say("describing", "writing the manifest")
+    document = manifest.distill(unpacked, run_id=run_name, label=run_name)
+    if not document.get("catchment_count"):
+        raise archive.ArchiveRejected(
+            "The run has no catchment outputs, so there would be nothing to plot."
+        )
+    manifest.write(unpacked, document)
+
+    say("publishing", f"copying {document['catchment_count']} catchments into storage")
+    _publish_directory(unpacked, run_name)
+
+    run_store.clear_caches()
+    manifest.clear_caches()
+    say("done", f"{run_name} is ready")
+    return run_name
 
 
 def _workspace():
