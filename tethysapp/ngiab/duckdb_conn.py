@@ -211,6 +211,10 @@ def query(sql, parameters=None):
 
     The common shape in utils.py, which reads a result and discards the handle.
     """
+    return _with_fresh_credentials(lambda: _query_once(sql, parameters))
+
+
+def _query_once(sql, parameters=None):
     cursor = connect()
     try:
         return cursor.execute(sql, parameters or []).df()
@@ -218,8 +222,46 @@ def query(sql, parameters=None):
         cursor.close()
 
 
+#: Substrings that mark a DuckDB S3 failure as "these credentials are no longer good"
+#: rather than "this object is missing". Matched on the message because httpfs reports the
+#: store's HTTP status in prose rather than through a typed exception.
+_AUTH_FAILURE_MARKERS = (
+    "http 401", "http 403", "expiredtoken", "invalidaccesskeyid",
+    "signaturedoesnotmatch", "access denied",
+)
+
+
+def _with_fresh_credentials(run):
+    """Run a query, and retry it once against a rebuilt connection on an auth failure.
+
+    The S3 secret is created when the connection is configured, and the connection is cached
+    for the life of the process. Credentials that rotate or expire -- which is the normal
+    case for instance and workload identity, the very providers ``credential_chain`` exists
+    to serve -- left every read failing until the worker restarted.
+
+    Only auth failures retry. A missing object must stay a missing object: rebuilding the
+    connection for those would turn one wrong answer into two round trips of the same wrong
+    answer.
+    """
+    try:
+        return run()
+    except duckdb.Error as exc:
+        if not is_object_storage():
+            raise
+        message = str(exc).lower()
+        if not any(marker in message for marker in _AUTH_FAILURE_MARKERS):
+            raise
+        logger.info("Rebuilding the DuckDB connection after an S3 auth failure")
+        reset()
+        return run()
+
+
 def fetchone(sql, parameters=None):
     """Run one statement and return its first row, or None."""
+    return _with_fresh_credentials(lambda: _fetchone_once(sql, parameters))
+
+
+def _fetchone_once(sql, parameters=None):
     cursor = connect()
     try:
         return cursor.execute(sql, parameters or []).fetchone()

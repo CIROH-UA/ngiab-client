@@ -12,6 +12,11 @@ import { canUpload } from '../config.js';
 
 const POLL_MS = 2000;
 
+// A ceiling so a job that never reaches a terminal state stops being reported as 'Working…'
+// forever. Generous: the server reports a stale job as failed well before this, and this is
+// only the backstop for a status object that cannot be read at all.
+const POLL_CEILING_MS = 60 * 60 * 1000;
+
 export class NgiabUploadRun extends HTMLElement {
   connectedCallback() {
     if (!canUpload()) return;
@@ -37,6 +42,11 @@ export class NgiabUploadRun extends HTMLElement {
 
     this._startEl.addEventListener('click', () => this._upload());
     this._fileEl.addEventListener('change', () => this._suggestName());
+  }
+
+  // Else the poll loop outlives the element, firing run-published from a detached node.
+  disconnectedCallback() {
+    this._stopped = true;
   }
 
   // A run is usually archived under its own name, so offer that rather than nothing.
@@ -104,8 +114,20 @@ export class NgiabUploadRun extends HTMLElement {
 
   // Unpacking outlives the request that started it, so its outcome arrives by polling.
   async _await(job) {
+    const started = Date.now();
     for (;;) {
       await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+      if (this._stopped || !this.isConnected) return undefined;
+
+      if (Date.now() - started > POLL_CEILING_MS) {
+        this._busy(false);
+        this._progressEl.hidden = true;
+        return this._say(
+          'This upload is taking longer than expected. It may still finish \u2014 reload to '
+          + 'check whether the run appeared.',
+          'warning',
+        );
+      }
 
       let status;
       try {

@@ -57,6 +57,10 @@ DEFAULT_RUNS_PREFIX = "ngiab_visualizer"
 
 # How long a listing may be stale. See _time_bucket for why this is a window rather than an
 # invalidation signal, and why 10 seconds.
+#: Manifests fetched at once when building a listing. Bounded so a bucket with many runs
+#: does not open a connection per run against a portal that also has pages to serve.
+LISTING_CONCURRENCY = int(os.environ.get("NGIAB_LISTING_CONCURRENCY", "16"))
+
 LISTING_TTL_ENV = "NGIAB_LISTING_TTL_SECONDS"
 DEFAULT_LISTING_TTL_SECONDS = 10.0
 
@@ -226,17 +230,22 @@ def _read_manifest(name):
 
     Goes through the storage interface rather than ``manifest.read`` so the object-store path
     works: ``manifest.read`` opens a filesystem path, which does not exist in a bucket.
+
+    Opened rather than probed first, because ``exists()`` is a round trip of its own and the
+    listing paid two per run before it could show any of them.
     """
     import json
 
     backend = storage()
     key = posixpath.join(name, manifest.MANIFEST_NAME)
     try:
-        if not backend.exists(key):
-            return None
         with backend.open(key) as handle:
             payload = handle.read()
+    except FileNotFoundError:
+        return None
     except Exception as exc:
+        if _is_missing(exc):
+            return None
         raise StorageUnreachable(str(exc)) from exc
 
     try:
@@ -246,6 +255,23 @@ def _read_manifest(name):
     except (UnicodeDecodeError, ValueError) as exc:
         logger.warning("Could not parse the manifest for %s: %s", name, exc)
         return False
+
+
+def _is_missing(exc):
+    """Whether a storage error means "no such key" rather than "storage is broken".
+
+    django-storages raises FileNotFoundError for a missing key on the filesystem backend and
+    on S3, but a bucket that answers 404 through botocore surfaces as a ClientError. Telling
+    the two apart matters more than usual here: reporting a missing manifest as unreachable
+    would take the whole run list down for one undistilled directory, and reporting
+    unreachable as missing is the silent-empty failure this module exists to avoid.
+    """
+    code = getattr(getattr(exc, "response", None), "get", lambda _k, _d=None: None)(
+        "Error", {}
+    )
+    if isinstance(code, dict) and str(code.get("Code")) in ("404", "NoSuchKey"):
+        return True
+    return isinstance(exc, FileNotFoundError)
 
 
 def _describe(name):
@@ -356,9 +382,16 @@ def _cached_listing(root_key, time_bucket):
     except Exception as exc:
         raise StorageUnreachable(f"Could not list runs at {root_key}: {exc}") from exc
 
-    return tuple(
-        _ordered([_describe(name) for name in directories if not is_reserved(name)])
-    )
+    names = [name for name in directories if not is_reserved(name)]
+    if len(names) <= 1:
+        return tuple(_ordered([_describe(name) for name in names]))
+
+    # Independent reads, paid on the request path every time the TTL rolls over.
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=min(LISTING_CONCURRENCY, len(names))) as pool:
+        described = list(pool.map(_describe, names))
+    return tuple(_ordered(described))
 
 
 def is_reserved(name):
@@ -470,16 +503,50 @@ def _contained_directory(name):
 
 
 def _delete_prefix(backend, prefix):
-    """Delete every object under a prefix, depth first.
+    """Delete every object under a prefix.
 
     Object stores have no directories to remove, only keys, so this enumerates and deletes
     rather than unlinking a tree.
+
+    Batched through ``delete_objects`` where the backend exposes a boto3 client, because
+    removal runs inside the HTTP request: a run whose config, forcing and restart files were
+    never consolidated is thousands of objects, and one DELETE apiece is a request that
+    times out before it finishes. Falls back to per-key deletion for the filesystem backend
+    and for any backend that does not offer a client.
     """
+    keys = list(_walk_keys(backend, prefix))
+    if not keys:
+        return
+
+    client = getattr(getattr(backend, "connection", None), "meta", None)
+    client = getattr(client, "client", None)
+    bucket = getattr(backend, "bucket_name", None)
+    if client is None or not bucket:
+        for key in keys:
+            backend.delete(key)
+        return
+
+    location = (getattr(backend, "location", "") or "").strip("/")
+    for chunk in (keys[i:i + 1000] for i in range(0, len(keys), 1000)):
+        client.delete_objects(
+            Bucket=bucket,
+            Delete={
+                "Objects": [
+                    {"Key": posixpath.join(location, key) if location else key}
+                    for key in chunk
+                ],
+                "Quiet": True,
+            },
+        )
+
+
+def _walk_keys(backend, prefix):
+    """Every object key under ``prefix``, depth first."""
     directories, files = backend.listdir(prefix)
     for name in files:
-        backend.delete(posixpath.join(prefix, name))
+        yield posixpath.join(prefix, name)
     for name in directories:
-        _delete_prefix(backend, posixpath.join(prefix, name))
+        yield from _walk_keys(backend, posixpath.join(prefix, name))
 
 
 def clear_caches():

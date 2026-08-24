@@ -383,8 +383,7 @@ def startUpload(request):
 
     ingest.write_status(job_id, state=ingest.PENDING, stage="queued",
                         message="preparing to unpack", run=name)
-    _launch(["--job", job_id, "--name", name])
-    return JsonResponse({"job": job_id, "state": ingest.PENDING})
+    return _start_or_report(job_id, name, ["--job", job_id, "--name", name])
 
 
 @controller
@@ -411,18 +410,34 @@ def uploadRun(request):
 
     ingest.write_status(job_id, state=ingest.PENDING, stage="queued",
                         message="preparing to unpack", run=name)
-    _launch(["--archive", path, "--name", name, "--job", job_id])
-    return JsonResponse({"job": job_id, "state": ingest.PENDING})
+    return _start_or_report(
+        job_id, name, ["--archive", path, "--name", name, "--job", job_id]
+    )
 
 
 @controller
 def uploadStatus(request):
-    """Where a job has got to. Polled until it reports a terminal state."""
+    """Where a job has got to. Polled until it reports a terminal state.
+
+    A storage failure answers 503 with ``terminal: false`` rather than 500. Letting it out
+    as a server error made the client report a job that was very likely still running as one
+    that had failed, because any error ends its poll loop.
+    """
     job_id = (request.GET.get("job") or "").strip()
     if not _is_job_id(job_id):
         return JsonResponse({"error": "That job id is not valid."}, status=400)
 
-    status = ingest.read_status(job_id)
+    try:
+        status = ingest.read_status(job_id)
+    except run_store.StorageUnreachable:
+        # Explicitly not terminal: the client stops polling on a terminal answer.
+        logger.warning("Could not read status for job %s", job_id, exc_info=True)
+        return JsonResponse(
+            {"error": "Could not reach storage to check on this upload. Retrying.",
+             "state": ingest.RUNNING, "terminal": False, "job": job_id},
+            status=503,
+        )
+
     if status is None:
         return JsonResponse({"error": "No such upload job."}, status=404)
     status["terminal"] = status.get("state") in ingest.TERMINAL
@@ -437,6 +452,34 @@ def _is_job_id(value):
     return bool(value) and len(value) == 32 and all(c in "0123456789abcdef" for c in value)
 
 
+#: Ingests allowed to run at once. Each holds the GIL through DuckDB and pandas for the
+#: length of a conversion, and the image serves on one uvicorn worker by default, so an
+#: unbounded fan-out starves the portal and can exhaust memory. Per worker process, which is
+#: the same granularity the rest of this module's process-local state already has.
+MAX_CONCURRENT_INGESTS = int(os.environ.get("NGIAB_MAX_CONCURRENT_INGESTS", "2"))
+
+#: Handles for launched ingests, kept only so they can be reaped. Nothing waits on these.
+_running = []
+
+
+class IngestBusy(RuntimeError):
+    """Too many ingests are already running to start another."""
+
+
+def _reap():
+    """Drop finished children and return how many are still running.
+
+    Popen objects that are never waited on leave zombies until the worker exits. Nothing
+    here needs the exit status -- the job's own status object carries the outcome -- but
+    something has to call poll() or the process table fills with one entry per upload.
+    """
+    global _running
+    for child in list(_running):
+        child.poll()
+    _running = [child for child in _running if child.returncode is None]
+    return len(_running)
+
+
 def _launch(arguments):
     """Run ingest_archive in its own process.
 
@@ -444,7 +487,17 @@ def _launch(arguments):
     process is running under, and resolving manage.py costs a subprocess of its own. The
     child is deliberately not waited on -- it outlives this request by design, and its exit
     status reaches the client through the job status rather than through the return code.
+
+    Raises IngestBusy rather than queueing. A queue would need to survive a restart to be
+    worth anything, and the honest answer to "the machine is already converting two runs" is
+    to say so now rather than accept work that will sit invisibly.
     """
+    if _reap() >= MAX_CONCURRENT_INGESTS:
+        raise IngestBusy(
+            f"{MAX_CONCURRENT_INGESTS} uploads are already being prepared. "
+            "Wait for one to finish and try again."
+        )
+
     executable = os.path.join(os.path.dirname(sys.executable), "django-admin")
     command = [executable, "ingest_archive", *arguments]
     environment = dict(
@@ -454,13 +507,43 @@ def _launch(arguments):
         ),
     )
     logger.info("launching %s", " ".join(command))
-    subprocess.Popen(  # noqa: S603 - fixed executable, validated arguments
-        command,
-        env=environment,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
+    _running.append(
+        subprocess.Popen(  # noqa: S603 - fixed executable, validated arguments
+            command,
+            env=environment,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
     )
+
+
+def _start_or_report(job_id, name, arguments):
+    """Launch an ingest, turning a failure to launch into a job the client can see.
+
+    Without this a Popen that never starts -- a missing django-admin, a fork that fails
+    under memory pressure, too many already running -- raised out of the view after the
+    status was already written PENDING and, on the presigned path, after the archive was
+    already in the bucket. The client polled a job that would never move and the staged
+    archive was never discarded.
+    """
+    try:
+        _launch(arguments)
+    except IngestBusy as exc:
+        ingest.write_status(job_id, state=ingest.FAILED, stage="failed",
+                            message=str(exc), run=name)
+        ingest.discard_staged(job_id)
+        return JsonResponse({"error": str(exc)}, status=503)
+    except Exception:  # noqa: BLE001 - any launch failure must become a visible job
+        logger.exception("Could not launch the ingest for job %s", job_id)
+        ingest.write_status(job_id, state=ingest.FAILED, stage="failed",
+                            message="The server could not start preparing this upload.",
+                            run=name)
+        ingest.discard_staged(job_id)
+        return JsonResponse(
+            {"error": "The server could not start preparing this upload."}, status=500
+        )
+    return JsonResponse({"job": job_id, "state": ingest.PENDING})
 
 
 @controller

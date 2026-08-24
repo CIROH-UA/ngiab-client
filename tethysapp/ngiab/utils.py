@@ -351,6 +351,23 @@ def _troute_time_string(value):
     return str(value)
 
 
+#: Formats the t-route reader can open from wherever the run lives.
+#:
+#: netCDF is read with xarray, which takes a filesystem path -- it cannot open an ``s3://``
+#: URI at all. An unconverted run published to a bucket therefore serves its catchment data
+#: (DuckDB globs csv over s3 happily) and then raised inside xarray on every routing chart.
+#: Conversion is the hosted workflow, so the honest answer is "no routing output here" plus
+#: a log line naming the fix, rather than a traceback the user cannot act on.
+_TROUTE_OBJECT_STORAGE_FORMATS = (".parquet",)
+
+
+def troute_readable_here(fmt):
+    """Whether t-route in ``fmt`` can be read against the configured backend."""
+    if not duckdb_conn.is_object_storage():
+        return True
+    return (fmt or "").lower() in _TROUTE_OBJECT_STORAGE_FORMATS
+
+
 def get_troute_df(model_id):
     """This run's t-route output, in the pinned shape, read once and cached."""
     entry = _run_entry(model_id)
@@ -360,6 +377,13 @@ def get_troute_df(model_id):
     document = entry["manifest"] or {}
     troute = document.get("troute")
     if not troute:
+        return None
+    if not troute_readable_here(troute.get("format", "")):
+        logger.warning(
+            "Run %s has %s t-route output, which cannot be read from object storage; "
+            "re-convert the run so it is published as parquet",
+            model_id, troute.get("format") or "unknown",
+        )
         return None
 
     frame = _cached_troute_frame(
