@@ -13,7 +13,7 @@ export const store = createStore({
   teehrVariable: null,
   trouteVariable: null,
 
-  theme: 'light', // 'light' | 'dark'
+  theme: 'light',
   layers: { catchmentHidden: false, showTeehr: true },
 
   mapVariable: null,

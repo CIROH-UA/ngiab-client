@@ -19,7 +19,8 @@
         // decides whether the user is shown an action they cannot complete.
         SIGNED_IN: {{ signed_in|yesno:"true,false" }},
         CAN_DELETE: {{ can_delete|yesno:"true,false" }},
-        CAN_UPLOAD: {{ can_upload|yesno:"true,false" }}
+        CAN_UPLOAD: {{ can_upload|yesno:"true,false" }},
+        MAX_UPLOAD_BYTES: {{ max_upload_bytes }}
       };
     </script>
 

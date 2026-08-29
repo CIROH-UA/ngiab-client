@@ -103,7 +103,7 @@ export class NgiabMap extends HTMLElement {
 
     map.on('load', () => {
       installLayers(map, this._view);
-      attachHoverCursor(map); // once only — see the note on the function
+      attachHoverCursor(map);
       attachMapTip(map, (numeric) => this._describeCatchment(numeric));
       this._syncModelRun();
     });
@@ -125,17 +125,24 @@ export class NgiabMap extends HTMLElement {
 
   _ensureLayers() {
     const map = this._map;
-    if (!map?.isStyleLoaded()) return; // addSource throws while a style is loading
+    if (!map?.isStyleLoaded()) return;
     if (map.getSource(SRC_DIVIDES)) return;
-    installLayers(map, this._view);
-    refresh(map, this._view);
+    const view = this._view;
+    installLayers(map, view);
+    this._appliedViewKey = JSON.stringify(view);
+    refresh(map, view);
   }
 
   _onStoreChange() {
     const map = this._map;
     if (!map) return;
 
-    refresh(map, this._view);
+    const view = this._view;
+    const viewKey = JSON.stringify(view);
+    if (viewKey !== this._appliedViewKey) {
+      this._appliedViewKey = viewKey;
+      refresh(map, view);
+    }
     if (map.isStyleLoaded()) this._syncModelRun();
     this._syncMapVariable();
     this._syncFrame();
@@ -199,7 +206,7 @@ export class NgiabMap extends HTMLElement {
     if (!this._chartPaneEl) return;
 
     const shouldShow = Boolean(store.get().selection.id);
-    if (this._chartPaneEl.hidden !== shouldShow) return; // already correct
+    if (this._chartPaneEl.hidden !== shouldShow) return;
 
     this._chartPaneEl.hidden = !shouldShow;
     this._map.resize();
@@ -216,7 +223,7 @@ export class NgiabMap extends HTMLElement {
       numeric: hit.numeric,
       label: this._labelFor(hit.numeric),
       nexusId: hit.nexusId,
-      fly: false, // the user already clicked where they wanted to be
+      fly: false,
     });
   }
 
@@ -322,7 +329,7 @@ export class NgiabMap extends HTMLElement {
 
     if (!geo) return;
 
-    refresh(this._map, this._view); // paint the TEEHR colours once both halves have landed
+    refresh(this._map, this._view);
     this._searchEl?.setIndex(this._local.catchmentIndex, (n) => this._lookupTeehrId(n) != null);
     this._legendEl?.setTeehrCount(teehr?.count ?? 0);
 

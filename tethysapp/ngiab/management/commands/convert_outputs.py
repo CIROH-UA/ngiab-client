@@ -8,8 +8,7 @@ import os
 from django.core.management.base import BaseCommand, CommandError
 
 from tethysapp.ngiab import duckdb_conn
-
-CONSOLIDATED_PREFIX = "catchments-"
+from tethysapp.ngiab.manifest import CONSOLIDATED_PREFIX
 
 TROUTE_PARQUET = "troute.parquet"
 

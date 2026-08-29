@@ -7,7 +7,12 @@ export function getConfig() {
     SIGNED_IN: cfg.SIGNED_IN === true,
     CAN_DELETE: cfg.CAN_DELETE === true,
     CAN_UPLOAD: cfg.CAN_UPLOAD === true,
+    MAX_UPLOAD_BYTES: Number(cfg.MAX_UPLOAD_BYTES) || 5 * 1024 * 1024 * 1024,
   };
+}
+
+export function maxUploadBytes() {
+  return getConfig().MAX_UPLOAD_BYTES;
 }
 
 export function canUpload() {

@@ -1,4 +1,4 @@
-const FALLBACK = 'Something went wrong. Please try again.';
+import { GENERIC_MESSAGE as FALLBACK } from '../api/client.js';
 
 export function userMessage(error) {
   return error?.userMessage ?? FALLBACK;

@@ -50,8 +50,8 @@ export const visibility = (hidden) => ({ visibility: hidden ? 'none' : 'visible'
 
 const HIGHLIGHT_LINE = '#ff0000';
 
-const TEEHR_FILL = { light: 'rgba(31, 120, 180, 0.55)', dark: 'rgba(32, 201, 151, 0.55)' };
-const PLAIN_FILL = { light: 'rgba(91, 44, 111, 0.316)', dark: 'rgba(238, 51, 119, 0.316)' };
+export const TEEHR_FILL = { light: 'rgba(31, 120, 180, 0.55)', dark: 'rgba(32, 201, 151, 0.55)' };
+export const PLAIN_FILL = { light: 'rgba(91, 44, 111, 0.316)', dark: 'rgba(238, 51, 119, 0.316)' };
 const TEEHR_LINE = { light: '#1f78b4', dark: '#20c997' };
 const PLAIN_LINE = { light: '#000000', dark: '#0077bb' };
 

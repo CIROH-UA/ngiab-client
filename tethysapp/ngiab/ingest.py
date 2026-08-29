@@ -402,12 +402,13 @@ def fetch_staged(job_id, destination):
     """Bring the uploaded archive out of storage onto local disk."""
     backend = run_store.storage()
     key = staging_key(job_id)
-    if not backend.exists(key):
+    try:
+        with backend.open(key) as source, open(destination, "wb") as sink:
+            shutil.copyfileobj(source, sink, length=8 * 1024 * 1024)
+    except FileNotFoundError as exc:
         raise IngestError(
             "The uploaded archive is not in storage. The upload may not have finished."
-        )
-    with backend.open(key) as source, open(destination, "wb") as sink:
-        shutil.copyfileobj(source, sink, length=8 * 1024 * 1024)
+        ) from exc
     return destination
 
 
@@ -416,7 +417,6 @@ def discard_staged(job_id):
     backend = run_store.storage()
     key = staging_key(job_id)
     try:
-        if backend.exists(key):
-            backend.delete(key)
+        backend.delete(key)
     except Exception:  # noqa: BLE001 - staging litter is not worth failing a job over
         logger.warning("Could not discard staged archive for %s", job_id, exc_info=True)

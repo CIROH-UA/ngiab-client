@@ -23,14 +23,6 @@ HEADROOM_FLOOR = 256 * 1024 * 1024
 REALIZATION = "realization.json"
 REQUIRED_DIRS = ("outputs",)
 
-# Run-relative trees the visualiser never opens, so it neither unpacks nor publishes them.
-# Measured on gage-07144100: forcings is 239 MB of a 312 MB run, and cat_config is 407 of the
-# objects a published run would otherwise carry. On gage-10154200 forcings is effectively the
-# whole 2.0 GB. None of these names appears in the app's Python, JavaScript or templates.
-#
-# What this makes is a run to look at, not a run to re-run: realization.json still names the
-# forcings and the per-catchment configs, and they will not be beside it. The archive the
-# uploader sent remains the reproducible copy.
 UNREAD_DIRS = ("forcings", "restart", "config/cat_config")
 
 

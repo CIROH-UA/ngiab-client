@@ -50,14 +50,9 @@ from .teehr_warehouse import (
 
 logger = logging.getLogger(__name__)
 
-# S3 takes at most 5 GiB in a single PUT and the archive goes up as one, so this is the
-# store's limit rather than a policy. Kept in step with MAX_UPLOAD_BYTES in
-# public/frontend/lib/upload.js, which stops the transfer before a job is reserved.
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
 
 
-DELETE_PERMISSION = "delete_model_runs"
-UPLOAD_PERMISSION = "upload_model_runs"
 
 UPLOAD_URL_TTL_SECONDS = 6 * 60 * 60
 
@@ -147,7 +142,7 @@ def _teehr_status_for(exc: TeehrWarehouseError):
         return ("TEEHR warehouse appears empty. Run TEEHR to populate it.", "info")
     return ("TEEHR warehouse could not be read.", "error")
 
-from .app import App
+from .app import App, DELETE_PERMISSION, UPLOAD_PERMISSION
 
 import pyproj
 
@@ -189,6 +184,7 @@ def home(request):
         "signed_in": signed_in(request),
         "can_delete": may_manage_runs(request),
         "can_upload": may_upload_runs(request),
+        "max_upload_bytes": MAX_UPLOAD_BYTES,
     }
     return App.render(request, "index.html", context)
 

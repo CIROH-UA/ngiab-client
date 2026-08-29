@@ -19,7 +19,7 @@ export class NgiabChart extends HTMLElement {
   connectedCallback() {
     this._source = 'catchment';
     this._plot = null;
-    this._requestSeq = 0; // guards against out-of-order responses
+    this._requestSeq = 0;
     this._lastSelectionKey = null;
 
     this.innerHTML = `

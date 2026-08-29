@@ -1,5 +1,6 @@
 import { store } from '../store/app-store.js';
 import { legendEntries, legendLabel } from '../lib/choropleth.js';
+import { PLAIN_FILL, TEEHR_FILL } from './map/layers.js';
 
 export class NgiabLegend extends HTMLElement {
   connectedCallback() {
@@ -21,6 +22,13 @@ export class NgiabLegend extends HTMLElement {
 
   render() {
     const { theme, mapVariable, layers, modelRunId } = store.get();
+
+    const key = JSON.stringify([
+      theme, mapVariable, layers.showTeehr, modelRunId,
+      this._variable, this._breaks, this._teehrCount,
+    ]);
+    if (key === this._renderedKey) return;
+    this._renderedKey = key;
 
     if (!modelRunId) {
       this.innerHTML = '';
@@ -65,8 +73,8 @@ export class NgiabLegend extends HTMLElement {
   }
 
   _renderCategorical(theme, showTeehr) {
-    const teehr = theme === 'dark' ? 'rgba(32, 201, 151, 0.55)' : 'rgba(31, 120, 180, 0.55)';
-    const plain = theme === 'dark' ? 'rgba(238, 51, 119, 0.32)' : 'rgba(91, 44, 111, 0.32)';
+    const teehr = TEEHR_FILL[theme] ?? TEEHR_FILL.light;
+    const plain = PLAIN_FILL[theme] ?? PLAIN_FILL.light;
 
     const rows = [
       showTeehr && this._teehrCount

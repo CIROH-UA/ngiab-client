@@ -14,7 +14,7 @@ export class NgiabSearch extends HTMLElement {
     this._results = this.querySelector('#map-search-results');
     this._empty = this.querySelector('#map-search-empty');
 
-    if (!this._input) return; // markup absent; nothing to wire
+    if (!this._input) return;
 
     this._onInput = () => {
       this._matches = searchCatchments(this._index, this._input.value);
@@ -102,7 +102,7 @@ export class NgiabSearch extends HTMLElement {
       }
 
       li.addEventListener('mousedown', (event) => {
-        event.preventDefault(); // keep focus in the input
+        event.preventDefault();
         this._choose(i);
       });
       this._results.append(li);

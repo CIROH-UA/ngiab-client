@@ -67,10 +67,17 @@ def runs_prefix():
     return os.environ.get(RUNS_PREFIX_ENV, DEFAULT_RUNS_PREFIX).strip("/")
 
 
+@functools.lru_cache(maxsize=4)
+def _backend_for(path, options):
+    """One backend instance per distinct configuration, since each build opens a client."""
+    from django.utils.module_loading import import_string
+
+    return import_string(path)(**dict(options))
+
+
 def _borrowed_from_default():
     """A storage on the portal's media bucket, re-pointed at the runs prefix."""
     from django.conf import settings
-    from django.utils.module_loading import import_string
 
     entry = (getattr(settings, "STORAGES", None) or {}).get("default")
     if not entry or not entry.get("BACKEND"):
@@ -84,7 +91,7 @@ def _borrowed_from_default():
     prefix = runs_prefix()
     options["location"] = posixpath.join(base, prefix) if base else prefix
 
-    return import_string(entry["BACKEND"])(**options)
+    return _backend_for(entry["BACKEND"], tuple(sorted(options.items())))
 
 
 def _bucket_uri():

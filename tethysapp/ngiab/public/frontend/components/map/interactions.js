@@ -47,7 +47,7 @@ export function catchmentAtPoint(map, event) {
   const feature = features[0];
   console.log('[map] catchment feature', { id: feature.id, properties: feature.properties });
 
-  const numeric = CATCHMENT_KEY === 'id' ? feature.id : feature.properties?.[CATCHMENT_KEY];
+  const numeric = featureCatchmentId(feature);
   if (numeric == null) {
     console.warn(`[map] no "${CATCHMENT_KEY}" on the clicked feature — check CATCHMENT_KEY`);
     return null;
@@ -96,11 +96,11 @@ export class CatchmentNexusIndex {
     try {
       features = map.querySourceFeatures(SRC_DIVIDES, { sourceLayer: LAYER_DIVIDES });
     } catch {
-      return; // source not ready yet
+      return;
     }
 
     for (const feature of features) {
-      const key = CATCHMENT_KEY === 'id' ? feature.id : feature.properties?.[CATCHMENT_KEY];
+      const key = featureCatchmentId(feature);
       const toid = feature.properties?.toid;
       if (key !== undefined && toid !== undefined) this._byCatchment.set(key, toid);
     }

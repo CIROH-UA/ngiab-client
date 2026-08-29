@@ -9,6 +9,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
+from tethysapp.ngiab import duckdb_conn
+
 BAKED_PASSWORD = "pass"
 BAKED_SECRET_KEY = "ngiab-local-default-override-in-any-shared-deployment"
 
@@ -24,7 +26,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        hosted = os.environ.get("NGIAB_STORAGE_BACKEND", "").strip().lower() == "s3"
+        hosted = duckdb_conn.is_object_storage()
         name = os.environ.get("PORTAL_SUPERUSER_NAME", "").strip()
         password = os.environ.get("PORTAL_SUPERUSER_PASSWORD", "")
         email = os.environ.get("PORTAL_SUPERUSER_EMAIL", "").strip()

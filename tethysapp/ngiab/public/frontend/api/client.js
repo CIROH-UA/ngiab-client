@@ -14,7 +14,7 @@ export class ApiError extends Error {
   }
 }
 
-const GENERIC_MESSAGE = 'Something went wrong. Please try again.';
+export const GENERIC_MESSAGE = 'Something went wrong. Please try again.';
 
 const STATUS_MESSAGES = {
   400: 'That request was not valid.',
@@ -48,7 +48,7 @@ async function readErrorDetail(response) {
       const parsed = JSON.parse(text);
       return typeof parsed?.error === 'string' ? parsed.error : null;
     } catch {
-      return null; // HTML debug page
+      return null;
     }
   } catch {
     return null;
