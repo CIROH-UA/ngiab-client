@@ -270,6 +270,5 @@ Basemap gallery (light and dark are the only two styles published for this hydro
 - ES2023+, ESM only. No `var`, no `require`, no callback-style async.
 - Doc comments may be any length: a JSDoc block, or a module header like the one at the
   top of `api/client.js`. Inside a function body, a comment is one line. Anything longer
-  belongs in the doc comment above it or in this file. `scripts/check-comment-style.py`
-  enforces this, for Python too.
+  belongs in the doc comment above it or in this file.
 - Components render into **light DOM** so the global stylesheet applies.

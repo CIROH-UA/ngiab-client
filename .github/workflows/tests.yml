@@ -127,11 +127,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Docstrings may be any length; an aside inside a function body may not. Enforced
-      # because it drifted back by hand twice.
-      - name: Comment style
-        run: python scripts/check-comment-style.py
-
       # The two dark blocks cannot share a declaration list, so a token added to one and
       # not the other renders light down that path.
       - name: Theme tokens

@@ -60,7 +60,6 @@ MODELS_RUNS_DIRECTORY="${MODELS_RUNS_DIRECTORY:-$HOME/ngiab_visualizer}"
 # the registry now -- but it does hold sign-ins and sessions, which became worth persisting
 # once changing a run required one. The image ships a baked database and seeds it here on
 # first start.
-DB_DIRECTORY="${DB_DIRECTORY:-$HOME/.ngiab_visualizer_db}"
 TETHYS_PERSIST_PATH="/var/lib/tethys_persist"
 
 # TEEHR warehouse (shared across model runs). Persisted in a sibling config file
@@ -443,7 +442,6 @@ wait_container_healthy() {
 
 run_tethys() {
     ensure_host_dir "$MODELS_RUNS_DIRECTORY"
-    ensure_host_dir "$DB_DIRECTORY"
 
     echo -e "${ARROW} ${BWhite}Launching Tethys container...${Color_Off}"
 
@@ -475,7 +473,6 @@ run_tethys() {
     ${DOCKER_CMD} run --rm -d \
         "${USERNS_ARGS[@]}" \
         -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer${VOLUME_SUFFIX}" \
-        -v "$DB_DIRECTORY:$TETHYS_PERSIST_PATH/db${VOLUME_SUFFIX}" \
         -p "$nginx_tethys_port:$CONTAINER_PORT" \
         "${NETWORK_ARGS[@]}" \
         --name "$TETHYS_CONTAINER_NAME" \

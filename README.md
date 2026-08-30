@@ -67,10 +67,10 @@ docker exec tethys-ngen-portal \
 Either is safe to re-run: the manifest is derived from the run's own contents, so an
 unchanged run rewrites identical files.
 
-The `~/.ngiab_visualizer_db` mount still matters, but for a different reason than it used to.
-It no longer holds the run registry. It holds the portal's own database -- sign-ins and
-sessions -- which became worth persisting when changing a run started requiring one. Without
-that mount you sign in again after every restart.
+The `~/.ngiab_visualizer_db` mount is gone. It held the portal's own database -- sign-ins and
+sessions -- and the container now runs on the one baked into the image, so a restart signs you
+out and forgets any account you added. The runs are unaffected: they live in
+`~/ngiab_visualizer`, which is the registry.
 
 **Deleting a run deletes it.** The `×` button next to the run picker removes the run's
 directory and everything in it, and asks first. This changed: it used to only forget the run
@@ -91,8 +91,7 @@ the shared links they were given keep working. Two things to know:
   outside the storage root will not be listed. The upgrade names any it finds, with the path.
   Move or copy them under `~/ngiab_visualizer` before upgrading.
 - **Downgrading afterwards is not supported.** The upgrade drops the old registry table, and
-  an older image expects it. Keep a copy of `~/.ngiab_visualizer_db` if you may want to go
-  back.
+  an older image expects it.
 
 ##### Hosted deployments
 
@@ -101,13 +100,14 @@ with DuckDB over `httpfs`. If Django's `STORAGES` has no `ngiab_runs` entry the 
 borrows the portal's `default` storage — the bucket that already holds media — and keeps runs
 under a prefix of their own, so a portal with media in S3 needs no second configuration.
 
-A hosted deployment **refuses to start** without a superuser of its own, or on the image's
-baked `admin`/`pass` or its default `TETHYS_SECRET_KEY`, all of which are public: supply
-`PORTAL_SUPERUSER_NAME`, `PORTAL_SUPERUSER_PASSWORD` and `TETHYS_SECRET_KEY`.
+This image is not the one a hosted deployment runs. It bakes a public `admin`/`pass` and a
+default `TETHYS_SECRET_KEY`, and nothing at startup stops it serving on them, so it is for
+local use. Host the app by installing it into a portal image, as *Installing into an existing
+portal image* below describes; the portal supplies its own superuser and secret key.
 
-Uploading and deleting runs each take a Tethys permission — `upload_model_runs` and
-`delete_model_runs`, both in the `run_managers` group — granted in the portal admin. Signing
-in alone is not enough. Superusers hold both.
+Uploading a run takes an account and nothing more: any signed-in user may upload. Deleting
+one takes the `delete_model_runs` permission, in the `run_managers` group, granted in the
+portal admin — losing a run is not recoverable, and adding one is. Superusers hold it.
 
 ###### Configuration
 
@@ -190,10 +190,8 @@ under `/apps/ngiab/` and provisions SQLite.
 
 ### Unassisted Usage
 
-First create the `MODELS_RUNS_DIRECTORY` directory at `"$HOME/ngiab_visualizer"` and the
-`DB_DIRECTORY` directory at `"$HOME/.ngiab_visualizer_db"`. The first holds the runs and is
-the registry. The second holds the portal's own database -- sign-ins and sessions -- which is
-worth persisting now that changing a run requires signing in.
+First create the `MODELS_RUNS_DIRECTORY` directory at `"$HOME/ngiab_visualizer"`. It holds the
+runs, and it is the registry.
 
 Copy your `my-ngen-output` into `MODELS_RUNS_DIRECTORY`, start the container as below, then
 give the run its manifest:
@@ -214,7 +212,6 @@ export TETHYS_CONTAINER_NAME="tethys-ngen-portal"        \
        TETHYS_TAG="latest"                               \
        NGINX_PORT=80                                     \
        MODELS_RUNS_DIRECTORY="$HOME/ngiab_visualizer"    \
-       DB_DIRECTORY="$HOME/.ngiab_visualizer_db"         \
        TETHYS_PERSIST_PATH="/var/lib/tethys_persist"     \
        SKIP_DB_SETUP=false                               \
        CSRF_TRUSTED_ORIGINS="[\"http://localhost:${NGINX_PORT}\",\"http://127.0.0.1:${NGINX_PORT}\"]"
@@ -224,7 +221,6 @@ export TETHYS_CONTAINER_NAME="tethys-ngen-portal"        \
 ```bash
 docker run --rm -d \
   -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer" \
-  -v "$DB_DIRECTORY:$TETHYS_PERSIST_PATH/db" \
   -p "$NGINX_PORT:$NGINX_PORT" \
   --name "$TETHYS_CONTAINER_NAME" \
   -e MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
@@ -263,7 +259,6 @@ podman build --format docker -t ngiab-visualizer:latest .
 podman run --rm -d \
   --userns=keep-id:uid=1000 \
   -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer:Z" \
-  -v "$DB_DIRECTORY:$TETHYS_PERSIST_PATH/db:Z" \
   -p "8080:8080" \
   --name "$TETHYS_CONTAINER_NAME" \
   -e NGINX_PORT="8080" \

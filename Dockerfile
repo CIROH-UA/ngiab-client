@@ -134,8 +134,6 @@ COPY --from=builder --chown=1000:1000 /opt/ngiab /opt/ngiab
 
 COPY --chown=1000:1000 conf/portal_config.yml /config/portal_config.yml
 COPY --chown=1000:1000 conf/portal-config.d/ /opt/portal/portal-config.d/
-COPY --chmod=0755 scripts/ngiab-seed-db.sh /usr/local/bin/ngiab-seed-db.sh
-COPY --chmod=0755 scripts/ngiab-entrypoint.sh /usr/local/bin/ngiab-entrypoint.sh
 COPY --chmod=0755 scripts/ngiab-convert.sh /usr/local/bin/ngiab-convert.sh
 
 ENV TETHYS_DB_ENGINE=django.db.backends.sqlite3
@@ -161,4 +159,4 @@ ENV NGIAB_DB_PATH=/var/lib/tethys_persist/db/portal.sqlite
 
 # Provisioning still happens at build time -- this wrapper only seeds the database onto the
 # host mount, then execs the base's serve.sh. It needs no privileges (see the script).
-CMD ["/usr/local/bin/ngiab-entrypoint.sh"]
+CMD ["/usr/local/bin/serve.sh"]
