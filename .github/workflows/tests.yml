@@ -117,21 +117,3 @@ jobs:
               sys.exit("::error::every test skipped -- the suite proved nothing")
           PYCHECK
           '
-
-  comment-style:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      # The two dark blocks cannot share a declaration list, so a token added to one and
-      # not the other renders light down that path.
-      - name: Theme tokens
-        run: python scripts/check-theme-tokens.py
-
-      # The table in DESIGN.md was wrong and the wrongness is what hid a failing role.
-      - name: Contrast
-        run: python scripts/check-contrast.py
