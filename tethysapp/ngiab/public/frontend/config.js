@@ -6,7 +6,6 @@ export function getConfig() {
     MODEL_RUN_ID: cfg.MODEL_RUN_ID || '',
     SIGNED_IN: cfg.SIGNED_IN === true,
     CAN_DELETE: cfg.CAN_DELETE === true,
-    CAN_UPLOAD: cfg.CAN_UPLOAD === true,
     MAX_UPLOAD_BYTES: Number(cfg.MAX_UPLOAD_BYTES) || 5 * 1024 * 1024 * 1024,
   };
 }
@@ -16,7 +15,7 @@ export function maxUploadBytes() {
 }
 
 export function canUpload() {
-  return getConfig().CAN_UPLOAD;
+  return getConfig().SIGNED_IN;
 }
 
 export function canSeeDelete() {

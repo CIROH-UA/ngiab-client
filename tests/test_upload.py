@@ -141,10 +141,10 @@ def test_anonymous_cannot_start_an_upload(refused, storage_root):
     assert _post(controllers.createUpload, AnonymousUser(), name="x").status_code == 401
 
 
-def test_a_user_without_the_permission_cannot_upload(refused, user, storage_root):
+def test_a_signed_in_user_without_any_permission_can_upload(refused, user, storage_root):
+    """Uploading takes an account, not a grant: the refused fixture denies every permission."""
     response = _post(controllers.createUpload, user, name="gage-99")
-    assert response.status_code == 403
-    assert b"permission" in response.content
+    assert response.status_code == 200
 
 
 def test_a_permitted_user_gets_a_job(permitted, user, storage_root):
@@ -201,7 +201,7 @@ def test_status_for_an_unknown_job_is_a_404(permitted, user, storage_root):
     assert controllers.uploadStatus(request).status_code == 404
 
 
-def test_the_page_reports_the_upload_permission(db, permitted, monkeypatch):
+def test_the_page_reports_whether_the_visitor_is_signed_in(db, refused, monkeypatch):
     captured = {}
 
     def fake_render(request, template, context):
@@ -213,15 +213,16 @@ def test_the_page_reports_the_upload_permission(db, permitted, monkeypatch):
     request = RequestFactory().get("/")
     request.user = get_user_model()(username="curator", is_active=True)
     controllers.home(request)
-    assert captured["can_upload"] is True
+    assert captured["signed_in"] is True
+    assert "can_upload" not in captured
 
 
-def test_the_app_declares_the_upload_permission():
+def test_the_app_declares_only_the_delete_permission():
+    """Upload is login-only, so no upload permission is registered to drift out of use."""
     from tethysapp.ngiab.app import App
 
     names = [p.name for g in App().permissions() for p in g.permissions]
-    assert controllers.UPLOAD_PERMISSION in names
-    assert controllers.DELETE_PERMISSION in names
+    assert names == [controllers.DELETE_PERMISSION]
 
 
 @pytest.fixture

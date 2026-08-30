@@ -1,7 +1,6 @@
 from tethys_sdk.base import TethysAppBase
 from tethys_sdk.permissions import Permission, PermissionGroup
 
-UPLOAD_PERMISSION = "upload_model_runs"
 DELETE_PERMISSION = "delete_model_runs"
 
 
@@ -28,10 +27,6 @@ class App(TethysAppBase):
             PermissionGroup(
                 name="run_managers",
                 permissions=(
-                    Permission(
-                        name=UPLOAD_PERMISSION,
-                        description="Upload model run archives and publish them",
-                    ),
                     Permission(
                         name=DELETE_PERMISSION,
                         description="Delete model runs and the outputs stored with them",

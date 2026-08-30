@@ -69,27 +69,18 @@ def _may(request, permission):
         return False
 
 
-def may_upload_runs(request):
-    """Whether this request's user may add a run."""
-    return _may(request, UPLOAD_PERMISSION)
-
-
 def may_manage_runs(request):
     """Whether this request's user may destroy a run."""
     return _may(request, DELETE_PERMISSION)
 
 
-def upload_permission_required(view):
-    """Refuse an upload from anyone without the upload permission."""
+def upload_login_required(view):
+    """Refuse an upload from an anonymous caller. Uploading takes an account, not a permission."""
 
     @functools.wraps(view)
     def wrapped(request, *args, **kwargs):
         if not signed_in(request):
             return JsonResponse({"error": "Sign in to upload a model run."}, status=401)
-        if not may_upload_runs(request):
-            return JsonResponse(
-                {"error": "You do not have permission to upload model runs."}, status=403
-            )
         return view(request, *args, **kwargs)
 
     return wrapped
@@ -115,7 +106,7 @@ def write_login_required(view):
     return wrapped
 
 
-from .app import App, DELETE_PERMISSION, UPLOAD_PERMISSION
+from .app import App, DELETE_PERMISSION
 
 import pyproj
 
@@ -156,7 +147,6 @@ def home(request):
         "app_root_url": reverse(f"{App.package}:{App.index}"),
         "signed_in": signed_in(request),
         "can_delete": may_manage_runs(request),
-        "can_upload": may_upload_runs(request),
         "max_upload_bytes": MAX_UPLOAD_BYTES,
     }
     return App.render(request, "index.html", context)
@@ -195,7 +185,7 @@ def removeModelRun(request):
 
 @controller
 @require_POST
-@upload_permission_required
+@upload_login_required
 def createUpload(request):
     """Reserve a job and say how the archive should be sent, after validating the name."""
     name = (request.POST.get("name") or "").strip()
@@ -287,7 +277,7 @@ def _presigned_put(key):
 
 @controller
 @require_POST
-@upload_permission_required
+@upload_login_required
 def startUpload(request):
     """Begin preparing an archive that is already in storage."""
     job_id = (request.POST.get("job") or "").strip()
@@ -304,7 +294,7 @@ def startUpload(request):
 
 @controller
 @require_POST
-@upload_permission_required
+@upload_login_required
 def uploadRun(request):
     """Take the archive as a plain upload, for deployments with no bucket."""
     job_id = (request.POST.get("job") or "").strip()

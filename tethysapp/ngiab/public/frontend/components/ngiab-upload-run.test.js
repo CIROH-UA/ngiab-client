@@ -38,7 +38,7 @@ describe('ngiab-upload-run', () => {
     realTransfer = { ...transfer };
     transfer.putPresigned = async () => ({ status: 200 });
     transfer.postToPortal = async () => ({ status: 200 });
-    window.__NGIAB__ = { CAN_UPLOAD: true, SIGNED_IN: true };
+    window.__NGIAB__ = { SIGNED_IN: true };
   });
 
   afterEach(() => {
@@ -48,15 +48,15 @@ describe('ngiab-upload-run', () => {
     delete window.__NGIAB__;
   });
 
-  it('renders nothing at all without the permission', async () => {
-    window.__NGIAB__ = { CAN_UPLOAD: false, SIGNED_IN: true };
+  it('renders nothing at all to a signed-out visitor', async () => {
+    window.__NGIAB__ = { SIGNED_IN: false };
     el = mount();
     await settle();
 
     expect(el.querySelector('#upload-start')).to.equal(null);
   });
 
-  it('renders the panel with the permission', async () => {
+  it('renders the panel to a signed-in user', async () => {
     el = mount();
     await settle();
 
