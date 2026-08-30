@@ -36,7 +36,7 @@ def test_duckdb_is_pinned_exactly():
     assert duckdb.__version__ in duckdb_requirement
 
 
-@pytest.mark.parametrize("extension", ["httpfs", "aws", "sqlite", "iceberg", "avro"])
+@pytest.mark.parametrize("extension", ["httpfs", "aws"])
 def test_required_duckdb_extensions_are_present_in_the_image(extension):
     """Installed at build time because the runtime has no route to extensions.duckdb.org."""
     from tethysapp.ngiab import duckdb_conn

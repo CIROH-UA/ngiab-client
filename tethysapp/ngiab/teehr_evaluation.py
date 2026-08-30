@@ -1,6 +1,5 @@
 """Read a TEEHR evaluation that lives inside a single model run.
 
-Same method names and return shapes as ``teehr_warehouse.WarehouseReader``.
 """
 
 import logging

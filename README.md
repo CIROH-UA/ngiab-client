@@ -162,7 +162,7 @@ h = os.environ['DUCKDB_HOME']; \
 c = duckdb.connect(); \
 c.execute(f\"SET home_directory='{h}'\"); \
 c.execute(f\"SET extension_directory='{h}'\"); \
-[c.execute(f'INSTALL {e}') for e in ('sqlite', 'iceberg', 'avro', 'httpfs', 'aws')]" \
+[c.execute(f'INSTALL {e}') for e in ('httpfs', 'aws')]" \
     && chmod -R a+rX "${DUCKDB_HOME}"
 ```
 

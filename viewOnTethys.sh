@@ -67,8 +67,6 @@ TETHYS_PERSIST_PATH="/var/lib/tethys_persist"
 # so runTeehr.sh and viewOnTethys.sh agree on the location. Must be mounted at
 # the SAME absolute path inside the Tethys container because Iceberg embeds
 # absolute paths in local_catalog.db and metadata/*.json.
-TEEHR_EVAL_CONFIG_FILE="$HOME/.teehr_evaluation_path.conf"
-TEEHR_WAREHOUSE_PATH=""
 
 # Parameters
 DOCKER_CMD="docker"
@@ -166,19 +164,6 @@ else
 fi
 
 # Main functions
-load_teehr_warehouse_path() {
-    # Load TEEHR_WAREHOUSE_PATH from the runTeehr.sh config file if present.
-    # Silent no-op when the file doesn't exist -- the Tethys backend treats
-    # "no warehouse configured" as a first-class empty state.
-    if [ -f "$TEEHR_EVAL_CONFIG_FILE" ]; then
-        local candidate
-        candidate="$(cat "$TEEHR_EVAL_CONFIG_FILE")"
-        if [ -n "$candidate" ] && [ -d "$candidate" ]; then
-            TEEHR_WAREHOUSE_PATH="$candidate"
-        fi
-    fi
-}
-
 ensure_host_dir() {
     local dir="$1"
 
@@ -483,20 +468,6 @@ run_tethys() {
     sleep 1
     echo -e "  ${INFO_MARK} ${BYellow}Starting Tethys container...${Color_Off}"
 
-    # Build the TEEHR warehouse mount flags conditionally -- mirrored-path
-    # bind mount is required when a warehouse is configured; skipped entirely
-    # when not so users without TEEHR set up are not blocked.
-    local teehr_mount_args=()
-    local teehr_env_args=()
-    if [ -n "$TEEHR_WAREHOUSE_PATH" ] && [ -d "$TEEHR_WAREHOUSE_PATH" ]; then
-        # Podman wants comma-separated mount options (ro,Z); VOLUME_SUFFIX is :Z so strip the colon.
-        local teehr_ro_flags="ro"
-        [ -n "$VOLUME_SUFFIX" ] && teehr_ro_flags="ro,${VOLUME_SUFFIX#:}"
-        teehr_mount_args=(-v "$TEEHR_WAREHOUSE_PATH:$TEEHR_WAREHOUSE_PATH:${teehr_ro_flags}")
-        teehr_env_args=(--env "TEEHR_WAREHOUSE_PATH=$TEEHR_WAREHOUSE_PATH")
-        echo -e "  ${INFO_MARK} Mounting TEEHR warehouse: ${BCyan}$TEEHR_WAREHOUSE_PATH${Color_Off}"
-    fi
-
     # Launch container with explicit error handling.
     # Container port is fixed at CONTAINER_PORT (image default 8080); the host
     # port is what the user picked. PORT inside matches CONTAINER_PORT.
@@ -505,7 +476,6 @@ run_tethys() {
         "${USERNS_ARGS[@]}" \
         -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer${VOLUME_SUFFIX}" \
         -v "$DB_DIRECTORY:$TETHYS_PERSIST_PATH/db${VOLUME_SUFFIX}" \
-        "${teehr_mount_args[@]}" \
         -p "$nginx_tethys_port:$CONTAINER_PORT" \
         "${NETWORK_ARGS[@]}" \
         --name "$TETHYS_CONTAINER_NAME" \
@@ -515,7 +485,6 @@ run_tethys() {
         --env PORTAL_ALLOWED_HOSTS="$PORTAL_ALLOWED_HOSTS" \
         --env CSRF_TRUSTED_ORIGINS="$CSRF_TRUSTED_ORIGINS" \
         --env TETHYS_SECRET_KEY="$TETHYS_SECRET_KEY" \
-        "${teehr_env_args[@]}" \
         "${TETHYS_REPO}:${TETHYS_TAG}"
 
     if [ $? -eq 0 ]; then
@@ -873,7 +842,6 @@ print_section_header "PREPARING VISUALIZATION ENVIRONMENT"
 
 # Load TEEHR warehouse path from runTeehr.sh's config file if set. Silent when
 # unset -- the visualizer treats "no warehouse configured" as a valid state.
-load_teehr_warehouse_path
 
 # If visualization directory is non-empty, offer a fresh start option
 prompt_fresh_start

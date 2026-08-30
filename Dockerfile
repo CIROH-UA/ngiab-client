@@ -21,9 +21,6 @@ h = os.environ['DUCKDB_HOME']; \
 c = duckdb.connect(); \
 c.execute(f\"SET home_directory='{h}'\"); \
 c.execute(f\"SET extension_directory='{h}'\"); \
-c.execute('INSTALL sqlite'); \
-c.execute('INSTALL iceberg'); \
-c.execute('INSTALL avro'); \
 c.execute('INSTALL httpfs'); \
 c.execute('INSTALL aws'); \
 print('duckdb extensions installed:', duckdb.__version__)" \

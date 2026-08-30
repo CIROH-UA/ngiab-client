@@ -40,13 +40,6 @@ from .utils import (
     _DEFAULT_MAX_POINTS,
     teehr_source,
 )
-from .teehr_warehouse import (
-    TeehrWarehouseError,
-    UnsupportedWarehouseVersion,
-    WarehouseCatalogLocked,
-    WarehouseMountMirrorBroken,
-    WarehouseUnreachable,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -121,26 +114,6 @@ def write_login_required(view):
 
     return wrapped
 
-
-def _teehr_status_for(exc: TeehrWarehouseError):
-    if isinstance(exc, UnsupportedWarehouseVersion):
-        return (
-            "TEEHR warehouse was written by an unsupported TEEHR version.",
-            "warning",
-        )
-    if isinstance(exc, WarehouseCatalogLocked):
-        return (
-            "TEEHR warehouse is busy or improperly closed. Wait and refresh, or rerun TEEHR.",
-            "warning",
-        )
-    if isinstance(exc, WarehouseMountMirrorBroken):
-        return (
-            "TEEHR warehouse files are not reachable. Check the mount configuration.",
-            "error",
-        )
-    if isinstance(exc, WarehouseUnreachable):
-        return ("TEEHR warehouse appears empty. Run TEEHR to populate it.", "info")
-    return ("TEEHR warehouse could not be read.", "error")
 
 from .app import App, DELETE_PERMISSION, UPLOAD_PERMISSION
 
@@ -673,12 +646,8 @@ def _teehr_variables_for(model_run_id):
     open_reader, config_name = teehr_source(model_run_id)
     if open_reader is None:
         return []
-    try:
-        with open_reader() as reader:
-            return reader.list_configurations_for_run(config_name) or []
-    except TeehrWarehouseError as exc:
-        logger.warning("Could not list TEEHR variables: %s", exc)
-        return []
+    with open_reader() as reader:
+        return reader.list_configurations_for_run(config_name) or []
 
 
 @controller
@@ -707,16 +676,11 @@ def getTeehrTimeSeries(request):
         return _empty_ts_response(
             selected, "That TEEHR configuration is not readable.", "warning", available
         )
-    try:
-        with open_reader() as reader:
-            data = reader.get_joined_timeseries(
-                teehr_configuration, teehr_variable, teehr_id
-            )
-            metrics = reader.get_metrics_for_location(teehr_configuration, teehr_id)
-    except TeehrWarehouseError as exc:
-        msg, severity = _teehr_status_for(exc)
-        logger.warning("getTeehrTimeSeries warehouse error: %s", exc)
-        return _empty_ts_response(selected, msg, severity, available)
+    with open_reader() as reader:
+        data = reader.get_joined_timeseries(
+            teehr_configuration, teehr_variable, teehr_id
+        )
+        metrics = reader.get_metrics_for_location(teehr_configuration, teehr_id)
 
     if not data:
         return _empty_ts_response(
@@ -760,13 +724,8 @@ def getTeehrVariables(request):
             "info",
         )
 
-    try:
-        with open_reader() as reader:
-            variables = reader.list_configurations_for_run(config_name)
-    except TeehrWarehouseError as exc:
-        msg, severity = _teehr_status_for(exc)
-        logger.warning("getTeehrVariables warehouse error: %s", exc)
-        return _empty_variables_response(msg, severity)
+    with open_reader() as reader:
+        variables = reader.list_configurations_for_run(config_name)
 
     if not variables:
         return _empty_variables_response(
@@ -805,13 +764,8 @@ def getTeehrLocations(request):
             "info",
         )
 
-    try:
-        with open_reader() as reader:
-            pairs = reader.list_location_pairs_for_run(config_name)
-    except TeehrWarehouseError as exc:
-        msg, severity = _teehr_status_for(exc)
-        logger.warning("getTeehrLocations warehouse error: %s", exc)
-        return _empty_locations_response(msg, severity)
+    with open_reader() as reader:
+        pairs = reader.list_location_pairs_for_run(config_name)
 
     locations = [
         {"nexus_id": ngen_id.replace("ngen-", "nex-", 1), "usgs_id": usgs_id}

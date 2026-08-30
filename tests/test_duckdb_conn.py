@@ -57,7 +57,6 @@ def test_local_backend_does_not_load_httpfs(local_backend):
     finally:
         cursor.close()
     assert "httpfs" not in loaded
-    assert {"sqlite_scanner", "iceberg"} <= loaded
 
 
 def test_object_storage_backend_loads_httpfs_and_aws(s3_backend):
@@ -86,8 +85,14 @@ def test_autoinstall_is_disabled(local_backend):
     assert autoload is False
 
 
-def test_missing_extension_directory_raises_extension_unavailable(monkeypatch, tmp_path):
-    """The failure names the connection, not the query that happened to run first."""
+def test_missing_extension_directory_raises_extension_unavailable(
+    monkeypatch, tmp_path, s3_backend
+):
+    """The failure names the connection, not the query that happened to run first.
+
+    Scoped to the object-storage backend: it is the only one that still loads an
+    extension, so it is the only one a missing extension directory can break.
+    """
     monkeypatch.setenv("DUCKDB_HOME", str(tmp_path / "nowhere"))
     duckdb_conn.reset()
     with pytest.raises(duckdb_conn.ExtensionUnavailable) as excinfo:
@@ -200,15 +205,3 @@ def test_value_matrix_survives_a_quoted_path(awkward_run, awkward_run_id):
     assert matrix["variable"] == "Q_OUT"
     assert matrix["catchment_ids"] == [100, 101, 102]
     assert len(matrix["times"]) == 6
-
-
-def test_warehouse_attach_path_is_quoted(tmp_path):
-    """teehr_warehouse ATTACHes a catalog path that used to be interpolated raw."""
-    from tethysapp.ngiab import teehr_warehouse
-
-    warehouse = tmp_path / "o'brien warehouse"
-    (warehouse / "local").mkdir(parents=True)
-    (warehouse / "local" / "version").write_text("0.6.2")
-
-    with pytest.raises(teehr_warehouse.WarehouseUnreachable):
-        teehr_warehouse.WarehouseReader(str(warehouse))

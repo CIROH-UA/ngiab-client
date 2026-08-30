@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_DUCKDB_HOME = "/opt/duckdb_extensions"
 
-_BASE_EXTENSIONS = ("sqlite", "iceberg", "avro")
+_BASE_EXTENSIONS = ()
 
 _OBJECT_STORAGE_EXTENSIONS = ("httpfs", "aws")
 

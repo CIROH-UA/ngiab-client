@@ -12,77 +12,21 @@ import xarray as xr
 
 from . import duckdb_conn, manifest, run_store
 from .manifest import child as _child
-from .teehr_warehouse import (
-    TeehrWarehouseError,
-    WarehouseReader,
-)
 
 logger = logging.getLogger(__name__)
 
 
-def _teehr_warehouse_path():
-    """Return the configured TEEHR warehouse path (from env), or None."""
-    return os.environ.get("TEEHR_WAREHOUSE_PATH")
-
-
-def _sanitize_stem(basename: str) -> str:
-    """Apply the same sanitization teehr uses to build ``ngen_<stem>``."""
-    return re.sub(r"[^a-zA-Z0-9_]", "_", basename).lower()
-
-
-def _resolve_configuration_name(model_run_id):
-    """Resolve the teehr ``ngen_<stem>`` configuration name for this run, or None."""
-    model_runs = _get_list_model_runs().get("model_runs", [])
-    entry = next((m for m in model_runs if m.get("id") == model_run_id), None)
-    if entry is None:
-        return None
-    persisted = entry.get("teehr_configuration_name")
-    if persisted:
-        return persisted
-    path = entry.get("path")
-    if not path:
-        return None
-    derived = "ngen_" + _sanitize_stem(os.path.basename(path.rstrip("/")))
-    warehouse = _teehr_warehouse_path()
-    if not warehouse:
-        return None
-    try:
-        with WarehouseReader(warehouse) as reader:
-            if reader.configuration_exists(derived):
-                return derived
-    except TeehrWarehouseError:
-        logger.info("Fallback configuration validation skipped; warehouse unavailable")
-        return None
-    return None
-
-
 def teehr_source(model_run_id):
-    """Pick a TEEHR reader for this run: its own evaluation, else the shared warehouse."""
+    """A reader for this run's own TEEHR evaluation, or None when it has none."""
     from .teehr_evaluation import RUN_CONFIGURATION, EvaluationReader, evaluation_dir
 
     entry = _run_entry(model_run_id)
     document = (entry or {}).get("manifest") or {}
     present = (document.get("teehr") or {}).get("present")
     dataset = evaluation_dir(entry["path"] if entry else None, present=present)
-    if dataset:
-        return (lambda: EvaluationReader(dataset)), RUN_CONFIGURATION
-
-    if not _teehr_warehouse_path():
+    if not dataset:
         return None, None
-
-    config_name = _resolve_configuration_name(model_run_id)
-    if config_name is None:
-        return None, None
-
-    return _open_warehouse, config_name
-
-
-def _open_warehouse():
-    """Open a WarehouseReader from TEEHR_WAREHOUSE_PATH. Returns None if unset."""
-    path = _teehr_warehouse_path()
-    if not path:
-        return None
-    return WarehouseReader(path)
+    return (lambda: EvaluationReader(dataset)), RUN_CONFIGURATION
 
 def _entry_from_manifest(entry):
     """One run_store entry, in the dict shape every reader here already expects."""
