@@ -140,7 +140,7 @@ def test_teehr_configuration_name_read_from_the_producer_manifest(mini_run_facto
 
 
 def test_legacy_uuids_is_a_list(mini_run):
-    """ModelRun.path is deliberately not unique, so one directory can carry several legacy ids."""
+    """One directory can answer to several ids, so a shared link from any of them resolves."""
     document = manifest.distill(
         mini_run,
         legacy_uuids=["11111111-1111-1111-1111-111111111111", "22222222222222222222222222222222"],
@@ -170,7 +170,7 @@ def test_created_is_captured(mini_run):
 
 
 def test_version_token_is_stable_for_unchanged_content(mini_run):
-    """Unit 7's backfill must be idempotent, so the token cannot be random."""
+    """Rewriting a manifest must be idempotent, so the token cannot be random."""
     first = manifest.distill(mini_run, created="2026-08-22T10:00:00+00:00")
     second = manifest.distill(mini_run, created="2026-08-22T10:00:00+00:00")
     assert first["version_token"] == second["version_token"]
@@ -222,7 +222,7 @@ def test_read_returns_the_hot_document(distilled):
 
 
 def test_writing_twice_is_idempotent(mini_run):
-    """Unit 7 runs the backfill on every start; re-running must change nothing on disk."""
+    """Writing a manifest twice must change nothing on disk."""
     manifest.write(mini_run, manifest.distill(mini_run, created="2026-08-22T10:00:00+00:00"))
     with open(os.path.join(mini_run, manifest.MANIFEST_NAME)) as handle:
         first = handle.read()

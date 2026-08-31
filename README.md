@@ -83,15 +83,18 @@ Sign in at `/accounts/login`.
 
 ##### Upgrading from an earlier version
 
-Runs registered in the old database are converted on the first start after the upgrade, and
-the shared links they were given keep working. Two things to know:
+The earlier version kept its registry in `ngiab_visualizer.json`. Nothing reads that file
+now, and nothing converts it: a run becomes usable when it carries a manifest. Existing run
+directories still appear in the picker after the upgrade, marked unusable and naming the
+command that fixes them.
 
+- **Write a manifest for each run you want to keep.** `tethys manage write_manifest --path
+  <run>` distils one, and is idempotent. Pass `--legacy-uuid <uuid>` with the id that run had in
+  `ngiab_visualizer.json` so its existing shared links keep resolving, and `--label` to keep
+  the name it was given; both are otherwise taken from the directory name.
 - **A run outside `~/ngiab_visualizer` is not carried over.** `NGIAB_SCAN_ROOTS` used to let
   the importer offer runs from other mounts; there is no importer now, and a directory
-  outside the storage root will not be listed. The upgrade names any it finds, with the path.
-  Move or copy them under `~/ngiab_visualizer` before upgrading.
-- **Downgrading afterwards is not supported.** The upgrade drops the old registry table, and
-  an older image expects it.
+  outside the storage root is never listed. Move or copy them under `~/ngiab_visualizer`.
 
 ##### Hosted deployments
 

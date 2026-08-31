@@ -110,28 +110,8 @@ def test_the_importer_endpoints_are_gone():
     assert not hasattr(controllers, "registerModelRun")
 
 
-def test_the_registry_table_is_dropped(db):
+def test_the_app_introduces_no_registry_table(db):
+    """The storage root is the registry, so the app owns no table and no migrations."""
     from django.db import connection
 
     assert "ngiab_modelrun" not in connection.introspection.table_names()
-
-
-def test_the_earlier_migrations_are_kept():
-    """The earlier migrations are kept, so the table's history is not orphaned."""
-    from tethysapp.ngiab import migrations
-
-    directory = os.path.dirname(migrations.__file__)
-    present = sorted(f for f in os.listdir(directory) if f.endswith(".py"))
-    assert "0001_initial.py" in present
-    assert "0002_normalize_model_run_ids.py" in present
-    assert "0003_delete_modelrun.py" in present
-
-
-def test_the_migration_is_a_pure_delete(db):
-    """The backfill runs as a command before migrate, not as work inside the migration itself."""
-    from importlib import import_module
-
-    module = import_module("tethysapp.ngiab.migrations.0003_delete_modelrun".replace("0003", "0003"))
-    operations = module.Migration.operations
-    assert len(operations) == 1
-    assert type(operations[0]).__name__ == "DeleteModel"
