@@ -253,21 +253,28 @@ def _presigned_put(key):
 
     full_key = run_store.raw_key(backend, key)
 
-    public = os.environ.get("NGIAB_S3_PUBLIC_ENDPOINT", "").strip()
+    import boto3
+    from botocore.config import Config
+
     client = backend.connection.meta.client
-    if public:
-        import boto3
+    # Presign with SigV4. Otherwise botocore falls back to the SigV2 query signer
+    # on the global S3 endpoint, and SigV2 folds Content-Type into the signature --
+    # so a browser PUT that sends its own Content-Type fails with
+    # SignatureDoesNotMatch. SigV4 query presign does not sign Content-Type.
+    config = client.meta.config.merge(Config(signature_version="s3v4"))
 
-        client = boto3.client(
-            "s3",
-            endpoint_url=public,
-            aws_access_key_id=getattr(backend, "access_key", None),
-            aws_secret_access_key=getattr(backend, "secret_key", None),
-            region_name=getattr(backend, "region_name", None),
-            config=client.meta.config,
-        )
+    public = os.environ.get("NGIAB_S3_PUBLIC_ENDPOINT", "").strip()
+    presign_client = boto3.client(
+        "s3",
+        endpoint_url=public or client.meta.endpoint_url,
+        aws_access_key_id=getattr(backend, "access_key", None),
+        aws_secret_access_key=getattr(backend, "secret_key", None),
+        aws_session_token=getattr(backend, "security_token", None),
+        region_name=getattr(backend, "region_name", None),
+        config=config,
+    )
 
-    return client.generate_presigned_url(
+    return presign_client.generate_presigned_url(
         "put_object",
         Params={"Bucket": bucket, "Key": full_key},
         ExpiresIn=UPLOAD_URL_TTL_SECONDS,
