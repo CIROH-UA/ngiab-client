@@ -54,6 +54,9 @@ docs/brainstorms/
 docs/plans/
 docs/solutions/
 docs/superpowers/
+# The design-system context the assistant reads. Stays at the repo root because the tooling
+# looks for it there, but it is working context rather than part of the app.
+DESIGN.md
 
 # Assistant working notes: review findings, run artifacts, scratch analysis. Useful while
 # the work is happening, noise in the history afterwards, and none of it is the codebase.

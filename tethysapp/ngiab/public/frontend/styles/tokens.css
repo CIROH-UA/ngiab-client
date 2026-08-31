@@ -1,4 +1,6 @@
-/* Design tokens. Every colour in the app resolves here; see public/frontend/DESIGN.md. */
+/* Design tokens. Every colour in the app resolves here -- nothing else in the app carries a
+   colour literal, and styles/tokens.test.js fails if a dark-mode token is declared in only
+   one of the two dark blocks, or if a text role drops below the 4.5:1 AA floor. */
 
 :root {
   /* Neutrals are tinted toward the brand hue (250) rather than pure grey, so panels sit
