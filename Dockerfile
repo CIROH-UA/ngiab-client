@@ -39,7 +39,7 @@ ENV PORTAL_SUPERUSER_NAME=admin
 ENV PORTAL_SUPERUSER_PASSWORD=pass
 
 # tethys reads ${TETHYS_HOME}/portal_config.yml. At run time serve.sh regenerates it from
-# /config via portal-config.sh (merging launch-time ALLOWED_HOSTS / CSRF origins); here we
+# /config via portal-config.sh (merging launch-time ALLOWED_HOSTS); here we
 # place the same file directly so the build-time commands see identical settings.
 COPY conf/portal_config.yml ${TETHYS_HOME}/portal_config.yml
 

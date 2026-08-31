@@ -151,7 +151,6 @@ docker run -d --name "$APP" --network "$NET" -p "$PORT:$PORT" \
     -e AWS_SECRET_ACCESS_KEY="$SECRET" \
     -e AWS_DEFAULT_REGION=us-east-1 \
     -e PORTAL_ALLOWED_HOSTS="localhost,127.0.0.1" \
-    -e CSRF_TRUSTED_ORIGINS="[\"http://localhost:$PORT\",\"http://127.0.0.1:$PORT\"]" \
     -e PORTAL_SUPERUSER_NAME=admin \
     -e PORTAL_SUPERUSER_PASSWORD=localdev \
     -e TETHYS_SECRET_KEY=local-rehearsal-not-a-shared-deployment \

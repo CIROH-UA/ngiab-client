@@ -72,7 +72,6 @@ VOLUME_SUFFIX=""
 CONTAINER_PORT=8080  # visualizer image listens on 8080 (rootless-Podman safe).
 WWW_UID=1000  # tethys-uvx base image: the "tethys" user is uid 1000 (was 1011 on tethys-core)
 PORTAL_ALLOWED_HOSTS=""
-CSRF_TRUSTED_ORIGINS=""
 TETHYS_SECRET_KEY="" # Generated per launch; see select_port(). Override to pin one.
 DATA_FOLDER_PATH="" # If non-empty, gets used as the gage path to import.
 TETHYS_TAG="" # If non-empty, gets used as the image tag.
@@ -337,34 +336,25 @@ choose_port_to_run_tethys() {
         break
     done
 
-    # Build PORTAL_ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS from localhost + every IPv4 the
-    # host owns (catches the WSL VM address, LAN address, etc.).
+    # Build PORTAL_ALLOWED_HOSTS from localhost + every IPv4 the host owns (catches the
+    # WSL VM address, LAN address, etc.).
     #
     # PORTAL_ALLOWED_HOSTS is comma-separated: the tethys-uvx portal-config.sh splits it on
     # commas and merges the result into ALLOWED_HOSTS. This replaced the old bracketed
     # "[a, b]" form, which existed only to survive the tethys-core salt state rendering it
     # through an unquoted shell command -- there is no salt any more.
-    #
-    # CSRF_TRUSTED_ORIGINS still needs building here because portal-config.sh derives it
-    # from ALLOWED_HOSTS but deliberately skips localhost/127.0.0.1/bare IPs (it only
-    # auto-trusts https:// hostnames). The visualizer is plain http on localhost, so
-    # without this every login fails CSRF validation. conf/portal-config.d/10-csrf.sh
-    # applies it inside the container.
     local host_ips
     host_ips=$(hostname -I 2>/dev/null || ip -4 -o addr show 2>/dev/null | awk '{split($4,a,"/"); print a[1]}' | tr '\n' ' ' || echo)
     local allowed_list="localhost,127.0.0.1"
-    local csrf_list="\"http://localhost:${nginx_tethys_port}\",\"http://127.0.0.1:${nginx_tethys_port}\""
     for ip in $host_ips; do
         case "$ip" in
             127.*|"") ;;  # skip loopback duplicates and empties
             *)
                 allowed_list="${allowed_list},$ip"
-                csrf_list="${csrf_list},\"http://${ip}:${nginx_tethys_port}\""
                 ;;
         esac
     done
     PORTAL_ALLOWED_HOSTS="${allowed_list}"
-    CSRF_TRUSTED_ORIGINS="[${csrf_list}]"
 
     # portal-config.sh hard-requires TETHYS_SECRET_KEY and reads it only from the
     # environment. The image ships a placeholder so a bare `docker run` works; generate a
@@ -476,7 +466,6 @@ run_tethys() {
         --env MEDIA_URL="/media/" \
         --env PORT="$CONTAINER_PORT" \
         --env PORTAL_ALLOWED_HOSTS="$PORTAL_ALLOWED_HOSTS" \
-        --env CSRF_TRUSTED_ORIGINS="$CSRF_TRUSTED_ORIGINS" \
         --env TETHYS_SECRET_KEY="$TETHYS_SECRET_KEY" \
         "${TETHYS_REPO}:${TETHYS_TAG}"
 

@@ -216,8 +216,7 @@ export TETHYS_CONTAINER_NAME="tethys-ngen-portal"        \
        NGINX_PORT=80                                     \
        MODELS_RUNS_DIRECTORY="$HOME/ngiab_visualizer"    \
        TETHYS_PERSIST_PATH="/home/tethys/persist"     \
-       SKIP_DB_SETUP=false                               \
-       CSRF_TRUSTED_ORIGINS="[\"http://localhost:${NGINX_PORT}\",\"http://127.0.0.1:${NGINX_PORT}\"]"
+       SKIP_DB_SETUP=false
 ```
 # Run container
 
@@ -230,7 +229,6 @@ docker run --rm -d \
   -e MEDIA_URL="/media/" \
   -e SKIP_DB_SETUP="$SKIP_DB_SETUP" \
   -e NGINX_PORT="$NGINX_PORT" \
-  -e CSRF_TRUSTED_ORIGINS="$CSRF_TRUSTED_ORIGINS" \
   "${TETHYS_REPO}:${TETHYS_TAG}"
 ```
 Verify deployment:
@@ -265,15 +263,14 @@ podman run --rm -d \
   -p "8080:8080" \
   --name "$TETHYS_CONTAINER_NAME" \
   -e NGINX_PORT="8080" \
-  -e ALLOWED_HOSTS='"[localhost, 127.0.0.1, <your-host-ip>]"' \
-  -e CSRF_TRUSTED_ORIGINS='["http://localhost:8080","http://127.0.0.1:8080","http://<your-host-ip>:8080"]' \
+  -e PORTAL_ALLOWED_HOSTS="localhost,127.0.0.1,<your-host-ip>" \
   -e MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
   -e MEDIA_URL="/media/" \
   -e SKIP_DB_SETUP="false" \
   ngiab-visualizer:latest
 ```
 
-> **WSL note:** Windows browsers reach rootless Podman containers via the WSL VM's IP (e.g. `172.x.x.x`), not via `localhost`. Find it with `ip -4 addr show eth0` and use that address in `ALLOWED_HOSTS`/`CSRF_TRUSTED_ORIGINS` above.
+> **WSL note:** Windows browsers reach rootless Podman containers via the WSL VM's IP (e.g. `172.x.x.x`), not via `localhost`. Find it with `ip -4 addr show eth0` and add that address to `PORTAL_ALLOWED_HOSTS` above. No CSRF setting is needed: the browser's Origin and the Host Django sees are the same address, so Django never consults `CSRF_TRUSTED_ORIGINS`.
 
 The `viewOnTethys.sh` launcher in [`NGIAB-CloudInfra`](https://github.com/CIROH-UA/NGIAB-CloudInfra) handles all of this automatically when invoked with `-p`.
 
