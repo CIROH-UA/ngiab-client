@@ -1,6 +1,7 @@
 import { expect } from '@esm-bundle/chai';
 import { actions } from '../store/app-store.js';
 import appAPI from '../api/app.js';
+import { noRunsMessage } from '../lib/empty-runs.js';
 import './ngiab-model-runs.js';
 
 
@@ -170,6 +171,8 @@ describe('ngiab-model-runs', () => {
 
     const status = el.querySelector('#model-run-status');
     expect(status.dataset.severity).to.equal('warning');
-    expect(status.textContent).to.contain('Copy a run directory');
+    // The shared message, so this panel and the card over the map cannot disagree about
+    // what to do next. noRunsMessage owns the wording; empty-runs.test.js owns the variants.
+    expect(status.textContent).to.equal(noRunsMessage(true));
   });
 });

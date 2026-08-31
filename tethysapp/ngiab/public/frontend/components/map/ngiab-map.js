@@ -2,7 +2,8 @@ import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 
 import appAPI from '../../api/app.js';
-import { getModelRunId } from '../../config.js';
+import { canUpload, getModelRunId } from '../../config.js';
+import { noRunsMessage } from '../../lib/empty-runs.js';
 import { store, actions } from '../../store/app-store.js';
 import { toNumericIds, toCatchmentIndex } from '../../lib/ids.js';
 import '../ngiab-search.js';
@@ -299,11 +300,7 @@ export class NgiabMap extends HTMLElement {
       this._searchEl?.setIndex([], () => false);
       this._timelineEl?.setTimes([]);
       refresh(this._map, this._view);
-      this._setEmptyState(
-        'No model run to show',
-        'No model runs yet. Copy a run directory into the visualizer\u2019s storage and ' +
-          'it will appear in the run picker.',
-      );
+      this._setEmptyState('No model run to show', noRunsMessage(canUpload()));
       this._setStatus('No model run selected.', 'warning');
       return;
     }

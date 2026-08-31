@@ -43,7 +43,8 @@
 
   /* Controls ---------------------------------------------------------- */
   /* WCAG 2.5.8 requires 24px; --tap-min is 44px, which is the comfortable target. */
-  .control, #map-variable, .runs-row select, .chart-variable select {
+  .control, #map-variable, .runs-row select, .chart-variable select,
+  #upload-name, #upload-file {
     width: 100%; box-sizing: border-box;
     min-height: var(--tap-min);
     font: inherit; color: var(--fg);
@@ -96,7 +97,29 @@
   /* Account ------------------------------------------------------------ */
   /* Ambient, not a task: the row states who you are and offers the one action that
      changes it, at the weight of a caption rather than a control. */
-  #map-account { margin-top: 10px; }
+  #map-footer { margin-top: 10px; }
+
+  /* About ------------------------------------------------------------- */
+  /* A disclosure, not a dialog: read once, and never in the way of the map. */
+  #about-panel > summary {
+    min-height: var(--tap-min); display: flex; align-items: center;
+    cursor: pointer; color: var(--fg-muted); font-size: 12px;
+  }
+  #about-panel > summary:hover { color: var(--fg); }
+  .about-blurb, .about-version {
+    margin: 6px 0 0; font-size: 12px; color: var(--fg-muted); line-height: 1.5;
+  }
+  .about-version code { font-size: 11px; color: var(--fg); word-break: break-all; }
+  .about-links {
+    list-style: none; margin: 8px 0 0; padding: 0;
+    display: flex; flex-direction: column;
+  }
+  .about-links a {
+    display: flex; align-items: center;
+    min-height: var(--tap-min);
+    color: var(--accent); text-decoration: none; font-size: 12px;
+  }
+  .about-links a:hover { text-decoration: underline; }
   ngiab-account {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   }
@@ -151,13 +174,42 @@
   .runs-row select { flex: 1 1 auto; min-width: 0; }
   #model-run-remove:hover:not(:disabled) { color: var(--danger); background: var(--surface-sunken); }
 
-  #upload-panel { margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.5rem; }
-  #upload-panel summary { cursor: pointer; color: var(--fg-muted); font-size: 0.85rem; }
-  #upload-panel summary:hover { color: var(--fg); }
-  #upload-panel input[type="text"],
-  #upload-panel input[type="file"] { width: 100%; margin-bottom: 0.4rem; }
-  #upload-start { width: 100%; margin-top: 0.25rem; }
-  #upload-progress { width: 100%; margin-top: 0.4rem; }
+  /* Upload was a muted 0.85rem caption under the picker and read as a footnote. It is the
+     second thing anyone does with this app, so it reads as an action now. */
+  #upload-panel { margin-top: 10px; }
+  #upload-panel > summary {
+    display: flex; align-items: center; gap: 8px;
+    min-height: var(--tap-min); padding: 0 12px;
+    border: 1px dashed var(--border-strong); border-radius: 7px;
+    color: var(--fg); cursor: pointer; font: inherit; font-weight: 500;
+    list-style: none;
+    transition: background-color var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out);
+  }
+  #upload-panel > summary::-webkit-details-marker { display: none; }
+  /* The glyph is the affordance; a rotated caret would read as a section, not an action. */
+  #upload-panel > summary::before { content: '+'; font-size: 16px; line-height: 1; }
+  #upload-panel > summary:hover { background: var(--surface-sunken); border-color: var(--accent); }
+  #upload-panel[open] > summary {
+    border-style: solid; margin-bottom: 8px;
+  }
+  #upload-panel[open] > summary::before { content: '\2212'; }
+  #upload-name, #upload-file { margin-bottom: 8px; }
+  /* A file input puts its own button at the top of the box, so it needs centring that the
+     shared control rule cannot assume. */
+  #upload-file { display: flex; align-items: center; padding-block: 0; }
+  /* The one primary action in the stack, so it carries the accent -- and 44px, which it did
+     not have when it was 21px of default button. */
+  #upload-start {
+    width: 100%; min-height: var(--tap-min); margin-top: 4px;
+    border: 1px solid transparent; border-radius: 7px;
+    background: var(--accent); color: var(--accent-contrast);
+    font: inherit; font-weight: 500; cursor: pointer;
+    transition: opacity var(--dur-fast) var(--ease-out);
+  }
+  #upload-start:hover:not(:disabled) { opacity: .9; }
+  #upload-start:disabled { opacity: .45; cursor: default; }
+  #upload-progress { width: 100%; margin-top: 8px; }
 
   /* Search ------------------------------------------------------------ */
   #map-search-box { position: relative; }
@@ -294,8 +346,11 @@
   }
 
   /* Chart pane --------------------------------------------------------- */
+  /* 340, not 240: the controls row, note and padding take ~90px before the canvas gets any,
+     so the old default left a hydrograph about 150px to draw in. Still draggable, and the
+     resize handle clamps to 70% of the viewport. */
   #chart-pane {
-    flex: 0 0 auto; height: 240px; min-height: 0;
+    flex: 0 0 auto; height: 340px; min-height: 0;
     display: flex; flex-direction: column;
     border-top: 1px solid var(--border);
     background: var(--bg);
@@ -500,12 +555,16 @@
         </div>
       </div>
 
-      <!-- Last, and its own card: identity is ambient rather than a step in either question
-           the cards above answer, and putting it inside one of them split a group. -->
-      <div class="map-card" id="map-account">
-        <div class="card-section">
+      <!-- Last, and its own card: identity and provenance are ambient rather than steps in
+           either question the cards above answer, and putting them inside one split a group. -->
+      <div class="map-card" id="map-footer">
+        <div class="card-section" id="map-account">
           <h3 class="sr-only">Account</h3>
           <ngiab-account></ngiab-account>
+        </div>
+        <div class="card-section" id="map-about">
+          <h3 class="sr-only">About</h3>
+          <ngiab-about></ngiab-about>
         </div>
       </div>
     </section>

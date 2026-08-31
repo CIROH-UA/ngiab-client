@@ -23,7 +23,8 @@
         // Portal-level and absolute, so they are the same whether this app is the whole
         // portal or one of many under /apps/.
         LOGIN_URL: "{{ login_url|escapejs }}",
-        LOGOUT_URL: "{{ logout_url|escapejs }}"
+        LOGOUT_URL: "{{ logout_url|escapejs }}",
+        VERSION: "{{ app_version|escapejs }}"
       };
     </script>
 

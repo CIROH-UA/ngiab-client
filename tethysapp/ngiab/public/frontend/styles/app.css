@@ -7,7 +7,7 @@ body {
 }
 
 /* Anything focusable gets the same ring, so the indicator never depends on the UA default. */
-:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+:where(a, button, summary, input, select, textarea, [tabindex]):focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
   border-radius: 4px;

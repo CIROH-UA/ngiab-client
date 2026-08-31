@@ -70,3 +70,23 @@ def test_logout_follows_the_same_prefix_as_login(monkeypatch, db):
     assert context["login_url"] == "/portal/accounts/login/"
     assert context["logout_url"].endswith("/accounts/logout/")
     assert context["logout_url"] == controllers.logout_url()
+
+
+def test_the_page_carries_the_running_version(monkeypatch, db):
+    """About exists to answer "which build is this", so the context must actually carry one."""
+    context = _context(AnonymousUser(), monkeypatch)
+
+    assert context["app_version"], "no version reached the page"
+    assert context["app_version"] == controllers.app_version()
+
+
+def test_a_missing_version_is_empty_rather_than_an_error(monkeypatch, db):
+    """Imported from a source tree with no metadata: a developer's machine, not a shipped app."""
+    from importlib.metadata import PackageNotFoundError
+
+    def absent(_name):
+        raise PackageNotFoundError("tethysapp-ngiab")
+
+    monkeypatch.setattr("importlib.metadata.version", absent)
+
+    assert controllers.app_version() == ""

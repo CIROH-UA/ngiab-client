@@ -60,6 +60,21 @@ UPLOAD_URL_TTL_SECONDS = 6 * 60 * 60
 LOGOUT_URL_FALLBACK = "/accounts/logout/"
 
 
+def app_version():
+    """The installed version, for the About panel and for a support question.
+
+    Derived from git metadata by setuptools-scm, so it identifies the build exactly rather
+    than a release series. Absent when the app is imported from a source tree with no
+    metadata, which is a developer's machine rather than anything shipped.
+    """
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("tethysapp-ngiab")
+    except PackageNotFoundError:
+        return ""
+
+
 def logout_url():
     """Where the portal logs a user out, following a URL prefix if it has one."""
     from django.urls import NoReverseMatch, reverse as reverse_url
@@ -174,6 +189,7 @@ def home(request):
         "username": user.get_username() if is_signed_in else "",
         "login_url": settings.LOGIN_URL,
         "logout_url": logout_url(),
+        "app_version": app_version(),
     }
     return App.render(request, "index.html", context)
 

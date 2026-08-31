@@ -1,7 +1,8 @@
 import appAPI from '../api/app.js';
 import { store, actions } from '../store/app-store.js';
 import { userMessage } from '../lib/errors.js';
-import { canSeeDelete } from '../config.js';
+import { canSeeDelete, canUpload } from '../config.js';
+import { noRunsMessage } from '../lib/empty-runs.js';
 
 export class NgiabModelRuns extends HTMLElement {
   connectedCallback() {
@@ -48,12 +49,7 @@ export class NgiabModelRuns extends HTMLElement {
     }
 
     if (!this._runs.length) {
-      this._setStatus(
-        this._statusEl,
-        'No model runs yet. Copy a run directory into the visualizer\u2019s storage and it '
-        + 'will appear here.',
-        'warning',
-      );
+      this._setStatus(this._statusEl, noRunsMessage(canUpload()), 'warning');
       this._selectEl.replaceChildren();
       this._selectEl.disabled = true;
       if (this._removeEl) this._removeEl.disabled = true;

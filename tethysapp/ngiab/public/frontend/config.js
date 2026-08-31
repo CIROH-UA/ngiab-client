@@ -10,6 +10,7 @@ export function getConfig() {
     USERNAME: cfg.USERNAME || '',
     LOGIN_URL: cfg.LOGIN_URL || '/accounts/login/',
     LOGOUT_URL: cfg.LOGOUT_URL || '/accounts/logout/',
+    VERSION: cfg.VERSION || '',
   };
 }
 
@@ -30,6 +31,10 @@ export function canUpload() {
 export function canSeeDelete() {
   const cfg = getConfig();
   return cfg.SIGNED_IN && cfg.CAN_DELETE;
+}
+
+export function appVersion() {
+  return getConfig().VERSION;
 }
 
 export function userName() {
