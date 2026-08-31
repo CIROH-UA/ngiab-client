@@ -67,8 +67,14 @@ fi
 # deployment where that is true -- serve.sh does not migrate, so without this a SIF carrying
 # newer platform migrations would start against the previous schema and fail at the first
 # query that needs a new column. Migrate is a no-op on a current database.
-"${VIRTUAL_ENV:-/opt/conda/envs/tethys}/bin/tethys" db migrate >/dev/null 2>&1 \
-    || echo "[ngiab] warning: could not migrate $live; continuing with the schema it has" >&2
+# Quiet when it works, and never quiet when it does not: a schema that failed to migrate is
+# the thing you want to read about, so the output is held and printed only on failure.
+migrate_log="$state/db/migrate.log"
+if ! "${VIRTUAL_ENV:-/opt/conda/envs/tethys}/bin/tethys" db migrate >"$migrate_log" 2>&1; then
+    echo "[ngiab] warning: could not migrate $live; continuing with the schema it has" >&2
+    echo "[ngiab] what migrate said:" >&2
+    tail -n 40 "$migrate_log" >&2
+fi
 
 echo "[ngiab] state directory: $state"
 echo "[ngiab] database: $live"

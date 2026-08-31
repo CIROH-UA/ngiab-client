@@ -361,16 +361,61 @@ def _reap():
         return _reap_locked()
 
 
+DIAGNOSTIC_TAIL_BYTES = 4000
+
+
+def _report_child_output(child):
+    """Log what a finished ingest wrote, then drop the capture file.
+
+    The child is detached, so its traceback has nowhere to go unless something reads it back.
+    A non-zero exit is logged at error; a clean exit that still said something is logged at
+    debug, because a warning from a run that worked is not an incident.
+    """
+    path = getattr(child, "_ngiab_output_log", None)
+    if not path:
+        return
+    try:
+        with open(path, "rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            size = handle.tell()
+            handle.seek(max(0, size - DIAGNOSTIC_TAIL_BYTES))
+            captured = handle.read().decode("utf-8", "replace").strip()
+    except OSError:
+        captured = ""
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+    if child.returncode:
+        logger.error(
+            "ingest_archive exited %s%s", child.returncode,
+            f"; it said:\n{captured}" if captured else " and wrote nothing",
+        )
+    elif captured:
+        logger.debug("ingest_archive finished cleanly and wrote:\n%s", captured)
+
+
 def _reap_locked():
     """The reaping itself, for callers that already hold the lock."""
     for child in list(_running):
         child.poll()
+    finished = [child for child in _running if child.returncode is not None]
     _running[:] = [child for child in _running if child.returncode is None]
+    for child in finished:
+        _report_child_output(child)
     return len(_running)
 
 
 def _launch(arguments):
-    """Run ingest_archive in its own detached process, raising IngestBusy over queueing."""
+    """Run ingest_archive in its own detached process, raising IngestBusy over queueing.
+
+    Its output is captured to a file rather than discarded: the child writes its traceback to
+    stderr, and with that on /dev/null a failed ingest left the operator nothing at all --
+    the job status carries a fixed sentence by design, so it cannot carry the reason either.
+    _reap_locked reads the capture back once the child exits.
+    """
     executable = os.path.join(os.path.dirname(sys.executable), "django-admin")
     command = [executable, "ingest_archive", *arguments]
     environment = dict(
@@ -386,15 +431,25 @@ def _launch(arguments):
                 f"{MAX_CONCURRENT_INGESTS} uploads are already being prepared. "
                 "Wait for one to finish and try again."
             )
-        _running.append(
-            subprocess.Popen(  # noqa: S603 - fixed executable, validated arguments
+        capture = tempfile.NamedTemporaryFile(  # noqa: SIM115 - handed to the child
+            prefix="ngiab-ingest-", suffix=".log", delete=False
+        )
+        try:
+            child = subprocess.Popen(  # noqa: S603 - fixed executable, validated arguments
                 command,
                 env=environment,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=capture,
+                stderr=capture,
                 start_new_session=True,
             )
-        )
+        except BaseException:
+            capture.close()
+            os.unlink(capture.name)
+            raise
+        finally:
+            capture.close()
+        child._ngiab_output_log = capture.name
+        _running.append(child)
 
 
 def _start_or_report(job_id, name, arguments, local_archive=None):
