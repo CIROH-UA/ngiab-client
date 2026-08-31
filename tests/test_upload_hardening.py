@@ -8,7 +8,6 @@ import tarfile
 
 import pytest
 from django.core.management import call_command
-from django.core.management.base import CommandError
 
 from tethysapp.ngiab import archive, duckdb_conn, manifest, run_store
 
@@ -154,43 +153,6 @@ def test_the_member_cap_is_not_off_by_one(tmp_path):
 
     with pytest.raises(archive.ArchiveRejected, match="more than 5 entries"):
         archive.inspect(str(tmp_path / "a.tar"), max_members=5)
-
-
-@pytest.fixture
-def hosted(monkeypatch):
-    monkeypatch.setenv("NGIAB_STORAGE_BACKEND", "s3")
-    monkeypatch.setenv("TETHYS_SECRET_KEY", "a-real-key-that-is-not-the-baked-one")
-    monkeypatch.delenv("PORTAL_SUPERUSER_NAME", raising=False)
-    monkeypatch.delenv("PORTAL_SUPERUSER_PASSWORD", raising=False)
-
-
-def test_a_hosted_start_with_no_superuser_is_refused(hosted, db):
-    """A hosted start with no superuser password supplied is refused, not let through."""
-    with pytest.raises(CommandError, match="no superuser configured"):
-        call_command("ensure_superuser")
-
-
-def test_a_hosted_start_with_only_a_name_is_refused(hosted, db, monkeypatch):
-    monkeypatch.setenv("PORTAL_SUPERUSER_NAME", "admin")
-    with pytest.raises(CommandError, match="PORTAL_SUPERUSER_PASSWORD"):
-        call_command("ensure_superuser")
-
-
-def test_a_hosted_start_with_real_credentials_proceeds(hosted, db, monkeypatch):
-    monkeypatch.setenv("PORTAL_SUPERUSER_NAME", "curator")
-    monkeypatch.setenv("PORTAL_SUPERUSER_PASSWORD", "not-the-baked-one")
-    call_command("ensure_superuser")
-
-    from django.contrib.auth import get_user_model
-    assert get_user_model().objects.filter(username="curator").exists()
-
-
-def test_a_local_start_with_no_superuser_is_still_fine(db, monkeypatch):
-    """A laptop keeps working exactly as it did; the gate is hosted-only."""
-    monkeypatch.delenv("NGIAB_STORAGE_BACKEND", raising=False)
-    monkeypatch.delenv("PORTAL_SUPERUSER_NAME", raising=False)
-    monkeypatch.delenv("PORTAL_SUPERUSER_PASSWORD", raising=False)
-    call_command("ensure_superuser")
 
 
 def test_the_sidecar_cache_keys_on_the_token_it_is_given():

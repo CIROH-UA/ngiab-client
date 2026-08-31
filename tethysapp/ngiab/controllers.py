@@ -257,10 +257,6 @@ def _presigned_put(key):
     from botocore.config import Config
 
     client = backend.connection.meta.client
-    # Presign with SigV4. Otherwise botocore falls back to the SigV2 query signer
-    # on the global S3 endpoint, and SigV2 folds Content-Type into the signature --
-    # so a browser PUT that sends its own Content-Type fails with
-    # SignatureDoesNotMatch. SigV4 query presign does not sign Content-Type.
     config = client.meta.config.merge(Config(signature_version="s3v4"))
 
     public = os.environ.get("NGIAB_S3_PUBLIC_ENDPOINT", "").strip()
