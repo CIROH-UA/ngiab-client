@@ -4,160 +4,162 @@
 | --- | --- |
 | ![CIROH Logo](https://ciroh.ua.edu/wp-content/uploads/2022/08/CIROHLogo_200x200.png) | Funding for this project was provided by the National Oceanic & Atmospheric Administration (NOAA), awarded to the Cooperative Institute for Research to Operations in Hydrology (CIROH) through the NOAA Cooperative Agreement with The University of Alabama (NA22NWS4320003). |
 
-This app was created using an experimental Tethys + React app scaffold. It uses React for the frontend of the app and Tethys as the backend.
+A map and chart view over the outputs of a NextGen In A Box run. Pick a run, click a
+catchment, compare its hydrograph against observations. It is a Tethys app: vanilla JS and
+web components on the front, Django on the back, no bundler and no build step.
 
-![Data Visualizer Interface](static/imgs/fig6-1.png)
+Built on Tethys Platform [(Swain et al., 2015)](https://doi.org/10.1016/j.envsoft.2015.01.014).
 
-The Data Visualizer component provides:
-- **Geospatial visualization** of catchments and nexus points
-- **Time series analysis** of catchments, nexus points, and troute variables
-- **TEEHR output visualization** including metrics and interactive plots
+![The visualizer showing a run: catchments drawn on the map, controls on the left](static/imgs/viewer-overview.png)
 
-Built on the Tethys Platform [(Swain et al., 2015)](https://doi.org/10.1016/j.envsoft.2015.01.014), it enables web-based exploration of model outputs [(CIROH, 2025)](https://github.com/CIROH-UA/ngiab-client).
+## Run it
 
-## Usage Guide
-
-### Assited using `ViewOnTethys` Script
-
-Like TEEHR, the Data Visualizer can be activated upon execution of the main NGIAB guide script, `guide.sh`. A separate `viewOnTethys.sh` script is also available in the NGIAB-CloudInfra repository.
-
-Once a run is complete, users can launch the Data Visualizer through their web browser when prompted by the guide script. Although TEEHR's outputs can be displayed within the Data Visualizer, this tool is primarily designed to provide a broad overview of model results. Users seeking TEEHR's more advanced analysis features can still access them outside the Data Visualizer.
-
-One of the advantages of the `viewOnTethys.sh` script is that it allows the user to keep multiple outputs for the same hydrofabric. It prompts the user if they want to use the same output directory by renaming it and adding it to the collection of outputs or if they want to overwrite it.
+**With the launcher.** `viewOnTethys.sh` lives here and in
+[NGIAB-CloudInfra](https://github.com/CIROH-UA/NGIAB-CloudInfra); `guide.sh` calls it after a
+run finishes. It picks a port, imports a run directory, and starts the container.
 
 ```bash
-  ⚠ ~/ngiab_visualizer is not empty.
-  → Keep (K) or Fresh start (F)? [K/F]: k
-ℹ Reclaiming ownership of ~/ngiab_visualizer  (sudo may prompt)...
-  ⚠ Directory exists: ~/ngiab_visualizer/gage-10154200
-  → Overwrite (O) or Duplicate (D)? [O/D]: o
-  ✓ Overwritten ➜ ~/ngiab_visualizer/gage-10154200
-  ℹ It appears in the visualizer's run picker once the portal is up.
+./viewOnTethys.sh              # import a run, then launch
+./viewOnTethys.sh -n           # launch with what is already there
+./viewOnTethys.sh -p           # rootless Podman instead of Docker
+./viewOnTethys.sh -h           # every flag
 ```
 
-You should be able to see multiple outputs through the UI:
+Runs land in `~/ngiab_visualizer`. If a name is already there it asks whether to overwrite or
+keep both, so several runs on the same hydrofabric can sit side by side.
 
-![Figure 2: NGIAB Visualizer dropdown for multiple outputs ](static/imgs/fig6-2.png){alt='A screenshot of the  NGIAB and DataStream Visualizer web interface. The map displays the ability of the visualizer to use multiple outputs'}
+**Docker directly.**
 
-#### Visualizer Directory Organization
+```bash
+docker run --rm -d -p 8080:8080 \
+  -v "$HOME/ngiab_visualizer:/home/tethys/persist/ngiab_visualizer" \
+  --name tethys-ngen-portal awiciroh/tethys-ngiab:latest
+```
 
-The Visualizer keeps model run outputs in a directory named `ngiab_visualizer`, and **that
-directory is the registry**. A run is registered by being there: one directory per run, each
-holding a `manifest.json` the visualizer writes when it ingests the run. There is no database
-table of runs, no configuration file to hand-edit, and nothing to register.
+**Apptainer,** for a cluster with no daemon and no root:
 
-`./ViewOnTethys.sh -d <path>` copies a run in and prepares it, and it appears in the picker
-within ten seconds. Preparing is what writes the manifest -- a directory without one is listed
-as unusable, with the reason, rather than hidden.
+```bash
+apptainer pull ngiab.sif oras://ghcr.io/ciroh-ua/ngiab-client/apptainer:latest
+apptainer run ngiab.sif
+```
 
-If you copy a directory in yourself, prepare it once:
+Writable state goes to `~/.ngiab_visualizer`; set `NGIAB_STATE_DIR` to move it to scratch and
+`APPTAINERENV_PORT` to move the port. `apptainer run-help ngiab.sif` has the rest.
+
+Then open <http://localhost:8080/>. Viewing needs no sign-in. Uploading or deleting a run
+does: the image bakes `admin` / `pass`, which is fine locally and must be rebuilt for
+anything shared.
+
+## The run directory
+
+**The directory is the registry.** A run is registered by being under the storage root, one
+directory per run. Nothing else records it, so removing the directory removes the run.
+
+```
+~/ngiab_visualizer/
+└── gage-10154200/
+    ├── manifest.json                  written on ingest; a run without one is not usable
+    ├── config/
+    │   └── *.gpkg                      hydrofabric: divides, nexus, flowpaths
+    └── outputs/
+        ├── ngen/                       per-catchment series, .csv or .parquet
+        │   ├── cat-2863848.csv
+        │   └── nex-2863779_output.csv
+        └── troute/                     channel routing, .nc or .parquet
+            └── troute_output_*.nc
+```
+
+`teehr/` beside those is optional; when present its evaluation is read for the run that
+carries it.
+
+`manifest.json` is what makes a run usable. Uploading writes it. For a directory you copied
+in yourself, write it once:
 
 ```bash
 docker exec tethys-ngen-portal \
   tethys manage write_manifest --path /home/tethys/persist/ngiab_visualizer/<name>
 ```
 
-Or convert its outputs to parquet at the same time, which is what the launcher runs:
+A run with no manifest still appears in the picker, marked unusable and naming that command.
+Upgrading from a version that used `ngiab_visualizer.json`, the command reads that file and
+keeps the run's name and its old id, so links shared as `?model_run_id=<uuid>` still resolve.
+
+## What it does
+
+Catchments can be shaded by any output variable. Picking one classifies every catchment into
+quantile classes and reveals a timeline that steps or plays through the run.
+
+![Catchments shaded by Q_OUT, with the legend and the timeline below the map](static/imgs/viewer-choropleth.png)
+
+Clicking a catchment, or searching one by id, loads its time series.
+
+![The time series for a selected catchment](static/imgs/viewer-timeseries.png)
+
+**T-Route** switches the same chart to the flowpath that catchment drains into. Catchments
+with a TEEHR evaluation are highlighted, and selecting one adds a **TEEHR** source that plots
+the simulated series against the observed, with the metrics in a table beside it.
+
+![The chart switched to the T-Route source for a flowpath](static/imgs/viewer-troute.png)
+
+## Uploading a run
+
+Sign in, then use **Upload a run** under the run picker. It takes a `.tar`, `.tar.gz` or
+`.zip` of the run directory, up to 5 GB.
+
+**Compress before you upload.** The archive is the whole run directory, and a NextGen run is
+mostly text: `.csv` outputs and per-catchment configs compress by a large factor. Use
+`.tar.gz` rather than `.tar` — the upload is the slow part, and gzip is the cheapest way to
+make it shorter.
+
+```bash
+tar -czf gage-10154200.tar.gz -C ~/ngiab_visualizer gage-10154200
+```
+
+**On S3, convert the outputs first.** t-route writes netCDF, and netCDF cannot be read over
+`s3://` — the map loads and every routing chart fails. Convert to parquet before uploading:
 
 ```bash
 docker exec tethys-ngen-portal \
   tethys manage convert_outputs --path /home/tethys/persist/ngiab_visualizer/<name>
 ```
 
-Either is safe to re-run: the manifest is derived from the run's own contents, so an
-unchanged run rewrites identical files.
+On the filesystem backend this is optional; parquet is still faster to read.
 
-The `~/.ngiab_visualizer_db` mount is gone. It held the portal's own database -- sign-ins and
-sessions -- and the container now runs on the one baked into the image, so a restart signs you
-out and forgets any account you added. The runs are unaffected: they live in
-`~/ngiab_visualizer`, which is the registry.
+Where the upload goes depends on the backend. On the filesystem it posts to the portal. On
+S3 the browser gets a presigned URL and PUTs straight to the bucket, so the archive never
+passes through the portal — which is what makes a 5 GB upload practical. That needs CORS on
+the bucket allowing `PUT` from the portal's origin.
 
-**Deleting a run deletes it.** The `×` button next to the run picker removes the run's
-directory and everything in it, and asks first. This changed: it used to only forget the run
-and leave the data alone. With the directory *being* the registry, a removal that only forgot
-would put the run back on the next scan, so it deletes for real. Only a signed-in user can.
+## Hosted deployments
 
-**Changing a run requires signing in; viewing does not.** The portal stays open -- share a
-`?model_run_id=` link with anyone -- but deleting a run or uploading one needs an account.
-Sign in at `/accounts/login`.
-
-##### Upgrading from an earlier version
-
-The earlier version kept its registry in `ngiab_visualizer.json`. A run becomes usable when
-it carries a manifest, so existing run directories appear in the picker after the upgrade
-marked unusable, naming the command that fixes them.
-
-- **Write a manifest for each run you want to keep.** `tethys manage write_manifest --path
-  <run>` distils one, and is idempotent. While `ngiab_visualizer.json` is still beside the
-  runs it takes that run's name and its old id from there, so the label survives and links
-  shared as `?model_run_id=<uuid>` keep resolving. `--label` and `--legacy-uuid` override it,
-  and a run with no row falls back to its directory name.
-- **A run outside `~/ngiab_visualizer` is not carried over.** `NGIAB_SCAN_ROOTS` used to let
-  the importer offer runs from other mounts; there is no importer now, and a directory
-  outside the storage root is never listed. Move or copy them under `~/ngiab_visualizer`.
-
-##### Hosted deployments
-
-Set `NGIAB_STORAGE_BACKEND=s3`; runs are then addressed as objects rather than files and read
-with DuckDB over `httpfs`. If Django's `STORAGES` has no `ngiab_runs` entry the run store
-borrows the portal's `default` storage — the bucket that already holds media — and keeps runs
-under a prefix of their own, so a portal with media in S3 needs no second configuration.
-
-This image is not the one a hosted deployment runs. It bakes a public `admin`/`pass` and a
-default `TETHYS_SECRET_KEY`, and nothing at startup stops it serving on them, so it is for
-local use. Host the app by installing it into a portal image, as *Installing into an existing
-portal image* below describes; the portal supplies its own superuser and secret key.
-
-Uploading a run takes an account and nothing more: any signed-in user may upload. Deleting
-one takes the `delete_model_runs` permission, in the `run_managers` group, granted in the
-portal admin — losing a run is not recoverable, and adding one is. Superusers hold it.
-
-###### Configuration
+Set `NGIAB_STORAGE_BACKEND=s3` and runs are addressed as objects instead of files, read with
+DuckDB over `httpfs`. If Django's `STORAGES` has no `ngiab_runs` entry the run store borrows
+the portal's `default` storage — the bucket already holding media — under a prefix.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `NGIAB_STORAGE_BACKEND` | `local` | `s3` addresses runs as objects. Anything else stays on the filesystem. |
-| `NGIAB_MANAGED_ROOT` | `$TETHYS_PERSIST/ngiab_visualizer` | Where runs live on the filesystem backend. Follows `TETHYS_PERSIST`, which is `/home/tethys/persist` in the tethys-uvx base. |
-| `NGIAB_RUNS_PREFIX` | `ngiab_visualizer` | Prefix runs live under when borrowing the portal's media bucket. |
-| `NGIAB_S3_BUCKET` | — | Bucket for the container's own `STORAGES` hook. Required when that hook configures storage. |
-| `NGIAB_S3_ENDPOINT` | — | Custom endpoint (MinIO, an S3-compatible store). Omit for AWS. |
-| `NGIAB_S3_PUBLIC_ENDPOINT` | — | Endpoint used when signing upload URLs, for when the browser cannot resolve the one the server uses. |
+| `NGIAB_STORAGE_BACKEND` | `local` | `s3` addresses runs as objects. |
+| `NGIAB_MANAGED_ROOT` | `$TETHYS_PERSIST/ngiab_visualizer` | Where runs live on the filesystem backend. |
+| `NGIAB_RUNS_PREFIX` | `ngiab_visualizer` | Prefix when borrowing the portal's media bucket. |
+| `NGIAB_S3_BUCKET` | — | Bucket for the container's own `STORAGES` hook. |
+| `NGIAB_S3_ENDPOINT` | — | Custom endpoint (MinIO). Omit for AWS. |
+| `NGIAB_S3_PUBLIC_ENDPOINT` | — | Endpoint used when signing upload URLs, when the browser cannot resolve the server's. |
 | `NGIAB_LISTING_TTL_SECONDS` | `10` | How stale the run listing may be. |
-| `NGIAB_LISTING_CONCURRENCY` | `10` | Manifests fetched at once when listing. Above botocore's pool of 10, connections churn. |
-| `NGIAB_UPLOAD_CONCURRENCY` | `10` | Objects uploaded at once when publishing a run. Same ceiling applies. |
-| `NGIAB_MAX_CONCURRENT_INGESTS` | `2` | Uploads prepared at once **per worker process**. Beyond it, uploads are refused with 503. |
-| `NGIAB_JOB_STALE_SECONDS` | `1800` | How long an upload may go without progress before it is reported failed. Raise it if conversions legitimately run longer. |
-| `DUCKDB_HOME` | `/opt/duckdb_extensions` | Where the image's DuckDB extensions live. |
+| `NGIAB_MAX_CONCURRENT_INGESTS` | `2` | Uploads prepared at once per worker. Beyond it, 503. |
 
-All of these are read once at startup, so changing one needs a restart.
+This image is a local tool. It bakes a known superuser and secret key and nothing at startup
+refuses them, so do not host it — install the app into a portal image instead, which brings
+its own.
 
-###### Uploading without a browser
+### Installing into a portal image
 
-`createUpload` → PUT the archive → `startUpload` → poll `uploadStatus`, or, with the archive
-already on the machine:
-
-```bash
-tethys manage ingest_archive --archive /path/to/run.tar.gz --name gage-07144100
-```
-
-`uploadStatus` answers `503` with `terminal: false` when storage is briefly unreachable —
-poll again rather than treating it as failure. `startUpload` answers `503` when
-`NGIAB_MAX_CONCURRENT_INGESTS` is reached; back off and retry. A job reported `failed` with a
-message about no longer responding was declared dead on the `NGIAB_JOB_STALE_SECONDS` timer
-rather than by the job itself. The CLI form bypasses the concurrency bound, so a script
-running several must limit itself.
-
-###### Installing into an existing portal image
-
-A portal that builds its own image installs this app the way it installs any other, but two
-things it will not do on its own: the DuckDB extensions, and the `INSTALLED_APPS` entry.
+A portal installs this like any other app, plus two things it will not do on its own: the
+DuckDB extensions, and the `INSTALLED_APPS` entry.
 
 ```dockerfile
 COPY apps/ngiab-client ${TETHYS_HOME}/apps/ngiab-client
 RUN cd ${TETHYS_HOME}/apps/ngiab-client && uv pip install .
 
-# The runtime has no route to extensions.duckdb.org, so the extensions are installed here
-# and pinned to the duckdb the app declares. A floating duckdb cannot load them.
 ENV DUCKDB_HOME=/opt/duckdb_extensions
 RUN mkdir -p "${DUCKDB_HOME}" && "${VIRTUAL_ENV}/bin/python" -c "\
 import duckdb, os; \
@@ -169,7 +171,7 @@ c.execute(f\"SET extension_directory='{h}'\"); \
     && chmod -R a+rX "${DUCKDB_HOME}"
 ```
 
-Then, in the portal's `portal_config.yml`:
+Then in the portal's `portal_config.yml`:
 
 ```yaml
 settings:
@@ -177,381 +179,42 @@ settings:
     - tethysapp.ngiab
 ```
 
-Tethys's own app discovery loads apps for routing only, which is enough for an app that is
-just controllers. This one also ships management commands, and `ingest_archive` runs
-`convert_outputs` in a subprocess, so Django has to see it as an application or an upload
-fails at the conversion stage with `Unknown command`.
+Tethys's app discovery loads apps for routing only. This one ships management commands, and
+`ingest_archive` runs `convert_outputs` in a subprocess, so Django has to see it as an
+application or an upload fails at the conversion step with `Unknown command`.
 
-The app needs `django-storages` and a `numpy` no older than 1.26 from the portal, both of
-which a portal serving media from S3 already has. It declares `duckdb` itself. Installing it
-into the CIROH portal image left that image's `django`, `numpy`, `django-storages`,
-`geopandas`, `pandas` and `boto3` untouched and added only `duckdb`.
+It needs `django-storages` and `numpy` 1.26 or newer from the portal, which a portal serving
+media from S3 already has. It declares `duckdb` itself.
 
-Verified against that image on Django 4.2.30 and PostgreSQL: the suite passes except for
-tests written for the standalone container, which mounts the app at the root rather than
-under `/apps/ngiab/` and provisions SQLite.
-
-### Unassisted Usage
-
-First create the `MODELS_RUNS_DIRECTORY` directory at `"$HOME/ngiab_visualizer"`. It holds the
-runs, and it is the registry.
-
-Copy your `my-ngen-output` into `MODELS_RUNS_DIRECTORY`, start the container as below, then
-give the run its manifest:
+## Development
 
 ```bash
-docker exec tethys-ngen-portal \
-  tethys manage write_manifest \
-    --path /home/tethys/persist/ngiab_visualizer/my-ngen-output \
-    --label my-ngen-output
+pdm install -G:all        # python deps
+pdm run test              # pytest
+pdm run lint              # flake8
+pdm run format            # yapf
+npm install && npm test   # frontend, real Chromium via @web/test-runner
 ```
 
-Define the env variables and running the container
+The frontend is hand-authored vanilla JS under `tethysapp/ngiab/public/frontend/` and is
+served as-is — no bundler, no build step, so an edit is live on reload. Its dependencies load
+from a CDN at pinned versions, declared in the import map in
+`tethysapp/ngiab/templates/ngiab/index.html`. See that directory's README.
+
+Tests run inside the image rather than a local environment, because the base image installs
+tethys-platform from git main and a locally built environment is a different Tethys than the
+one that ships:
 
 ```bash
-# Set environment variables
-export TETHYS_CONTAINER_NAME="tethys-ngen-portal"        \
-       TETHYS_REPO="awiciroh/tethys-ngiab"               \
-       TETHYS_TAG="latest"                               \
-       NGINX_PORT=80                                     \
-       MODELS_RUNS_DIRECTORY="$HOME/ngiab_visualizer"    \
-       TETHYS_PERSIST_PATH="/home/tethys/persist"     \
-       SKIP_DB_SETUP=false
+docker build --target test -t ngiab-visualizer:test .
+docker run --rm ngiab-visualizer:test
 ```
-# Run container
-
-```bash
-docker run --rm -d \
-  -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer" \
-  -p "$NGINX_PORT:$NGINX_PORT" \
-  --name "$TETHYS_CONTAINER_NAME" \
-  -e MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
-  -e MEDIA_URL="/media/" \
-  -e SKIP_DB_SETUP="$SKIP_DB_SETUP" \
-  -e NGINX_PORT="$NGINX_PORT" \
-  "${TETHYS_REPO}:${TETHYS_TAG}"
-```
-Verify deployment:
-
-```bash
-docker ps
-# CONTAINER ID   IMAGE                          PORTS                 NAMES
-# b1818a03de9b   awiciroh/tethys-ngiab:latest   0.0.0.0:80->80/tcp    tethys-ngen-portal
-```
-
-Access at: http://localhost:80
-
-### Running with rootless Podman
-
-The image is also compatible with rootless Podman (no `sudo` required). The main differences vs. Docker:
-
-- Use port `8080` (rootless cannot bind privileged ports < 1024). Set `NGINX_PORT=8080`.
-- Pass `--userns=keep-id:uid=1000` so files written by the container's `tethys` user (UID 1000 in the tethys-uvx base) appear with the invoking user's UID on the host. This was 1011 under the old conda base image.
-- Append `:Z` to bind mounts on SELinux-enforcing hosts (RHEL, Fedora, Rocky, etc.).
-- Build with `--format docker` so the `HEALTHCHECK` directive is preserved (Podman's default OCI format strips it).
-- Wrap `ALLOWED_HOSTS` in literal outer double-quotes so the value survives the salt-state shell rendering inside the container.
-- Reach the portal at `http://127.0.0.1:8080`, not `http://localhost:8080`. Podman's default pasta networking publishes the port on IPv4 only, and `localhost` resolves to `::1` first, so the browser reports a refused connection while the container is serving normally.
-
-```bash
-# Build (Docker format so HEALTHCHECK is preserved)
-podman build --format docker -t ngiab-visualizer:latest .
-
-# Run
-podman run --rm -d \
-  --userns=keep-id:uid=1000 \
-  -v "$MODELS_RUNS_DIRECTORY:$TETHYS_PERSIST_PATH/ngiab_visualizer:Z" \
-  -p "8080:8080" \
-  --name "$TETHYS_CONTAINER_NAME" \
-  -e NGINX_PORT="8080" \
-  -e PORTAL_ALLOWED_HOSTS="localhost,127.0.0.1,<your-host-ip>" \
-  -e MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
-  -e MEDIA_URL="/media/" \
-  -e SKIP_DB_SETUP="false" \
-  ngiab-visualizer:latest
-```
-
-> **WSL note:** Windows browsers reach rootless Podman containers via the WSL VM's IP (e.g. `172.x.x.x`), not via `localhost`. Find it with `ip -4 addr show eth0` and add that address to `PORTAL_ALLOWED_HOSTS` above. No CSRF setting is needed: the browser's Origin and the Host Django sees are the same address, so Django never consults `CSRF_TRUSTED_ORIGINS`.
-
-The `viewOnTethys.sh` launcher in [`NGIAB-CloudInfra`](https://github.com/CIROH-UA/NGIAB-CloudInfra) handles all of this automatically when invoked with `-p`.
-
-### Running on a cluster with Apptainer
-
-An Apptainer image is published to GitHub Packages on every push to `main`, tagged `latest`
-and with the commit it was built from:
-
-```bash
-apptainer pull ngiab.sif oras://ghcr.io/ciroh-ua/ngiab-client/apptainer:latest
-apptainer run ngiab.sif
-```
-
-Then open <http://localhost:8080/>. It needs no root and no daemon, which is what makes it the
-form to use on an HPC node. Everything writable lives in `~/.ngiab_visualizer`; point
-`NGIAB_STATE_DIR` somewhere else — usually scratch rather than a home quota — and use
-`APPTAINERENV_PORT` to move the port. `apptainer run-help ngiab.sif` covers the rest, and
-`apptainer/ngiab.def` builds it locally with `apptainer build --fakeroot`.
-
-###  Visualization Features 
-
-Selecting a model run draws its catchments. Clicking a catchment, or searching for one by
-id, selects it and loads its time series. The flowpath that catchment routes through is
-highlighted with it, because two of the three chart tabs describe that reach rather than
-the polygon.
-
-![Figure 3: NGIAB Visualizer time series visualization from Nexus points](static/imgs/fig6-3.png){alt='A screenshot of the  NGIAB and DataStream Visualizer web interface. The map displays the ability of the visualizer to retrieve time series from Nexus points'}
-
-The chart has one tab per source: **Catchment** for the ngen land-surface outputs,
-**T-Route** for channel routing along the corresponding flowpath, and **TEEHR** where an
-evaluation exists. Each tab offers the variables that source actually wrote.
-
-![Figure 4: NGIAB Visualizer time series visualization from Troute variables](static/imgs/fig6-4.png){alt='A screenshot of the NGIAB and DataStream Visualizer web interface. The map displays the ability of the visualizer to retrieve time series from Troute variables'}
-
-Catchments can also be shaded by any output variable. Choosing one under **Shade
-catchments by** classifies every catchment into quantile classes and reveals a timeline
-below the map, which steps or plays through the run.
-
-![Figure 5: NGIAB Visualizer time series visualization for Catchments](static/imgs/fig6-5.png){alt='A screenshot of the  NGIAB and DataStream Visualizer web interface. The map displays the ability of the visualizer to retrieve time series from Catchments variables'}
-
-Catchments with a TEEHR evaluation are highlighted on the map. Selecting one enables the
-**TEEHR** tab, which plots the simulated series against the observed one.
-
-![Figure 6: A map showing the geospatial visualization using the Data Visualizer within the Tethys framework for a selected outlet nexus point as well as displaying a time series plot between observed (labeled "USGS"; blue line) and simulated (labeled "ngen"; orange line)](static/imgs/fig6-6.png){alt='alt='A screenshot of the  NGIAB and DataStream Visualizer web interface. The left panel contains a "Time Series Menu" where the user can select a Nexus ID, variable (e.g., flow), and TEEHR data source. A map in the center displays a stream reach with a highlighted section representing the drainage basin and a blue point, indicating the selected nexus location. Below the map, a time series plot compares USGS (blue line) and Ngen (orange line) streamflow data from 2017 to 2023.'}
-
-The evaluation metrics accompany that chart in a table beside it.
-
-[Figure 7: NGIAB Visualizer performance metrics (KGE, NSE, and relative bias). The Visualizer can also show the performance of the NWM 3.0 compared to the observed time series.](static/imgs/fig6-7.png){alt='A screenshot of the  NGIAB and DataStream Visualizer web interface. The map displays the ability of the visualizer to retrieve the TEEHR metrics on a table."Teehr Metrics" presents performance metrics (e.g., Kling-Gupta Efficiency, Nash-Sutcliffe Efficiency, and Relative Bias) for the selected model versus reference data.'}
-
-## Development Installation
-
-You need to install both the Tethys dependencies and the node dependencies.
-
-The webpack dev server is configured to proxy the Tethys development server (see `webpack.config.js`). The app endpoint will be handled by the webpack development server and all other endpoints will be handled by the Tethys (Django) development server. As such, you will need to start both in separate terminals.
-
-
-0. First create a Virtual Environment with the tool of your choice and then run the following commands
-
-1. Install libmamba and make it your default solver (see: A Faster Solver for Conda: Libmamba):
-
-    ```bash
-    conda update -n base conda
-    conda install -n base conda-libmamba-solver
-    conda config --set solver libmamba
-
-    ```
-2. Install the Tethys Platform
-
-    Using `conda`
-
-    ```bash
-    conda install -c conda-forge tethys-platform django=<DJANGO_VESION>
-
-    ```
-    or using `pip`
-
-    ```
-    pip install tethys-platform django=<DJANGO_VERSION>
-
-    ```
-
-3. Create a `portal_config.yml` file :
-
-    To add custom configurations such as the database and other local settings you will need to generate a portal_config.yml file. To generate a new template portal_config.yml run:
-
-    ```bash
-    tethys gen portal_config
-    ```
-
-    You can customize your settings in the portal_config.yml file after you generate it by manually editing the file or by using the settings command command. Refer to the Tethys Portal Configuration documentation for more information.
-
-
-4. Configure the Tethys Database
-
-    There are several options for setting up a DB server: local, docker, or remote. Tethys Platform uses a local SQLite database by default. For development environments you can use Tethys to create a local server:
-
-    ```bash
-    tethys db configure
-    ```
-
-5. Install Node Version Manager and Node.js:
-
-    5.1 Install Node Version Manager (nvm): https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
-
-    5.2 CLOSE ALL OF YOUR TERMINALS AND OPEN NEW ONES
-
-    5.3 Use NVM to install Node.js 20:
-
-    ```bash
-    nvm install 20
-    nvm use 20
-    ```
-
-6. Install the PDM dependency manager:
-    ```bash
-    pip install --user pdm
-    ```
-
-    > **_NOTE:_** if you have previously installed pdm in another environment, uninstall pdm first (`pip uninstall pdm`), and then reinstall as shown above with the new environment active.
-
-
-
-7. Clone the app and install into the Tethys environment in development mode:
-
-    ```bash
-    git clone https://github.com/CIROH-UA/ngiab-client.git
-    cd ngiab-client
-    pdm install
-    npm install --include=dev
-    cd ../
-    ```
-
-## PDM Tips
-
-See below for more PDM tips like how to manage dependencies, install dependencies, and run scripts.
-
-### Install only dev dependencies
-
-* Install all dev dependencies (test & lint)
-
-    ```bash
-    pdm install -G:all
-    ```
-
-* Install only test dependencies
-
-    ```bash
-    pdm install -G test
-    ```
-
-* Install only lint and formatter dependencies
-
-    ```bash
-    pdm install -G lint
-    ```
-
-### Managing dependencies
-
-* Add a new dependency:
-
-1. Add the package using `pdm`:
-
-    ```bash
-    pdm add <package-name>
-    ```
-
-2. Manually add the dependency to the `install.yml`.
-
-    > **_IMPORTANT:_** Dependencies are not automatically added to the `install.yml` yet!
-
-* Add a new dev dependency:
-
-    ```bash
-    pdm add -dG test <package-name>
-    pdm add -dG lint <package-name>
-    ```
-
-    > **_NOTE:_** Just use `pdm` to install and manage dev dependencies. The `install.yml` does not support dev dependencies, but they shouldn't be needed in it anyway, right?
-
-* Add a new optional dependeny:
-
-    ```bash
-    pdm add -G <group-name> <package-name>
-    ```
-
-    > **_NOTE:_** You'll need to decide whether or not to add the optional dependencies to the `install.yml` b/c it does not support optional dependencies. You may consider using `pdm` to manage the optional dependencies.
-
-* Remove a dependency:
-
-1. Remove it from the `pyproject.yaml` and lock file:
-
-    ```bash
-    pdm remove --no-sync <package-name>
-    ```
-
-2. Manually remove it from the `install.yml`
-
-3. If you want to remove it from the environment, use `pip` or `conda` to remove the package.
-
-    > **_IMPORTANT:_** TL;DR: Running `pdm remove` without the `--no-sync` will remove nearly all of the dependencies in your environment. While `pdm remove` is capable of removing the package from the environment, running `pdm remove` without the `--no-sync` option can break your Tethys environment. This is because `pdm` will attempt to get the environment to match the dependencies listed in your `pyproject.toml`, which usually does not include all of the dependencies of Tethys.
-
-### PDM Scripts
-
-The project is configured with several PDM convenience scripts:
-
-```bash
-# Run linter
-pdm run lint
-
-# Run formatter
-pdm run format
-
-# Run tests
-pdm run test
-
-# Run all checks
-pdm run all
-```
-
-## Formatting and Linting Manually
-
-This package is configured to use yapf code formatting
-
-1. Install lint dependencies:
-
-    ```bash
-    pdm install -G lint
-    ```
-
-2. Run code formatting from the project directory:
-
-    ```bash
-    yapf --in-place --recursive --verbose .
-
-    # Short version
-    yapf -ir -vv .
-    ```
-
-3. Run linter from the project directory:
-
-    ```bash
-    flake8 .
-    ```
-
-    > **_NOTE:_** The configuration for yapf and flake8 is in the `pyproject.toml`.
-
-## Testing Manually
-
-This package is configured to use pytest for testing
-
-1. Install test dependencies:
-
-    ```bash
-    pdm install -G test
-    ```
-
-2. Run tests from the project directory:
-
-    ```bash
-    pytest
-    ```
-
-    > **_NOTE:_** The configuration for pytest and coverage is in the `pyproject.toml`.
-
-
-## Frontend
-
-The frontend is build-less: hand-authored vanilla JS and native Web Components under
-`tethysapp/ngiab/public/frontend/`, served as-is, with dependencies loaded from `esm.sh`
-through the import map in the page template. There is nothing to bundle before a release.
-
-```bash
-npm run test:frontend
-```
-
-Tests run as native ES modules in real Chromium via `@web/test-runner`. See
-`tethysapp/ngiab/public/frontend/README.md` for the layout.
 
 ## Acknowledgements
 
-The React + Django implementation is based on the excellent work done by @Jitensid that can be found on GitHub here: [Jitensid/django-webpack-dev-server](https://github.com/Jitensid/django-webpack-dev-server).
+Funded by CIROH through the NOAA Cooperative Agreement with The University of Alabama
+(NA22NWS4320003).
 
 ## Contribute
-Please feel free to contribute!
+
+Issues and pull requests: <https://github.com/CIROH-UA/ngiab-client>.
