@@ -24,8 +24,8 @@
 # uid 1000. Neither base image needs root at run time, so the user change costs nothing --
 # but the read-only rootfs does: the container image writes its database, its rendered
 # config and its model runs to paths inside the image or onto a mounted volume, and none of
-# those writes can land here. scripts/ngiab-apptainer-run.sh moves every one of them onto
-# the host before starting the same serve.sh the container image runs.
+# those writes can land here. ngiab-apptainer-run.sh beside this file moves every one of
+# them onto the host before starting the same serve.sh the container image runs.
 #
 # Everything writable therefore lives under a host state directory, ~/.ngiab_visualizer by
 # default, overridable with NGIAB_STATE_DIR. Apptainer binds $HOME by default, so that path
@@ -117,7 +117,7 @@ Stage: final
 %files
     conf/portal_config.yml /config/portal_config.yml
     conf/portal-config.d /opt/portal/portal-config.d
-    scripts/ngiab-apptainer-run.sh /usr/local/bin/ngiab-apptainer-run.sh
+    apptainer/ngiab-apptainer-run.sh /usr/local/bin/ngiab-apptainer-run.sh
     scripts/ngiab-convert.sh /usr/local/bin/ngiab-convert.sh
 
 %post

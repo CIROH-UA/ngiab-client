@@ -8,7 +8,7 @@
 # on the portal.
 #
 # Usage:
-#     scripts/try-object-storage.sh [prepared-run-directory] [port]
+#     dev/try-object-storage.sh [prepared-run-directory] [port]
 #
 # With no run directory it starts empty, which is the way to exercise uploading.
 #
@@ -18,7 +18,7 @@
 # Mounting the run itself at /run instead would name it "run": distill takes the id from the
 # basename of the path it is given, so the mount point becomes the run's identity.
 #
-# Tear down with: scripts/try-object-storage.sh --down
+# Tear down with: dev/try-object-storage.sh --down
 
 set -euo pipefail
 
@@ -94,7 +94,7 @@ if [ -n "$MANIFEST_ID" ] && [ "$MANIFEST_ID" != "$RUN_NAME" ]; then
 fi
 fi
 
-trap 'echo; echo "(leaving containers up; scripts/try-object-storage.sh --down to remove)"' INT
+trap 'echo; echo "(leaving containers up; dev/try-object-storage.sh --down to remove)"' INT
 
 down >/dev/null 2>&1 || true
 docker network create "$NET" >/dev/null
@@ -171,4 +171,4 @@ echo "Sign in as admin, then use the upload panel under the run picker."
 echo
 echo "The delete button appears only after signing in as admin."
 echo "Logs:  docker logs -f $APP"
-echo "Down:  scripts/try-object-storage.sh --down"
+echo "Down:  dev/try-object-storage.sh --down"
