@@ -175,11 +175,9 @@ Stage: final
     export PORT="${PORT:-8080}"
     export TETHYS_PORT="${TETHYS_PORT:-${PORT:-8080}}"
 
-    # Matches the container image. The baked database already contains this superuser, so
-    # changing these alone does not change the password. Override for any shared
-    # deployment, and rebuild if you need different credentials.
-    export PORTAL_SUPERUSER_NAME=admin
-    export PORTAL_SUPERUSER_PASSWORD=pass
+    # The baked account is admin/pass, created at build time. Deliberately not exported:
+    # nothing reads PORTAL_SUPERUSER_* at run time, so an override would look like it worked
+    # and would not. Rebuild if you need different credentials.
 
     export DUCKDB_HOME=/opt/duckdb_extensions
 
@@ -203,7 +201,9 @@ Stage: final
 
         apptainer run ngiab.sif
 
-    then open http://localhost:8080/ . The portal is open, so there is no login.
+    then open http://localhost:8080/ . Viewing needs no login. Uploading or deleting a run
+    does: sign in as admin / pass from the account card at the foot of the control column.
+    Those credentials are baked in, so rebuild with your own for anything shared.
 
     Writable state (the portal database, rendered config, media, and the model runs
     themselves) lives in ~/.ngiab_visualizer. Point NGIAB_STATE_DIR somewhere else to move

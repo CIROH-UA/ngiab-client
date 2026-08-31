@@ -111,7 +111,7 @@ def test_the_page_is_told_a_refused_user_may_not(db, refused, monkeypatch):
 
 
 def test_an_anonymous_visitor_is_marked_signed_out(refused, monkeypatch):
-    """Signed out keeps the control visible, so the 401 can send them to sign in."""
+    """Signed out means no delete control at all; the account row carries the sign-in prompt."""
     context = _home_context(AnonymousUser(), monkeypatch)
     assert context["signed_in"] is False
     assert context["can_delete"] is False

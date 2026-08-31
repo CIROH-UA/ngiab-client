@@ -6,6 +6,7 @@ import time
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
 
 from tethysapp.ngiab import controllers, ingest, run_store
@@ -148,6 +149,12 @@ def test_a_storage_failure_is_retryable_not_terminal(permitted, user, storage_ro
 
 
 class TestAFailedIngestSaysWhy:
+    @pytest.fixture(autouse=True)
+    def _isolated_children(self, monkeypatch):
+        """A per-test registry: a stub that never reports an exit code is never reaped, and
+        left in the module-global list it burns an ingest slot for the whole session."""
+        monkeypatch.setattr(controllers, "_running", [])
+
     """A detached ingest's traceback has to reach the operator somehow.
 
     The child writes it to stderr and the job status deliberately carries a fixed sentence, so
@@ -244,3 +251,104 @@ class TestAFailedIngestSaysWhy:
         child = controllers._running[-1]
         assert getattr(child, "_ngiab_output_log", None), "the child carries no capture path"
         os.unlink(child._ngiab_output_log)
+
+    def test_polling_reports_a_dead_child_without_waiting_for_the_next_upload(
+        self, caplog, storage_root, monkeypatch
+    ):
+        """Reaping is what reads the output back, and _launch used to be its only caller.
+
+        A portal where nobody uploads again would have left the traceback in a temp file
+        forever while the client was told, thirty minutes later, that the job stopped
+        responding -- symptom without cause.
+        """
+        job_id = "f" * 32
+        ingest.write_status(job_id, state=ingest.RUNNING, stage="publishing", run="gage-1")
+        child, path = self._finished(1, "MemoryError: the real reason")
+        controllers._running.append(child)
+
+        request = RequestFactory().get("/uploadStatus/", {"job": job_id})
+        request.user = AnonymousUser()
+        with caplog.at_level("ERROR", logger="tethysapp.ngiab.controllers"):
+            controllers.uploadStatus(request)
+
+        assert "MemoryError: the real reason" in caplog.text
+        assert not os.path.exists(path)
+
+    def test_a_failed_launch_leaves_no_capture_file_behind(self, monkeypatch):
+        """The capture is created before Popen, so a launch that raises must still clean up."""
+        import glob
+        import subprocess
+        import tempfile
+
+        pattern = os.path.join(tempfile.gettempdir(), "ngiab-ingest-*.log")
+        before = set(glob.glob(pattern))
+
+        def explode(command, **_kwargs):
+            raise FileNotFoundError(command[0])
+
+        monkeypatch.setattr(subprocess, "Popen", explode)
+        monkeypatch.setattr(controllers.os.path, "dirname", lambda _p: "/usr/bin")
+
+        with pytest.raises(FileNotFoundError):
+            controllers._launch(["--job", "e" * 32, "--name", "gage-1"])
+
+        assert set(glob.glob(pattern)) == before
+
+    def test_a_child_with_no_capture_does_not_break_reaping(self):
+        """Tests elsewhere stub _launch, so children without the attribute reach _reap."""
+        class Bare:
+            returncode = 0
+
+            def poll(self):
+                return 0
+
+        controllers._running.append(Bare())
+
+        assert controllers._reap() == 0
+
+    def test_a_real_child_is_reported_when_it_exits(self, caplog, monkeypatch):
+        """No later upload, no poll: the watcher reports at the moment the child exits.
+
+        This is the case the capture exists for -- one upload, it fails, the operator goes
+        looking. Reaping used to happen only inside the next _launch, so with no second
+        upload the traceback was never read at all.
+        """
+        monkeypatch.setattr(controllers.os.path, "dirname", lambda _p: "/bin")
+        monkeypatch.setattr(
+            controllers, "_reap_locked", lambda: 0
+        )  # skip the concurrency probe; this test owns the registry
+
+        real_popen = controllers.subprocess.Popen
+
+        def as_a_failing_shell(command, **kwargs):
+            return real_popen(
+                ["/bin/sh", "-c", "echo the-real-reason >&2; exit 7"], **kwargs
+            )
+
+        monkeypatch.setattr(controllers.subprocess, "Popen", as_a_failing_shell)
+
+        with caplog.at_level("ERROR", logger="tethysapp.ngiab.controllers"):
+            controllers._launch(["--job", "d" * 32, "--name", "gage-1"])
+            for _ in range(200):
+                if "the-real-reason" in caplog.text:
+                    break
+                time.sleep(0.05)
+
+        assert "the-real-reason" in caplog.text, "the watcher never reported the child"
+        assert "exited 7" in caplog.text
+        assert controllers._running == [], "the watcher left the child in the registry"
+
+    def test_the_sweep_clears_a_capture_no_worker_will_read(self, monkeypatch, tmp_path):
+        """A worker recycled between launch and exit leaves a file nobody owns."""
+        monkeypatch.setattr(controllers.tempfile, "gettempdir", lambda: str(tmp_path))
+        orphan = tmp_path / f"{controllers.CAPTURE_PREFIX}old.log"
+        orphan.write_text("a traceback nobody read")
+        fresh = tmp_path / f"{controllers.CAPTURE_PREFIX}new.log"
+        fresh.write_text("still in flight")
+        old_enough = time.time() - controllers.CAPTURE_ORPHAN_SECONDS - 60
+        os.utime(orphan, (old_enough, old_enough))
+
+        controllers._sweep_abandoned_captures()
+
+        assert not orphan.exists(), "the orphan survived the sweep"
+        assert fresh.exists(), "the sweep took a capture that was still in use"

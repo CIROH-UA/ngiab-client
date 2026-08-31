@@ -151,8 +151,6 @@ docker run -d --name "$APP" --network "$NET" -p "$PORT:$PORT" \
     -e AWS_SECRET_ACCESS_KEY="$SECRET" \
     -e AWS_DEFAULT_REGION=us-east-1 \
     -e PORTAL_ALLOWED_HOSTS="localhost,127.0.0.1" \
-    -e PORTAL_SUPERUSER_NAME=admin \
-    -e PORTAL_SUPERUSER_PASSWORD=localdev \
     -e TETHYS_SECRET_KEY=local-rehearsal-not-a-shared-deployment \
     "$IMAGE" >/dev/null
 
@@ -163,7 +161,9 @@ for _ in $(seq 1 60); do
 done
 
 echo
-echo "portal   http://127.0.0.1:$PORT/       (admin / localdev)"
+# admin/pass, not anything this script sets: the superuser is created at image build
+# time and nothing reads PORTAL_SUPERUSER_* at runtime.
+echo "portal   http://127.0.0.1:$PORT/       (admin / pass, baked into the image)"
 echo "minio    http://127.0.0.1:9001/        ($KEY / $SECRET)"
 echo "runs     $(curl -s "http://127.0.0.1:$PORT/getModelRuns/")"
 echo

@@ -4,12 +4,14 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 from django.urls import reverse
 import functools
+import glob
 import logging
 import os
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import uuid
 import duckdb
 from tethys_sdk.routing import controller
@@ -50,11 +52,23 @@ MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
 
 UPLOAD_URL_TTL_SECONDS = 6 * 60 * 60
 
-# The portal owns sign-in, at the site root rather than under the app: the same pair of URLs
-# whether this app is the whole portal or one of many. Tethys registers no reversible name for
-# logout, so it is named here; login comes from the setting so a portal that moves it is
-# followed.
-LOGOUT_URL = "/accounts/logout/"
+# The portal owns sign-in, at the site root rather than under the app, so the pair is the same
+# whether this app is the whole portal or one of many. Both are resolved rather than written
+# down: Tethys rewrites LOGIN_URL when PREFIX_URL is set (settings.py) and reverses logout
+# through the accounts namespace, so a hardcoded logout would 404 on a prefixed portal while
+# sign-in kept working.
+LOGOUT_URL_FALLBACK = "/accounts/logout/"
+
+
+def logout_url():
+    """Where the portal logs a user out, following a URL prefix if it has one."""
+    from django.urls import NoReverseMatch, reverse as reverse_url
+
+    try:
+        return reverse_url("accounts:logout")
+    except NoReverseMatch:
+        logger.warning("accounts:logout does not reverse; falling back to a literal path")
+        return LOGOUT_URL_FALLBACK
 
 
 def signed_in(request):
@@ -159,7 +173,7 @@ def home(request):
         "max_upload_bytes": MAX_UPLOAD_BYTES,
         "username": user.get_username() if is_signed_in else "",
         "login_url": settings.LOGIN_URL,
-        "logout_url": LOGOUT_URL,
+        "logout_url": logout_url(),
     }
     return App.render(request, "index.html", context)
 
@@ -339,6 +353,11 @@ def uploadStatus(request):
     if not _is_job_id(job_id):
         return JsonResponse({"error": "That job id is not valid."}, status=400)
 
+    # Reaping is where a dead child's output gets read back and logged, and the only other
+    # place it happens is the next _launch -- which on a quiet portal is hours away or never.
+    # Polling is the one thing that reliably runs while a job is in flight, so it reaps too.
+    _reap()
+
     try:
         status = ingest.read_status(job_id)
     except run_store.StorageUnreachable:
@@ -378,6 +397,10 @@ def _reap():
 
 DIAGNOSTIC_TAIL_BYTES = 4000
 
+CAPTURE_PREFIX = "ngiab-ingest-log-"
+
+CAPTURE_ORPHAN_SECONDS = 24 * 60 * 60
+
 
 def _report_child_output(child):
     """Log what a finished ingest wrote, then drop the capture file.
@@ -395,15 +418,21 @@ def _report_child_output(child):
             size = handle.tell()
             handle.seek(max(0, size - DIAGNOSTIC_TAIL_BYTES))
             captured = handle.read().decode("utf-8", "replace").strip()
-    except OSError:
-        captured = ""
+        unreadable = None
+    except OSError as exc:
+        captured, unreadable = "", exc
     finally:
         try:
             os.unlink(path)
         except OSError:
             pass
 
-    if child.returncode:
+    if child.returncode and unreadable is not None:
+        logger.error(
+            "ingest_archive exited %s and its output could not be read: %s",
+            child.returncode, unreadable,
+        )
+    elif child.returncode:
         logger.error(
             "ingest_archive exited %s%s", child.returncode,
             f"; it said:\n{captured}" if captured else " and wrote nothing",
@@ -423,13 +452,46 @@ def _reap_locked():
     return len(_running)
 
 
+def _sweep_abandoned_captures():
+    """Remove captures whose worker died before it could read them back.
+
+    _running is per-process, so a worker recycled between launch and exit leaves its
+    children's capture files with nobody to unlink them. Best effort by design: a sweep that
+    cannot run must never stop an upload from starting.
+    """
+    cutoff = time.time() - CAPTURE_ORPHAN_SECONDS
+    for path in glob.glob(os.path.join(tempfile.gettempdir(), f"{CAPTURE_PREFIX}*.log")):
+        try:
+            if os.path.getmtime(path) < cutoff:
+                os.unlink(path)
+        except OSError:
+            pass
+
+
+def _watch(child):
+    """Wait for one child and report it, so reporting does not wait for the next upload."""
+    try:
+        child.wait()
+    except Exception:  # noqa: BLE001 - a watcher must never raise into the interpreter
+        logger.exception("Could not wait on an ingest child")
+        return
+    with _running_lock:
+        if child in _running:
+            _running.remove(child)
+    _report_child_output(child)
+
+
 def _launch(arguments):
     """Run ingest_archive in its own detached process, raising IngestBusy over queueing.
 
     Its output is captured to a file rather than discarded: the child writes its traceback to
     stderr, and with that on /dev/null a failed ingest left the operator nothing at all --
     the job status carries a fixed sentence by design, so it cannot carry the reason either.
-    _reap_locked reads the capture back once the child exits.
+
+    A file rather than a pipe, deliberately: a pipe would couple the child's lifetime to this
+    worker, so recycling the worker mid-publish would kill the ingest with EPIPE. The cost is
+    a file on disk, which the watcher below removes as soon as the child exits and
+    _sweep_abandoned_captures clears if this worker never gets that far.
     """
     executable = os.path.join(os.path.dirname(sys.executable), "django-admin")
     command = [executable, "ingest_archive", *arguments]
@@ -440,6 +502,7 @@ def _launch(arguments):
         ),
     )
     logger.info("launching %s", " ".join(command))
+    _sweep_abandoned_captures()
     with _running_lock:
         if _reap_locked() >= MAX_CONCURRENT_INGESTS:
             raise IngestBusy(
@@ -447,7 +510,7 @@ def _launch(arguments):
                 "Wait for one to finish and try again."
             )
         capture = tempfile.NamedTemporaryFile(  # noqa: SIM115 - handed to the child
-            prefix="ngiab-ingest-", suffix=".log", delete=False
+            prefix=CAPTURE_PREFIX, suffix=".log", delete=False
         )
         try:
             child = subprocess.Popen(  # noqa: S603 - fixed executable, validated arguments
@@ -459,12 +522,18 @@ def _launch(arguments):
             )
         except BaseException:
             capture.close()
-            os.unlink(capture.name)
+            try:
+                os.unlink(capture.name)
+            except OSError:
+                logger.warning("Could not remove the unused capture %s", capture.name)
             raise
         finally:
             capture.close()
         child._ngiab_output_log = capture.name
         _running.append(child)
+
+    # Outside the lock: the watcher takes it itself when the child exits.
+    threading.Thread(target=_watch, args=(child,), daemon=True).start()
 
 
 def _start_or_report(job_id, name, arguments, local_archive=None):

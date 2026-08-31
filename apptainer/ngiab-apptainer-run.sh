@@ -69,12 +69,19 @@ fi
 # query that needs a new column. Migrate is a no-op on a current database.
 # Quiet when it works, and never quiet when it does not: a schema that failed to migrate is
 # the thing you want to read about, so the output is held and printed only on failure.
-migrate_log="$state/db/migrate.log"
+# Per-start, so a printed tail always belongs to the run that printed it and two containers
+# sharing a state directory cannot overwrite each other's diagnostic.
+migrate_log="$state/db/migrate.$$.log"
+: >"$migrate_log" 2>/dev/null || migrate_log="$(mktemp "${TMPDIR:-/tmp}/ngiab-migrate-XXXXXX")"
 if ! "${VIRTUAL_ENV:-/opt/conda/envs/tethys}/bin/tethys" db migrate >"$migrate_log" 2>&1; then
     echo "[ngiab] warning: could not migrate $live; continuing with the schema it has" >&2
     echo "[ngiab] what migrate said:" >&2
-    tail -n 40 "$migrate_log" >&2
+    # `|| true` is load-bearing: set -e applies inside this branch, so a tail that cannot read
+    # the log would abort the start entirely -- turning a warning into a container that never
+    # serves, which is worse than the schema being stale.
+    tail -n 40 "$migrate_log" >&2 || echo "[ngiab] (no migrate output was captured)" >&2
 fi
+rm -f "$migrate_log"
 
 echo "[ngiab] state directory: $state"
 echo "[ngiab] database: $live"

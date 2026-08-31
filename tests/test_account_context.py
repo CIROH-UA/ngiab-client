@@ -5,7 +5,6 @@ whether this app is served at / or under /apps/<name>/, and neither is reversed 
 own namespace.
 """
 
-import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpResponse
@@ -46,20 +45,28 @@ def test_a_signed_in_user_is_named(monkeypatch, db):
     assert context["username"] == "hydro"
 
 
-@pytest.mark.parametrize("permitted", [True, False])
-def test_the_delete_flag_is_the_permission_not_the_session(monkeypatch, db, permitted):
-    """can_delete carries the permission alone; the frontend requires a session as well."""
-    user = get_user_model()(username="hydro", is_active=True)
-
-    context = _context(user, monkeypatch, permitted=permitted)
-
-    assert context["can_delete"] is permitted
-
-
 def test_the_auth_urls_are_site_root_not_app_relative(monkeypatch, db):
     """An app-relative sign-in would 404 in single-app mode and miss the portal's in both."""
     context = _context(AnonymousUser(), monkeypatch)
 
     for key in ("login_url", "logout_url"):
+        # The leading slash is the whole property: "accounts/login/" and "accounts:login" are
+        # both app-relative and both 404, and both passed the earlier version of this test.
+        assert context[key].startswith("/"), context[key]
         assert not context[key].startswith("/apps/"), context[key]
         assert "accounts" in context[key], context[key]
+
+
+def test_logout_follows_the_same_prefix_as_login(monkeypatch, db):
+    """A hardcoded logout 404s on a prefixed portal while sign-in keeps working.
+
+    Tethys rewrites LOGIN_URL when PREFIX_URL is set but cannot rewrite a literal, so logout
+    is reversed through the accounts namespace instead of written down.
+    """
+    monkeypatch.setattr(controllers.settings, "LOGIN_URL", "/portal/accounts/login/")
+
+    context = _context(AnonymousUser(), monkeypatch)
+
+    assert context["login_url"] == "/portal/accounts/login/"
+    assert context["logout_url"].endswith("/accounts/logout/")
+    assert context["logout_url"] == controllers.logout_url()

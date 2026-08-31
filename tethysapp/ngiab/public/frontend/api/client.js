@@ -1,4 +1,4 @@
-import { getPortalHost } from '../config.js';
+import { getPortalHost, loginUrl } from '../config.js';
 
 
 export class ApiError extends Error {
@@ -56,8 +56,9 @@ async function readErrorDetail(response) {
 }
 
 function loginRedirect() {
-  const host = getPortalHost();
-  window.location.assign(`${host}/accounts/login?next=${window.location.pathname}`);
+  // loginUrl() follows the portal's LOGIN_URL and keeps the query string, so an expiring
+  // session comes back to the run you were on. This used to build its own, worse, copy.
+  window.location.assign(loginUrl());
 }
 
 export function csrfToken() {

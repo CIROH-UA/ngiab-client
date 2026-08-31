@@ -877,7 +877,7 @@ echo -e "${BG_Green}${BWhite} Your model outputs are now available for visualiza
 print_visualization_urls
 # The portal runs open (ENABLE_OPEN_PORTAL), so the map needs no sign-in. The admin
 # account still exists for /admin/, which is why it is worth mentioning at all.
-echo -e "${INFO_MARK} No sign-in needed. The Django admin at ${BWhite}/admin/${Color_Off} uses admin / pass."
+echo -e "${INFO_MARK} Viewing needs no sign-in. Uploading or deleting a run does: sign in as ${BWhite}admin / pass${Color_Off} from the account card."
 echo -e "\n${INFO_MARK} Source code: ${UBlue}https://github.com/CIROH-UA/ngiab-client${Color_Off}"
 
 # Keep the script running

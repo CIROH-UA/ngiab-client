@@ -229,7 +229,7 @@ export class NgiabChart extends HTMLElement {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = source.label;
-      button.className = source.key === this._source ? 'is-active' : '';
+      button.className = source.key === this._source ? 'pill is-active' : 'pill';
       button.disabled = !selection.id;
       button.addEventListener('click', () => {
         if (this._source === source.key) return;

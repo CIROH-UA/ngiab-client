@@ -36,18 +36,17 @@ export function userName() {
   return getConfig().USERNAME;
 }
 
-// Come back to the page you left, selected run and all, rather than the portal's profile.
-function withReturn(url) {
-  const here = window.location.pathname + window.location.search;
-  return `${url}?next=${encodeURIComponent(here)}`;
-}
-
+// Sign in comes back to the page you left, selected run and all, rather than the portal's
+// profile page. Signing out cannot: the portal's logout view ignores next and redirects to
+// its own home or login, so adding one here would only promise something it does not do.
 export function loginUrl() {
-  return withReturn(getConfig().LOGIN_URL);
+  const here = window.location.pathname + window.location.search;
+  const url = getConfig().LOGIN_URL;
+  return `${url}${url.includes('?') ? '&' : '?'}next=${encodeURIComponent(here)}`;
 }
 
 export function logoutUrl() {
-  return withReturn(getConfig().LOGOUT_URL);
+  return getConfig().LOGOUT_URL;
 }
 
 export function getPortalHost() {

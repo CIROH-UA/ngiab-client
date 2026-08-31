@@ -34,7 +34,9 @@ Run the tests with `npm run test:frontend` (real Chromium via `@web/test-runner`
 | `components/map/ngiab-map.js` | The map element: lifecycle, selection, data loading. |
 | `components/ngiab-search.js` | Catchment combobox. Emits `catchment-selected`. |
 | `components/ngiab-chart.js` | uPlot time-series panel and TEEHR metrics table. |
-| `components/ngiab-model-runs.js` | Model-run selector. |
+| `components/ngiab-model-runs.js` | Model-run selector, and the delete control. |
+| `components/ngiab-upload-run.js` | Archive upload: presigned PUT, progress, job polling. |
+| `components/ngiab-account.js` | Who is signed in, and the one control that changes it. |
 | `components/ngiab-legend.js` | What the catchment colours currently mean. |
 | `components/ngiab-timeline.js` | Timestep scrubber and playback. |
 

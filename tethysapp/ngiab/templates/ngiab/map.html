@@ -64,14 +64,15 @@
   }
   /* One outlined-pill treatment, shared by the chart's source buttons and the account
      action. It was written twice before. */
-  .pill, .chart-sources button {
+  .pill {
+    display: inline-flex; align-items: center; justify-content: center;
     min-height: var(--tap-min); padding: 0 14px; white-space: nowrap;
     border: 1px solid var(--border-strong); border-radius: 7px;
-    background: transparent; color: var(--fg); cursor: pointer; font: inherit;
+    background: transparent; color: var(--fg); cursor: pointer;
+    font: inherit; text-decoration: none;
     transition: background-color var(--dur-fast) var(--ease-out);
   }
-  .pill:hover,
-  .chart-sources button:hover:not(:disabled):not(.is-active) { background: var(--surface-sunken); }
+  .pill:hover:not(:disabled):not(.is-active) { background: var(--surface-sunken); }
 
   .icon-button {
     flex: 0 0 auto;
@@ -111,12 +112,7 @@
      not truncated. It takes the line and the action sits under it. */
   ngiab-account[data-state="guest"] .account-note { flex: 1 1 100%; }
 
-  /* An <a>, so it needs the box the pill assumes a button already has. */
-  .account-action {
-    flex: 0 0 auto;
-    display: inline-flex; align-items: center;
-    text-decoration: none;
-  }
+  .account-action { flex: 0 0 auto; }
 
   /* Model runs -------------------------------------------------------- */
   /* Import list: rows of what is on disk, sized to be scanned rather than read. */

@@ -108,8 +108,8 @@ ENV STATIC_ROOT=/home/tethys/ngiab/static
 ENV PORT=8080
 ENV TETHYS_PORT=8080
 
-ENV PORTAL_SUPERUSER_NAME=admin
-ENV PORTAL_SUPERUSER_PASSWORD=pass
+# The baked account is admin/pass, created at build time. There is no runtime override:
+# nothing reads PORTAL_SUPERUSER_* after the image is built.
 ENV DUCKDB_HOME=/opt/duckdb_extensions
 ENV TETHYS_SECRET_KEY=ngiab-local-default-override-in-any-shared-deployment
 ENV GUNICORN_TIMEOUT=600

@@ -12,13 +12,18 @@ export class NgiabAccount extends HTMLElement {
     const signedIn = isSignedIn();
     this.dataset.state = signedIn ? 'signed-in' : 'guest';
 
+    // Nothing is interpolated into markup. The username is portal-supplied and the URLs come
+    // from settings, but an href built by string concatenation is a different trust boundary
+    // from one set as a property, and there is no reason for this file to have two.
     this.innerHTML = `
       <p class="account-note"></p>
-      <a class="pill account-action"
-         id="${signedIn ? 'account-sign-out' : 'account-sign-in'}"
-         href="${signedIn ? logoutUrl() : loginUrl()}"
-      >${signedIn ? 'Sign out' : 'Sign in'}</a>
+      <a class="pill account-action"></a>
     `;
+
+    const action = this.querySelector('.account-action');
+    action.id = signedIn ? 'account-sign-out' : 'account-sign-in';
+    action.href = signedIn ? logoutUrl() : loginUrl();
+    action.textContent = signedIn ? 'Sign out' : 'Sign in';
 
     const note = this.querySelector('.account-note');
     if (!signedIn) {

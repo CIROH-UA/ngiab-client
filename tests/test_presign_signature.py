@@ -47,8 +47,11 @@ def test_presigned_put_is_sigv4(s3_backend):
 def test_presigned_put_does_not_sign_content_type(s3_backend):
     """Content-Type must not be in the signed headers, or a browser PUT would 403."""
     url = controllers._presigned_put("run/archive")
-    signed = ""
+    signed = None
     for part in url.split("?", 1)[1].split("&"):
         if part.startswith("X-Amz-SignedHeaders="):
             signed = part.split("=", 1)[1].lower()
-    assert "content-type" not in signed
+    # Asserted separately: SigV2 emits no SignedHeaders at all, so a bare "content-type not in
+    # signed" passed against the very regression this test is named for.
+    assert signed is not None, "no X-Amz-SignedHeaders, so this is not a SigV4 presign"
+    assert signed == "host", signed
