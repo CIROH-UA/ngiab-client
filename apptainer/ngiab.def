@@ -21,12 +21,11 @@
 # WHAT DIFFERS FROM THE CONTAINER IMAGE, AND WHY
 #
 # Apptainer mounts the image read-only and runs it as the invoking user rather than as
-# uid 1000. The Docker image is already built so that nothing needs root at run time, so
-# the user change costs nothing -- but the read-only rootfs does: the Docker entrypoint
-# seeds the database onto a host mount and symlinks the image path at it, and that symlink
-# is a write into /opt. scripts/ngiab-apptainer-run.sh does the equivalent without writing
-# to the image: it copies the baked database into the state directory and points
-# TETHYS_DB_NAME at it, which portal-config.sh already turns into DATABASES.default.NAME.
+# uid 1000. Neither base image needs root at run time, so the user change costs nothing --
+# but the read-only rootfs does: the container image writes its database, its rendered
+# config and its model runs to paths inside the image or onto a mounted volume, and none of
+# those writes can land here. scripts/ngiab-apptainer-run.sh moves every one of them onto
+# the host before starting the same serve.sh the container image runs.
 #
 # Everything writable therefore lives under a host state directory, ~/.ngiab_visualizer by
 # default, overridable with NGIAB_STATE_DIR. Apptainer binds $HOME by default, so that path
@@ -47,10 +46,10 @@ Stage: build
     git config --global --add safe.directory '*'
     uv pip install --python "${VIRTUAL_ENV}" /build
 
-    # Pre-install the DuckDB extensions the TEEHR reader needs, so a runtime LOAD never
-    # reaches extensions.duckdb.org -- which would fail on a restricted-egress HPC node,
-    # and fail anyway against a read-only image. avro is required in addition to sqlite and
-    # iceberg: as of DuckDB 1.5.5 the iceberg extension auto-installs it on first use.
+    # Pre-install the DuckDB extensions the object-storage backend needs, so a runtime LOAD
+    # never reaches extensions.duckdb.org -- which would fail on a restricted-egress HPC
+    # node, and fail anyway against a read-only image. Only these two: TEEHR evaluations are
+    # read as plain parquet, and duckdb_conn loads nothing at all on the filesystem backend.
     export DUCKDB_HOME=/opt/duckdb_extensions
     mkdir -p "${DUCKDB_HOME}"
     "${VIRTUAL_ENV}/bin/python" -c "
@@ -59,9 +58,6 @@ h = os.environ['DUCKDB_HOME']
 c = duckdb.connect()
 c.execute(f\"SET home_directory='{h}'\")
 c.execute(f\"SET extension_directory='{h}'\")
-c.execute('INSTALL sqlite')
-c.execute('INSTALL iceberg')
-c.execute('INSTALL avro')
 c.execute('INSTALL httpfs')
 c.execute('INSTALL aws')
 print('duckdb extensions installed:', duckdb.__version__)"
@@ -182,7 +178,7 @@ Stage: final
     export DUCKDB_HOME=/opt/duckdb_extensions
 
     # TEEHR and DuckDB queries can run for minutes. Only matters under SERVER=gunicorn,
-    # whose 60s default would kill a warehouse query mid-flight.
+    # whose 60s default would kill one mid-flight.
     export GUNICORN_TIMEOUT=600
     export GUNICORN_GRACEFUL_TIMEOUT=60
 
@@ -203,21 +199,24 @@ Stage: final
 
     then open http://localhost:8080/ . The portal is open, so there is no login.
 
-    Writable state (the portal database, the model-run registry, rendered config) lives in
-    ~/.ngiab_visualizer. Point NGIAB_STATE_DIR somewhere else to move it -- on a cluster
-    that usually means scratch rather than a home quota:
+    Writable state (the portal database, rendered config, media, and the model runs
+    themselves) lives in ~/.ngiab_visualizer. Point NGIAB_STATE_DIR somewhere else to move
+    it -- on a cluster that usually means scratch rather than a home quota:
 
         NGIAB_STATE_DIR=/scratch/$USER/ngiab apptainer run ngiab.sif
 
-    Model run data has to be readable at the path recorded when the run was registered.
-    Apptainer binds $HOME automatically; anything outside it needs an explicit bind:
+    A run is registered by being in the runs directory, which is ngiab_visualizer inside the
+    state directory. Upload one through the web page, or drop it there beforehand -- a run
+    that has never been ingested is listed with the write_manifest command that fixes it.
 
-        apptainer run --bind /data/ngen-runs ngiab.sif
+    To read runs that already exist elsewhere, point NGIAB_MANAGED_ROOT at a directory of
+    run directories and bind it. Apptainer binds $HOME automatically; anything outside it
+    needs an explicit bind. Read-only is enough to list and view; uploading needs write:
 
-    To read TEEHR results, bind the warehouse at the SAME absolute path the producer wrote,
-    because Iceberg records absolute paths in its catalog, and point the app at it:
+        APPTAINERENV_NGIAB_MANAGED_ROOT=/data/ngen-runs \
+            apptainer run --bind /data/ngen-runs ngiab.sif
 
-        APPTAINERENV_TEEHR_WAREHOUSE_PATH=/data/teehr_eval \
-            apptainer run --bind /data/teehr_eval ngiab.sif
+    A TEEHR evaluation travels inside the run directory it belongs to, so it needs no bind
+    and no configuration of its own.
 
     Change the port with APPTAINERENV_PORT=9000.

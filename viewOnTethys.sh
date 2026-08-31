@@ -56,16 +56,10 @@ TETHYS_CONTAINER_NAME="tethys-ngen-portal"
 TETHYS_REPO="awiciroh/tethys-ngiab"
 
 MODELS_RUNS_DIRECTORY="${MODELS_RUNS_DIRECTORY:-$HOME/ngiab_visualizer}"
-# The portal database lives here. It no longer holds the model runs -- the runs directory is
-# the registry now -- but it does hold sign-ins and sessions, which became worth persisting
-# once changing a run required one. The image ships a baked database and seeds it here on
-# first start.
+# Where the runs directory is mounted inside the container, and so where the app looks for
+# it: the directory is the registry. The portal database is not here -- it is baked into the
+# image, so sign-ins last as long as the container does.
 TETHYS_PERSIST_PATH="/var/lib/tethys_persist"
-
-# TEEHR warehouse (shared across model runs). Persisted in a sibling config file
-# so runTeehr.sh and viewOnTethys.sh agree on the location. Must be mounted at
-# the SAME absolute path inside the Tethys container because Iceberg embeds
-# absolute paths in local_catalog.db and metadata/*.json.
 
 # Parameters
 DOCKER_CMD="docker"

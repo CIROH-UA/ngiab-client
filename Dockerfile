@@ -152,11 +152,7 @@ ENV TETHYS_SECRET_KEY=ngiab-local-default-override-in-any-shared-deployment
 ENV GUNICORN_TIMEOUT=600
 ENV GUNICORN_GRACEFUL_TIMEOUT=60
 
-# Where the model-run registry actually lives when a writable volume is mounted. The
-# entrypoint seeds the baked database here on first start and symlinks the image path at it;
-# without the mount the container still runs, just without persistence.
-ENV NGIAB_DB_PATH=/var/lib/tethys_persist/db/portal.sqlite
-
-# Provisioning still happens at build time -- this wrapper only seeds the database onto the
-# host mount, then execs the base's serve.sh. It needs no privileges (see the script).
+# Provisioning happens at build time, so the base image's own server is the whole runtime.
+# The database it serves is the baked one; the runs directory is mounted over
+# /var/lib/tethys_persist/ngiab_visualizer, which is the registry.
 CMD ["/usr/local/bin/serve.sh"]
