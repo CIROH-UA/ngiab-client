@@ -1,23 +1,12 @@
-# Global configuration for Anchore Grype scans.
-# This keeps suppressions and path exclusions versioned alongside the codebase
-# so both local scans and the GitHub Action behave the same way.
 exclude:
-  # Salt’s vendored Python tree contains known CVEs that we do not ship.
   - /opt/saltstack/**
 
 ignore:
-  # We intentionally pin an older CPython in the conda environment while we
-  # wait on conda-build support for the latest release. Track the waiver here
-  # so the justification is audited and easy to revisit.
   - package:
       name: python
       type: binary
     reason: "Pinned to an older CPython until conda-build grows support for the latest version."
 
-  # The following come from the tethysplatform/tethys-core base image and are
-  # not controllable from this repo. Waive until the upstream base image tag
-  # bumps Django past 5.2.13 and Debian 13 picks up libngtcp2 1.11.0-1+deb13u1.
-  # Revisit when the base image is refreshed.
   - vulnerability: GHSA-mvfq-ggxm-9mc5
     package:
       name: django
@@ -39,13 +28,6 @@ ignore:
       type: deb
     reason: "Debian 13 libngtcp2 shipped by tethys-core base image; waiting on base image rebuild to pick up 1.11.0-1+deb13u1."
 
-  # npm is only used at build time (`npm install && npm run build`), and the
-  # app's node_modules is removed right after the build. npm's *own* bundled
-  # dependencies under ${NODE_VERSION_DIR}/lib/node_modules/npm/** are never
-  # invoked at runtime, so ReDoS / path-traversal findings against them have
-  # no realistic exploit path in the shipped image. We keep `npm install -g
-  # npm@latest` in the Dockerfile as the forward-looking fix; this block
-  # absorbs any residual findings from whichever subdeps npm happens to ship.
   - package:
       location: "/usr/local/nvm/versions/node/*/lib/node_modules/npm/**"
     reason: "npm CLI and its vendored deps are build-time only; not reachable at runtime."

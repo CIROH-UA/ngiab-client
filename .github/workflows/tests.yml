@@ -1,6 +1,5 @@
 name: tests
 
-# Callable, so the image builds can gate on it rather than duplicating it.
 on:
   push:
     branches: ['*']
@@ -21,13 +20,9 @@ jobs:
         with:
           node-version: '20'
 
-      # No lockfile is committed, and the only dev dependencies are the test runner itself.
       - name: Install test dependencies
         run: npm install --no-audit --no-fund
 
-      # @web/test-runner drives a real Chromium through the puppeteer launcher, which is
-      # what the tests are written against -- the DOM behaviour they pin down (feature-state,
-      # ResizeObserver, custom elements) is not reproducible under jsdom.
       - name: Run the frontend test suite
         run: npm run test:frontend
 
@@ -40,23 +35,14 @@ jobs:
         with:
           python-version: '3.12'
 
-      # No Django test suite yet, so this is a syntax and import-shape gate: it catches the
-      # dangling import or stray reference that a refactor leaves behind, which is exactly
-      # what broke during the DataStream removal.
       - name: Byte-compile the app
         run: python -m compileall -q tethysapp/
 
-      # compileall accepts a name that does not exist anywhere, which is how a constant
-      # referenced but never defined reached a release and emptied the T-Route tab.
       - name: Undefined names
         run: |
           pip install pyflakes
           python -m pyflakes tethysapp/
 
-      # Matches the bare name, so `from .models import ModelRun` is caught as well as
-      # `from tethysapp.ngiab.models import ModelRun`. A dotted-path pattern misses the
-      # relative form, which is the form this app actually uses -- utils.py and controllers.py
-      # both import that way, so a dotted guard would pass on a broken tree.
       - name: Check for imports of removed modules
         run: |
           set -e
@@ -68,9 +54,6 @@ jobs:
           done
           echo "no references to removed modules"
 
-      # models.py is gone: the storage root is the registry. A bare "ModelRun" grep would be
-      # wrong -- the migrations name the model legitimately, and docstrings cite it as history
-      # -- so this matches the import, which is the thing that actually breaks.
       - name: Check for imports of the removed model
         run: |
           set -e
@@ -86,21 +69,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # setuptools-scm derives the version from git metadata, which the image build needs.
           fetch-depth: 0
 
-      # Tests run inside the image, not in a pip or conda environment assembled here. The
-      # base image installs tethys-platform from git main, so any environment built
-      # separately is a different Tethys than the one that ships -- a suite green against it
-      # proves less than it looks like it does. The test stage stops short of the runtime
-      # stage, so this reuses the builder layers the image build already produces.
       - name: Build the test image
         run: docker build --target test -t ngiab-visualizer:test .
 
-      # The count assertion is the point of this step. pytest exits 0 when every test skips,
-      # and the existing TEEHR suite skips 19 of 28 without its fixture warehouse -- so "the
-      # suite passed" and "the suite ran" are different claims, and only the second one is
-      # worth gating on. The parity suite generates its own fixtures and must never skip.
       - name: Run the suite, and prove it actually ran
         run: |
           docker run --rm ngiab-visualizer:test /bin/sh -c '

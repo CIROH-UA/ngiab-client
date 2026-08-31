@@ -9,7 +9,6 @@ readme = "README.md"
 license = { text = "" }
 keywords = [""]
 
-
 [tool.pdm]
 [tool.pdm.dev-dependencies]
 test = [
@@ -24,7 +23,6 @@ lint = ["flake8>=5.0.4", "yapf>=0.32.0"]
 
 [tool.pdm.version]
 source = "scm"
-
 
 [tool.pdm.scripts]
 test.cmd = "pytest"
@@ -62,7 +60,6 @@ column_limit = 120
 [tool.yapfignore]
 ignore_patterns = [".git", ".venv", "build", "dist", "node_modules"]
 
-
 [tool.setuptools]
 include-package-data = true
 
@@ -73,7 +70,6 @@ include = ["tethysapp*"]
 "*" = ["*.js", "*.png", "*.gif", "*.jpg", "*.html", "*.css", "*.json", "*.svg"]
 
 [tool.setuptools_scm]
-# can be empty if no extra settings are needed, presence enables setuptools-scm
 
 [build-system]
 requires = ["setuptools", "setuptools-scm"]
