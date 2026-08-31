@@ -2,8 +2,9 @@
 
 Vanilla JS + native Web Components. No bundler, no build step. Served as-is by Tethys at
 `/static/ngiab/frontend/`, entry point `map.js`. Dependencies load from the `esm.sh` CDN at
-pinned versions — see `DEPENDENCIES.md` — wired through the import map in
-`tethysapp/ngiab/templates/ngiab/index.html`.
+exactly pinned versions, declared in the `<script type="importmap">` block in
+`tethysapp/ngiab/templates/ngiab/index.html` — that map is the whole dependency list. Pin
+exact versions there, never a range: an upstream publish must not be able to change the app.
 
 **This directory is hand-authored source and is tracked in git.** The React app it replaced is
 gone; `git log -- reactapp` still has it if you ever need the reference implementation.
