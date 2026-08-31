@@ -57,10 +57,6 @@ class Command(BaseCommand):
             self._fail(job_id, run_name, str(exc))
             raise CommandError(str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - a job must never end without a status
-            # Both destinations on purpose. logger reaches the portal's configured logging
-            # wherever this runs; stderr is what a person sees running the command by hand,
-            # and what the launching process captures for a detached run. The status message
-            # stays a fixed sentence, so neither of these is a duplicate of it.
             logger.exception("Could not publish %s", run_name)
             self.stderr.write(traceback.format_exc())
             self._fail(job_id, run_name, "The run could not be published.")

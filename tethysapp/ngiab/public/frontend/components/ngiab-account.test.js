@@ -28,8 +28,6 @@ describe('ngiab-account when nobody is signed in', () => {
   });
 
   it('comes back to the page you were on, selected run and all', () => {
-    // A real URL with a query string, because the runner's own has none: without one, an
-    // implementation that dropped window.location.search would still pass.
     const restore = window.location.pathname + window.location.search;
     history.pushState({}, '', '/apps/ngiab/?model_run_id=gage-07144100');
     try {

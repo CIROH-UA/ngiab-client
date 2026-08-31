@@ -22,8 +22,6 @@ export function isSignedIn() {
   return getConfig().SIGNED_IN;
 }
 
-// Uploading takes an account and nothing more today, so this is the same answer -- but it is
-// a different question, and a permission added here must not silently move the account row.
 export function canUpload() {
   return isSignedIn();
 }
@@ -41,9 +39,6 @@ export function userName() {
   return getConfig().USERNAME;
 }
 
-// Sign in comes back to the page you left, selected run and all, rather than the portal's
-// profile page. Signing out cannot: the portal's logout view ignores next and redirects to
-// its own home or login, so adding one here would only promise something it does not do.
 export function loginUrl() {
   const here = window.location.pathname + window.location.search;
   const url = getConfig().LOGIN_URL;

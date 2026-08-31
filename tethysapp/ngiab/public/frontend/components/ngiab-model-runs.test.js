@@ -38,8 +38,6 @@ describe('ngiab-model-runs', () => {
       removeCalls.push(params);
       return { removed: params.model_run_id };
     };
-    // Deleting is offered only to someone who can complete it, so the tests that exercise
-    // the control have to be that someone.
     window.__NGIAB__ = { SIGNED_IN: true, CAN_DELETE: true };
   });
 
@@ -135,9 +133,6 @@ describe('ngiab-model-runs', () => {
       expect(el.querySelector('#model-run-remove')).to.not.equal(null);
     });
 
-    // It used to stay visible for a guest so the 401 would lead them to a login page. That
-    // offered an irreversible action to someone who could not complete it, and the account
-    // row now carries the sign-in prompt instead.
     it('is hidden from a guest, who has the account row to sign in with', async () => {
       window.__NGIAB__ = { SIGNED_IN: false, CAN_DELETE: false };
       el = mount();
@@ -171,8 +166,6 @@ describe('ngiab-model-runs', () => {
 
     const status = el.querySelector('#model-run-status');
     expect(status.dataset.severity).to.equal('warning');
-    // The shared message, so this panel and the card over the map cannot disagree about
-    // what to do next. noRunsMessage owns the wording; empty-runs.test.js owns the variants.
     expect(status.textContent).to.equal(noRunsMessage(true));
   });
 });

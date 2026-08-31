@@ -17,8 +17,6 @@ describe('noRunsMessage', () => {
     }
   });
 
-  // The first version composed both variants from one shared clause and produced
-  // "once someone copy a run directory ... and it will appear here".
   it('reads as sentences, not as a clause glued to a stem', () => {
     for (const canUpload of [true, false]) {
       const message = noRunsMessage(canUpload);

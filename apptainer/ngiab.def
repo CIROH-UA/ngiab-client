@@ -175,9 +175,6 @@ Stage: final
     export PORT="${PORT:-8080}"
     export TETHYS_PORT="${TETHYS_PORT:-${PORT:-8080}}"
 
-    # The baked account is admin/pass, created at build time. Deliberately not exported:
-    # nothing reads PORTAL_SUPERUSER_* at run time, so an override would look like it worked
-    # and would not. Rebuild if you need different credentials.
 
     export DUCKDB_HOME=/opt/duckdb_extensions
 

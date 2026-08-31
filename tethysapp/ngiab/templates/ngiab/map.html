@@ -63,8 +63,6 @@
     background-size: 5px 5px, 5px 5px;
     background-repeat: no-repeat;
   }
-  /* One outlined-pill treatment, shared by the chart's source buttons and the account
-     action. It was written twice before. */
   .pill {
     display: inline-flex; align-items: center; justify-content: center;
     min-height: var(--tap-min); padding: 0 14px; white-space: nowrap;
@@ -94,13 +92,8 @@
   .status[data-severity="error"] { color: var(--danger); }
   .status[data-severity="warning"] { color: var(--warning); }
 
-  /* Account ------------------------------------------------------------ */
-  /* Ambient, not a task: the row states who you are and offers the one action that
-     changes it, at the weight of a caption rather than a control. */
   #map-footer { margin-top: 10px; }
 
-  /* About ------------------------------------------------------------- */
-  /* A disclosure, not a dialog: read once, and never in the way of the map. */
   #about-panel > summary {
     min-height: var(--tap-min); display: flex; align-items: center;
     cursor: pointer; color: var(--fg-muted); font-size: 12px;
@@ -126,13 +119,10 @@
   .account-note { margin: 0; min-width: 0; font-size: 12px; color: var(--fg-muted); }
   .account-name { color: var(--fg); font-weight: 600; }
 
-  /* Signed in: one row. A long username truncates rather than pushing the action away. */
   ngiab-account[data-state="signed-in"] .account-note {
     flex: 1 1 auto;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  /* Guest: the sentence is why the upload and delete controls are missing, so it is read,
-     not truncated. It takes the line and the action sits under it. */
   ngiab-account[data-state="guest"] .account-note { flex: 1 1 100%; }
 
   .account-action { flex: 0 0 auto; }
@@ -174,8 +164,6 @@
   .runs-row select { flex: 1 1 auto; min-width: 0; }
   #model-run-remove:hover:not(:disabled) { color: var(--danger); background: var(--surface-sunken); }
 
-  /* Upload was a muted 0.85rem caption under the picker and read as a footnote. It is the
-     second thing anyone does with this app, so it reads as an action now. */
   #upload-panel { margin-top: 10px; }
   #upload-panel > summary {
     display: flex; align-items: center; gap: 8px;
@@ -187,7 +175,6 @@
                 border-color var(--dur-fast) var(--ease-out);
   }
   #upload-panel > summary::-webkit-details-marker { display: none; }
-  /* The glyph is the affordance; a rotated caret would read as a section, not an action. */
   #upload-panel > summary::before { content: '+'; font-size: 16px; line-height: 1; }
   #upload-panel > summary:hover { background: var(--surface-sunken); border-color: var(--accent); }
   #upload-panel[open] > summary {
@@ -195,11 +182,7 @@
   }
   #upload-panel[open] > summary::before { content: '\2212'; }
   #upload-name, #upload-file { margin-bottom: 8px; }
-  /* A file input puts its own button at the top of the box, so it needs centring that the
-     shared control rule cannot assume. */
   #upload-file { display: flex; align-items: center; padding-block: 0; }
-  /* The one primary action in the stack, so it carries the accent -- and 44px, which it did
-     not have when it was 21px of default button. */
   #upload-start {
     width: 100%; min-height: var(--tap-min); margin-top: 4px;
     border: 1px solid transparent; border-radius: 7px;
@@ -346,9 +329,6 @@
   }
 
   /* Chart pane --------------------------------------------------------- */
-  /* 340, not 240: the controls row, note and padding take ~90px before the canvas gets any,
-     so the old default left a hydrograph about 150px to draw in. Still draggable, and the
-     resize handle clamps to 70% of the viewport. */
   #chart-pane {
     flex: 0 0 auto; height: 340px; min-height: 0;
     display: flex; flex-direction: column;
@@ -555,8 +535,6 @@
         </div>
       </div>
 
-      <!-- Last, and its own card: identity and provenance are ambient rather than steps in
-           either question the cards above answer, and putting them inside one split a group. -->
       <div class="map-card" id="map-footer">
         <div class="card-section" id="map-account">
           <h3 class="sr-only">Account</h3>

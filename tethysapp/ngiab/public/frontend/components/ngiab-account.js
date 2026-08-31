@@ -12,9 +12,6 @@ export class NgiabAccount extends HTMLElement {
     const signedIn = isSignedIn();
     this.dataset.state = signedIn ? 'signed-in' : 'guest';
 
-    // Nothing is interpolated into markup. The username is portal-supplied and the URLs come
-    // from settings, but an href built by string concatenation is a different trust boundary
-    // from one set as a property, and there is no reason for this file to have two.
     this.innerHTML = `
       <p class="account-note"></p>
       <a class="pill account-action"></a>
@@ -30,7 +27,6 @@ export class NgiabAccount extends HTMLElement {
       note.textContent = 'Read-only: uploading and deleting need an account.';
       return;
     }
-    // A username is whatever the portal's account system allows, so it is set as text.
     note.append('Signed in as ');
     const who = document.createElement('span');
     who.className = 'account-name';

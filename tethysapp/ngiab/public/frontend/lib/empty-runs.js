@@ -8,8 +8,6 @@
  * Pure, so it takes the answer rather than reading config itself.
  */
 export function noRunsMessage(canUpload) {
-  // Written out rather than composed from a shared fragment: the first attempt shared the
-  // clause and produced "once someone copy a run directory ... and it will appear here".
   return canUpload
     ? 'No model runs yet. Upload a run archive with the control under the run picker, or '
       + 'copy a run directory into the visualizer’s storage.'

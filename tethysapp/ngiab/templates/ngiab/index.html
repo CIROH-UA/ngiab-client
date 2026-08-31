@@ -15,13 +15,10 @@
         PORTAL_HOST: "",
         // Default model run; override per request with ?model_run_id=... in the URL.
         MODEL_RUN_ID: "",
-        // The server refuses regardless; these only decide what is offered.
         SIGNED_IN: {{ signed_in|yesno:"true,false" }},
         CAN_DELETE: {{ can_delete|yesno:"true,false" }},
         MAX_UPLOAD_BYTES: {{ max_upload_bytes }},
         USERNAME: "{{ username|escapejs }}",
-        // Portal-level and absolute, so they are the same whether this app is the whole
-        // portal or one of many under /apps/.
         LOGIN_URL: "{{ login_url|escapejs }}",
         LOGOUT_URL: "{{ logout_url|escapejs }}",
         VERSION: "{{ app_version|escapejs }}"

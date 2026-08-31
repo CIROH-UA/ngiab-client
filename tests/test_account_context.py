@@ -50,8 +50,6 @@ def test_the_auth_urls_are_site_root_not_app_relative(monkeypatch, db):
     context = _context(AnonymousUser(), monkeypatch)
 
     for key in ("login_url", "logout_url"):
-        # The leading slash is the whole property: "accounts/login/" and "accounts:login" are
-        # both app-relative and both 404, and both passed the earlier version of this test.
         assert context[key].startswith("/"), context[key]
         assert not context[key].startswith("/apps/"), context[key]
         assert "accounts" in context[key], context[key]

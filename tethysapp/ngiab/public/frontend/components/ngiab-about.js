@@ -42,7 +42,6 @@ export class NgiabAbout extends HTMLElement {
       link.href = href;
       link.textContent = label;
       link.target = '_blank';
-      // noopener: these open in a new tab, and the opened page has no business reaching back.
       link.rel = 'noopener noreferrer';
       item.append(link);
       list.append(item);

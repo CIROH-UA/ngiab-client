@@ -27,9 +27,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # amd64 only: ghcr.io/aquaveo/tethys-uvx publishes no arm64 manifest, so an
-        # arm64 build cannot resolve its own base and has been failing since the move
-        # to that base. Add linux/arm64 back when the upstream tag ships it.
         platform:
           - linux/amd64
 

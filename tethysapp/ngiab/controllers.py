@@ -49,14 +49,8 @@ logger = logging.getLogger(__name__)
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
 
 
-
 UPLOAD_URL_TTL_SECONDS = 6 * 60 * 60
 
-# The portal owns sign-in, at the site root rather than under the app, so the pair is the same
-# whether this app is the whole portal or one of many. Both are resolved rather than written
-# down: Tethys rewrites LOGIN_URL when PREFIX_URL is set (settings.py) and reverses logout
-# through the accounts namespace, so a hardcoded logout would 404 on a prefixed portal while
-# sign-in kept working.
 LOGOUT_URL_FALLBACK = "/accounts/logout/"
 
 
@@ -192,9 +186,6 @@ def home(request):
         "app_version": app_version(),
     }
     return App.render(request, "index.html", context)
-
-
-    
 
 
 @controller
@@ -369,9 +360,6 @@ def uploadStatus(request):
     if not _is_job_id(job_id):
         return JsonResponse({"error": "That job id is not valid."}, status=400)
 
-    # Reaping is where a dead child's output gets read back and logged, and the only other
-    # place it happens is the next _launch -- which on a quiet portal is hours away or never.
-    # Polling is the one thing that reliably runs while a job is in flight, so it reaps too.
     _reap()
 
     try:
@@ -548,7 +536,6 @@ def _launch(arguments):
         child._ngiab_output_log = capture.name
         _running.append(child)
 
-    # Outside the lock: the watcher takes it itself when the child exits.
     threading.Thread(target=_watch, args=(child,), daemon=True).start()
 
 
@@ -929,5 +916,4 @@ def getTeehrLocations(request):
             "teehr_status_severity": None,
         }
     )
-
 

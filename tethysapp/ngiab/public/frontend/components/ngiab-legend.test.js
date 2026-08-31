@@ -68,9 +68,6 @@ describe('ngiab-legend', () => {
 });
 
 describe('ngiab-legend and hostile run content', () => {
-  // A variable name is a column header out of the run's own output files, so an uploaded run
-  // chooses it. The title used to be interpolated into innerHTML, which made that header
-  // executable in every viewer's session on an open portal.
   const HOSTILE = '"><img src=x onerror="window.__legendXss=1">';
 
   afterEach(() => {

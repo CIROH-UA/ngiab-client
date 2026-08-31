@@ -56,8 +56,6 @@ async function readErrorDetail(response) {
 }
 
 function loginRedirect() {
-  // loginUrl() follows the portal's LOGIN_URL and keeps the query string, so an expiring
-  // session comes back to the run you were on. This used to build its own, worse, copy.
   window.location.assign(loginUrl());
 }
 

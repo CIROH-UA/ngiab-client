@@ -70,9 +70,6 @@ describe('who may see the delete control', () => {
     expect(canSeeDelete()).to.equal(false);
   });
 
-  // This is the case the previous rule got backwards: it showed the control to a guest on
-  // purpose, so that clicking it would prompt a sign-in. Deleting a run is irreversible, so
-  // the control now appears only to someone who can actually complete it.
   it('is withheld from a guest, who cannot complete it', () => {
     window.__NGIAB__ = { SIGNED_IN: false, CAN_DELETE: false };
     expect(canSeeDelete()).to.equal(false);

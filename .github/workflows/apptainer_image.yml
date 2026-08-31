@@ -21,8 +21,6 @@ on:
 
 permissions:
   contents: read
-  # Publishing the SIF to GitHub Packages. A pull_request run never reaches the publish step,
-  # so this scope is unused there.
   packages: write
 
 jobs:
@@ -54,9 +52,6 @@ jobs:
           test "$(curl -s -m 10 -o /dev/null -w '%{http_code}' http://localhost:8080/)" = "200"
           curl -s -m 10 http://localhost:8080/getModelRuns/ | grep -q model_runs
 
-          # The runs directory IS the registry, so a root that resolved into the read-only
-          # image is the failure this image exists to avoid -- and it looks identical to an
-          # empty one over HTTP, because a missing root lists as no runs. Ask the app itself.
           expected="${NGIAB_STATE_DIR}/ngiab_visualizer"
           actual=$(apptainer exec --env TETHYS_PERSIST="$NGIAB_STATE_DIR" ngiab.sif \
             /opt/conda/envs/tethys/bin/python -c \
@@ -66,9 +61,6 @@ jobs:
           test -d "$actual"
           echo "state directory contents:"; find "$NGIAB_STATE_DIR" -maxdepth 2
 
-      # Kept for pull requests, where nothing is published: a reviewer can still download the
-      # image the branch produced. Fourteen days, because the published package is the durable
-      # copy and this one only has to outlive the review.
       - name: Upload the image as a build artifact
         uses: actions/upload-artifact@v4
         with:
@@ -76,21 +68,16 @@ jobs:
           path: ngiab.sif
           retention-days: 14
 
-      # Only after the verify step above, and never from a pull request: a fork's PR has no
-      # package write, and an unreviewed branch should not be able to publish.
       - name: Publish to GitHub Packages
         if: github.event_name != 'pull_request'
         env:
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # ghcr rejects an uppercase path, and this repository's owner has one.
           package="ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')/apptainer"
           printf '%s' "$REGISTRY_TOKEN" \
             | apptainer registry login --username "${{ github.actor }}" --password-stdin oras://ghcr.io
 
-          # Two tags: latest for "give me the current image", and the commit for a report that
-          # has to name exactly what it ran.
           apptainer push ngiab.sif "oras://${package}:latest"
           apptainer push ngiab.sif "oras://${package}:$(git rev-parse --short HEAD)"
           echo "published oras://${package}:latest"

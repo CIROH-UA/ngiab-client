@@ -1,11 +1,5 @@
 import { expect } from '@esm-bundle/chai';
 
-// The dark palette is declared twice -- once for the explicit toggle and once for the system
-// preference -- because CSS cannot share a declaration list between two selectors. A token
-// added to one and not the other renders its light value down the other path, with no error
-// and nothing in the console. Contrast is checked here too, against the browser's own colour
-// engine rather than a reimplementation of OKLCH: the roles sit within 0.05 of the AA floor,
-// so a lightness nudge can drop one below it.
 
 const CSS = new URL('./tokens.css', import.meta.url);
 
@@ -35,9 +29,6 @@ function declarations(selector) {
   return found;
 }
 
-// Painted onto a canvas rather than read back from getComputedStyle: Chromium returns
-// wide-gamut colours in their authored form, so an oklch() token read as text yields its
-// own components and a regex looking for rgb() silently measures nonsense.
 function srgb(value) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 1;
