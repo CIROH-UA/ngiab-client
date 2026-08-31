@@ -274,6 +274,22 @@ podman run --rm -d \
 
 The `viewOnTethys.sh` launcher in [`NGIAB-CloudInfra`](https://github.com/CIROH-UA/NGIAB-CloudInfra) handles all of this automatically when invoked with `-p`.
 
+### Running on a cluster with Apptainer
+
+An Apptainer image is published to GitHub Packages on every push to `main`, tagged `latest`
+and with the commit it was built from:
+
+```bash
+apptainer pull ngiab.sif oras://ghcr.io/ciroh-ua/ngiab-client/apptainer:latest
+apptainer run ngiab.sif
+```
+
+Then open <http://localhost:8080/>. It needs no root and no daemon, which is what makes it the
+form to use on an HPC node. Everything writable lives in `~/.ngiab_visualizer`; point
+`NGIAB_STATE_DIR` somewhere else — usually scratch rather than a home quota — and use
+`APPTAINERENV_PORT` to move the port. `apptainer run-help ngiab.sif` covers the rest, and
+`apptainer/ngiab.def` builds it locally with `apptainer build --fakeroot`.
+
 ###  Visualization Features 
 
 Selecting a model run draws its catchments. Clicking a catchment, or searching for one by
