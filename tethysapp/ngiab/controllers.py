@@ -212,10 +212,11 @@ def createUpload(request):
 
     try:
         url = _presigned_put(ingest.staging_key(job_id))
-    except Exception as exc:  # noqa: BLE001 - reported, not raised into a 500
+    except Exception:  # noqa: BLE001 - reported, not raised into a 500
         logger.exception("Could not presign an upload")
         ingest.write_status(job_id, state=ingest.FAILED, stage="failed",
-                            message=str(exc), run=name)
+                            message="This portal's object storage would not accept an upload.",
+                            run=name)
         return JsonResponse(
             {"error": "This portal's object storage would not accept an upload."},
             status=503,

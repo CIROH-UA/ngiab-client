@@ -39,9 +39,9 @@ basemap reads as dead chrome.
 panel ground it is actually drawn on, and held at or above the 4.5:1 AA floor. The numbers
 below were measured, not asserted -- an earlier version of this table listed four roles,
 omitted `--fg-subtle`, and claimed 5:1 for all of them while `--fg-subtle` sat at 4.13:1 on
-the smallest text in the interface. Nothing recomputes them now, so treat them as a record of
-one measurement rather than a live guarantee, and re-measure when you change a colour: the
-dark roles sit within 0.05 of the floor.
+the smallest text in the interface. `styles/tokens.test.js` recomputes them in the browser on
+every test run and fails below the floor, so a colour change cannot quietly drop a role. The
+dark roles sit within 0.05 of it, so expect that test to be the one that tells you.
 
 | Role | Light | Dark |
 |---|---|---|

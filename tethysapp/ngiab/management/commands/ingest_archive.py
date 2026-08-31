@@ -58,7 +58,7 @@ class Command(BaseCommand):
             raise CommandError(str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - a job must never end without a status
             self.stderr.write(traceback.format_exc())
-            self._fail(job_id, run_name, f"The run could not be published: {exc}")
+            self._fail(job_id, run_name, "The run could not be published.")
             raise CommandError(str(exc)) from exc
         finally:
             if job_id:

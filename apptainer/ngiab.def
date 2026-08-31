@@ -133,6 +133,9 @@ Stage: final
     apt-get install -y --no-install-recommends --only-upgrade \
         libexpat1 \
         libpq5 \
+        openssl \
+        libssl3t64 \
+        openssl-provider-legacy \
         postgresql-client-17 \
         bsdutils \
         libblkid1 \
@@ -163,6 +166,7 @@ Stage: final
     export TETHYS_DB_ENGINE=django.db.backends.sqlite3
     export TETHYS_DB_NAME=/home/tethys/ngiab/tethys_platform.sqlite
     export STATIC_ROOT=/home/tethys/ngiab/static
+    export TETHYS_PERSIST=/home/tethys/persist
 
     # Defaulted rather than fixed, so `--env PORT=9000` is honoured. Note that a bare
     # `PORT=9000 apptainer run ...` is not: Apptainer does not carry that one through, which

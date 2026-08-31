@@ -76,6 +76,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends --only-upgrade \
         libexpat1 \
         libpq5 \
+        openssl \
+        libssl3t64 \
+        openssl-provider-legacy \
         postgresql-client-17 \
         bsdutils \
         libblkid1 \
@@ -98,6 +101,7 @@ COPY --chown=1000:1000 conf/portal-config.d/ /opt/portal/portal-config.d/
 COPY --chmod=0755 scripts/ngiab-convert.sh /usr/local/bin/ngiab-convert.sh
 
 ENV TETHYS_DB_ENGINE=django.db.backends.sqlite3
+ENV TETHYS_PERSIST=/home/tethys/persist
 ENV TETHYS_DB_NAME=/home/tethys/ngiab/tethys_platform.sqlite
 ENV STATIC_ROOT=/home/tethys/ngiab/static
 

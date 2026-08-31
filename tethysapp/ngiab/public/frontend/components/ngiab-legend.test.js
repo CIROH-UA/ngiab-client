@@ -66,3 +66,31 @@ describe('ngiab-legend', () => {
     }
   });
 });
+
+describe('ngiab-legend and hostile run content', () => {
+  // A variable name is a column header out of the run's own output files, so an uploaded run
+  // chooses it. The title used to be interpolated into innerHTML, which made that header
+  // executable in every viewer's session on an open portal.
+  const HOSTILE = '"><img src=x onerror="window.__legendXss=1">';
+
+  afterEach(() => {
+    delete window.__legendXss;
+    actions.setMapVariable(null);
+    actions.setModelRun(null);
+    document.querySelectorAll('ngiab-legend').forEach((node) => node.remove());
+  });
+
+  it('renders a variable name as text, never as markup', async () => {
+    actions.setModelRun('11111111-2222-3333-4444-555555555555');
+    actions.setMapVariable(HOSTILE);
+    const el = document.createElement('ngiab-legend');
+    document.body.append(el);
+    el.setScale({ variable: HOSTILE, breaks: [0.05, 0.068] });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(el.querySelector('img')).to.equal(null);
+    expect(window.__legendXss).to.equal(undefined);
+    expect(el.querySelector('.legend-title').textContent).to.equal(HOSTILE);
+  });
+});

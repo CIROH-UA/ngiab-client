@@ -83,15 +83,15 @@ Sign in at `/accounts/login`.
 
 ##### Upgrading from an earlier version
 
-The earlier version kept its registry in `ngiab_visualizer.json`. Nothing reads that file
-now, and nothing converts it: a run becomes usable when it carries a manifest. Existing run
-directories still appear in the picker after the upgrade, marked unusable and naming the
-command that fixes them.
+The earlier version kept its registry in `ngiab_visualizer.json`. A run becomes usable when
+it carries a manifest, so existing run directories appear in the picker after the upgrade
+marked unusable, naming the command that fixes them.
 
 - **Write a manifest for each run you want to keep.** `tethys manage write_manifest --path
-  <run>` distils one, and is idempotent. Pass `--legacy-uuid <uuid>` with the id that run had in
-  `ngiab_visualizer.json` so its existing shared links keep resolving, and `--label` to keep
-  the name it was given; both are otherwise taken from the directory name.
+  <run>` distils one, and is idempotent. While `ngiab_visualizer.json` is still beside the
+  runs it takes that run's name and its old id from there, so the label survives and links
+  shared as `?model_run_id=<uuid>` keep resolving. `--label` and `--legacy-uuid` override it,
+  and a run with no row falls back to its directory name.
 - **A run outside `~/ngiab_visualizer` is not carried over.** `NGIAB_SCAN_ROOTS` used to let
   the importer offer runs from other mounts; there is no importer now, and a directory
   outside the storage root is never listed. Move or copy them under `~/ngiab_visualizer`.

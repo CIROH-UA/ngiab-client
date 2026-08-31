@@ -62,7 +62,7 @@ export class NgiabLegend extends HTMLElement {
         : 'constant across every catchment in this run';
 
     this.innerHTML = `
-      <div class="legend-title" title="${this._variable}">${this._variable}</div>
+      <div class="legend-title"></div>
       <div class="legend-ramp">${segments}</div>
       <div class="legend-ends">
         <span>${low}</span>
@@ -70,6 +70,10 @@ export class NgiabLegend extends HTMLElement {
       </div>
       <div class="legend-note">${note}</div>
     `;
+
+    const title = this.querySelector('.legend-title');
+    title.textContent = this._variable;
+    title.title = this._variable;
   }
 
   _renderCategorical(theme, showTeehr) {

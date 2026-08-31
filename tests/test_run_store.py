@@ -250,3 +250,29 @@ def test_clear_caches_makes_a_new_run_visible(local_root, mini_run_factory):
 
     run_store.clear_caches()
     assert len(run_store.list_runs()) == 3
+
+
+def test_the_launcher_mounts_where_the_app_looks():
+    """The launcher's mount target and the app's runs root are one contract, in two files.
+
+    Deriving local_root() from TETHYS_PERSIST removed one hardcoded path but left the
+    launcher holding its own copy. When they disagree the volume still mounts, nothing
+    errors, and the picker is simply empty -- so the two literals are compared here.
+    """
+    import re
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(run_store.__file__)))
+    launcher = os.path.join(os.path.dirname(root), "viewOnTethys.sh")
+    if not os.path.isfile(launcher):
+        pytest.skip("viewOnTethys.sh is not in this build context")
+
+    with open(launcher) as handle:
+        text = handle.read()
+
+    declared = re.search(r'^TETHYS_PERSIST_PATH="([^"]+)"', text, re.M)
+    assert declared, "viewOnTethys.sh no longer declares TETHYS_PERSIST_PATH"
+    assert declared.group(1) == run_store.DEFAULT_PERSIST
+
+    mount = re.search(r'-v "\$MODELS_RUNS_DIRECTORY:\$TETHYS_PERSIST_PATH/(\w+)', text)
+    assert mount, "the launcher no longer mounts the runs directory the way this test reads"
+    assert mount.group(1) == run_store.MANAGED_DIR_NAME

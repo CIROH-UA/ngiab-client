@@ -455,14 +455,13 @@ export class NgiabMap extends HTMLElement {
     if (!this._mapVariableEl) return;
     try {
       const body = await appAPI.getCatchmentVariables({ model_run_id: runId });
-      const options = ['<option value="">no shading</option>'].concat(
-        (body.variables ?? []).map((name) => `<option value="${name}">${name}</option>`),
-      );
-      this._mapVariableEl.innerHTML = options.join('');
-      this._mapVariableEl.disabled = !(body.variables ?? []).length;
+      const names = body.variables ?? [];
+      this._mapVariableEl.replaceChildren(new Option('no shading', ''));
+      for (const name of names) this._mapVariableEl.add(new Option(name, name));
+      this._mapVariableEl.disabled = !names.length;
     } catch (error) {
       console.warn('[map] variable list unavailable', error);
-      this._mapVariableEl.innerHTML = '<option value="">no shading</option>';
+      this._mapVariableEl.replaceChildren(new Option('no shading', ''));
       this._mapVariableEl.disabled = true;
     }
   }

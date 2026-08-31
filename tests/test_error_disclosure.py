@@ -67,7 +67,10 @@ def test_an_unreadable_matrix_does_not_name_the_file_or_the_query(ingest, monkey
 
     response = controllers.getCatchmentValueMatrix(request)
 
-    _assert_discloses_nothing(response, "Binder Error", "catchment_id")
+    body = _assert_discloses_nothing(response, "Binder Error", "catchment_id")
+    assert body == "Could not read this run's outputs.", (
+        "the json_errors wrapper short-circuited; this test never reached the except branch"
+    )
 
 
 def test_the_caller_is_still_told_that_something_failed(ingest, permitted, monkeypatch):
@@ -83,3 +86,34 @@ def test_the_caller_is_still_told_that_something_failed(ingest, permitted, monke
 
     assert response.status_code == 500
     assert "delete" in json.loads(response.content)["error"].lower()
+
+
+def test_a_failed_publish_does_not_name_the_path_through_job_status(ingest, monkeypatch, tmp_path):
+    """The upload path reports through job status, which the browser renders unfiltered.
+
+    uploadStatus returns the stored document verbatim and the frontend prints message straight
+    into the DOM, bypassing the client-side filter the two handlers above rely on -- so this
+    surface needs the invariant enforced at the source rather than downstream.
+    """
+    from django.core.management import call_command
+
+    from tethysapp.ngiab import ingest as ingest_module
+
+    run_id = ingest()
+    job_id = "job-leak"
+
+    def explode(*_args, **_kwargs):
+        raise OSError(2, None, f"/home/tethys/persist/ngiab_visualizer/{run_id}/outputs")
+
+    monkeypatch.setattr(ingest_module, "publish", explode)
+    archive_path = tmp_path / "run.tar.gz"
+    archive_path.write_bytes(b"not really an archive")
+
+    with pytest.raises(Exception):
+        call_command("ingest_archive", "--job", job_id, "--name", "beta",
+                     "--archive", str(archive_path))
+
+    document = ingest_module.read_status(job_id) or {}
+    message = document.get("message") or ""
+    for leak in LEAKS:
+        assert leak not in message, f"{leak!r} reached the job status in {message!r}"

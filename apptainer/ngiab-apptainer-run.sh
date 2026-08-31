@@ -54,13 +54,21 @@ export STATIC_ROOT="${STATIC_ROOT:-/home/tethys/ngiab/static}"
 # at a bound directory of existing runs to read them in place. Read-only is enough to list
 # and view; only uploading needs write, which is why this mkdir is not fatal.
 runs="${NGIAB_MANAGED_ROOT:-$state/ngiab_visualizer}"
-mkdir -p "$runs" 2>/dev/null || true
+mkdir -p "$runs" 2>/dev/null \
+    || echo "[ngiab] warning: $runs is not writable; runs there can be listed but not uploaded" >&2
 
 # portal-config.sh reads this from the environment only and refuses to start without it.
 # Ephemeral by design: a SIF has no per-install secret to inherit.
 if [ -z "${TETHYS_SECRET_KEY:-}" ]; then
     export TETHYS_SECRET_KEY="ngiab-apptainer-$(head -c 32 /dev/urandom | base64 | tr -d '=+/')"
 fi
+
+# The state database outlives the image it was seeded from, and this is the only shipped
+# deployment where that is true -- serve.sh does not migrate, so without this a SIF carrying
+# newer platform migrations would start against the previous schema and fail at the first
+# query that needs a new column. Migrate is a no-op on a current database.
+"${VIRTUAL_ENV:-/opt/conda/envs/tethys}/bin/tethys" db migrate >/dev/null 2>&1 \
+    || echo "[ngiab] warning: could not migrate $live; continuing with the schema it has" >&2
 
 echo "[ngiab] state directory: $state"
 echo "[ngiab] database: $live"

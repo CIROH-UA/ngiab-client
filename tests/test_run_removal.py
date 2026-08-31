@@ -1,4 +1,4 @@
-"""Removing a run now deletes it, and the migration that made that necessary.
+"""Removing a run now deletes it, because the storage directory is the registry.
 Signing in and resolving by listed name replace the separation the old no-op relied on."""
 
 import os

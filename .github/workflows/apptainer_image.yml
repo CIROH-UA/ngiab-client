@@ -2,9 +2,18 @@ name: Build Apptainer image
 
 on:
   push:
-    branches: [main, feature/vanilla-js-migration]
+    branches: [main]
     paths:
       - 'apptainer/**'
+      - 'scripts/**'
+      - 'conf/**'
+      - 'tethysapp/**'
+      - 'pyproject.toml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apptainer/**'
+      - 'scripts/**'
       - 'conf/**'
       - 'tethysapp/**'
       - 'pyproject.toml'
@@ -41,6 +50,17 @@ jobs:
           done
           test "$(curl -s -m 10 -o /dev/null -w '%{http_code}' http://localhost:8080/)" = "200"
           curl -s -m 10 http://localhost:8080/getModelRuns/ | grep -q model_runs
+
+          # The runs directory IS the registry, so a root that resolved into the read-only
+          # image is the failure this image exists to avoid -- and it looks identical to an
+          # empty one over HTTP, because a missing root lists as no runs. Ask the app itself.
+          expected="${NGIAB_STATE_DIR}/ngiab_visualizer"
+          actual=$(apptainer exec --env TETHYS_PERSIST="$NGIAB_STATE_DIR" ngiab.sif \
+            /opt/conda/envs/tethys/bin/python -c \
+            'import os,django;os.environ.setdefault("DJANGO_SETTINGS_MODULE","tethys_portal.settings");django.setup();from tethysapp.ngiab import run_store;print(run_store.local_root())')
+          echo "runs root: $actual"
+          test "$actual" = "$expected"
+          test -d "$actual"
           echo "state directory contents:"; find "$NGIAB_STATE_DIR" -maxdepth 2
 
       - name: Upload the image

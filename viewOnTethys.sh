@@ -462,6 +462,7 @@ run_tethys() {
         -p "$nginx_tethys_port:$CONTAINER_PORT" \
         "${NETWORK_ARGS[@]}" \
         --name "$TETHYS_CONTAINER_NAME" \
+        --env TETHYS_PERSIST="$TETHYS_PERSIST_PATH" \
         --env MEDIA_ROOT="$TETHYS_PERSIST_PATH/media" \
         --env MEDIA_URL="/media/" \
         --env PORT="$CONTAINER_PORT" \

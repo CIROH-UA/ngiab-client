@@ -32,7 +32,9 @@ LISTING_TTL_ENV = "NGIAB_LISTING_TTL_SECONDS"
 DEFAULT_LISTING_TTL_SECONDS = 10.0
 
 _NOT_INGESTED = (
-    "This directory has no manifest yet. Run: tethys manage write_manifest --path <run>"
+    "This directory has no manifest yet. Run: tethys manage write_manifest --path <run> "
+    "(it carries over the name and shared link from ngiab_visualizer.json when that file "
+    "is still beside it)."
 )
 _NO_OUTPUTS = "No catchment outputs in this run, so there is nothing to plot."
 _UNREADABLE = "This run's manifest could not be read."

@@ -89,7 +89,11 @@ jobs:
           skipped = int(suite.get("skipped", 0))
           executed = total - skipped
           print(f"collected {total}, skipped {skipped}, executed {executed}")
-          if executed == 0:
-              sys.exit("::error::every test skipped -- the suite proved nothing")
+          FLOOR = 415
+          if executed < FLOOR:
+              sys.exit(
+                  f"::error::only {executed} tests executed, expected at least {FLOOR}; "
+                  "a skipped module proves nothing, so move the floor deliberately"
+              )
           PYCHECK
           '
