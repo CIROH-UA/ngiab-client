@@ -14,6 +14,7 @@ env:
   REGISTRY_IMAGE: awiciroh/tethys-ngiab
 
 permissions:
+  contents: read
   security-events: write
 
 jobs:
