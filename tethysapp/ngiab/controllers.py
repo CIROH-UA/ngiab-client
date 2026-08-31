@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
@@ -48,6 +49,12 @@ MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
 
 
 UPLOAD_URL_TTL_SECONDS = 6 * 60 * 60
+
+# The portal owns sign-in, at the site root rather than under the app: the same pair of URLs
+# whether this app is the whole portal or one of many. Tethys registers no reversible name for
+# logout, so it is named here; login comes from the setting so a portal that moves it is
+# followed.
+LOGOUT_URL = "/accounts/logout/"
 
 
 def signed_in(request):
@@ -143,11 +150,16 @@ def json_errors(view):
 @ensure_csrf_cookie
 def home(request):
     """Render the map page with the runtime config and permission flags it needs."""
+    user = getattr(request, "user", None)
+    is_signed_in = signed_in(request)
     context = {
         "app_root_url": reverse(f"{App.package}:{App.index}"),
-        "signed_in": signed_in(request),
+        "signed_in": is_signed_in,
         "can_delete": may_manage_runs(request),
         "max_upload_bytes": MAX_UPLOAD_BYTES,
+        "username": user.get_username() if is_signed_in else "",
+        "login_url": settings.LOGIN_URL,
+        "logout_url": LOGOUT_URL,
     }
     return App.render(request, "index.html", context)
 

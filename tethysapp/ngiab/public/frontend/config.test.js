@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai';
-import { getConfig, getPortalHost, getModelRunId } from './config.js';
+import { canSeeDelete, getConfig, getPortalHost, getModelRunId } from './config.js';
 
 describe('getConfig', () => {
   afterEach(() => {
@@ -53,5 +53,33 @@ describe('getModelRunId', () => {
   it('returns empty when neither source provides one', () => {
     delete window.__NGIAB__;
     expect(getModelRunId()).to.equal('');
+  });
+});
+
+describe('who may see the delete control', () => {
+  const original = window.__NGIAB__;
+  afterEach(() => { window.__NGIAB__ = original; });
+
+  it('is offered to a signed-in user who holds the permission', () => {
+    window.__NGIAB__ = { SIGNED_IN: true, CAN_DELETE: true };
+    expect(canSeeDelete()).to.equal(true);
+  });
+
+  it('is withheld from a signed-in user without it', () => {
+    window.__NGIAB__ = { SIGNED_IN: true, CAN_DELETE: false };
+    expect(canSeeDelete()).to.equal(false);
+  });
+
+  // This is the case the previous rule got backwards: it showed the control to a guest on
+  // purpose, so that clicking it would prompt a sign-in. Deleting a run is irreversible, so
+  // the control now appears only to someone who can actually complete it.
+  it('is withheld from a guest, who cannot complete it', () => {
+    window.__NGIAB__ = { SIGNED_IN: false, CAN_DELETE: false };
+    expect(canSeeDelete()).to.equal(false);
+  });
+
+  it('is withheld from a guest even if the server sent a stale permission', () => {
+    window.__NGIAB__ = { SIGNED_IN: false, CAN_DELETE: true };
+    expect(canSeeDelete()).to.equal(false);
   });
 });

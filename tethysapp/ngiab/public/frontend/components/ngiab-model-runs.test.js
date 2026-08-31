@@ -37,9 +37,13 @@ describe('ngiab-model-runs', () => {
       removeCalls.push(params);
       return { removed: params.model_run_id };
     };
+    // Deleting is offered only to someone who can complete it, so the tests that exercise
+    // the control have to be that someone.
+    window.__NGIAB__ = { SIGNED_IN: true, CAN_DELETE: true };
   });
 
   afterEach(() => {
+    delete window.__NGIAB__;
     window.confirm = realConfirm;
     appAPI.getModelRuns = realGet;
     appAPI.removeModelRun = realRemove;
@@ -130,12 +134,15 @@ describe('ngiab-model-runs', () => {
       expect(el.querySelector('#model-run-remove')).to.not.equal(null);
     });
 
-    it('stays visible for an anonymous visitor, whose 401 leads to the login page', async () => {
+    // It used to stay visible for a guest so the 401 would lead them to a login page. That
+    // offered an irreversible action to someone who could not complete it, and the account
+    // row now carries the sign-in prompt instead.
+    it('is hidden from a guest, who has the account row to sign in with', async () => {
       window.__NGIAB__ = { SIGNED_IN: false, CAN_DELETE: false };
       el = mount();
       await settle();
 
-      expect(el.querySelector('#model-run-remove')).to.not.equal(null);
+      expect(el.querySelector('#model-run-remove')).to.equal(null);
     });
 
     it('does not break the empty-state path when it is absent', async () => {
