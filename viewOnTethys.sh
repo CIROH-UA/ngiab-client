@@ -56,11 +56,6 @@ TETHYS_CONTAINER_NAME="tethys-ngen-portal"
 TETHYS_REPO="awiciroh/tethys-ngiab"
 
 MODELS_RUNS_DIRECTORY="${MODELS_RUNS_DIRECTORY:-$HOME/ngiab_visualizer}"
-# Where the runs directory is mounted inside the container, and so where the app looks for
-# it: the directory is the registry. This is tethys-uvx's own persist path, which the image
-# inherits -- the old /var/lib/tethys_persist belonged to the pre-uvx base and is not a
-# directory in this one. The portal database is not here; it is baked into the image, so
-# sign-ins last as long as the container does.
 TETHYS_PERSIST_PATH="/home/tethys/persist"
 
 # Parameters
@@ -69,10 +64,10 @@ DOCKER_CMD="docker"
 USERNS_ARGS=()
 NETWORK_ARGS=()
 VOLUME_SUFFIX=""
-CONTAINER_PORT=8080  # visualizer image listens on 8080 (rootless-Podman safe).
-WWW_UID=1000  # tethys-uvx base image: the "tethys" user is uid 1000 (was 1011 on tethys-core)
+CONTAINER_PORT=8080
+WWW_UID=1000  # tethys-uvx base image: the "tethys" user is uid 1000
 PORTAL_ALLOWED_HOSTS=""
-TETHYS_SECRET_KEY="" # Generated per launch; see select_port(). Override to pin one.
+TETHYS_SECRET_KEY=""
 DATA_FOLDER_PATH="" # If non-empty, gets used as the gage path to import.
 TETHYS_TAG="" # If non-empty, gets used as the image tag.
 IMPORT_GAGE="ask" # "ask"/"yes"/"no"/"done"
@@ -175,10 +170,6 @@ ensure_host_dir() {
         :  # BSD stat (macOS, Git-Bash)
     fi
 
-    # Escalate on writability, not ownership. A directory owned by another uid that the user
-    # can already write to needs nothing -- and asking for sudo anyway is how a launcher that
-    # deliberately needs no privileges ends up prompting for a password on every run. This
-    # bites anyone upgrading from the tethys-core image, whose files are owned by uid 1011.
     if [[ -n "$owner_uid" && "$owner_uid" != "$(id -u)" ]] && [ ! -w "$dir" ]; then
         if command -v chown >/dev/null 2>&1; then
             # 1) \n guarantees its own line
@@ -204,11 +195,7 @@ ensure_host_dir() {
     return 0
 }
 
-# Set engine-specific run flags. Called after arg parsing.
-# Assumes Podman >= 4.3 (keep-id:uid= syntax). Podman emits clear errors itself
-# if subuid ranges are missing or the version is too old.
-# Caveat: :Z is an exclusive SELinux relabel. If the bind mount is shared with
-# other containers, switch to :z manually.
+
 configure_container_engine() {
     if [ "${DOCKER_CMD}" != "podman" ]; then
         NETWORK_ARGS=(--network "$DOCKER_NETWORK")
@@ -216,11 +203,9 @@ configure_container_engine() {
     fi
     USERNS_ARGS=(--userns=keep-id:uid=${WWW_UID})
     VOLUME_SUFFIX=":Z"
-    # NETWORK_ARGS stays empty; rootless uses slirp4netns/netavark.
 }
 
 create_tethys_docker_network() {
-    # Rootless Podman doesn't need an explicit user-defined network.
     if [ "${DOCKER_CMD}" == "podman" ]; then
         return 0
     fi
@@ -262,13 +247,11 @@ set_tethys_tag() {
 }
 
 check_for_existing_tethys_image() {
-    # First check if Docker is running
     if ! ${DOCKER_CMD} info >/dev/null 2>&1; then
         echo -e "${BRed}Docker daemon is not running or accessible.${Color_Off}"
         return 1
     fi
     
-    # Check if the image exists locally
     local image_exists=false
     if ${DOCKER_CMD} image inspect "${TETHYS_REPO}:${TETHYS_TAG}" >/dev/null 2>&1; then
         image_exists=true
@@ -289,13 +272,7 @@ check_for_existing_tethys_image() {
     fi
 }
 
-# True if anything is listening on the port.
-#
-# ss first, because lsof only reports sockets the calling user owns: a port held by another
-# user reads as free, the launcher accepts it, and the failure surfaces much later as
-# "pasta failed ... Address already in use", which says nothing about what to do. A
-# /dev/tcp connect probe is not a substitute -- a listener can accept the bind while
-# refusing our connection.
+
 port_in_use() {
     local port="$1"
     if command -v ss >/dev/null 2>&1; then
@@ -309,8 +286,6 @@ port_in_use() {
 }
 
 choose_port_to_run_tethys() {
-    # Default 8080 so rootless Podman can bind without privileged-port hacks.
-    # Existing Docker users on port 80 must pass it explicitly.
     local default_port=8080
     while true; do
         echo -e "${BBlue}Select a port to run Tethys on. [Default: ${default_port}] ${Color_Off}"
@@ -336,13 +311,6 @@ choose_port_to_run_tethys() {
         break
     done
 
-    # Build PORTAL_ALLOWED_HOSTS from localhost + every IPv4 the host owns (catches the
-    # WSL VM address, LAN address, etc.).
-    #
-    # PORTAL_ALLOWED_HOSTS is comma-separated: the tethys-uvx portal-config.sh splits it on
-    # commas and merges the result into ALLOWED_HOSTS. This replaced the old bracketed
-    # "[a, b]" form, which existed only to survive the tethys-core salt state rendering it
-    # through an unquoted shell command -- there is no salt any more.
     local host_ips
     host_ips=$(hostname -I 2>/dev/null || ip -4 -o addr show 2>/dev/null | awk '{split($4,a,"/"); print a[1]}' | tr '\n' ' ' || echo)
     local allowed_list="localhost,127.0.0.1"
@@ -356,14 +324,8 @@ choose_port_to_run_tethys() {
     done
     PORTAL_ALLOWED_HOSTS="${allowed_list}"
 
-    # portal-config.sh hard-requires TETHYS_SECRET_KEY and reads it only from the
-    # environment. The image ships a placeholder so a bare `docker run` works; generate a
-    # fresh one per launch instead. Sessions do not outlive the container (--rm), so a
-    # per-launch key costs nothing and avoids every install sharing one baked secret.
     if [ -z "${TETHYS_SECRET_KEY:-}" ]; then
         TETHYS_SECRET_KEY=$(head -c 32 /dev/urandom | base64 | tr -d '=+/' 2>/dev/null)
-        # /dev/urandom should always exist, but never launch with an empty key: that
-        # reduces to the image placeholder and silently shares a secret across installs.
         if [ -z "$TETHYS_SECRET_KEY" ]; then
             TETHYS_SECRET_KEY="ngiab-fallback-$(date +%s)-$$"
         fi
@@ -377,9 +339,6 @@ choose_port_to_run_tethys() {
 wait_container_healthy() {
     local container_name=$1
 
-    # Detect once whether the image has a healthcheck. Podman builds in default
-    # OCI format strip HEALTHCHECK; the inspect query for .State.Health.Status
-    # then nil-derefs and exits 125. Fall back to a TCP probe in that case.
     local has_healthcheck
     has_healthcheck=$(${DOCKER_CMD} inspect -f '{{if .State.Health}}yes{{else}}no{{end}}' "$container_name" 2>/dev/null)
 
@@ -403,8 +362,6 @@ wait_container_healthy() {
         done
     fi
 
-    # No healthcheck in the image: poll the published port directly. Bounded so a
-    # truly broken container doesn't hang the script forever.
     echo -e "${INFO_MARK} ${BWhite} Image has no healthcheck; polling http://127.0.0.1:${nginx_tethys_port}/ for readiness (max 5 min)...${Color_Off}"
     local max_wait=300
     local elapsed=0
@@ -452,9 +409,6 @@ run_tethys() {
     sleep 1
     echo -e "  ${INFO_MARK} ${BYellow}Starting Tethys container...${Color_Off}"
 
-    # Launch container with explicit error handling.
-    # Container port is fixed at CONTAINER_PORT (image default 8080); the host
-    # port is what the user picked. PORT inside matches CONTAINER_PORT.
     echo -e "  ${INFO_MARK} Running ${DOCKER_CMD} command..."
     ${DOCKER_CMD} run --rm -d \
         "${USERNS_ARGS[@]}" \
@@ -634,12 +588,6 @@ copy_models_run() {
 }
 
 # Convert the copied run's ngen CSV outputs to parquet.
-#
-# Purely additive: the parquet lands beside the csv and nothing is removed, so a failed or
-# partial conversion costs read speed and never data.
-#
-# Measured on a real run: 438 MB of csv -> 65 MB of parquet in ~4.6 s, which is small
-# against the cp -r that just happened.
 convert_run_outputs() {
     local final_path="$1"
 
@@ -665,20 +613,11 @@ convert_run_outputs() {
 }
 
 # Prepare a copied run for the visualizer.
-#
-# Registration is the user's action in the interface: the app scans this directory itself
-# and offers what it finds. Doing it here meant booting a whole one-shot Tethys container
-# per run to insert one row, and duplicating the TEEHR configuration rule in shell.
 prepare_model_run() {
     local final_path="$TETHYS_PERSIST_PATH/ngiab_visualizer/$(basename "$1")"
     convert_run_outputs "$final_path"
 }
-# Print URLs ordered by reliability for the current engine.
-#
-# Under rootless Podman on WSL the Windows browser doesn't reliably route
-# `localhost` (Windows resolves to ::1 but pasta only binds IPv4) and may not
-# route `127.0.0.1` either (depends on whether WSL2 localhostForwarding is
-# enabled on the Windows host). The host's non-loopback IPv4 always works.
+
 print_visualization_urls() {
     # Single-app mode (MULTIPLE_APP_MODE false in conf/portal_config.yml) serves the app at
     # the root; there is no /apps/<name>/ prefix to print.
@@ -854,11 +793,7 @@ select_tethys_image_source || {
     exit 1
 }
 
-# Setup and run Tethys
-# check_for_existing_tethys_image || {
-#     echo -e "${CROSS_MARK} ${BRed}Failed to prepare Tethys image. Exiting.${Color_Off}"
-#     exit 1
-# }
+
 choose_port_to_run_tethys
 run_tethys || {
     echo -e "${CROSS_MARK} ${BRed}Failed to start Tethys container. Exiting.${Color_Off}"
