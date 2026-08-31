@@ -17,7 +17,9 @@ from . import duckdb_conn, manifest
 logger = logging.getLogger(__name__)
 
 MANAGED_ROOT_ENV = "NGIAB_MANAGED_ROOT"
-DEFAULT_MANAGED_ROOT = "/var/lib/tethys_persist/ngiab_visualizer"
+PERSIST_ENV = "TETHYS_PERSIST"
+DEFAULT_PERSIST = "/home/tethys/persist"
+MANAGED_DIR_NAME = "ngiab_visualizer"
 
 STORAGE_ALIAS = "ngiab_runs"
 
@@ -45,8 +47,17 @@ class StorageUnreachable(RuntimeError):
 
 
 def local_root():
-    """The filesystem directory holding run directories."""
-    return os.environ.get(MANAGED_ROOT_ENV, DEFAULT_MANAGED_ROOT)
+    """The filesystem directory holding run directories.
+
+    Derived from TETHYS_PERSIST rather than fixed, so moving the persist directory moves the
+    runs with it. A hardcoded path let the two drift apart silently: nothing errors, the
+    listing just comes up empty against a directory nobody writes to.
+    """
+    override = os.environ.get(MANAGED_ROOT_ENV)
+    if override:
+        return override
+    persist = os.environ.get(PERSIST_ENV) or DEFAULT_PERSIST
+    return os.path.join(persist, MANAGED_DIR_NAME)
 
 
 def storage():

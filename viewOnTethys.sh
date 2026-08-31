@@ -57,9 +57,11 @@ TETHYS_REPO="awiciroh/tethys-ngiab"
 
 MODELS_RUNS_DIRECTORY="${MODELS_RUNS_DIRECTORY:-$HOME/ngiab_visualizer}"
 # Where the runs directory is mounted inside the container, and so where the app looks for
-# it: the directory is the registry. The portal database is not here -- it is baked into the
-# image, so sign-ins last as long as the container does.
-TETHYS_PERSIST_PATH="/var/lib/tethys_persist"
+# it: the directory is the registry. This is tethys-uvx's own persist path, which the image
+# inherits -- the old /var/lib/tethys_persist belonged to the pre-uvx base and is not a
+# directory in this one. The portal database is not here; it is baked into the image, so
+# sign-ins last as long as the container does.
+TETHYS_PERSIST_PATH="/home/tethys/persist"
 
 # Parameters
 DOCKER_CMD="docker"
@@ -678,7 +680,7 @@ convert_run_outputs() {
 # and offers what it finds. Doing it here meant booting a whole one-shot Tethys container
 # per run to insert one row, and duplicating the TEEHR configuration rule in shell.
 prepare_model_run() {
-    local final_path="/var/lib/tethys_persist/ngiab_visualizer/$(basename "$1")"
+    local final_path="$TETHYS_PERSIST_PATH/ngiab_visualizer/$(basename "$1")"
     convert_run_outputs "$final_path"
 }
 # Print URLs ordered by reliability for the current engine.

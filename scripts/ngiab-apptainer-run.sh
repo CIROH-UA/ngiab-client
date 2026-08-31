@@ -19,7 +19,7 @@ set -euo pipefail
 state="${NGIAB_STATE_DIR:-${HOME:-/tmp}/.ngiab_visualizer}"
 baked="${NGIAB_BAKED_DB:-/opt/ngiab/tethys_platform.sqlite}"
 
-mkdir -p "$state/portal" "$state/db" "$state/media" "$state/workspaces" "$state/ngiab_visualizer"
+mkdir -p "$state/portal" "$state/db" "$state/media" "$state/workspaces"
 
 if [ ! -w "$state" ]; then
     echo "[ngiab] $state is not writable. Set NGIAB_STATE_DIR to a writable path." >&2
@@ -46,13 +46,13 @@ export MEDIA_ROOT="$state/media"
 export TETHYS_WORKSPACES_ROOT="$state/workspaces"
 export STATIC_ROOT="${STATIC_ROOT:-/opt/ngiab/static}"
 
-# The directory of run directories IS the registry, and its default sits under the image's
-# own /var/lib/tethys_persist, which does not exist here and cannot be created on a read-only
-# rootfs -- the picker would come up empty and every upload would fail. Keep the same
-# <persist>/ngiab_visualizer shape the container image uses, on the host instead. Point this
-# at a bound directory of existing runs to read them in place; it need not be writable to
-# list and view, only to upload.
-export NGIAB_MANAGED_ROOT="${NGIAB_MANAGED_ROOT:-$state/ngiab_visualizer}"
+# The directory of run directories IS the registry, and the app derives it from
+# TETHYS_PERSIST, which is already the state directory above -- so it follows onto the host
+# with no second setting to keep in step. NGIAB_MANAGED_ROOT still overrides it: point that
+# at a bound directory of existing runs to read them in place. Read-only is enough to list
+# and view; only uploading needs write, which is why this mkdir is not fatal.
+runs="${NGIAB_MANAGED_ROOT:-$state/ngiab_visualizer}"
+mkdir -p "$runs" 2>/dev/null || true
 
 # portal-config.sh reads this from the environment only and refuses to start without it.
 # Ephemeral by design: a SIF has no per-install secret to inherit.
@@ -62,7 +62,7 @@ fi
 
 echo "[ngiab] state directory: $state"
 echo "[ngiab] database: $live"
-echo "[ngiab] model runs: $NGIAB_MANAGED_ROOT"
+echo "[ngiab] model runs: $runs"
 echo "[ngiab] serving on port ${PORT:-8080}"
 
 exec /usr/local/bin/serve.sh

@@ -139,7 +139,6 @@ COPY --chmod=0755 scripts/ngiab-convert.sh /usr/local/bin/ngiab-convert.sh
 ENV TETHYS_DB_ENGINE=django.db.backends.sqlite3
 ENV TETHYS_DB_NAME=/opt/ngiab/tethys_platform.sqlite
 ENV STATIC_ROOT=/opt/ngiab/static
-ENV TETHYS_PERSIST=/var/lib/tethys_persist
 
 # 8080 keeps viewOnTethys.sh's CONTAINER_PORT contract intact (and is rootless-Podman safe).
 ENV PORT=8080
@@ -154,5 +153,7 @@ ENV GUNICORN_GRACEFUL_TIMEOUT=60
 
 # Provisioning happens at build time, so the base image's own server is the whole runtime.
 # The database it serves is the baked one; the runs directory is mounted over
-# /var/lib/tethys_persist/ngiab_visualizer, which is the registry.
+# ${TETHYS_PERSIST}/ngiab_visualizer, which is the registry. TETHYS_PERSIST is the base
+# image's own /home/tethys/persist -- overriding it here to the pre-uvx /var/lib path only
+# invented a directory that no longer exists in this base.
 CMD ["/usr/local/bin/serve.sh"]

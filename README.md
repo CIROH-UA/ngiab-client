@@ -54,14 +54,14 @@ If you copy a directory in yourself, prepare it once:
 
 ```bash
 docker exec tethys-ngen-portal \
-  tethys manage write_manifest --path /var/lib/tethys_persist/ngiab_visualizer/<name>
+  tethys manage write_manifest --path /home/tethys/persist/ngiab_visualizer/<name>
 ```
 
 Or convert its outputs to parquet at the same time, which is what the launcher runs:
 
 ```bash
 docker exec tethys-ngen-portal \
-  tethys manage convert_outputs --path /var/lib/tethys_persist/ngiab_visualizer/<name>
+  tethys manage convert_outputs --path /home/tethys/persist/ngiab_visualizer/<name>
 ```
 
 Either is safe to re-run: the manifest is derived from the run's own contents, so an
@@ -117,7 +117,7 @@ portal admin — losing a run is not recoverable, and adding one is. Superusers 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `NGIAB_STORAGE_BACKEND` | `local` | `s3` addresses runs as objects. Anything else stays on the filesystem. |
-| `NGIAB_MANAGED_ROOT` | `/var/lib/tethys_persist/ngiab_visualizer` | Where runs live on the filesystem backend. |
+| `NGIAB_MANAGED_ROOT` | `$TETHYS_PERSIST/ngiab_visualizer` | Where runs live on the filesystem backend. Follows `TETHYS_PERSIST`, which is `/home/tethys/persist` in the tethys-uvx base. |
 | `NGIAB_RUNS_PREFIX` | `ngiab_visualizer` | Prefix runs live under when borrowing the portal's media bucket. |
 | `NGIAB_S3_BUCKET` | — | Bucket for the container's own `STORAGES` hook. Required when that hook configures storage. |
 | `NGIAB_S3_ENDPOINT` | — | Custom endpoint (MinIO, an S3-compatible store). Omit for AWS. |
@@ -202,7 +202,7 @@ give the run its manifest:
 ```bash
 docker exec tethys-ngen-portal \
   tethys manage write_manifest \
-    --path /var/lib/tethys_persist/ngiab_visualizer/my-ngen-output \
+    --path /home/tethys/persist/ngiab_visualizer/my-ngen-output \
     --label my-ngen-output
 ```
 
@@ -215,7 +215,7 @@ export TETHYS_CONTAINER_NAME="tethys-ngen-portal"        \
        TETHYS_TAG="latest"                               \
        NGINX_PORT=80                                     \
        MODELS_RUNS_DIRECTORY="$HOME/ngiab_visualizer"    \
-       TETHYS_PERSIST_PATH="/var/lib/tethys_persist"     \
+       TETHYS_PERSIST_PATH="/home/tethys/persist"     \
        SKIP_DB_SETUP=false                               \
        CSRF_TRUSTED_ORIGINS="[\"http://localhost:${NGINX_PORT}\",\"http://127.0.0.1:${NGINX_PORT}\"]"
 ```

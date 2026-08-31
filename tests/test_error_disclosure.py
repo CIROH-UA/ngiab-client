@@ -17,7 +17,7 @@ from django.test import RequestFactory
 
 from tethysapp.ngiab import controllers, run_store
 
-LEAKS = ("/var/lib", "/opt/", "Errno", "Traceback", ".parquet", "tethys_persist")
+LEAKS = ("/var/lib", "/opt/", "/home/tethys", "Errno", "Traceback", ".parquet", "persist")
 
 
 def _assert_discloses_nothing(response, *extra):
@@ -38,7 +38,7 @@ def test_a_failed_delete_does_not_name_the_directory(ingest, permitted, monkeypa
     run_id = ingest()
 
     def explode(_name):
-        raise OSError(2, None, f"/var/lib/tethys_persist/ngiab_visualizer/{run_id}/outputs")
+        raise OSError(2, None, f"/home/tethys/persist/ngiab_visualizer/{run_id}/outputs")
 
     monkeypatch.setattr(run_store, "delete", explode)
     request = RequestFactory().post("/removeModelRun/", {"model_run_id": run_id})
@@ -56,7 +56,7 @@ def test_an_unreadable_matrix_does_not_name_the_file_or_the_query(ingest, monkey
     def explode(*_args, **_kwargs):
         raise duckdb.Error(
             'Binder Error: Referenced column "catchment_id" not found in '
-            f'"/var/lib/tethys_persist/ngiab_visualizer/{run_id}/outputs/troute.parquet"'
+            f'"/home/tethys/persist/ngiab_visualizer/{run_id}/outputs/troute.parquet"'
         )
 
     monkeypatch.setattr(controllers, "get_catchment_value_matrix", explode)

@@ -99,13 +99,28 @@ def object_root(tmp_path, mini_run_factory, monkeypatch):
     return storage
 
 
-def test_local_root_defaults_to_the_existing_run_mount(monkeypatch):
-    """The storage root defaults to the existing run mount, not to MEDIA_ROOT."""
+def test_local_root_follows_the_persist_directory(monkeypatch):
+    """The runs root sits under TETHYS_PERSIST, so moving one moves the other.
+
+    It was hardcoded to the pre-uvx /var/lib/tethys_persist, which is not a directory in the
+    tethys-uvx base at all -- and when the Apptainer runscript moved TETHYS_PERSIST onto the
+    host, the runs root silently stayed behind on a read-only path.
+    """
     monkeypatch.delenv(run_store.MANAGED_ROOT_ENV, raising=False)
-    assert run_store.local_root() == "/var/lib/tethys_persist/ngiab_visualizer"
+    monkeypatch.setenv(run_store.PERSIST_ENV, "/somewhere/persist")
+    assert run_store.local_root() == "/somewhere/persist/ngiab_visualizer"
+
+
+def test_local_root_falls_back_to_the_base_image_persist(monkeypatch):
+    """With no TETHYS_PERSIST at all, the tethys-uvx default is the sensible guess."""
+    monkeypatch.delenv(run_store.MANAGED_ROOT_ENV, raising=False)
+    monkeypatch.delenv(run_store.PERSIST_ENV, raising=False)
+    assert run_store.local_root() == "/home/tethys/persist/ngiab_visualizer"
 
 
 def test_local_root_is_overridable(monkeypatch):
+    """An explicit root wins over the derivation, so a bound directory can be read in place."""
+    monkeypatch.setenv(run_store.PERSIST_ENV, "/somewhere/persist")
     monkeypatch.setenv(run_store.MANAGED_ROOT_ENV, "/somewhere/else")
     assert run_store.local_root() == "/somewhere/else"
 
