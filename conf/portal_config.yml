@@ -37,7 +37,7 @@ settings:
   DATABASES:
     default:
       ENGINE: django.db.backends.sqlite3
-      NAME: /opt/ngiab/tethys_platform.sqlite
+      NAME: /home/tethys/ngiab/tethys_platform.sqlite
 
   # Merged with PORTAL_ALLOWED_HOSTS by portal-config.sh. Localhost entries are the
   # default single-container case; viewOnTethys.sh adds the host's own IPv4 addresses so
@@ -54,7 +54,9 @@ settings:
 
   # Baked at build time, deliberately outside ${TETHYS_PERSIST} -- that path is a declared
   # VOLUME in the base image, so anything written there can be masked by a user bind mount.
-  STATIC_ROOT: /opt/ngiab/static
+  # Under the runtime user's home rather than /opt: /opt is a system location by convention,
+  # and this is application data owned by uid 1000.
+  STATIC_ROOT: /home/tethys/ngiab/static
 
   # The visualizer is a local, single-user tool; the sign-up flow is not wanted.
   TETHYS_PORTAL_CONFIG:

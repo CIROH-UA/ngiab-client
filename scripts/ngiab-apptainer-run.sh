@@ -17,7 +17,7 @@
 set -euo pipefail
 
 state="${NGIAB_STATE_DIR:-${HOME:-/tmp}/.ngiab_visualizer}"
-baked="${NGIAB_BAKED_DB:-/opt/ngiab/tethys_platform.sqlite}"
+baked="${NGIAB_BAKED_DB:-/home/tethys/ngiab/tethys_platform.sqlite}"
 
 mkdir -p "$state/portal" "$state/db" "$state/media" "$state/workspaces"
 
@@ -39,12 +39,14 @@ fi
 export TETHYS_DB_NAME="$live"
 
 # portal-config.sh copies this into TETHYS_HOME and rewrites it there, so both must be
-# writable. STATIC_ROOT stays in the image: collectstatic already ran at build time.
+# writable. STATIC_ROOT stays in the image: collectstatic already ran at build time, and
+# /home/tethys/ngiab is read-only here, which is all static needs. Note TETHYS_PERSIST moves
+# to the host while the baked artefacts keep the image path -- writes go out, reads stay in.
 export TETHYS_HOME="$state/portal"
 export TETHYS_PERSIST="$state"
 export MEDIA_ROOT="$state/media"
 export TETHYS_WORKSPACES_ROOT="$state/workspaces"
-export STATIC_ROOT="${STATIC_ROOT:-/opt/ngiab/static}"
+export STATIC_ROOT="${STATIC_ROOT:-/home/tethys/ngiab/static}"
 
 # The directory of run directories IS the registry, and the app derives it from
 # TETHYS_PERSIST, which is already the state directory above -- so it follows onto the host

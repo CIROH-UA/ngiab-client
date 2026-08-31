@@ -64,10 +64,12 @@ print('duckdb extensions installed:', duckdb.__version__)"
     chmod -R a+rX "${DUCKDB_HOME}"
 
     # Provision the database and static files at build time, exactly as the Dockerfile
-    # does. Every input is known now, so a run never pays for it.
+    # does. Every input is known now, so a run never pays for it. They land in
+    # /home/tethys/ngiab for the reasons the Dockerfile gives: not /opt, and not the
+    # persist directory the base image declares as a VOLUME.
     export TETHYS_DB_ENGINE=django.db.backends.sqlite3
-    export TETHYS_DB_NAME=/opt/ngiab/tethys_platform.sqlite
-    export STATIC_ROOT=/opt/ngiab/static
+    export TETHYS_DB_NAME=/home/tethys/ngiab/tethys_platform.sqlite
+    export STATIC_ROOT=/home/tethys/ngiab/static
     export PORTAL_SUPERUSER_NAME=admin
     export PORTAL_SUPERUSER_PASSWORD=pass
 
@@ -79,7 +81,7 @@ print('duckdb extensions installed:', duckdb.__version__)"
     # where that table does not exist yet. Upstream guards this with `except
     # ProgrammingError`, which is what psycopg raises for a missing table; sqlite raises
     # OperationalError and sails straight through.
-    mkdir -p /opt/ngiab/static
+    mkdir -p /home/tethys/ngiab/static
     sed -i -E 's/^([[:space:]]*)(MULTIPLE_APP_MODE|STANDALONE_APP):/\1# BUILD-DISABLED \2:/' \
         "${TETHYS_HOME}/portal_config.yml"
     "${VIRTUAL_ENV}/bin/tethys" db migrate
@@ -92,14 +94,14 @@ print('duckdb extensions installed:', duckdb.__version__)"
     "${VIRTUAL_ENV}/bin/tethys" manage collectstatic --noinput
 
     # Fail the build rather than ship an image whose database silently landed elsewhere.
-    test -s /opt/ngiab/tethys_platform.sqlite
-    echo "baked db: $(stat -c%s /opt/ngiab/tethys_platform.sqlite) bytes"
-    echo "baked static: $(find /opt/ngiab/static -type f | wc -l) files"
+    test -s /home/tethys/ngiab/tethys_platform.sqlite
+    echo "baked db: $(stat -c%s /home/tethys/ngiab/tethys_platform.sqlite) bytes"
+    echo "baked static: $(find /home/tethys/ngiab/static -type f | wc -l) files"
 
     # World-readable rather than owned by uid 1000: an Apptainer image runs as whoever
     # invoked it, so ownership inside the image means nothing and read access means
     # everything. The database is copied out to the state directory before it is written.
-    chmod -R a+rX /opt/ngiab
+    chmod -R a+rX /home/tethys/ngiab
 
 
 Bootstrap: docker
@@ -110,7 +112,7 @@ Stage: final
     /opt/python /opt/python
     /opt/conda /opt/conda
     /opt/duckdb_extensions /opt/duckdb_extensions
-    /opt/ngiab /opt/ngiab
+    /home/tethys/ngiab /home/tethys/ngiab
 
 %files
     conf/portal_config.yml /config/portal_config.yml
@@ -145,7 +147,7 @@ Stage: final
     chmod 0755 /usr/local/bin/ngiab-apptainer-run.sh \
                /usr/local/bin/ngiab-convert.sh
     # Readable by any invoking user, since there is no fixed runtime uid.
-    chmod -R a+rX /opt/ngiab /opt/duckdb_extensions /config /opt/portal
+    chmod -R a+rX /opt/duckdb_extensions /config /opt/portal
 
     # The base image ships /home/tethys as 0700, which is right for a container that always
     # runs as uid 1000 and wrong for an image that runs as whoever invoked it. This was
@@ -159,8 +161,8 @@ Stage: final
     # SQLite, not Postgres: the visualizer ships as one self-contained image. The runscript
     # repoints TETHYS_DB_NAME at the live copy under the state directory before serving.
     export TETHYS_DB_ENGINE=django.db.backends.sqlite3
-    export TETHYS_DB_NAME=/opt/ngiab/tethys_platform.sqlite
-    export STATIC_ROOT=/opt/ngiab/static
+    export TETHYS_DB_NAME=/home/tethys/ngiab/tethys_platform.sqlite
+    export STATIC_ROOT=/home/tethys/ngiab/static
 
     # Defaulted rather than fixed, so `--env PORT=9000` is honoured. Note that a bare
     # `PORT=9000 apptainer run ...` is not: Apptainer does not carry that one through, which

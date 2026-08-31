@@ -33,7 +33,7 @@ if [ ! -w "${TETHYS_HOME:-/home/tethys/portal}" ]; then
 
     # Harvesting writes to the database on any command that is not `migrate`, so a read-only
     # baked copy is not enough.
-    cp "${NGIAB_BAKED_DB:-/opt/ngiab/tethys_platform.sqlite}" "$scratch/db/portal.sqlite"
+    cp "${NGIAB_BAKED_DB:-/home/tethys/ngiab/tethys_platform.sqlite}" "$scratch/db/portal.sqlite"
     chmod u+w "$scratch/db/portal.sqlite"
 
     export TETHYS_HOME="$scratch/portal"

@@ -28,9 +28,13 @@ print('duckdb extensions installed:', duckdb.__version__)" \
 
 # Provision. These are the same steps provision.sh performs at deploy time, run here
 # instead because SQLite is a file and every input is known at build time.
+#
+# Baked artefacts live in /home/tethys/ngiab: owned by the runtime user, and outside both
+# /opt (a system location by convention) and ${TETHYS_PERSIST} (a declared VOLUME in the
+# base image, where a bind mount would hide them).
 ENV TETHYS_DB_ENGINE=django.db.backends.sqlite3
-ENV TETHYS_DB_NAME=/opt/ngiab/tethys_platform.sqlite
-ENV STATIC_ROOT=/opt/ngiab/static
+ENV TETHYS_DB_NAME=/home/tethys/ngiab/tethys_platform.sqlite
+ENV STATIC_ROOT=/home/tethys/ngiab/static
 ENV PORTAL_SUPERUSER_NAME=admin
 ENV PORTAL_SUPERUSER_PASSWORD=pass
 
@@ -39,7 +43,7 @@ ENV PORTAL_SUPERUSER_PASSWORD=pass
 # place the same file directly so the build-time commands see identical settings.
 COPY conf/portal_config.yml ${TETHYS_HOME}/portal_config.yml
 
-RUN mkdir -p /opt/ngiab/static \
+RUN mkdir -p /home/tethys/ngiab/static \
     && sed -i -E 's/^([[:space:]]*)(MULTIPLE_APP_MODE|STANDALONE_APP):/\1# BUILD-DISABLED \2:/' \
         "${TETHYS_HOME}/portal_config.yml" \
     && "${VIRTUAL_ENV}/bin/tethys" db migrate \
@@ -52,13 +56,13 @@ RUN mkdir -p /opt/ngiab/static \
     && grep -q '^[[:space:]]*MULTIPLE_APP_MODE:' "${TETHYS_HOME}/portal_config.yml" \
     && "${VIRTUAL_ENV}/bin/tethys" site -f \
     && "${VIRTUAL_ENV}/bin/tethys" manage collectstatic --noinput \
-    && chown -R 1000:1000 /opt/ngiab \
+    && chown -R 1000:1000 /home/tethys/ngiab \
     # Fail the build rather than ship an image whose DB silently landed elsewhere:
     # the settings module ignores TETHYS_DB_NAME, so the DATABASES block in
     # portal_config.yml is what actually places this file.
-    && test -s /opt/ngiab/tethys_platform.sqlite \
-    && echo "baked db: $(stat -c%s /opt/ngiab/tethys_platform.sqlite) bytes" \
-    && echo "baked static: $(find /opt/ngiab/static -type f | wc -l) files"
+    && test -s /home/tethys/ngiab/tethys_platform.sqlite \
+    && echo "baked db: $(stat -c%s /home/tethys/ngiab/tethys_platform.sqlite) bytes" \
+    && echo "baked static: $(find /home/tethys/ngiab/static -type f | wc -l) files"
 
 # ---------------------------------------------------------------------------
 # Test: the builder, plus the dev dependencies pytest needs
@@ -130,15 +134,15 @@ USER 1000
 COPY --from=builder /opt/python /opt/python
 COPY --from=builder /opt/conda /opt/conda
 COPY --from=builder /opt/duckdb_extensions /opt/duckdb_extensions
-COPY --from=builder --chown=1000:1000 /opt/ngiab /opt/ngiab
+COPY --from=builder --chown=1000:1000 /home/tethys/ngiab /home/tethys/ngiab
 
 COPY --chown=1000:1000 conf/portal_config.yml /config/portal_config.yml
 COPY --chown=1000:1000 conf/portal-config.d/ /opt/portal/portal-config.d/
 COPY --chmod=0755 scripts/ngiab-convert.sh /usr/local/bin/ngiab-convert.sh
 
 ENV TETHYS_DB_ENGINE=django.db.backends.sqlite3
-ENV TETHYS_DB_NAME=/opt/ngiab/tethys_platform.sqlite
-ENV STATIC_ROOT=/opt/ngiab/static
+ENV TETHYS_DB_NAME=/home/tethys/ngiab/tethys_platform.sqlite
+ENV STATIC_ROOT=/home/tethys/ngiab/static
 
 # 8080 keeps viewOnTethys.sh's CONTAINER_PORT contract intact (and is rootless-Podman safe).
 ENV PORT=8080
