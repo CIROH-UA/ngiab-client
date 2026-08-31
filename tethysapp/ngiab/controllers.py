@@ -174,11 +174,9 @@ def removeModelRun(request):
         run_store.delete(name)
     except LookupError:
         return JsonResponse({"error": "No such model run."}, status=404)
-    except OSError as exc:
+    except OSError:
         logger.exception("Could not delete run %s", name)
-        return JsonResponse(
-            {"error": f"Could not delete that run: {exc.strerror or exc}"}, status=500
-        )
+        return JsonResponse({"error": "Could not delete that run."}, status=500)
 
     return JsonResponse({"removed": name})
 
@@ -504,9 +502,9 @@ def getCatchmentValueMatrix(request):
 
     try:
         return JsonResponse(get_catchment_value_matrix(model_run_id, request.GET.get("variable")))
-    except (OSError, ValueError, duckdb.Error) as exc:
+    except (OSError, ValueError, duckdb.Error):
         logger.exception("Could not build the value matrix for %s", model_run_id)
-        return JsonResponse({"error": f"Could not read this run's outputs: {exc}"})
+        return JsonResponse({"error": "Could not read this run's outputs."})
 
 
 @controller
