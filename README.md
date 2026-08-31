@@ -95,11 +95,15 @@ Clicking a catchment, or searching one by id, loads its time series.
 
 ![The time series for a selected catchment](static/imgs/viewer-timeseries.png)
 
-**T-Route** switches the same chart to the flowpath that catchment drains into. Catchments
-with a TEEHR evaluation are highlighted, and selecting one adds a **TEEHR** source that plots
-the simulated series against the observed, with the metrics in a table beside it.
+**T-Route** switches the same chart to the flowpath that catchment drains into.
 
 ![The chart switched to the T-Route source for a flowpath](static/imgs/viewer-troute.png)
+
+Catchments with a TEEHR evaluation are highlighted on the map, and their id carries a TEEHR
+badge in the search results. Selecting one adds a **TEEHR** source that plots the simulated
+series against the observed gauge, with the evaluation metrics in a table beside it.
+
+![cat-2172222 selected against usgs-07143672, with KGE, NSE, relative bias and RMSDR for ngen and the NWM 3.0 retrospective](static/imgs/viewer-teehr.png)
 
 ## Uploading a run
 
