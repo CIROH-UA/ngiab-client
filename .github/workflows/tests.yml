@@ -1,0 +1,99 @@
+name: tests
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install test dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run the frontend test suite
+        run: npm run test:frontend
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Byte-compile the app
+        run: python -m compileall -q tethysapp/
+
+      - name: Undefined names
+        run: |
+          pip install pyflakes
+          python -m pyflakes tethysapp/
+
+      - name: Check for imports of removed modules
+        run: |
+          set -e
+          for gone in datastream_utils reactapp; do
+            if grep -rn "\b${gone}\b" --include='*.py' tethysapp/; then
+              echo "::error::tethysapp still references removed module: ${gone}"
+              exit 1
+            fi
+          done
+          echo "no references to removed modules"
+
+      - name: Check for imports of the removed model
+        run: |
+          set -e
+          if grep -rnE "from \.models import|from tethysapp\.ngiab\.models import" \
+               --include='*.py' tethysapp/; then
+            echo "::error::tethysapp still imports the removed ModelRun model"
+            exit 1
+          fi
+          echo "no imports of the removed model"
+
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build the test image
+        run: docker build --target test -t ngiab-visualizer:test .
+
+      - name: Run the suite, and prove it actually ran
+        run: |
+          docker run --rm ngiab-visualizer:test /bin/sh -c '
+            set -e
+            "${VIRTUAL_ENV}/bin/python" -m pytest \
+              -p no:cacheprovider --no-cov \
+              --junit-xml=/tmp/report.xml
+            "${VIRTUAL_ENV}/bin/python" - <<PYCHECK
+          import sys, xml.etree.ElementTree as ET
+
+          suite = ET.parse("/tmp/report.xml").getroot().find("testsuite")
+          total = int(suite.get("tests", 0))
+          skipped = int(suite.get("skipped", 0))
+          executed = total - skipped
+          print(f"collected {total}, skipped {skipped}, executed {executed}")
+          FLOOR = 415
+          if executed < FLOOR:
+              sys.exit(
+                  f"::error::only {executed} tests executed, expected at least {FLOOR}; "
+                  "a skipped module proves nothing, so move the floor deliberately"
+              )
+          PYCHECK
+          '

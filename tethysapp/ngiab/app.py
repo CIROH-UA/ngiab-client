@@ -1,4 +1,7 @@
 from tethys_sdk.base import TethysAppBase
+from tethys_sdk.permissions import Permission, PermissionGroup
+
+DELETE_PERMISSION = "delete_model_runs"
 
 
 class App(TethysAppBase):
@@ -6,14 +9,28 @@ class App(TethysAppBase):
     Tethys app class for Next Gen in a Box Visualizer.
     """
 
-    name = "NGIAB and DataStream Visualizer"
-    description = "This application helps to visualize the outputs of the model runs created by Next gen in a box and the DataStream"
-    package = "ngiab"  # WARNING: Do not change this value
+    name = "NGIAB Visualizer"
+    description = "Visualize the outputs of model runs created by NextGen In A Box"
+    package = "ngiab"
     index = "home"
     icon = f"{package}/images/icon.png"
-    catch_all = "home"  # Catch all url mapped to home controller, required for react browser routing
+    catch_all = "home"
     root_url = "ngiab"
-    color = ""  # Don't set color here, set it in reactapp/custom-bootstrap.scss
+    color = ""
     tags = ""
     enable_feedback = False
     feedback_emails = []
+
+    def permissions(self):
+        """Who may destroy a model run."""
+        return (
+            PermissionGroup(
+                name="run_managers",
+                permissions=(
+                    Permission(
+                        name=DELETE_PERMISSION,
+                        description="Delete model runs and the outputs stored with them",
+                    ),
+                ),
+            ),
+        )
