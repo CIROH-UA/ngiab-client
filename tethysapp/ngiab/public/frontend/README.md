@@ -287,21 +287,26 @@ Two optional, off-by-default toggles in the layers panel:
   dependency and no data change — height encodes the value's bin rank, not an absolute measure.
 
 - **terrain** — `components/map/terrain.js` adds a `raster-dem` source (terrarium encoding) through
-  the already-registered `pmtiles` protocol and calls `map.setTerrain(...)`. The toggle is disabled
-  until a terrain URL is configured.
+  the already-registered `pmtiles` protocol and calls `map.setTerrain(...)`. The source URL is
+  `TERRAIN_URL` in `config.js`; the toggle is disabled only if it is emptied.
 
-### Hosting the terrain tiles (ops, one-time)
+### Terrain tiles
 
-Terrain uses [Mapterhorn](https://protomaps.com/blog/mapterhorn-terrain/) terrain as static PMTiles
-(terrarium encoding), self-hosted — no SaaS, no new external host in the code:
+`TERRAIN_URL` defaults to [Mapterhorn](https://protomaps.com/blog/mapterhorn-terrain/)'s public
+global archive, `https://download.mapterhorn.com/planet.pmtiles` (terrarium encoding). PMTiles is
+range-read, so the browser only fetches the tiles currently in view, and the portal sets no CSP, so
+no `connect-src` allowance is needed. This works out of the box — no infrastructure — and is the
+current default while prototyping.
 
-1. Copy a CONUS subset of the Mapterhorn terrarium PMTiles into an S3 bucket the app is already
-   allowed to read (e.g. the same `communityhydrofabric.s3` bucket that serves the hydrofabric, or
-   `ciroh-portal-assets`) — the same pattern used for other bulk datasets.
-2. Ensure that bucket host is in the page CSP `connect-src` (it already is if the hydrofabric loads).
-3. Set `window.__NGIAB__.TERRAIN_URL` to the tiles' `https://…/terrain.pmtiles` URL (read by
-   `config.js`; wired from the Django context when shipping to the portal). Optionally set
-   `TERRAIN_EXAGGERATION` (default `1.4`). Confirm the tiles' `tileSize` matches `terrain.js`.
+For production, prefer **self-hosting a CONUS subset** so terrain doesn't depend on Mapterhorn's
+hosting and stays small:
 
-Until `TERRAIN_URL` is set, the terrain toggle stays disabled and the 3D-extrusion half works on its
-own with no terrain infrastructure.
+1. Extract a CONUS box from the global archive and cap the zoom (biggest lever on size):
+   `pmtiles extract https://download.mapterhorn.com/planet.pmtiles conus-terrain.pmtiles --bbox=-125,24,-66,50 --maxzoom=12`
+2. Upload `conus-terrain.pmtiles` to a bucket the app already reads (`communityhydrofabric.s3` or
+   `ciroh-portal-assets`).
+3. Point `TERRAIN_URL` at it — either edit the `config.js` default or inject
+   `window.__NGIAB__.TERRAIN_URL` from the Django context. Optionally set `TERRAIN_EXAGGERATION`
+   (default `1.4`); confirm the tiles' `tileSize` matches `terrain.js` (default `512`).
+
+The 3D-extrusion half is independent and works with or without terrain.

@@ -68,13 +68,13 @@ describe('terrain config', () => {
     delete window.__NGIAB__;
   });
 
-  it('defaults to no terrain url and a sane exaggeration', () => {
+  it('defaults to the Mapterhorn planet archive and a sane exaggeration', () => {
     delete window.__NGIAB__;
-    expect(terrainUrl()).to.equal('');
+    expect(terrainUrl()).to.equal('https://download.mapterhorn.com/planet.pmtiles');
     expect(terrainExaggeration()).to.equal(1.4);
   });
 
-  it('reads the terrain url and exaggeration injected by the template', () => {
+  it('lets the template override the terrain url and exaggeration', () => {
     window.__NGIAB__ = { TERRAIN_URL: 'https://h/terrain.pmtiles', TERRAIN_EXAGGERATION: 2 };
     expect(terrainUrl()).to.equal('https://h/terrain.pmtiles');
     expect(terrainExaggeration()).to.equal(2);
