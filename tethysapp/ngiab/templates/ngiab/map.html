@@ -278,6 +278,10 @@
     inline-size: 18px; block-size: 18px; margin: 0;
     accent-color: var(--accent); cursor: pointer;
   }
+  .toggle:has(input:disabled) { opacity: 0.45; cursor: not-allowed; }
+  .toggle:has(input:disabled):hover { background: none; }
+  .toggle input:disabled { cursor: not-allowed; }
+  .toggle-divider { block-size: 1px; margin: 6px 4px; background: var(--border); }
   #map-reset-view { width: 100%; margin-top: 4px; justify-content: center; border-color: var(--border-strong); }
 
   /* MapTip ------------------------------------------------------------- */
@@ -524,8 +528,9 @@
           <label class="toggle"><input type="checkbox" id="toggle-theme" /> dark basemap</label>
           <label class="toggle"><input type="checkbox" id="toggle-catchments" checked /> catchments</label>
           <label class="toggle"><input type="checkbox" id="toggle-teehr" checked /> highlight TEEHR</label>
+          <div class="toggle-divider" role="presentation"></div>
           <label class="toggle"><input type="checkbox" id="toggle-3d" /> 3D catchments</label>
-          <label class="toggle"><input type="checkbox" id="toggle-terrain" /> terrain</label>
+          <label class="toggle"><input type="checkbox" id="toggle-terrain" /> terrain relief</label>
           <button id="map-reset-view" type="button" class="icon-button">Zoom to run extent</button>
           <!-- role=status: loading and error text is announced without stealing focus. -->
           <div id="map-status" class="status" role="status">loading...</div>
