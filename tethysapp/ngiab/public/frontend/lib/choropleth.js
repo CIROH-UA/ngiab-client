@@ -13,6 +13,8 @@ export const RAMP = {
   ],
 };
 
+export const MAX_BIN = RAMP.light.length - 1;
+
 export function decodeBins(base64) {
   if (typeof base64 !== 'string' || base64 === '') return new Uint8Array(0);
   const binary = atob(base64);

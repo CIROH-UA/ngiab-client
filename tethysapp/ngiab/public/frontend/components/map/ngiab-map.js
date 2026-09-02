@@ -137,8 +137,7 @@ export class NgiabMap extends HTMLElement {
     installLayers(map, view);
     this._appliedViewKey = JSON.stringify(view);
     refresh(map, view);
-    this._appliedTerrain = null;
-    this._syncTerrain(view);
+    this._syncTerrain(view, { force: true });
   }
 
   _syncExtrude(view) {
@@ -147,9 +146,9 @@ export class NgiabMap extends HTMLElement {
     this._map?.easeTo({ pitch: view.extrude ? 55 : 0, duration: 500 });
   }
 
-  _syncTerrain(view) {
+  _syncTerrain(view, { force = false } = {}) {
     if (!this._map?.isStyleLoaded()) return;
-    if (view.terrain === this._appliedTerrain) return;
+    if (!force && view.terrain === this._appliedTerrain) return;
     this._appliedTerrain = view.terrain;
     if (view.terrain) {
       applyTerrain(this._map, { url: terrainUrl(), exaggeration: terrainExaggeration() });
@@ -444,9 +443,9 @@ export class NgiabMap extends HTMLElement {
 
   _bindControls() {
     const bind = (id, handler) => {
-      document
-        .getElementById(id)
-        ?.addEventListener('change', (event) => handler(event.target.checked));
+      const el = document.getElementById(id);
+      el?.addEventListener('change', (event) => handler(event.target.checked));
+      return el;
     };
 
     bind('toggle-theme', (on) => {
@@ -456,14 +455,11 @@ export class NgiabMap extends HTMLElement {
     bind('toggle-catchments', (shown) => actions.setLayer('catchmentHidden', !shown));
     bind('toggle-teehr', (show) => actions.setLayer('showTeehr', show));
     bind('toggle-3d', (on) => actions.setLayer('extrude', on));
-    bind('toggle-terrain', (on) => actions.setLayer('terrain', on));
+    const terrainToggle = bind('toggle-terrain', (on) => actions.setLayer('terrain', on));
 
-    if (!terrainUrl()) {
-      const terrainToggle = document.getElementById('toggle-terrain');
-      if (terrainToggle) {
-        terrainToggle.disabled = true;
-        terrainToggle.closest('.toggle')?.setAttribute('title', 'Terrain tiles are not configured');
-      }
+    if (!terrainUrl() && terrainToggle) {
+      terrainToggle.disabled = true;
+      terrainToggle.closest('.toggle')?.setAttribute('title', 'Terrain tiles are not configured');
     }
 
     this._mapVariableEl?.addEventListener('change', (event) => {

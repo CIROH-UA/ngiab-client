@@ -1,4 +1,4 @@
-import { RAMP, NO_DATA_BIN } from '../../lib/choropleth.js';
+import { RAMP, NO_DATA_BIN, MAX_BIN } from '../../lib/choropleth.js';
 
 const PMTILES_BASE =
   'pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/only_geometry/upstream_index/';
@@ -75,18 +75,17 @@ export const catchmentFillColor = (view) =>
   view.choropleth ? choroplethFillColor(view) : teehrAware(view, TEEHR_FILL, PLAIN_FILL);
 export const flowPathsLineColor = (view) => teehrAware(view, TEEHR_LINE, PLAIN_LINE);
 
-export const catchmentExtrusionHeight = () => {
-  const maxBin = Math.max(RAMP.light.length - 1, 1);
-  return [
-    'interpolate',
-    ['linear'],
-    ['coalesce', ['feature-state', 'bin'], 0],
-    0,
-    0,
-    maxBin,
-    EXTRUSION_MAX_HEIGHT,
-  ];
-};
+const EXTRUSION_HEIGHT = [
+  'interpolate',
+  ['linear'],
+  ['coalesce', ['feature-state', 'bin'], 0],
+  0,
+  0,
+  Math.max(MAX_BIN, 1),
+  EXTRUSION_MAX_HEIGHT,
+];
+
+export const catchmentExtrusionHeight = () => EXTRUSION_HEIGHT;
 
 export const catchmentFillOpacity = () => ({ stops: [[4, 0.85], [9, 0.9]] });
 
@@ -94,6 +93,9 @@ export const catchmentOutlineColor = (view) => {
   if (view.choropleth) return isDark(view) ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)';
   return isDark(view) ? 'rgba(238, 51, 119, 0.7)' : 'rgba(91, 44, 111, 0.7)';
 };
+
+export const flatCatchmentsHidden = (view) => view.catchmentHidden || Boolean(view.extrude);
+export const extrudedCatchmentsHidden = (view) => view.catchmentHidden || !view.extrude;
 
 export function catchmentsSpec(view) {
   return {
@@ -107,7 +109,7 @@ export function catchmentsSpec(view) {
       'fill-outline-color': catchmentOutlineColor(view),
       'fill-opacity': catchmentFillOpacity(),
     },
-    layout: visibility(view.catchmentHidden || Boolean(view.extrude)),
+    layout: visibility(flatCatchmentsHidden(view)),
   };
 }
 
@@ -124,7 +126,7 @@ export function catchmentsExtrudedSpec(view) {
       'fill-extrusion-base': 0,
       'fill-extrusion-opacity': 0.9,
     },
-    layout: visibility(view.catchmentHidden || !view.extrude),
+    layout: visibility(extrudedCatchmentsHidden(view)),
   };
 }
 
@@ -206,26 +208,28 @@ export function refresh(map, view) {
     if (map.getLayer(id)) map.setPaintProperty(id, prop, value);
   };
 
-  setFilter('catchments-layer', catchmentSetFilter(view));
-  setFilter(LAYER_CATCHMENTS_EXTRUDED, catchmentSetFilter(view));
+  const catchmentFilter = catchmentSetFilter(view);
+  const catchmentFill = catchmentFillColor(view);
+
+  setFilter('catchments-layer', catchmentFilter);
+  setFilter(LAYER_CATCHMENTS_EXTRUDED, catchmentFilter);
   setFilter('flowpaths-layer', flowPathsFilter(view));
   setFilter('catchment-highlight', catchmentHighlightFilter(view));
   setFilter('flowpath-highlight', flowPathHighlightFilter(view));
 
-  setPaint('catchments-layer', 'fill-color', catchmentFillColor(view));
+  setPaint('catchments-layer', 'fill-color', catchmentFill);
   setPaint('catchments-layer', 'fill-outline-color', catchmentOutlineColor(view));
   setPaint('catchments-layer', 'fill-opacity', catchmentFillOpacity());
-  setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-color', catchmentFillColor(view));
+  setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-color', catchmentFill);
   setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-height', catchmentExtrusionHeight());
   setPaint('flowpaths-layer', 'line-color', flowPathsLineColor(view));
 
-  const setVis = (id, visible) => {
+  const setVis = (id, hidden) => {
     if (map.getLayer(id)) {
-      map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+      map.setLayoutProperty(id, 'visibility', visibility(hidden).visibility);
     }
   };
-  const catchmentsShown = !view.catchmentHidden;
-  setVis('catchments-layer', catchmentsShown && !view.extrude);
-  setVis(LAYER_CATCHMENTS_EXTRUDED, catchmentsShown && Boolean(view.extrude));
-  setVis('catchment-highlight', catchmentsShown);
+  setVis('catchments-layer', flatCatchmentsHidden(view));
+  setVis(LAYER_CATCHMENTS_EXTRUDED, extrudedCatchmentsHidden(view));
+  setVis('catchment-highlight', view.catchmentHidden);
 }
