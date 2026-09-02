@@ -12,7 +12,8 @@ export function getConfig() {
     LOGOUT_URL: cfg.LOGOUT_URL || '/accounts/logout/',
     VERSION: cfg.VERSION || '',
     TERRAIN_URL: cfg.TERRAIN_URL || 'https://download.mapterhorn.com/planet.pmtiles',
-    TERRAIN_EXAGGERATION: Number(cfg.TERRAIN_EXAGGERATION) || 1.4,
+    TERRAIN_EXAGGERATION: Number(cfg.TERRAIN_EXAGGERATION) || 3,
+    TERRAIN_TILE_SIZE: Number(cfg.TERRAIN_TILE_SIZE) || 512,
   };
 }
 
@@ -22,6 +23,10 @@ export function terrainUrl() {
 
 export function terrainExaggeration() {
   return getConfig().TERRAIN_EXAGGERATION;
+}
+
+export function terrainTileSize() {
+  return getConfig().TERRAIN_TILE_SIZE;
 }
 
 export function maxUploadBytes() {

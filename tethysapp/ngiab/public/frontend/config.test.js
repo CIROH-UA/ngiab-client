@@ -6,6 +6,7 @@ import {
   getModelRunId,
   terrainUrl,
   terrainExaggeration,
+  terrainTileSize,
 } from './config.js';
 
 describe('getConfig', () => {
@@ -68,21 +69,27 @@ describe('terrain config', () => {
     delete window.__NGIAB__;
   });
 
-  it('defaults to the Mapterhorn planet archive and a sane exaggeration', () => {
+  it('defaults to the Mapterhorn planet archive, exaggeration, and tile size', () => {
     delete window.__NGIAB__;
     expect(terrainUrl()).to.equal('https://download.mapterhorn.com/planet.pmtiles');
-    expect(terrainExaggeration()).to.equal(1.4);
+    expect(terrainExaggeration()).to.equal(3);
+    expect(terrainTileSize()).to.equal(512);
   });
 
-  it('lets the template override the terrain url and exaggeration', () => {
-    window.__NGIAB__ = { TERRAIN_URL: 'https://h/terrain.pmtiles', TERRAIN_EXAGGERATION: 2 };
+  it('lets the template override the terrain url, exaggeration, and tile size', () => {
+    window.__NGIAB__ = {
+      TERRAIN_URL: 'https://h/terrain.pmtiles',
+      TERRAIN_EXAGGERATION: 2,
+      TERRAIN_TILE_SIZE: 256,
+    };
     expect(terrainUrl()).to.equal('https://h/terrain.pmtiles');
     expect(terrainExaggeration()).to.equal(2);
+    expect(terrainTileSize()).to.equal(256);
   });
 
   it('falls back to the default exaggeration when the value is not a number', () => {
     window.__NGIAB__ = { TERRAIN_EXAGGERATION: 'nope' };
-    expect(terrainExaggeration()).to.equal(1.4);
+    expect(terrainExaggeration()).to.equal(3);
   });
 });
 

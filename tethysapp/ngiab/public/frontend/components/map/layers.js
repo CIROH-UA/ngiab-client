@@ -17,7 +17,7 @@ export const LAYER_DIVIDES = 'divides';
 export const LAYER_FLOWPATHS = 'flowpaths';
 export const LAYER_CATCHMENTS_EXTRUDED = 'catchments-extruded';
 
-export const EXTRUSION_MAX_HEIGHT = 30000;
+export const EXTRUSION_MAX_HEIGHT = 12000;
 
 export const CATCHMENT_KEY = 'id';
 
@@ -124,7 +124,7 @@ export function catchmentsExtrudedSpec(view) {
       'fill-extrusion-color': catchmentFillColor(view),
       'fill-extrusion-height': catchmentExtrusionHeight(),
       'fill-extrusion-base': 0,
-      'fill-extrusion-opacity': 0.9,
+      'fill-extrusion-opacity': 0.6,
     },
     layout: visibility(extrudedCatchmentsHidden(view)),
   };

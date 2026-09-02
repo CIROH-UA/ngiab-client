@@ -2,7 +2,13 @@ import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 
 import appAPI from '../../api/app.js';
-import { canUpload, getModelRunId, terrainUrl, terrainExaggeration } from '../../config.js';
+import {
+  canUpload,
+  getModelRunId,
+  terrainUrl,
+  terrainExaggeration,
+  terrainTileSize,
+} from '../../config.js';
 import { noRunsMessage } from '../../lib/empty-runs.js';
 import { store, actions } from '../../store/app-store.js';
 import { toNumericIds, toCatchmentIndex } from '../../lib/ids.js';
@@ -100,7 +106,7 @@ export class NgiabMap extends HTMLElement {
       zoom: 4,
     });
     this._map = map;
-    this._appliedExtrude = false;
+    this._appliedPitch = false;
     this._appliedTerrain = false;
     this._choropleth = new ChoroplethState(map);
 
@@ -140,10 +146,11 @@ export class NgiabMap extends HTMLElement {
     this._syncTerrain(view, { force: true });
   }
 
-  _syncExtrude(view) {
-    if (view.extrude === this._appliedExtrude) return;
-    this._appliedExtrude = view.extrude;
-    this._map?.easeTo({ pitch: view.extrude ? 55 : 0, duration: 500 });
+  _syncPitch(view) {
+    const pitched = Boolean(view.extrude || view.terrain);
+    if (pitched === this._appliedPitch) return;
+    this._appliedPitch = pitched;
+    this._map?.easeTo({ pitch: pitched ? 55 : 0, duration: 500 });
   }
 
   _syncTerrain(view, { force = false } = {}) {
@@ -151,7 +158,11 @@ export class NgiabMap extends HTMLElement {
     if (!force && view.terrain === this._appliedTerrain) return;
     this._appliedTerrain = view.terrain;
     if (view.terrain) {
-      applyTerrain(this._map, { url: terrainUrl(), exaggeration: terrainExaggeration() });
+      applyTerrain(this._map, {
+        url: terrainUrl(),
+        exaggeration: terrainExaggeration(),
+        tileSize: terrainTileSize(),
+      });
     } else {
       removeTerrain(this._map);
     }
@@ -167,7 +178,7 @@ export class NgiabMap extends HTMLElement {
       this._appliedViewKey = viewKey;
       refresh(map, view);
     }
-    this._syncExtrude(view);
+    this._syncPitch(view);
     this._syncTerrain(view);
     if (map.isStyleLoaded()) this._syncModelRun();
     this._syncMapVariable();
