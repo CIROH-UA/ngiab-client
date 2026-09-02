@@ -100,6 +100,8 @@ export class NgiabMap extends HTMLElement {
       zoom: 4,
     });
     this._map = map;
+    this._appliedExtrude = false;
+    this._appliedTerrain = false;
     this._choropleth = new ChoroplethState(map);
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right');
@@ -135,6 +137,8 @@ export class NgiabMap extends HTMLElement {
     installLayers(map, view);
     this._appliedViewKey = JSON.stringify(view);
     refresh(map, view);
+    this._appliedTerrain = null;
+    this._syncTerrain(view);
   }
 
   _syncExtrude(view) {
@@ -144,6 +148,7 @@ export class NgiabMap extends HTMLElement {
   }
 
   _syncTerrain(view) {
+    if (!this._map?.isStyleLoaded()) return;
     if (view.terrain === this._appliedTerrain) return;
     this._appliedTerrain = view.terrain;
     if (view.terrain) {

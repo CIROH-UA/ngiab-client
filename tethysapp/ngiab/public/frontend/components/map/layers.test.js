@@ -11,7 +11,6 @@ import {
   catchmentSetFilter,
   catchmentsExtrudedSpec,
   catchmentsSpec,
-  choroplethFillColor,
   flowPathHighlightFilter,
   flowPathsFilter,
   flowPathsLineColor,
@@ -191,10 +190,14 @@ describe('extruded catchments', () => {
     expect(spec.filter).to.deep.equal(catchmentSetFilter(view()));
   });
 
-  it('colors the prisms with the same ramp as the flat choropleth', () => {
-    const v = view();
-    expect(catchmentsExtrudedSpec(v).paint['fill-extrusion-color']).to.deep.equal(
-      choroplethFillColor(v),
+  it('colors the prisms with the same helper as the flat catchments layer', () => {
+    const plain = view();
+    expect(catchmentsExtrudedSpec(plain).paint['fill-extrusion-color']).to.deep.equal(
+      catchmentFillColor(plain),
+    );
+    const choro = view({ choropleth: true });
+    expect(catchmentsExtrudedSpec(choro).paint['fill-extrusion-color']).to.deep.equal(
+      catchmentFillColor(choro),
     );
   });
 

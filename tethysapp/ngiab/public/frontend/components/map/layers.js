@@ -21,7 +21,6 @@ export const EXTRUSION_MAX_HEIGHT = 30000;
 
 export const CATCHMENT_KEY = 'id';
 
-export const CATCHMENT_LAYERS = ['catchments-layer', 'catchment-highlight'];
 export const TOP_LAYERS = ['flowpaths-layer', 'flowpath-highlight', 'catchment-highlight'];
 
 const isDark = (view) => view.theme === 'dark';
@@ -120,7 +119,7 @@ export function catchmentsExtrudedSpec(view) {
     'source-layer': LAYER_DIVIDES,
     filter: catchmentSetFilter(view),
     paint: {
-      'fill-extrusion-color': choroplethFillColor(view),
+      'fill-extrusion-color': catchmentFillColor(view),
       'fill-extrusion-height': catchmentExtrusionHeight(),
       'fill-extrusion-base': 0,
       'fill-extrusion-opacity': 0.9,
@@ -216,7 +215,7 @@ export function refresh(map, view) {
   setPaint('catchments-layer', 'fill-color', catchmentFillColor(view));
   setPaint('catchments-layer', 'fill-outline-color', catchmentOutlineColor(view));
   setPaint('catchments-layer', 'fill-opacity', catchmentFillOpacity());
-  setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-color', choroplethFillColor(view));
+  setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-color', catchmentFillColor(view));
   setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-height', catchmentExtrusionHeight());
   setPaint('flowpaths-layer', 'line-color', flowPathsLineColor(view));
 
