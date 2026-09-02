@@ -2,7 +2,7 @@ import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 
 import appAPI from '../../api/app.js';
-import { canUpload, getModelRunId } from '../../config.js';
+import { canUpload, getModelRunId, terrainUrl, terrainExaggeration } from '../../config.js';
 import { noRunsMessage } from '../../lib/empty-runs.js';
 import { store, actions } from '../../store/app-store.js';
 import { toNumericIds, toCatchmentIndex } from '../../lib/ids.js';
@@ -13,6 +13,7 @@ import {
   installLayers,
   refresh,
 } from './layers.js';
+import { applyTerrain, removeTerrain } from './terrain.js';
 import {
   attachHoverCursor,
   attachMapTip,
@@ -81,6 +82,8 @@ export class NgiabMap extends HTMLElement {
       theme: state.theme,
       catchmentHidden: state.layers.catchmentHidden,
       showTeehr: state.layers.showTeehr,
+      extrude: state.layers.extrude,
+      terrain: state.layers.terrain,
       selectedCatchmentId: state.selection.id,
       catchmentIds: this._local.catchmentIds,
       teehrNexusIds: this._local.teehrNexusIds,
@@ -134,6 +137,22 @@ export class NgiabMap extends HTMLElement {
     refresh(map, view);
   }
 
+  _syncExtrude(view) {
+    if (view.extrude === this._appliedExtrude) return;
+    this._appliedExtrude = view.extrude;
+    this._map?.easeTo({ pitch: view.extrude ? 55 : 0, duration: 500 });
+  }
+
+  _syncTerrain(view) {
+    if (view.terrain === this._appliedTerrain) return;
+    this._appliedTerrain = view.terrain;
+    if (view.terrain) {
+      applyTerrain(this._map, { url: terrainUrl(), exaggeration: terrainExaggeration() });
+    } else {
+      removeTerrain(this._map);
+    }
+  }
+
   _onStoreChange() {
     const map = this._map;
     if (!map) return;
@@ -144,6 +163,8 @@ export class NgiabMap extends HTMLElement {
       this._appliedViewKey = viewKey;
       refresh(map, view);
     }
+    this._syncExtrude(view);
+    this._syncTerrain(view);
     if (map.isStyleLoaded()) this._syncModelRun();
     this._syncMapVariable();
     this._syncFrame();
@@ -429,6 +450,16 @@ export class NgiabMap extends HTMLElement {
     });
     bind('toggle-catchments', (shown) => actions.setLayer('catchmentHidden', !shown));
     bind('toggle-teehr', (show) => actions.setLayer('showTeehr', show));
+    bind('toggle-3d', (on) => actions.setLayer('extrude', on));
+    bind('toggle-terrain', (on) => actions.setLayer('terrain', on));
+
+    if (!terrainUrl()) {
+      const terrainToggle = document.getElementById('toggle-terrain');
+      if (terrainToggle) {
+        terrainToggle.disabled = true;
+        terrainToggle.closest('.toggle')?.setAttribute('title', 'Terrain tiles are not configured');
+      }
+    }
 
     this._mapVariableEl?.addEventListener('change', (event) => {
       actions.setMapVariable(event.target.value || null);

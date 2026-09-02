@@ -1,5 +1,12 @@
 import { expect } from '@esm-bundle/chai';
-import { canSeeDelete, getConfig, getPortalHost, getModelRunId } from './config.js';
+import {
+  canSeeDelete,
+  getConfig,
+  getPortalHost,
+  getModelRunId,
+  terrainUrl,
+  terrainExaggeration,
+} from './config.js';
 
 describe('getConfig', () => {
   afterEach(() => {
@@ -53,6 +60,29 @@ describe('getModelRunId', () => {
   it('returns empty when neither source provides one', () => {
     delete window.__NGIAB__;
     expect(getModelRunId()).to.equal('');
+  });
+});
+
+describe('terrain config', () => {
+  afterEach(() => {
+    delete window.__NGIAB__;
+  });
+
+  it('defaults to no terrain url and a sane exaggeration', () => {
+    delete window.__NGIAB__;
+    expect(terrainUrl()).to.equal('');
+    expect(terrainExaggeration()).to.equal(1.4);
+  });
+
+  it('reads the terrain url and exaggeration injected by the template', () => {
+    window.__NGIAB__ = { TERRAIN_URL: 'https://h/terrain.pmtiles', TERRAIN_EXAGGERATION: 2 };
+    expect(terrainUrl()).to.equal('https://h/terrain.pmtiles');
+    expect(terrainExaggeration()).to.equal(2);
+  });
+
+  it('falls back to the default exaggeration when the value is not a number', () => {
+    window.__NGIAB__ = { TERRAIN_EXAGGERATION: 'nope' };
+    expect(terrainExaggeration()).to.equal(1.4);
   });
 });
 

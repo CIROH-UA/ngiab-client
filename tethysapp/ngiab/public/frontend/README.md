@@ -275,3 +275,33 @@ Basemap gallery (light and dark are the only two styles published for this hydro
   top of `api/client.js`. Inside a function body, a comment is one line. Anything longer
   belongs in the doc comment above it or in this file.
 - Components render into **light DOM** so the global stylesheet applies.
+
+## 3D view (extrusion + terrain)
+
+Two optional, off-by-default toggles in the layers panel:
+
+- **3D catchments** — a `fill-extrusion` layer (`catchments-extruded` in `components/map/layers.js`)
+  whose `fill-extrusion-height` reads the same `bin` feature-state that colors the flat choropleth,
+  so it re-animates with the timeline. The toggle sets `layers.extrude` in the store, swaps flat vs
+  extruded visibility in `refresh`, and pitches the camera in `components/map/ngiab-map.js`. No new
+  dependency and no data change — height encodes the value's bin rank, not an absolute measure.
+
+- **terrain** — `components/map/terrain.js` adds a `raster-dem` source (terrarium encoding) through
+  the already-registered `pmtiles` protocol and calls `map.setTerrain(...)`. The toggle is disabled
+  until a terrain URL is configured.
+
+### Hosting the terrain tiles (ops, one-time)
+
+Terrain uses [Mapterhorn](https://protomaps.com/blog/mapterhorn-terrain/) terrain as static PMTiles
+(terrarium encoding), self-hosted — no SaaS, no new external host in the code:
+
+1. Copy a CONUS subset of the Mapterhorn terrarium PMTiles into an S3 bucket the app is already
+   allowed to read (e.g. the same `communityhydrofabric.s3` bucket that serves the hydrofabric, or
+   `ciroh-portal-assets`) — the same pattern used for other bulk datasets.
+2. Ensure that bucket host is in the page CSP `connect-src` (it already is if the hydrofabric loads).
+3. Set `window.__NGIAB__.TERRAIN_URL` to the tiles' `https://…/terrain.pmtiles` URL (read by
+   `config.js`; wired from the Django context when shipping to the portal). Optionally set
+   `TERRAIN_EXAGGERATION` (default `1.4`). Confirm the tiles' `tileSize` matches `terrain.js`.
+
+Until `TERRAIN_URL` is set, the terrain toggle stays disabled and the 3D-extrusion half works on its
+own with no terrain infrastructure.

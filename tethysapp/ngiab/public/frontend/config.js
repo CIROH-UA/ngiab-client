@@ -11,7 +11,17 @@ export function getConfig() {
     LOGIN_URL: cfg.LOGIN_URL || '/accounts/login/',
     LOGOUT_URL: cfg.LOGOUT_URL || '/accounts/logout/',
     VERSION: cfg.VERSION || '',
+    TERRAIN_URL: cfg.TERRAIN_URL || '',
+    TERRAIN_EXAGGERATION: Number(cfg.TERRAIN_EXAGGERATION) || 1.4,
   };
+}
+
+export function terrainUrl() {
+  return getConfig().TERRAIN_URL;
+}
+
+export function terrainExaggeration() {
+  return getConfig().TERRAIN_EXAGGERATION;
 }
 
 export function maxUploadBytes() {
