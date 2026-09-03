@@ -4,7 +4,6 @@ import {
   RAMP,
   decodeBins,
   frameAt,
-  diffFrames,
   binColor,
   legendEntries,
   legendLabel,
@@ -36,18 +35,6 @@ describe('frameAt', () => {
   it('returns empty outside the frame range instead of reading past the end', () => {
     expect(frameAt(bins, 2, 3, 2).length).to.equal(0);
     expect(frameAt(bins, 2, 3, -1).length).to.equal(0);
-  });
-});
-
-describe('diffFrames', () => {
-  it('reports only the catchments whose class changed', () => {
-    const previous = Uint8Array.from([1, 2, 3]);
-    const next = Uint8Array.from([1, 5, 3]);
-    expect(diffFrames(previous, next)).to.deep.equal([1]);
-  });
-
-  it('reports every catchment on the first frame', () => {
-    expect(diffFrames(null, Uint8Array.from([4, 4]))).to.deep.equal([0, 1]);
   });
 });
 

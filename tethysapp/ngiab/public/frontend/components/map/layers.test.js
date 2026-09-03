@@ -201,10 +201,11 @@ describe('extruded catchments', () => {
     );
   });
 
-  it('drives height from the bin feature-state', () => {
+  it('drives height from the value feature-state, not the colour bin', () => {
     const height = catchmentsExtrudedSpec(view()).paint['fill-extrusion-height'];
     expect(height).to.deep.equal(catchmentExtrusionHeight());
-    expect(JSON.stringify(height)).to.contain('["feature-state","bin"]');
+    expect(JSON.stringify(height)).to.contain('["feature-state","val"]');
+    expect(JSON.stringify(height)).to.not.contain('["feature-state","bin"]');
   });
 
   it('is visible only when 3D is on and a variable is shading', () => {

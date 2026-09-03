@@ -1,4 +1,4 @@
-import { RAMP, NO_DATA_BIN, MAX_BIN } from '../../lib/choropleth.js';
+import { RAMP, NO_DATA_BIN } from '../../lib/choropleth.js';
 
 const PMTILES_BASE =
   'pmtiles://https://communityhydrofabric.s3.us-east-1.amazonaws.com/map/only_geometry/upstream_index/';
@@ -74,7 +74,7 @@ export const catchmentFillColor = (view) =>
   view.choropleth ? choroplethFillColor(view) : teehrAware(view, TEEHR_FILL, PLAIN_FILL);
 export const flowPathsLineColor = (view) => teehrAware(view, TEEHR_LINE, PLAIN_LINE);
 
-const BIN_FRACTION = ['/', ['coalesce', ['feature-state', 'bin'], 0], Math.max(MAX_BIN, 1)];
+const VAL_FRACTION = ['/', ['coalesce', ['feature-state', 'val'], 0], 255];
 
 const EXTRUSION_HEIGHT_STOPS = [[5, 5000], [9, 2000], [13, 700]];
 
@@ -82,7 +82,7 @@ const EXTRUSION_HEIGHT = [
   'interpolate',
   ['linear'],
   ['zoom'],
-  ...EXTRUSION_HEIGHT_STOPS.flatMap(([zoom, max]) => [zoom, ['*', BIN_FRACTION, max]]),
+  ...EXTRUSION_HEIGHT_STOPS.flatMap(([zoom, max]) => [zoom, ['*', VAL_FRACTION, max]]),
 ];
 
 export const catchmentExtrusionHeight = () => EXTRUSION_HEIGHT;

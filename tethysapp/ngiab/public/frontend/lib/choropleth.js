@@ -13,8 +13,6 @@ export const RAMP = {
   ],
 };
 
-export const MAX_BIN = RAMP.light.length - 1;
-
 export function decodeBins(base64) {
   if (typeof base64 !== 'string' || base64 === '') return new Uint8Array(0);
   const binary = atob(base64);
@@ -27,15 +25,6 @@ export function frameAt(bins, frameCount, catchmentCount, index) {
   if (index < 0 || index >= frameCount || catchmentCount <= 0) return new Uint8Array(0);
   const start = index * catchmentCount;
   return bins.subarray(start, start + catchmentCount);
-}
-
-export function diffFrames(previous, next) {
-  const changed = [];
-  if (!next) return changed;
-  for (let i = 0; i < next.length; i += 1) {
-    if (!previous || previous[i] !== next[i]) changed.push(i);
-  }
-  return changed;
 }
 
 export function binColor(bin, theme) {
