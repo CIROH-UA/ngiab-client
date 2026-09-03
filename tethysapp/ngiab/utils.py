@@ -287,6 +287,7 @@ _BUCKET_HOURS = (1, 3, 6, 12, 24, 48, 168, 720)
 _NO_DATA_BIN = 0
 _CLASS_COUNT = 8
 _NORM_PERCENTILE_CLAMP = (2, 98)
+_NORM_BYTE_MAX = 255
 
 
 def _group_table_for(outputs, stem):
@@ -395,7 +396,7 @@ def _value_norms(grid):
     if span > 0:
         scaled = np.clip((grid - float(low)) / span, 0.0, 1.0)
         scaled[~finite] = 0.0
-        norms = (scaled * 255.0).astype(np.uint8)
+        norms = (scaled * float(_NORM_BYTE_MAX)).astype(np.uint8)
     return norms
 
 

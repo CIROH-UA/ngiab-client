@@ -280,11 +280,13 @@ Basemap gallery (light and dark are the only two styles published for this hydro
 
 Two optional, off-by-default toggles in the layers panel:
 
-- **3D catchments** — a `fill-extrusion` layer (`catchments-extruded` in `components/map/layers.js`)
-  whose `fill-extrusion-height` reads the same `bin` feature-state that colors the flat choropleth,
-  so it re-animates with the timeline. The toggle sets `layers.extrude` in the store, swaps flat vs
-  extruded visibility in `refresh`, and pitches the camera in `components/map/ngiab-map.js`. No new
-  dependency and no data change — height encodes the value's bin rank, not an absolute measure.
+- **3D catchments** — a `fill-extrusion` layer (`catchments-extruded` in `components/map/layers.js`).
+  Colour keys on the same `bin` feature-state as the flat choropleth, while `fill-extrusion-height`
+  reads a separate `val` feature-state so height reflects the actual value, not just its bin rank.
+  Both re-animate with the timeline. The backend adds a `norms` byte array (0-255, clamped to the
+  run's 2nd-98th percentile in `_value_norms`, `utils.py`) to the value-matrix payload alongside
+  `bins`; the frontend sets `val` from it. The toggle sets `layers.extrude` in the store, swaps flat
+  vs extruded visibility in `refresh`, and pitches the camera in `components/map/ngiab-map.js`.
 
 - **terrain** — `components/map/terrain.js` adds a `raster-dem` source (terrarium encoding) through
   the already-registered `pmtiles` protocol and calls `map.setTerrain(...)`. The source URL is
@@ -306,7 +308,10 @@ hosting and stays small:
 2. Upload `conus-terrain.pmtiles` to a bucket the app already reads (`communityhydrofabric.s3` or
    `ciroh-portal-assets`).
 3. Point `TERRAIN_URL` at it — either edit the `config.js` default or inject
-   `window.__NGIAB__.TERRAIN_URL` from the Django context. Optionally set `TERRAIN_EXAGGERATION`
-   (default `1.4`); confirm the tiles' `tileSize` matches `terrain.js` (default `512`).
+   `window.__NGIAB__.TERRAIN_URL` from the Django context. Optionally tune the vertical
+   exaggeration: `TERRAIN_EXAGGERATION` (default `3`) for the terrain-only view, and
+   `TERRAIN_EXAGGERATION_3D` (default `1.4`), the gentler value used while extruded catchments are
+   shown so the relief and the prisms share a coherent scale. Confirm the tiles' `tileSize` matches
+   `terrain.js` (default `512`).
 
 The 3D-extrusion half is independent and works with or without terrain.

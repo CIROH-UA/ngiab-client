@@ -74,7 +74,9 @@ export const catchmentFillColor = (view) =>
   view.choropleth ? choroplethFillColor(view) : teehrAware(view, TEEHR_FILL, PLAIN_FILL);
 export const flowPathsLineColor = (view) => teehrAware(view, TEEHR_LINE, PLAIN_LINE);
 
-const VAL_FRACTION = ['/', ['coalesce', ['feature-state', 'val'], 0], 255];
+const NORM_BYTE_MAX = 255;
+
+const VAL_FRACTION = ['/', ['coalesce', ['feature-state', 'val'], 0], NORM_BYTE_MAX];
 
 const EXTRUSION_HEIGHT_STOPS = [[5, 5000], [9, 2000], [13, 700]];
 
@@ -87,7 +89,7 @@ const EXTRUSION_HEIGHT = [
 
 export const catchmentExtrusionHeight = () => EXTRUSION_HEIGHT;
 
-export const catchmentExtrusionOpacity = (view) => (view.choropleth ? 0.85 : 0.55);
+const EXTRUSION_OPACITY = 0.85;
 
 export const catchmentFillOpacity = () => ({ stops: [[4, 0.85], [9, 0.9]] });
 
@@ -127,7 +129,7 @@ export function catchmentsExtrudedSpec(view) {
       'fill-extrusion-color': catchmentFillColor(view),
       'fill-extrusion-height': catchmentExtrusionHeight(),
       'fill-extrusion-base': 0,
-      'fill-extrusion-opacity': catchmentExtrusionOpacity(view),
+      'fill-extrusion-opacity': EXTRUSION_OPACITY,
     },
     layout: visibility(extrudedCatchmentsHidden(view)),
   };
@@ -225,7 +227,7 @@ export function refresh(map, view) {
   setPaint(LAYER_CATCHMENTS, 'fill-opacity', catchmentFillOpacity());
   setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-color', catchmentFill);
   setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-height', catchmentExtrusionHeight());
-  setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-opacity', catchmentExtrusionOpacity(view));
+  setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-opacity', EXTRUSION_OPACITY);
   setPaint('flowpaths-layer', 'line-color', flowPathsLineColor(view));
 
   const setVis = (id, hidden) => {

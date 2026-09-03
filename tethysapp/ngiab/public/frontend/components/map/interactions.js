@@ -1,14 +1,25 @@
 import maplibregl from 'maplibre-gl';
 
-import { SRC_DIVIDES, LAYER_DIVIDES, LAYER_CATCHMENTS, CATCHMENT_KEY, catchmentRef } from './layers.js';
+import {
+  SRC_DIVIDES,
+  LAYER_DIVIDES,
+  LAYER_CATCHMENTS,
+  LAYER_CATCHMENTS_EXTRUDED,
+  CATCHMENT_KEY,
+  catchmentRef,
+} from './layers.js';
+
+const CATCHMENT_HIT_LAYERS = [LAYER_CATCHMENTS, LAYER_CATCHMENTS_EXTRUDED];
 
 export function attachHoverCursor(map) {
-  map.on('mouseenter', LAYER_CATCHMENTS, () => {
-    map.getCanvas().style.cursor = 'pointer';
-  });
-  map.on('mouseleave', LAYER_CATCHMENTS, () => {
-    map.getCanvas().style.cursor = '';
-  });
+  for (const layer of CATCHMENT_HIT_LAYERS) {
+    map.on('mouseenter', layer, () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+    map.on('mouseleave', layer, () => {
+      map.getCanvas().style.cursor = '';
+    });
+  }
 }
 
 export const featureCatchmentId = (feature) =>
@@ -22,7 +33,7 @@ export function attachMapTip(map, describe) {
     className: 'map-tip',
   });
 
-  map.on('mousemove', LAYER_CATCHMENTS, (event) => {
+  const onMove = (event) => {
     const numeric = featureCatchmentId(event.features?.[0]);
     if (numeric == null) return;
 
@@ -32,16 +43,20 @@ export function attachMapTip(map, describe) {
       return;
     }
     popup.setLngLat(event.lngLat).setHTML(html).addTo(map);
-  });
+  };
 
-  map.on('mouseleave', LAYER_CATCHMENTS, () => popup.remove());
+  for (const layer of CATCHMENT_HIT_LAYERS) {
+    map.on('mousemove', layer, onMove);
+    map.on('mouseleave', layer, () => popup.remove());
+  }
   return popup;
 }
 
 export function catchmentAtPoint(map, event) {
-  if (!map.getLayer(LAYER_CATCHMENTS)) return null;
+  const layers = CATCHMENT_HIT_LAYERS.filter((id) => map.getLayer(id));
+  if (!layers.length) return null;
 
-  const features = map.queryRenderedFeatures(event.point, { layers: [LAYER_CATCHMENTS] });
+  const features = map.queryRenderedFeatures(event.point, { layers });
   if (!features?.length) return null;
 
   const feature = features[0];

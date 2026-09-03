@@ -208,6 +208,16 @@ describe('extruded catchments', () => {
     expect(JSON.stringify(height)).to.not.contain('["feature-state","bin"]');
   });
 
+  it('scales the zoom-interpolated height ceiling down as the map zooms in', () => {
+    const height = catchmentExtrusionHeight();
+    const zoomStops = height.slice(3);
+    expect(zoomStops[0]).to.equal(5);
+    expect(zoomStops[2]).to.equal(9);
+    expect(zoomStops[4]).to.equal(13);
+    expect(zoomStops[1][2]).to.be.above(zoomStops[3][2]);
+    expect(zoomStops[3][2]).to.be.above(zoomStops[5][2]);
+  });
+
   it('is visible only when 3D is on and a variable is shading', () => {
     expect(
       catchmentsExtrudedSpec(view({ extrude: true, choropleth: true })).layout.visibility,
@@ -231,10 +241,9 @@ describe('extruded catchments', () => {
     ).to.equal('none');
   });
 
-  it('is more solid when a variable is shading and lighter otherwise', () => {
+  it('renders the prisms at a solid, readable opacity', () => {
     expect(
       catchmentsExtrudedSpec(view({ choropleth: true })).paint['fill-extrusion-opacity'],
     ).to.equal(0.85);
-    expect(catchmentsExtrudedSpec(view()).paint['fill-extrusion-opacity']).to.equal(0.55);
   });
 });

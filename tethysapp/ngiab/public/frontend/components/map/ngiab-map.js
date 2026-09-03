@@ -130,6 +130,7 @@ export class NgiabMap extends HTMLElement {
     this._appliedPitch = false;
     this._appliedTerrain = false;
     this._appliedExaggeration = null;
+    this._appliedSkyTheme = null;
     this._choropleth = new ChoroplethState(map);
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right');
@@ -178,7 +179,10 @@ export class NgiabMap extends HTMLElement {
   }
 
   _applySky() {
-    this._map?.setSky(store.get().theme === 'dark' ? SKY_PAINT.dark : SKY_PAINT.light);
+    const theme = store.get().theme;
+    if (theme === this._appliedSkyTheme) return;
+    this._appliedSkyTheme = theme;
+    this._map?.setSky(theme === 'dark' ? SKY_PAINT.dark : SKY_PAINT.light);
   }
 
   _syncTerrain(view, { force = false } = {}) {
@@ -203,18 +207,19 @@ export class NgiabMap extends HTMLElement {
     });
   }
 
+  _applyView(view = this._view) {
+    this._appliedViewKey = JSON.stringify(view);
+    refresh(this._map, view);
+    this._syncPitch(view);
+    this._syncTerrain(view);
+  }
+
   _onStoreChange() {
     const map = this._map;
     if (!map) return;
 
     const view = this._view;
-    const viewKey = JSON.stringify(view);
-    if (viewKey !== this._appliedViewKey) {
-      this._appliedViewKey = viewKey;
-      refresh(map, view);
-    }
-    this._syncPitch(view);
-    this._syncTerrain(view);
+    if (JSON.stringify(view) !== this._appliedViewKey) this._applyView(view);
     if (map.isStyleLoaded()) this._syncModelRun();
     this._syncMapVariable();
     this._syncFrame();
@@ -231,7 +236,7 @@ export class NgiabMap extends HTMLElement {
       this._choropleth.clear();
       this._timelineEl?.setTimes([]);
       this._legendEl?.setScale({ variable: null, breaks: [] });
-      refresh(this._map, this._view);
+      this._applyView();
       return;
     }
 
@@ -252,8 +257,7 @@ export class NgiabMap extends HTMLElement {
       this._timelineEl?.setTimes(matrix.times);
       this._legendEl?.setScale({ variable: matrix.variable, breaks: matrix.breaks });
 
-      refresh(this._map, this._view);
-      this._applied = null;
+      this._applyView();
       this._syncFrame(true);
 
       const step = matrix.step_hours ? ` · ${matrix.step_hours}h steps` : '';
@@ -496,6 +500,9 @@ export class NgiabMap extends HTMLElement {
 
     bind('toggle-theme', (on) => {
       actions.setTheme(on ? 'dark' : 'light');
+      this._appliedTerrain = false;
+      this._appliedExaggeration = null;
+      this._appliedSkyTheme = null;
       this._map.setStyle(STYLE_URLS[on ? 'dark' : 'light']);
     });
     bind('toggle-catchments', (shown) => actions.setLayer('catchmentHidden', !shown));
