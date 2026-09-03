@@ -96,8 +96,9 @@ export const catchmentOutlineColor = (view) => {
   return isDark(view) ? 'rgba(238, 51, 119, 0.7)' : 'rgba(91, 44, 111, 0.7)';
 };
 
-export const flatCatchmentsHidden = (view) => view.catchmentHidden || Boolean(view.extrude);
-export const extrudedCatchmentsHidden = (view) => view.catchmentHidden || !view.extrude;
+export const catchmentsExtruded = (view) => Boolean(view.extrude && view.choropleth);
+export const flatCatchmentsHidden = (view) => view.catchmentHidden || catchmentsExtruded(view);
+export const extrudedCatchmentsHidden = (view) => view.catchmentHidden || !catchmentsExtruded(view);
 
 export function catchmentsSpec(view) {
   return {

@@ -207,18 +207,27 @@ describe('extruded catchments', () => {
     expect(JSON.stringify(height)).to.contain('["feature-state","bin"]');
   });
 
-  it('is visible only in 3D mode and while catchments are shown', () => {
-    expect(catchmentsExtrudedSpec(view({ extrude: true })).layout.visibility).to.equal('visible');
-    expect(catchmentsExtrudedSpec(view({ extrude: false })).layout.visibility).to.equal('none');
+  it('is visible only when 3D is on and a variable is shading', () => {
+    expect(
+      catchmentsExtrudedSpec(view({ extrude: true, choropleth: true })).layout.visibility,
+    ).to.equal('visible');
+    expect(catchmentsExtrudedSpec(view({ extrude: true })).layout.visibility).to.equal('none');
+    expect(
+      catchmentsExtrudedSpec(view({ extrude: false, choropleth: true })).layout.visibility,
+    ).to.equal('none');
     expect(catchmentsExtrudedSpec(view()).layout.visibility).to.equal('none');
     expect(
-      catchmentsExtrudedSpec(view({ extrude: true, catchmentHidden: true })).layout.visibility,
+      catchmentsExtrudedSpec(view({ extrude: true, choropleth: true, catchmentHidden: true }))
+        .layout.visibility,
     ).to.equal('none');
   });
 
-  it('hides the flat fill when 3D is on', () => {
+  it('keeps the flat drape unless a shaded 3D view replaces it', () => {
     expect(catchmentsSpec(view()).layout.visibility).to.equal('visible');
-    expect(catchmentsSpec(view({ extrude: true })).layout.visibility).to.equal('none');
+    expect(catchmentsSpec(view({ extrude: true })).layout.visibility).to.equal('visible');
+    expect(
+      catchmentsSpec(view({ extrude: true, choropleth: true })).layout.visibility,
+    ).to.equal('none');
   });
 
   it('is more solid when a variable is shading and lighter otherwise', () => {
