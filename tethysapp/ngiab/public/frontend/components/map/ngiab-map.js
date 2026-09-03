@@ -120,6 +120,8 @@ export class NgiabMap extends HTMLElement {
       this._syncModelRun();
     });
 
+    map.on('style.load', () => this._applySky());
+
     map.on('click', (event) => this._handleClick(event));
 
     map.on('idle', () => {
@@ -151,7 +153,18 @@ export class NgiabMap extends HTMLElement {
     const pitched = Boolean(view.extrude || view.terrain);
     if (pitched === this._appliedPitch) return;
     this._appliedPitch = pitched;
-    this._map?.easeTo({ pitch: pitched ? 55 : 0, duration: 500 });
+    this._map?.easeTo({ pitch: pitched ? 70 : 0, duration: 500 });
+  }
+
+  _applySky() {
+    this._map?.setSky({
+      'sky-color': '#8fbce6',
+      'sky-horizon-blend': 0.5,
+      'horizon-color': '#e8f0f7',
+      'horizon-fog-blend': 0.6,
+      'fog-color': '#dfe6ec',
+      'fog-ground-blend': 0.5,
+    });
   }
 
   _syncTerrain(view, { force = false } = {}) {

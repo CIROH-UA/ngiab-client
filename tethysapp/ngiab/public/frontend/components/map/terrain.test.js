@@ -1,13 +1,17 @@
 import { expect } from '@esm-bundle/chai';
-import { applyTerrain, removeTerrain, TERRAIN_SOURCE } from './terrain.js';
+import { applyTerrain, removeTerrain, TERRAIN_SOURCE, HILLSHADE_LAYER } from './terrain.js';
 
 const fakeMap = () => {
   const sources = new Map();
+  const layers = new Map();
   const calls = { setTerrain: [] };
   return {
     calls,
     getSource: (id) => sources.get(id),
     addSource: (id, spec) => sources.set(id, spec),
+    getLayer: (id) => layers.get(id),
+    addLayer: (spec) => layers.set(spec.id, spec),
+    removeLayer: (id) => layers.delete(id),
     setTerrain: (arg) => calls.setTerrain.push(arg),
   };
 };
@@ -54,5 +58,14 @@ describe('terrain', () => {
     const map = fakeMap();
     removeTerrain(map);
     expect(map.calls.setTerrain.at(-1)).to.equal(null);
+  });
+
+  it('adds a hillshade layer with terrain and removes it on teardown', () => {
+    const map = fakeMap();
+    applyTerrain(map, { url: 'https://x/t.pmtiles' });
+    expect(map.getLayer(HILLSHADE_LAYER).type).to.equal('hillshade');
+    expect(map.getLayer(HILLSHADE_LAYER).source).to.equal(TERRAIN_SOURCE);
+    removeTerrain(map);
+    expect(map.getLayer(HILLSHADE_LAYER)).to.equal(undefined);
   });
 });

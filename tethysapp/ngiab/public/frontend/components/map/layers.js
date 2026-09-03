@@ -17,8 +17,6 @@ export const LAYER_DIVIDES = 'divides';
 export const LAYER_FLOWPATHS = 'flowpaths';
 export const LAYER_CATCHMENTS_EXTRUDED = 'catchments-extruded';
 
-export const EXTRUSION_MAX_HEIGHT = 12000;
-
 export const CATCHMENT_KEY = 'id';
 
 export const TOP_LAYERS = ['flowpaths-layer', 'flowpath-highlight', 'catchment-highlight'];
@@ -75,14 +73,15 @@ export const catchmentFillColor = (view) =>
   view.choropleth ? choroplethFillColor(view) : teehrAware(view, TEEHR_FILL, PLAIN_FILL);
 export const flowPathsLineColor = (view) => teehrAware(view, TEEHR_LINE, PLAIN_LINE);
 
+const BIN_FRACTION = ['/', ['coalesce', ['feature-state', 'bin'], 0], Math.max(MAX_BIN, 1)];
+
 const EXTRUSION_HEIGHT = [
   'interpolate',
   ['linear'],
-  ['coalesce', ['feature-state', 'bin'], 0],
-  0,
-  0,
-  Math.max(MAX_BIN, 1),
-  EXTRUSION_MAX_HEIGHT,
+  ['zoom'],
+  5, ['*', BIN_FRACTION, 5000],
+  9, ['*', BIN_FRACTION, 2000],
+  13, ['*', BIN_FRACTION, 700],
 ];
 
 export const catchmentExtrusionHeight = () => EXTRUSION_HEIGHT;
