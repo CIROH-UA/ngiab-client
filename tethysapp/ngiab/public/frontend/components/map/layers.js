@@ -87,6 +87,8 @@ const EXTRUSION_HEIGHT = [
 
 export const catchmentExtrusionHeight = () => EXTRUSION_HEIGHT;
 
+export const catchmentExtrusionOpacity = (view) => (view.choropleth ? 0.85 : 0.55);
+
 export const catchmentFillOpacity = () => ({ stops: [[4, 0.85], [9, 0.9]] });
 
 export const catchmentOutlineColor = (view) => {
@@ -124,7 +126,7 @@ export function catchmentsExtrudedSpec(view) {
       'fill-extrusion-color': catchmentFillColor(view),
       'fill-extrusion-height': catchmentExtrusionHeight(),
       'fill-extrusion-base': 0,
-      'fill-extrusion-opacity': 0.6,
+      'fill-extrusion-opacity': catchmentExtrusionOpacity(view),
     },
     layout: visibility(extrudedCatchmentsHidden(view)),
   };
@@ -222,6 +224,7 @@ export function refresh(map, view) {
   setPaint('catchments-layer', 'fill-opacity', catchmentFillOpacity());
   setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-color', catchmentFill);
   setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-height', catchmentExtrusionHeight());
+  setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-opacity', catchmentExtrusionOpacity(view));
   setPaint('flowpaths-layer', 'line-color', flowPathsLineColor(view));
 
   const setVis = (id, hidden) => {

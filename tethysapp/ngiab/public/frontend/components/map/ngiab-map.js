@@ -126,6 +126,7 @@ export class NgiabMap extends HTMLElement {
       this._ensureLayers();
       this._nexusIndex.reindex(map);
       this._choropleth.reapply();
+      this._syncTerrain(this._view);
 
       this._syncModelRun();
     });
@@ -154,18 +155,19 @@ export class NgiabMap extends HTMLElement {
   }
 
   _syncTerrain(view, { force = false } = {}) {
-    if (!this._map?.isStyleLoaded()) return;
     if (!force && view.terrain === this._appliedTerrain) return;
-    this._appliedTerrain = view.terrain;
-    if (view.terrain) {
-      applyTerrain(this._map, {
-        url: terrainUrl(),
-        exaggeration: terrainExaggeration(),
-        tileSize: terrainTileSize(),
-      });
-    } else {
+    if (!view.terrain) {
+      this._appliedTerrain = false;
       removeTerrain(this._map);
+      return;
     }
+    if (!this._map?.isStyleLoaded()) return;
+    this._appliedTerrain = true;
+    applyTerrain(this._map, {
+      url: terrainUrl(),
+      exaggeration: terrainExaggeration(),
+      tileSize: terrainTileSize(),
+    });
   }
 
   _onStoreChange() {

@@ -220,4 +220,11 @@ describe('extruded catchments', () => {
     expect(catchmentsSpec(view()).layout.visibility).to.equal('visible');
     expect(catchmentsSpec(view({ extrude: true })).layout.visibility).to.equal('none');
   });
+
+  it('is more solid when a variable is shading and lighter otherwise', () => {
+    expect(
+      catchmentsExtrudedSpec(view({ choropleth: true })).paint['fill-extrusion-opacity'],
+    ).to.equal(0.85);
+    expect(catchmentsExtrudedSpec(view()).paint['fill-extrusion-opacity']).to.equal(0.55);
+  });
 });
