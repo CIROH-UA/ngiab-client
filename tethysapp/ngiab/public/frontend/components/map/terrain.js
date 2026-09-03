@@ -1,9 +1,24 @@
+import { LAYER_CATCHMENTS } from './layers.js';
+
 export const TERRAIN_SOURCE = 'terrain-dem';
 export const HILLSHADE_LAYER = 'terrain-hillshade';
 
 const withProtocol = (url) => (url.startsWith('pmtiles://') ? url : `pmtiles://${url}`);
 
-export function applyTerrain(map, { url, exaggeration = 1.4, tileSize = 512 } = {}) {
+const HILLSHADE_PAINT = {
+  light: {
+    'hillshade-exaggeration': 0.55,
+    'hillshade-shadow-color': 'rgba(58, 60, 74, 0.55)',
+    'hillshade-highlight-color': 'rgba(244, 247, 252, 0.4)',
+  },
+  dark: {
+    'hillshade-exaggeration': 0.6,
+    'hillshade-shadow-color': 'rgba(6, 10, 18, 0.6)',
+    'hillshade-highlight-color': 'rgba(120, 140, 170, 0.35)',
+  },
+};
+
+export function applyTerrain(map, { url, exaggeration = 1.4, tileSize = 512, dark = false } = {}) {
   if (!map || !url) return false;
   if (!map.getSource(TERRAIN_SOURCE)) {
     map.addSource(TERRAIN_SOURCE, {
@@ -14,17 +29,13 @@ export function applyTerrain(map, { url, exaggeration = 1.4, tileSize = 512 } = 
     });
   }
   if (!map.getLayer(HILLSHADE_LAYER)) {
-    const before = map.getLayer('catchments-layer') ? 'catchments-layer' : undefined;
+    const before = map.getLayer(LAYER_CATCHMENTS) ? LAYER_CATCHMENTS : undefined;
     map.addLayer(
       {
         id: HILLSHADE_LAYER,
         type: 'hillshade',
         source: TERRAIN_SOURCE,
-        paint: {
-          'hillshade-exaggeration': 0.55,
-          'hillshade-shadow-color': 'rgba(60, 60, 70, 0.55)',
-          'hillshade-highlight-color': 'rgba(255, 255, 255, 0.4)',
-        },
+        paint: dark ? HILLSHADE_PAINT.dark : HILLSHADE_PAINT.light,
       },
       before,
     );

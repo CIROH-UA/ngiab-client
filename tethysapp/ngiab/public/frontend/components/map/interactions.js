@@ -1,12 +1,12 @@
 import maplibregl from 'maplibre-gl';
 
-import { SRC_DIVIDES, LAYER_DIVIDES, CATCHMENT_KEY, catchmentRef } from './layers.js';
+import { SRC_DIVIDES, LAYER_DIVIDES, LAYER_CATCHMENTS, CATCHMENT_KEY, catchmentRef } from './layers.js';
 
 export function attachHoverCursor(map) {
-  map.on('mouseenter', 'catchments-layer', () => {
+  map.on('mouseenter', LAYER_CATCHMENTS, () => {
     map.getCanvas().style.cursor = 'pointer';
   });
-  map.on('mouseleave', 'catchments-layer', () => {
+  map.on('mouseleave', LAYER_CATCHMENTS, () => {
     map.getCanvas().style.cursor = '';
   });
 }
@@ -22,7 +22,7 @@ export function attachMapTip(map, describe) {
     className: 'map-tip',
   });
 
-  map.on('mousemove', 'catchments-layer', (event) => {
+  map.on('mousemove', LAYER_CATCHMENTS, (event) => {
     const numeric = featureCatchmentId(event.features?.[0]);
     if (numeric == null) return;
 
@@ -34,14 +34,14 @@ export function attachMapTip(map, describe) {
     popup.setLngLat(event.lngLat).setHTML(html).addTo(map);
   });
 
-  map.on('mouseleave', 'catchments-layer', () => popup.remove());
+  map.on('mouseleave', LAYER_CATCHMENTS, () => popup.remove());
   return popup;
 }
 
 export function catchmentAtPoint(map, event) {
-  if (!map.getLayer('catchments-layer')) return null;
+  if (!map.getLayer(LAYER_CATCHMENTS)) return null;
 
-  const features = map.queryRenderedFeatures(event.point, { layers: ['catchments-layer'] });
+  const features = map.queryRenderedFeatures(event.point, { layers: [LAYER_CATCHMENTS] });
   if (!features?.length) return null;
 
   const feature = features[0];

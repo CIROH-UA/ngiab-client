@@ -68,4 +68,14 @@ describe('terrain', () => {
     removeTerrain(map);
     expect(map.getLayer(HILLSHADE_LAYER)).to.equal(undefined);
   });
+
+  it('shades the hillshade to match the active theme', () => {
+    const light = fakeMap();
+    applyTerrain(light, { url: 'https://x/t.pmtiles', dark: false });
+    const dark = fakeMap();
+    applyTerrain(dark, { url: 'https://x/t.pmtiles', dark: true });
+    expect(dark.getLayer(HILLSHADE_LAYER).paint).to.not.deep.equal(
+      light.getLayer(HILLSHADE_LAYER).paint,
+    );
+  });
 });

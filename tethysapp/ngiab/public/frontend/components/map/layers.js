@@ -15,6 +15,7 @@ export const SRC_DIVIDES = 'divides';
 export const SRC_FLOWPATHS = 'flowpaths';
 export const LAYER_DIVIDES = 'divides';
 export const LAYER_FLOWPATHS = 'flowpaths';
+export const LAYER_CATCHMENTS = 'catchments-layer';
 export const LAYER_CATCHMENTS_EXTRUDED = 'catchments-extruded';
 
 export const CATCHMENT_KEY = 'id';
@@ -75,13 +76,13 @@ export const flowPathsLineColor = (view) => teehrAware(view, TEEHR_LINE, PLAIN_L
 
 const BIN_FRACTION = ['/', ['coalesce', ['feature-state', 'bin'], 0], Math.max(MAX_BIN, 1)];
 
+const EXTRUSION_HEIGHT_STOPS = [[5, 5000], [9, 2000], [13, 700]];
+
 const EXTRUSION_HEIGHT = [
   'interpolate',
   ['linear'],
   ['zoom'],
-  5, ['*', BIN_FRACTION, 5000],
-  9, ['*', BIN_FRACTION, 2000],
-  13, ['*', BIN_FRACTION, 700],
+  ...EXTRUSION_HEIGHT_STOPS.flatMap(([zoom, max]) => [zoom, ['*', BIN_FRACTION, max]]),
 ];
 
 export const catchmentExtrusionHeight = () => EXTRUSION_HEIGHT;
@@ -101,7 +102,7 @@ export const extrudedCatchmentsHidden = (view) => view.catchmentHidden || !catch
 
 export function catchmentsSpec(view) {
   return {
-    id: 'catchments-layer',
+    id: LAYER_CATCHMENTS,
     type: 'fill',
     source: SRC_DIVIDES,
     'source-layer': LAYER_DIVIDES,
@@ -213,15 +214,15 @@ export function refresh(map, view) {
   const catchmentFilter = catchmentSetFilter(view);
   const catchmentFill = catchmentFillColor(view);
 
-  setFilter('catchments-layer', catchmentFilter);
+  setFilter(LAYER_CATCHMENTS, catchmentFilter);
   setFilter(LAYER_CATCHMENTS_EXTRUDED, catchmentFilter);
   setFilter('flowpaths-layer', flowPathsFilter(view));
   setFilter('catchment-highlight', catchmentHighlightFilter(view));
   setFilter('flowpath-highlight', flowPathHighlightFilter(view));
 
-  setPaint('catchments-layer', 'fill-color', catchmentFill);
-  setPaint('catchments-layer', 'fill-outline-color', catchmentOutlineColor(view));
-  setPaint('catchments-layer', 'fill-opacity', catchmentFillOpacity());
+  setPaint(LAYER_CATCHMENTS, 'fill-color', catchmentFill);
+  setPaint(LAYER_CATCHMENTS, 'fill-outline-color', catchmentOutlineColor(view));
+  setPaint(LAYER_CATCHMENTS, 'fill-opacity', catchmentFillOpacity());
   setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-color', catchmentFill);
   setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-height', catchmentExtrusionHeight());
   setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-opacity', catchmentExtrusionOpacity(view));
@@ -232,7 +233,7 @@ export function refresh(map, view) {
       map.setLayoutProperty(id, 'visibility', visibility(hidden).visibility);
     }
   };
-  setVis('catchments-layer', flatCatchmentsHidden(view));
+  setVis(LAYER_CATCHMENTS, flatCatchmentsHidden(view));
   setVis(LAYER_CATCHMENTS_EXTRUDED, extrudedCatchmentsHidden(view));
   setVis('catchment-highlight', view.catchmentHidden);
 }

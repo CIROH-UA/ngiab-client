@@ -36,6 +36,25 @@ const escapeHtml = (value) =>
 
 maplibregl.addProtocol('pmtiles', new Protocol({ metadata: true }).tile);
 
+const SKY_PAINT = {
+  light: {
+    'sky-color': '#8fbce6',
+    'sky-horizon-blend': 0.5,
+    'horizon-color': '#e8f0f7',
+    'horizon-fog-blend': 0.6,
+    'fog-color': '#dfe6ec',
+    'fog-ground-blend': 0.5,
+  },
+  dark: {
+    'sky-color': '#0b1a2e',
+    'sky-horizon-blend': 0.5,
+    'horizon-color': '#243244',
+    'horizon-fog-blend': 0.6,
+    'fog-color': '#111a24',
+    'fog-ground-blend': 0.5,
+  },
+};
+
 export class NgiabMap extends HTMLElement {
   connectedCallback() {
     this._local = {
@@ -120,8 +139,6 @@ export class NgiabMap extends HTMLElement {
       this._syncModelRun();
     });
 
-    map.on('style.load', () => this._applySky());
-
     map.on('click', (event) => this._handleClick(event));
 
     map.on('idle', () => {
@@ -129,6 +146,7 @@ export class NgiabMap extends HTMLElement {
       this._nexusIndex.reindex(map);
       this._choropleth.reapply();
       this._syncTerrain(this._view);
+      this._applySky();
 
       this._syncModelRun();
     });
@@ -157,14 +175,7 @@ export class NgiabMap extends HTMLElement {
   }
 
   _applySky() {
-    this._map?.setSky({
-      'sky-color': '#8fbce6',
-      'sky-horizon-blend': 0.5,
-      'horizon-color': '#e8f0f7',
-      'horizon-fog-blend': 0.6,
-      'fog-color': '#dfe6ec',
-      'fog-ground-blend': 0.5,
-    });
+    this._map?.setSky(store.get().theme === 'dark' ? SKY_PAINT.dark : SKY_PAINT.light);
   }
 
   _syncTerrain(view, { force = false } = {}) {
@@ -180,6 +191,7 @@ export class NgiabMap extends HTMLElement {
       url: terrainUrl(),
       exaggeration: terrainExaggeration(),
       tileSize: terrainTileSize(),
+      dark: view.theme === 'dark',
     });
   }
 
