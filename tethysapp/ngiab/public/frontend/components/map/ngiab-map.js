@@ -7,6 +7,7 @@ import {
   getModelRunId,
   terrainUrl,
   terrainExaggeration,
+  terrainExaggeration3D,
   terrainTileSize,
 } from '../../config.js';
 import { noRunsMessage } from '../../lib/empty-runs.js';
@@ -16,6 +17,7 @@ import '../ngiab-search.js';
 import {
   STYLE_URLS,
   SRC_DIVIDES,
+  catchmentsExtruded,
   installLayers,
   refresh,
 } from './layers.js';
@@ -127,6 +129,7 @@ export class NgiabMap extends HTMLElement {
     this._map = map;
     this._appliedPitch = false;
     this._appliedTerrain = false;
+    this._appliedExaggeration = null;
     this._choropleth = new ChoroplethState(map);
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right');
@@ -179,17 +182,22 @@ export class NgiabMap extends HTMLElement {
   }
 
   _syncTerrain(view, { force = false } = {}) {
-    if (!force && view.terrain === this._appliedTerrain) return;
     if (!view.terrain) {
       this._appliedTerrain = false;
+      this._appliedExaggeration = null;
       removeTerrain(this._map);
       return;
     }
+    const exaggeration = catchmentsExtruded(view)
+      ? terrainExaggeration3D()
+      : terrainExaggeration();
+    if (!force && this._appliedTerrain && exaggeration === this._appliedExaggeration) return;
     if (!this._map?.isStyleLoaded()) return;
     this._appliedTerrain = true;
+    this._appliedExaggeration = exaggeration;
     applyTerrain(this._map, {
       url: terrainUrl(),
-      exaggeration: terrainExaggeration(),
+      exaggeration,
       tileSize: terrainTileSize(),
       dark: view.theme === 'dark',
     });

@@ -6,6 +6,7 @@ import {
   getModelRunId,
   terrainUrl,
   terrainExaggeration,
+  terrainExaggeration3D,
   terrainTileSize,
 } from './config.js';
 
@@ -90,6 +91,17 @@ describe('terrain config', () => {
   it('falls back to the default exaggeration when the value is not a number', () => {
     window.__NGIAB__ = { TERRAIN_EXAGGERATION: 'nope' };
     expect(terrainExaggeration()).to.equal(3);
+  });
+
+  it('uses a gentler exaggeration for the extruded-catchment view', () => {
+    delete window.__NGIAB__;
+    expect(terrainExaggeration3D()).to.equal(1.4);
+    expect(terrainExaggeration3D()).to.be.below(terrainExaggeration());
+  });
+
+  it('lets the template override the 3D exaggeration', () => {
+    window.__NGIAB__ = { TERRAIN_EXAGGERATION_3D: 2 };
+    expect(terrainExaggeration3D()).to.equal(2);
   });
 });
 
