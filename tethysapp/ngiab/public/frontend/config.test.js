@@ -1,5 +1,14 @@
 import { expect } from '@esm-bundle/chai';
-import { canSeeDelete, getConfig, getPortalHost, getModelRunId } from './config.js';
+import {
+  canSeeDelete,
+  getConfig,
+  getPortalHost,
+  getModelRunId,
+  terrainUrl,
+  terrainExaggeration,
+  terrainExaggeration3D,
+  terrainTileSize,
+} from './config.js';
 
 describe('getConfig', () => {
   afterEach(() => {
@@ -53,6 +62,46 @@ describe('getModelRunId', () => {
   it('returns empty when neither source provides one', () => {
     delete window.__NGIAB__;
     expect(getModelRunId()).to.equal('');
+  });
+});
+
+describe('terrain config', () => {
+  afterEach(() => {
+    delete window.__NGIAB__;
+  });
+
+  it('defaults to the Mapterhorn planet archive, exaggeration, and tile size', () => {
+    delete window.__NGIAB__;
+    expect(terrainUrl()).to.equal('https://download.mapterhorn.com/planet.pmtiles');
+    expect(terrainExaggeration()).to.equal(3);
+    expect(terrainTileSize()).to.equal(512);
+  });
+
+  it('lets the template override the terrain url, exaggeration, and tile size', () => {
+    window.__NGIAB__ = {
+      TERRAIN_URL: 'https://h/terrain.pmtiles',
+      TERRAIN_EXAGGERATION: 2,
+      TERRAIN_TILE_SIZE: 256,
+    };
+    expect(terrainUrl()).to.equal('https://h/terrain.pmtiles');
+    expect(terrainExaggeration()).to.equal(2);
+    expect(terrainTileSize()).to.equal(256);
+  });
+
+  it('falls back to the default exaggeration when the value is not a number', () => {
+    window.__NGIAB__ = { TERRAIN_EXAGGERATION: 'nope' };
+    expect(terrainExaggeration()).to.equal(3);
+  });
+
+  it('uses a gentler exaggeration for the extruded-catchment view', () => {
+    delete window.__NGIAB__;
+    expect(terrainExaggeration3D()).to.equal(1.4);
+    expect(terrainExaggeration3D()).to.be.below(terrainExaggeration());
+  });
+
+  it('lets the template override the 3D exaggeration', () => {
+    window.__NGIAB__ = { TERRAIN_EXAGGERATION_3D: 2 };
+    expect(terrainExaggeration3D()).to.equal(2);
   });
 });
 

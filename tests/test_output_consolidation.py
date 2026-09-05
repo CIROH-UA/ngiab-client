@@ -61,7 +61,20 @@ def test_the_value_matrix_matches_the_per_catchment_layout(ingest, consolidate):
     assert before["catchment_ids"] == after["catchment_ids"]
     assert before["times"] == after["times"]
     assert before["bins"] == after["bins"]
+    assert before["norms"] == after["norms"]
     assert before["breaks"] == after["breaks"]
+
+
+def test_the_value_matrix_carries_normalised_heights(consolidate):
+    """norms drives extrusion height: one byte per catchment per frame, with real spread."""
+    import base64
+
+    import numpy as np
+
+    matrix = ngiab_utils.get_catchment_value_matrix(consolidate(), "Q_OUT")
+    norms = np.frombuffer(base64.b64decode(matrix["norms"]), dtype=np.uint8)
+    assert norms.size == len(matrix["catchment_ids"]) * len(matrix["times"])
+    assert norms.max() > norms.min()
 
 
 def test_one_catchment_series_matches_the_per_catchment_layout(ingest, consolidate):

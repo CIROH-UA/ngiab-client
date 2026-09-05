@@ -10,8 +10,28 @@ it('starts with the documented shape', () => {
   const s = store.get();
   expect(s).to.have.property('selection');
   expect(s.selection).to.have.all.keys('type', 'id', 'label');
-  expect(s.layers).to.have.all.keys('catchmentHidden', 'showTeehr');
+  expect(s.layers).to.have.all.keys('catchmentHidden', 'showTeehr', 'extrude', 'terrain');
   expect(s.theme).to.be.oneOf(['light', 'dark']);
+});
+
+it('defaults the 3D and terrain layer toggles to off', () => {
+  expect(store.get().layers.extrude).to.equal(false);
+  expect(store.get().layers.terrain).to.equal(false);
+});
+
+it('setLayer toggles the extrude flag without disturbing other layers', () => {
+  actions.setLayer('extrude', true);
+  expect(store.get().layers.extrude).to.equal(true);
+  expect(store.get().layers.showTeehr).to.equal(true);
+  actions.setLayer('extrude', false);
+  expect(store.get().layers.extrude).to.equal(false);
+});
+
+it('setLayer toggles the terrain flag', () => {
+  actions.setLayer('terrain', true);
+  expect(store.get().layers.terrain).to.equal(true);
+  actions.setLayer('terrain', false);
+  expect(store.get().layers.terrain).to.equal(false);
 });
 
 it('selectCatchment records the selection and derived ids', () => {
@@ -116,7 +136,12 @@ it('setTheme changes only the theme', () => {
 it('setLayer patches one layer flag without dropping the others', () => {
   actions.setLayer('showTeehr', false);
   actions.setLayer('catchmentHidden', true);
-  expect(store.get().layers).to.deep.equal({ catchmentHidden: true, showTeehr: false });
+  expect(store.get().layers).to.deep.equal({
+    catchmentHidden: true,
+    showTeehr: false,
+    extrude: false,
+    terrain: false,
+  });
   actions.setLayer('catchmentHidden', false);
   actions.setLayer('showTeehr', true);
 });

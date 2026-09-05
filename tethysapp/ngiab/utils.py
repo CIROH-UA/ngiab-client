@@ -286,6 +286,8 @@ _BUCKET_HOURS = (1, 3, 6, 12, 24, 48, 168, 720)
 
 _NO_DATA_BIN = 0
 _CLASS_COUNT = 8
+_NORM_PERCENTILE_CLAMP = (2, 98)
+_NORM_BYTE_MAX = 255
 
 
 def _group_table_for(outputs, stem):
@@ -378,6 +380,26 @@ def _class_breaks(values):
     return unique
 
 
+def _value_norms(grid):
+    """Per-cell magnitude scaled to 0-255, clamped to the run's 2nd-98th percentile.
+
+    Drives extrusion height so prisms reflect the actual value, not just the
+    quantile rank. The percentile clamp keeps a single outlier catchment from
+    flattening everyone else. No-data and no-spread cells resolve to 0.
+    """
+    norms = np.zeros(grid.shape, dtype=np.uint8)
+    finite = np.isfinite(grid)
+    if not finite.any():
+        return norms
+    low, high = np.nanpercentile(grid, _NORM_PERCENTILE_CLAMP)
+    span = float(high) - float(low)
+    if span > 0:
+        scaled = np.clip((grid - float(low)) / span, 0.0, 1.0)
+        scaled[~finite] = 0.0
+        norms = (scaled * float(_NORM_BYTE_MAX)).astype(np.uint8)
+    return norms
+
+
 @functools.lru_cache(maxsize=32)
 def _cached_catchment_variables(directory, version, table):
     """Keyed on the run's version token so re-ingested outputs invalidate it."""
@@ -462,6 +484,7 @@ def _build_value_matrix(table, variable=None, consolidated=False, catchment_coun
         "times": [],
         "breaks": [],
         "bins": "",
+        "norms": "",
         "step_hours": None,
         "no_data_bin": _NO_DATA_BIN,
     }
@@ -528,6 +551,8 @@ def _build_value_matrix(table, variable=None, consolidated=False, catchment_coun
     bins = np.searchsorted(np.asarray(breaks), grid, side="right").astype(np.uint8) + 1
     bins[~np.isfinite(grid)] = _NO_DATA_BIN
 
+    norms = _value_norms(grid)
+
     return {
         "variable": selected,
         "variables": variables,
@@ -535,6 +560,7 @@ def _build_value_matrix(table, variable=None, consolidated=False, catchment_coun
         "times": [pd.Timestamp(value).isoformat() for value in buckets],
         "breaks": breaks,
         "bins": base64.b64encode(bins.tobytes()).decode("ascii"),
+        "norms": base64.b64encode(norms.tobytes()).decode("ascii"),
         "step_hours": bucket_hours,
         "no_data_bin": _NO_DATA_BIN,
     }

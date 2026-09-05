@@ -275,3 +275,43 @@ Basemap gallery (light and dark are the only two styles published for this hydro
   top of `api/client.js`. Inside a function body, a comment is one line. Anything longer
   belongs in the doc comment above it or in this file.
 - Components render into **light DOM** so the global stylesheet applies.
+
+## 3D view (extrusion + terrain)
+
+Two optional, off-by-default toggles in the layers panel:
+
+- **3D catchments** — a `fill-extrusion` layer (`catchments-extruded` in `components/map/layers.js`).
+  Colour keys on the same `bin` feature-state as the flat choropleth, while `fill-extrusion-height`
+  reads a separate `val` feature-state so height reflects the actual value, not just its bin rank.
+  Both re-animate with the timeline. The backend adds a `norms` byte array (0-255, clamped to the
+  run's 2nd-98th percentile in `_value_norms`, `utils.py`) to the value-matrix payload alongside
+  `bins`; the frontend sets `val` from it. The toggle sets `layers.extrude` in the store, swaps flat
+  vs extruded visibility in `refresh`, and pitches the camera in `components/map/ngiab-map.js`.
+
+- **terrain** — `components/map/terrain.js` adds a `raster-dem` source (terrarium encoding) through
+  the already-registered `pmtiles` protocol and calls `map.setTerrain(...)`. The source URL is
+  `TERRAIN_URL` in `config.js`; the toggle is disabled only if it is emptied.
+
+### Terrain tiles
+
+`TERRAIN_URL` defaults to [Mapterhorn](https://protomaps.com/blog/mapterhorn-terrain/)'s public
+global archive, `https://download.mapterhorn.com/planet.pmtiles` (terrarium encoding). PMTiles is
+range-read, so the browser only fetches the tiles currently in view, and the portal sets no CSP, so
+no `connect-src` allowance is needed. This works out of the box — no infrastructure — and is the
+current default while prototyping.
+
+For production, prefer **self-hosting a CONUS subset** so terrain doesn't depend on Mapterhorn's
+hosting and stays small:
+
+1. Extract a CONUS box from the global archive and cap the zoom (biggest lever on size):
+   `pmtiles extract https://download.mapterhorn.com/planet.pmtiles conus-terrain.pmtiles --bbox=-125,24,-66,50 --maxzoom=12`
+2. Upload `conus-terrain.pmtiles` to a bucket the app already reads (`communityhydrofabric.s3` or
+   `ciroh-portal-assets`).
+3. Point `TERRAIN_URL` at it — either edit the `config.js` default or inject
+   `window.__NGIAB__.TERRAIN_URL` from the Django context. Optionally tune the vertical
+   exaggeration: `TERRAIN_EXAGGERATION` (default `3`) for the terrain-only view, and
+   `TERRAIN_EXAGGERATION_3D` (default `1.4`), the gentler value used while extruded catchments are
+   shown so the relief and the prisms share a coherent scale. Confirm the tiles' `tileSize` matches
+   `terrain.js` (default `512`).
+
+The 3D-extrusion half is independent and works with or without terrain.
