@@ -9,7 +9,8 @@ WORKDIR /build
 COPY . /build
 
 RUN git config --global --add safe.directory '*' \
-    && uv pip install --python "${VIRTUAL_ENV}" /build
+    && uv pip install --python "${VIRTUAL_ENV}" /build \
+    && uv pip install --python "${VIRTUAL_ENV}" 'tornado>=6.5.8'
 
 ENV DUCKDB_HOME=/opt/duckdb_extensions
 RUN mkdir -p "${DUCKDB_HOME}" \
