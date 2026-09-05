@@ -74,6 +74,12 @@ export const catchmentFillColor = (view) =>
   view.choropleth ? choroplethFillColor(view) : teehrAware(view, TEEHR_FILL, PLAIN_FILL);
 export const flowPathsLineColor = (view) => teehrAware(view, TEEHR_LINE, PLAIN_LINE);
 
+export const catchmentExtrusionColor = (view) => {
+  const base = catchmentFillColor(view);
+  if (view.selectedCatchmentId == null) return base;
+  return ['case', ['==', catchmentRef(), view.selectedCatchmentId], HIGHLIGHT_LINE, base];
+};
+
 const NORM_BYTE_MAX = 255;
 
 const VAL_FRACTION = ['/', ['coalesce', ['feature-state', 'val'], 0], NORM_BYTE_MAX];
@@ -126,7 +132,7 @@ export function catchmentsExtrudedSpec(view) {
     'source-layer': LAYER_DIVIDES,
     filter: catchmentSetFilter(view),
     paint: {
-      'fill-extrusion-color': catchmentFillColor(view),
+      'fill-extrusion-color': catchmentExtrusionColor(view),
       'fill-extrusion-height': catchmentExtrusionHeight(),
       'fill-extrusion-base': 0,
       'fill-extrusion-opacity': EXTRUSION_OPACITY,
@@ -147,7 +153,7 @@ export function catchmentHighlightSpec(view) {
       'fill-outline-color': '#ffffff',
       'fill-opacity': 0.5,
     },
-    layout: visibility(view.catchmentHidden),
+    layout: visibility(flatCatchmentsHidden(view)),
   };
 }
 
@@ -225,7 +231,7 @@ export function refresh(map, view) {
   setPaint(LAYER_CATCHMENTS, 'fill-color', catchmentFill);
   setPaint(LAYER_CATCHMENTS, 'fill-outline-color', catchmentOutlineColor(view));
   setPaint(LAYER_CATCHMENTS, 'fill-opacity', catchmentFillOpacity());
-  setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-color', catchmentFill);
+  setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-color', catchmentExtrusionColor(view));
   setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-height', catchmentExtrusionHeight());
   setPaint(LAYER_CATCHMENTS_EXTRUDED, 'fill-extrusion-opacity', EXTRUSION_OPACITY);
   setPaint('flowpaths-layer', 'line-color', flowPathsLineColor(view));
@@ -237,5 +243,5 @@ export function refresh(map, view) {
   };
   setVis(LAYER_CATCHMENTS, flatCatchmentsHidden(view));
   setVis(LAYER_CATCHMENTS_EXTRUDED, extrudedCatchmentsHidden(view));
-  setVis('catchment-highlight', view.catchmentHidden);
+  setVis('catchment-highlight', flatCatchmentsHidden(view));
 }

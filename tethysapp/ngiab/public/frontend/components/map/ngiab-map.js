@@ -22,6 +22,7 @@ import {
   refresh,
 } from './layers.js';
 import { applyTerrain, removeTerrain } from './terrain.js';
+import { applyPitch, pitchFor, PITCH_FLAT } from './camera.js';
 import {
   attachHoverCursor,
   attachMapTip,
@@ -127,7 +128,8 @@ export class NgiabMap extends HTMLElement {
       zoom: 4,
     });
     this._map = map;
-    this._appliedPitch = false;
+    this._appliedPitch = PITCH_FLAT;
+    this._pitchState = { deferred: false, pitch: PITCH_FLAT };
     this._appliedTerrain = false;
     this._appliedExaggeration = null;
     this._appliedSkyTheme = null;
@@ -172,10 +174,10 @@ export class NgiabMap extends HTMLElement {
   }
 
   _syncPitch(view) {
-    const pitched = Boolean(view.extrude || view.terrain);
-    if (pitched === this._appliedPitch) return;
-    this._appliedPitch = pitched;
-    this._map?.easeTo({ pitch: pitched ? 70 : 0, duration: 500 });
+    const pitch = pitchFor(view);
+    if (pitch === this._appliedPitch) return;
+    this._appliedPitch = pitch;
+    applyPitch(this._map, pitch, this._pitchState);
   }
 
   _applySky() {

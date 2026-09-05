@@ -4,6 +4,7 @@ import {
   LAYER_CATCHMENTS_EXTRUDED,
   SRC_DIVIDES,
   SRC_FLOWPATHS,
+  catchmentExtrusionColor,
   catchmentExtrusionHeight,
   catchmentFillColor,
   catchmentHighlightFilter,
@@ -230,6 +231,26 @@ describe('extruded catchments', () => {
     expect(
       catchmentsExtrudedSpec(view({ extrude: true, choropleth: true, catchmentHidden: true }))
         .layout.visibility,
+    ).to.equal('none');
+  });
+
+  it('paints the prism with the plain fill colour when nothing is selected', () => {
+    const plain = view({ choropleth: true });
+    expect(catchmentExtrusionColor(plain)).to.deep.equal(catchmentFillColor(plain));
+  });
+
+  it('highlights the selected prism so the pick reads in 3D', () => {
+    const color = catchmentExtrusionColor(view({ choropleth: true, selectedCatchmentId: 7 }));
+    expect(color[0]).to.equal('case');
+    expect(color[1]).to.deep.equal(['==', ['id'], 7]);
+    expect(color[2]).to.equal(catchmentHighlightSpec(view()).paint['fill-color']);
+    expect(color[3]).to.deep.equal(catchmentFillColor(view({ choropleth: true })));
+  });
+
+  it('hides the flat highlight ring in 3D so it cannot sit buried under a prism', () => {
+    expect(catchmentHighlightSpec(view()).layout.visibility).to.equal('visible');
+    expect(
+      catchmentHighlightSpec(view({ extrude: true, choropleth: true })).layout.visibility,
     ).to.equal('none');
   });
 
