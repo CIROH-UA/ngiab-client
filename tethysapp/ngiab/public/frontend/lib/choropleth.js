@@ -27,15 +27,6 @@ export function frameAt(bins, frameCount, catchmentCount, index) {
   return bins.subarray(start, start + catchmentCount);
 }
 
-export function diffFrames(previous, next) {
-  const changed = [];
-  if (!next) return changed;
-  for (let i = 0; i < next.length; i += 1) {
-    if (!previous || previous[i] !== next[i]) changed.push(i);
-  }
-  return changed;
-}
-
 export function binColor(bin, theme) {
   const ramp = RAMP[theme === 'dark' ? 'dark' : 'light'];
   if (!Number.isInteger(bin) || bin <= NO_DATA_BIN || bin >= ramp.length) return ramp[0];

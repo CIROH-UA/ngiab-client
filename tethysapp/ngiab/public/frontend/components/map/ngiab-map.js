@@ -2,7 +2,14 @@ import maplibregl from 'maplibre-gl';
 import { Protocol } from 'pmtiles';
 
 import appAPI from '../../api/app.js';
-import { canUpload, getModelRunId } from '../../config.js';
+import {
+  canUpload,
+  getModelRunId,
+  terrainUrl,
+  terrainExaggeration,
+  terrainExaggeration3D,
+  terrainTileSize,
+} from '../../config.js';
 import { noRunsMessage } from '../../lib/empty-runs.js';
 import { store, actions } from '../../store/app-store.js';
 import { toNumericIds, toCatchmentIndex } from '../../lib/ids.js';
@@ -10,9 +17,12 @@ import '../ngiab-search.js';
 import {
   STYLE_URLS,
   SRC_DIVIDES,
+  catchmentsExtruded,
   installLayers,
   refresh,
 } from './layers.js';
+import { applyTerrain, removeTerrain } from './terrain.js';
+import { applyPitch, pitchFor, PITCH_FLAT } from './camera.js';
 import {
   attachHoverCursor,
   attachMapTip,
@@ -28,6 +38,25 @@ const escapeHtml = (value) =>
   String(value).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 maplibregl.addProtocol('pmtiles', new Protocol({ metadata: true }).tile);
+
+const SKY_PAINT = {
+  light: {
+    'sky-color': '#8fbce6',
+    'sky-horizon-blend': 0.5,
+    'horizon-color': '#e8f0f7',
+    'horizon-fog-blend': 0.6,
+    'fog-color': '#dfe6ec',
+    'fog-ground-blend': 0.5,
+  },
+  dark: {
+    'sky-color': '#0b1a2e',
+    'sky-horizon-blend': 0.5,
+    'horizon-color': '#243244',
+    'horizon-fog-blend': 0.6,
+    'fog-color': '#111a24',
+    'fog-ground-blend': 0.5,
+  },
+};
 
 export class NgiabMap extends HTMLElement {
   connectedCallback() {
@@ -81,6 +110,8 @@ export class NgiabMap extends HTMLElement {
       theme: state.theme,
       catchmentHidden: state.layers.catchmentHidden,
       showTeehr: state.layers.showTeehr,
+      extrude: state.layers.extrude,
+      terrain: state.layers.terrain,
       selectedCatchmentId: state.selection.id,
       catchmentIds: this._local.catchmentIds,
       teehrNexusIds: this._local.teehrNexusIds,
@@ -97,6 +128,11 @@ export class NgiabMap extends HTMLElement {
       zoom: 4,
     });
     this._map = map;
+    this._appliedPitch = PITCH_FLAT;
+    this._pitchState = { deferred: false, pitch: PITCH_FLAT };
+    this._appliedTerrain = false;
+    this._appliedExaggeration = null;
+    this._appliedSkyTheme = null;
     this._choropleth = new ChoroplethState(map);
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-right');
@@ -115,6 +151,8 @@ export class NgiabMap extends HTMLElement {
       this._ensureLayers();
       this._nexusIndex.reindex(map);
       this._choropleth.reapply();
+      this._syncTerrain(this._view);
+      this._applySky();
 
       this._syncModelRun();
     });
@@ -130,8 +168,69 @@ export class NgiabMap extends HTMLElement {
     if (map.getSource(SRC_DIVIDES)) return;
     const view = this._view;
     installLayers(map, view);
-    this._appliedViewKey = JSON.stringify(view);
+    this._markViewApplied(view);
     refresh(map, view);
+    this._syncTerrain(view, { force: true });
+  }
+
+  _syncPitch(view) {
+    const pitch = pitchFor(view);
+    if (pitch === this._appliedPitch) return;
+    this._appliedPitch = pitch;
+    applyPitch(this._map, pitch, this._pitchState);
+  }
+
+  _applySky() {
+    const theme = store.get().theme;
+    if (theme === this._appliedSkyTheme) return;
+    this._appliedSkyTheme = theme;
+    this._map?.setSky(theme === 'dark' ? SKY_PAINT.dark : SKY_PAINT.light);
+  }
+
+  _syncTerrain(view, { force = false } = {}) {
+    if (!view.terrain) {
+      this._appliedTerrain = false;
+      this._appliedExaggeration = null;
+      removeTerrain(this._map);
+      return;
+    }
+    const exaggeration = catchmentsExtruded(view)
+      ? terrainExaggeration3D()
+      : terrainExaggeration();
+    if (!force && this._appliedTerrain && exaggeration === this._appliedExaggeration) return;
+    if (!this._map?.isStyleLoaded()) return;
+    this._appliedTerrain = true;
+    this._appliedExaggeration = exaggeration;
+    applyTerrain(this._map, {
+      url: terrainUrl(),
+      exaggeration,
+      tileSize: terrainTileSize(),
+      dark: view.theme === 'dark',
+    });
+  }
+
+  _applyView(view = this._view) {
+    this._markViewApplied(view);
+    refresh(this._map, view);
+    this._syncPitch(view);
+    this._syncTerrain(view);
+  }
+
+  _viewKey(view) {
+    return `${view.theme}|${view.catchmentHidden}|${view.showTeehr}|${view.extrude}|`
+      + `${view.terrain}|${view.selectedCatchmentId}|${view.choropleth}`;
+  }
+
+  _markViewApplied(view) {
+    this._appliedScalarKey = this._viewKey(view);
+    this._appliedCatchmentIds = view.catchmentIds;
+    this._appliedTeehrIds = view.teehrNexusIds;
+  }
+
+  _viewChanged(view) {
+    return this._viewKey(view) !== this._appliedScalarKey
+      || view.catchmentIds !== this._appliedCatchmentIds
+      || view.teehrNexusIds !== this._appliedTeehrIds;
   }
 
   _onStoreChange() {
@@ -139,11 +238,7 @@ export class NgiabMap extends HTMLElement {
     if (!map) return;
 
     const view = this._view;
-    const viewKey = JSON.stringify(view);
-    if (viewKey !== this._appliedViewKey) {
-      this._appliedViewKey = viewKey;
-      refresh(map, view);
-    }
+    if (this._viewChanged(view)) this._applyView(view);
     if (map.isStyleLoaded()) this._syncModelRun();
     this._syncMapVariable();
     this._syncFrame();
@@ -160,7 +255,7 @@ export class NgiabMap extends HTMLElement {
       this._choropleth.clear();
       this._timelineEl?.setTimes([]);
       this._legendEl?.setScale({ variable: null, breaks: [] });
-      refresh(this._map, this._view);
+      this._applyView();
       return;
     }
 
@@ -181,8 +276,7 @@ export class NgiabMap extends HTMLElement {
       this._timelineEl?.setTimes(matrix.times);
       this._legendEl?.setScale({ variable: matrix.variable, breaks: matrix.breaks });
 
-      refresh(this._map, this._view);
-      this._applied = null;
+      this._applyView();
       this._syncFrame(true);
 
       const step = matrix.step_hours ? ` · ${matrix.step_hours}h steps` : '';
@@ -418,17 +512,27 @@ export class NgiabMap extends HTMLElement {
 
   _bindControls() {
     const bind = (id, handler) => {
-      document
-        .getElementById(id)
-        ?.addEventListener('change', (event) => handler(event.target.checked));
+      const el = document.getElementById(id);
+      el?.addEventListener('change', (event) => handler(event.target.checked));
+      return el;
     };
 
     bind('toggle-theme', (on) => {
       actions.setTheme(on ? 'dark' : 'light');
+      this._appliedTerrain = false;
+      this._appliedExaggeration = null;
+      this._appliedSkyTheme = null;
       this._map.setStyle(STYLE_URLS[on ? 'dark' : 'light']);
     });
     bind('toggle-catchments', (shown) => actions.setLayer('catchmentHidden', !shown));
     bind('toggle-teehr', (show) => actions.setLayer('showTeehr', show));
+    bind('toggle-3d', (on) => actions.setLayer('extrude', on));
+    const terrainToggle = bind('toggle-terrain', (on) => actions.setLayer('terrain', on));
+
+    if (!terrainUrl() && terrainToggle) {
+      terrainToggle.disabled = true;
+      terrainToggle.closest('.toggle')?.setAttribute('title', 'Terrain tiles are not configured');
+    }
 
     this._mapVariableEl?.addEventListener('change', (event) => {
       actions.setMapVariable(event.target.value || null);

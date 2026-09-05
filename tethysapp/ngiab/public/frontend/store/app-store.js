@@ -14,7 +14,7 @@ export const store = createStore({
   trouteVariable: null,
 
   theme: 'light',
-  layers: { catchmentHidden: false, showTeehr: true },
+  layers: { catchmentHidden: false, showTeehr: true, extrude: false, terrain: false },
 
   mapVariable: null,
   frameIndex: 0,

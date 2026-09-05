@@ -1,12 +1,16 @@
 import { expect } from '@esm-bundle/chai';
 import {
   LAYER_DIVIDES,
+  LAYER_CATCHMENTS_EXTRUDED,
   SRC_DIVIDES,
   SRC_FLOWPATHS,
+  catchmentExtrusionColor,
+  catchmentExtrusionHeight,
   catchmentFillColor,
   catchmentHighlightFilter,
   catchmentHighlightSpec,
   catchmentSetFilter,
+  catchmentsExtrudedSpec,
   catchmentsSpec,
   flowPathHighlightFilter,
   flowPathsFilter,
@@ -125,13 +129,17 @@ function fakeMap() {
 }
 
 describe('installLayers', () => {
-  it('adds both sources and all four layers', () => {
+  it('adds both sources and all five layers', () => {
     const map = fakeMap();
     installLayers(map, view());
     expect([...map.sources.keys()].sort()).to.deep.equal([SRC_DIVIDES, SRC_FLOWPATHS].sort());
-    expect([...map.layers.keys()].sort()).to.deep.equal(
-      ['catchment-highlight', 'catchments-layer', 'flowpath-highlight', 'flowpaths-layer'],
-    );
+    expect([...map.layers.keys()].sort()).to.deep.equal([
+      'catchment-highlight',
+      'catchments-extruded',
+      'catchments-layer',
+      'flowpath-highlight',
+      'flowpaths-layer',
+    ]);
   });
 
   it('is idempotent, so calling it on every idle is safe', () => {
@@ -139,7 +147,7 @@ describe('installLayers', () => {
     installLayers(map, view());
     const first = map.layers.get('catchments-layer');
     installLayers(map, view());
-    expect(map.layers.size).to.equal(4);
+    expect(map.layers.size).to.equal(5);
     expect(map.layers.get('catchments-layer')).to.equal(first);
   });
 
@@ -151,7 +159,7 @@ describe('installLayers', () => {
 
     installLayers(map, view({ theme: 'dark' }));
     expect(map.getSource(SRC_DIVIDES)).to.not.equal(undefined);
-    expect(map.layers.size).to.equal(4);
+    expect(map.layers.size).to.equal(5);
   });
 });
 
@@ -170,5 +178,93 @@ describe('flowPathHighlightFilter', () => {
       ['get', 'divide_id'],
       -1,
     ]);
+  });
+});
+
+describe('extruded catchments', () => {
+  it('is a fill-extrusion on the divides source, filtered to the run', () => {
+    const spec = catchmentsExtrudedSpec(view({ extrude: true }));
+    expect(spec.id).to.equal(LAYER_CATCHMENTS_EXTRUDED);
+    expect(spec.type).to.equal('fill-extrusion');
+    expect(spec.source).to.equal(SRC_DIVIDES);
+    expect(spec['source-layer']).to.equal(LAYER_DIVIDES);
+    expect(spec.filter).to.deep.equal(catchmentSetFilter(view()));
+  });
+
+  it('colors the prisms with the same helper as the flat catchments layer', () => {
+    const plain = view();
+    expect(catchmentsExtrudedSpec(plain).paint['fill-extrusion-color']).to.deep.equal(
+      catchmentFillColor(plain),
+    );
+    const choro = view({ choropleth: true });
+    expect(catchmentsExtrudedSpec(choro).paint['fill-extrusion-color']).to.deep.equal(
+      catchmentFillColor(choro),
+    );
+  });
+
+  it('drives height from the value feature-state, not the colour bin', () => {
+    const height = catchmentsExtrudedSpec(view()).paint['fill-extrusion-height'];
+    expect(height).to.deep.equal(catchmentExtrusionHeight());
+    expect(JSON.stringify(height)).to.contain('["feature-state","val"]');
+    expect(JSON.stringify(height)).to.not.contain('["feature-state","bin"]');
+  });
+
+  it('scales the zoom-interpolated height ceiling down as the map zooms in', () => {
+    const height = catchmentExtrusionHeight();
+    const zoomStops = height.slice(3);
+    expect(zoomStops[0]).to.equal(5);
+    expect(zoomStops[2]).to.equal(9);
+    expect(zoomStops[4]).to.equal(13);
+    expect(zoomStops[1][2]).to.be.above(zoomStops[3][2]);
+    expect(zoomStops[3][2]).to.be.above(zoomStops[5][2]);
+  });
+
+  it('is visible only when 3D is on and a variable is shading', () => {
+    expect(
+      catchmentsExtrudedSpec(view({ extrude: true, choropleth: true })).layout.visibility,
+    ).to.equal('visible');
+    expect(catchmentsExtrudedSpec(view({ extrude: true })).layout.visibility).to.equal('none');
+    expect(
+      catchmentsExtrudedSpec(view({ extrude: false, choropleth: true })).layout.visibility,
+    ).to.equal('none');
+    expect(catchmentsExtrudedSpec(view()).layout.visibility).to.equal('none');
+    expect(
+      catchmentsExtrudedSpec(view({ extrude: true, choropleth: true, catchmentHidden: true }))
+        .layout.visibility,
+    ).to.equal('none');
+  });
+
+  it('paints the prism with the plain fill colour when nothing is selected', () => {
+    const plain = view({ choropleth: true });
+    expect(catchmentExtrusionColor(plain)).to.deep.equal(catchmentFillColor(plain));
+  });
+
+  it('highlights the selected prism so the pick reads in 3D', () => {
+    const color = catchmentExtrusionColor(view({ choropleth: true, selectedCatchmentId: 7 }));
+    expect(color[0]).to.equal('case');
+    expect(color[1]).to.deep.equal(['==', ['id'], 7]);
+    expect(color[2]).to.equal(catchmentHighlightSpec(view()).paint['fill-color']);
+    expect(color[3]).to.deep.equal(catchmentFillColor(view({ choropleth: true })));
+  });
+
+  it('hides the flat highlight ring in 3D so it cannot sit buried under a prism', () => {
+    expect(catchmentHighlightSpec(view()).layout.visibility).to.equal('visible');
+    expect(
+      catchmentHighlightSpec(view({ extrude: true, choropleth: true })).layout.visibility,
+    ).to.equal('none');
+  });
+
+  it('keeps the flat drape unless a shaded 3D view replaces it', () => {
+    expect(catchmentsSpec(view()).layout.visibility).to.equal('visible');
+    expect(catchmentsSpec(view({ extrude: true })).layout.visibility).to.equal('visible');
+    expect(
+      catchmentsSpec(view({ extrude: true, choropleth: true })).layout.visibility,
+    ).to.equal('none');
+  });
+
+  it('renders the prisms at a solid, readable opacity', () => {
+    expect(
+      catchmentsExtrudedSpec(view({ choropleth: true })).paint['fill-extrusion-opacity'],
+    ).to.equal(0.85);
   });
 });
