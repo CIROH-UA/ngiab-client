@@ -168,7 +168,7 @@ export class NgiabMap extends HTMLElement {
     if (map.getSource(SRC_DIVIDES)) return;
     const view = this._view;
     installLayers(map, view);
-    this._appliedViewKey = JSON.stringify(view);
+    this._markViewApplied(view);
     refresh(map, view);
     this._syncTerrain(view, { force: true });
   }
@@ -210,10 +210,27 @@ export class NgiabMap extends HTMLElement {
   }
 
   _applyView(view = this._view) {
-    this._appliedViewKey = JSON.stringify(view);
+    this._markViewApplied(view);
     refresh(this._map, view);
     this._syncPitch(view);
     this._syncTerrain(view);
+  }
+
+  _viewKey(view) {
+    return `${view.theme}|${view.catchmentHidden}|${view.showTeehr}|${view.extrude}|`
+      + `${view.terrain}|${view.selectedCatchmentId}|${view.choropleth}`;
+  }
+
+  _markViewApplied(view) {
+    this._appliedScalarKey = this._viewKey(view);
+    this._appliedCatchmentIds = view.catchmentIds;
+    this._appliedTeehrIds = view.teehrNexusIds;
+  }
+
+  _viewChanged(view) {
+    return this._viewKey(view) !== this._appliedScalarKey
+      || view.catchmentIds !== this._appliedCatchmentIds
+      || view.teehrNexusIds !== this._appliedTeehrIds;
   }
 
   _onStoreChange() {
@@ -221,7 +238,7 @@ export class NgiabMap extends HTMLElement {
     if (!map) return;
 
     const view = this._view;
-    if (JSON.stringify(view) !== this._appliedViewKey) this._applyView(view);
+    if (this._viewChanged(view)) this._applyView(view);
     if (map.isStyleLoaded()) this._syncModelRun();
     this._syncMapVariable();
     this._syncFrame();
