@@ -53,7 +53,7 @@ export TERM=xterm-256color
 CONFIG_FILE="$HOME/.host_data_path.conf"
 DOCKER_NETWORK="tethys-network"
 TETHYS_CONTAINER_NAME="tethys-ngen-portal"
-TETHYS_REPO="awiciroh/tethys-ngiab"
+TETHYS_REPO="docker.io/awiciroh/tethys-ngiab"
 
 MODELS_RUNS_DIRECTORY="${MODELS_RUNS_DIRECTORY:-$HOME/ngiab_visualizer}"
 TETHYS_PERSIST_PATH="/home/tethys/persist"
