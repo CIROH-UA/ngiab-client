@@ -4,7 +4,7 @@ export function createStore(initialState) {
 
   return {
     get() {
-      return state;
+      return { ...state };
     },
 
     set(patch) {
