@@ -1,16 +1,55 @@
 {% load static tethys %}
 <!DOCTYPE html>
-<html>
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="theme-color" content="#2c3e50" />
-		<link rel="shortcut icon" href="{% if site_globals.favicon and 'http' in site_globals.favicon %}{{ site_globals.favicon }}{% elif site_globals.favicon %}{% static site_globals.favicon %}{% else %}{% static 'tethys_portal/images/default_favicon.png' %}{% endif %}" />
-		<title>{{ tethys_app.name }}</title>
-	</head>
-	<body style="margin: 0;">
-		<noscript>You need to enable JavaScript to run this app.</noscript>
-		<div id="root"></div>
-		<script src="{% static tethys_app|public:'frontend/main.js' %}"></script>
-	</body>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#2c3e50" />
+    <link rel="shortcut icon" href="{% if site_globals.favicon and 'http' in site_globals.favicon %}{{ site_globals.favicon }}{% elif site_globals.favicon %}{% static site_globals.favicon %}{% else %}{% static 'tethys_portal/images/default_favicon.png' %}{% endif %}" />
+    <title>{{ tethys_app.name }}</title>
+
+    <!-- Runtime config; a classic inline script so it runs before the deferred modules below. -->
+    <script>
+      window.__NGIAB__ = {
+        APP_ROOT_URL: "{{ app_root_url|escapejs }}",
+        PORTAL_HOST: "",
+        // Default model run; override per request with ?model_run_id=... in the URL.
+        MODEL_RUN_ID: "",
+        SIGNED_IN: {{ signed_in|yesno:"true,false" }},
+        CAN_DELETE: {{ can_delete|yesno:"true,false" }},
+        MAX_UPLOAD_BYTES: {{ max_upload_bytes }},
+        USERNAME: "{{ username|escapejs }}",
+        LOGIN_URL: "{{ login_url|escapejs }}",
+        LOGOUT_URL: "{{ logout_url|escapejs }}",
+        VERSION: "{{ app_version|escapejs }}"
+      };
+    </script>
+
+    <!-- One import map per document, before the first module script; see public/frontend/README.md. -->
+    <script type="importmap">
+    {
+      "imports": {
+        "maplibre-gl": "https://esm.sh/maplibre-gl@4.7.1",
+        "pmtiles": "https://esm.sh/pmtiles@3.2.1",
+        "uplot": "https://esm.sh/uplot@1.6.32"
+      }
+    }
+    </script>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.32/dist/uPlot.min.css" />
+    <link rel="stylesheet" href="{% static tethys_app|public:'frontend/styles/tokens.css' %}" />
+    <link rel="stylesheet" href="{% static tethys_app|public:'frontend/styles/app.css' %}" />
+    <style>
+      html, body { height: 100%; margin: 0; }
+      /* #map is absolutely positioned, so its container needs a positioning context. */
+      #root { position: relative; height: 100%; }
+    </style>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root">
+      {% include "ngiab/map.html" %}
+    </div>
+  </body>
 </html>

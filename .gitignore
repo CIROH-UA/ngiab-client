@@ -38,8 +38,8 @@ build/*
 
 # Node/React
 node_modules*
-tethysapp/ngiab/public/frontend/
-reactapp/config/production.env
+# webpack output for the legacy React app (deleted at the Phase 2 cutover).
+# NOTE: tethysapp/ngiab/public/frontend/ is hand-authored vanilla-JS source and IS tracked.
 coverage
 
 
@@ -53,3 +53,12 @@ coverage
 docs/brainstorms/
 docs/plans/
 docs/solutions/
+docs/superpowers/
+# The design-system context the assistant reads. Stays at the repo root because the tooling
+# looks for it there, but it is working context rather than part of the app.
+DESIGN.md
+
+# Assistant working notes: review findings, run artifacts, scratch analysis. Useful while
+# the work is happening, noise in the history afterwards, and none of it is the codebase.
+.context/
+.impeccable/

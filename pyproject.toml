@@ -1,14 +1,13 @@
 [project]
 name = "tethysapp-ngiab"
 dynamic = ["version"]
-description = "An application for visualizaing Next gen model data."
+description = "Visualize the outputs of model runs created by NextGen In A Box."
 authors = [{ name = "Giovanni Romero", email = "gromero@aquaveo.com" }]
-dependencies = ["duckdb>=1.5,<1.6", "geopandas>=1.1.2", "xarray", "netcdf4>=1.7.2", "numpy<2", "botocore", "boto3", "pytz", "reactpy>=1.1.0", "anyio>=4.13.0", "urllib3>=2.7.0", "idna>=3.15", "ujson>=5.12.1"]
+dependencies = ["duckdb==1.5.5", "geopandas>=1.1.2", "pyogrio>=0.8", "pyproj>=3.6", "xarray", "netcdf4>=1.7.2", "numpy>=1.26", "botocore", "boto3", "pytz", "anyio>=4.13.0", "urllib3>=2.7.0", "idna>=3.15", "ujson>=5.12.1", "cryptography>=50.0.0", "sqlparse>=0.6.0", "django-storages[s3]>=1.14.6"]
 requires-python = ">=3.10"
 readme = "README.md"
 license = { text = "" }
 keywords = [""]
-
 
 [tool.pdm]
 [tool.pdm.dev-dependencies]
@@ -24,7 +23,6 @@ lint = ["flake8>=5.0.4", "yapf>=0.32.0"]
 
 [tool.pdm.version]
 source = "scm"
-
 
 [tool.pdm.scripts]
 test.cmd = "pytest"
@@ -62,7 +60,6 @@ column_limit = 120
 [tool.yapfignore]
 ignore_patterns = [".git", ".venv", "build", "dist", "node_modules"]
 
-
 [tool.setuptools]
 include-package-data = true
 
@@ -73,7 +70,6 @@ include = ["tethysapp*"]
 "*" = ["*.js", "*.png", "*.gif", "*.jpg", "*.html", "*.css", "*.json", "*.svg"]
 
 [tool.setuptools_scm]
-# can be empty if no extra settings are needed, presence enables setuptools-scm
 
 [build-system]
 requires = ["setuptools", "setuptools-scm"]

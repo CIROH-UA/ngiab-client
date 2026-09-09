@@ -1,0 +1,225 @@
+# NGIAB Visualizer, as an Apptainer image.
+#
+# Same base, same provisioning and same server as Dockerfile -- this is that build
+# expressed as a def file, not a second implementation. Keep the two in step: the pinned
+# tethys-uvx tag, the DuckDB extension list and the provisioning steps are duplicated here
+# because a def file has no ARG and no way to include another build.
+#
+# Build from the repository root, so the %files paths resolve. --fakeroot needs a subuid
+# range for your user; nothing in %post wants real root. Verified on apptainer 1.5.3:
+#
+#     apptainer build --fakeroot ngiab.sif apptainer/ngiab.def
+#
+# Run:
+#
+#     apptainer run --net --network-args "portmap=8080:8080/tcp" ngiab.sif
+#
+# or simply, for a local port:
+#
+#     APPTAINERENV_PORT=9000 apptainer run ngiab.sif
+#
+# WHAT DIFFERS FROM THE CONTAINER IMAGE, AND WHY
+#
+# Apptainer mounts the image read-only and runs it as the invoking user rather than as
+# uid 1000. Neither base image needs root at run time, so the user change costs nothing --
+# but the read-only rootfs does: the container image writes its database, its rendered
+# config and its model runs to paths inside the image or onto a mounted volume, and none of
+# those writes can land here. ngiab-apptainer-run.sh beside this file moves every one of
+# them onto the host before starting the same serve.sh the container image runs.
+#
+# Everything writable therefore lives under a host state directory, ~/.ngiab_visualizer by
+# default, overridable with NGIAB_STATE_DIR. Apptainer binds $HOME by default, so that path
+# is writable with no --bind flag.
+
+Bootstrap: docker
+From: ghcr.io/aquaveo/tethys-uvx:builder-a3148d5
+Stage: build
+
+%files
+    . /build
+
+%post
+    set -eux
+
+    # setuptools-scm derives the version from git metadata, so .git must be present in the
+    # build context and trusted here.
+    git config --global --add safe.directory '*'
+    uv pip install --python "${VIRTUAL_ENV}" /build
+
+    # Pre-install the DuckDB extensions the object-storage backend needs, so a runtime LOAD
+    # never reaches extensions.duckdb.org -- which would fail on a restricted-egress HPC
+    # node, and fail anyway against a read-only image. Only these two: TEEHR evaluations are
+    # read as plain parquet, and duckdb_conn loads nothing at all on the filesystem backend.
+    export DUCKDB_HOME=/opt/duckdb_extensions
+    mkdir -p "${DUCKDB_HOME}"
+    "${VIRTUAL_ENV}/bin/python" -c "
+import duckdb, os
+h = os.environ['DUCKDB_HOME']
+c = duckdb.connect()
+c.execute(f\"SET home_directory='{h}'\")
+c.execute(f\"SET extension_directory='{h}'\")
+c.execute('INSTALL httpfs')
+c.execute('INSTALL aws')
+print('duckdb extensions installed:', duckdb.__version__)"
+    chmod -R a+rX "${DUCKDB_HOME}"
+
+    # Provision the database and static files at build time, exactly as the Dockerfile
+    # does. Every input is known now, so a run never pays for it. They land in
+    # /home/tethys/ngiab for the reasons the Dockerfile gives: not /opt, and not the
+    # persist directory the base image declares as a VOLUME.
+    export TETHYS_DB_ENGINE=django.db.backends.sqlite3
+    export TETHYS_DB_NAME=/home/tethys/ngiab/tethys_platform.sqlite
+    export STATIC_ROOT=/home/tethys/ngiab/static
+    export PORTAL_SUPERUSER_NAME=admin
+    export PORTAL_SUPERUSER_PASSWORD=pass
+
+    cp /build/conf/portal_config.yml "${TETHYS_HOME}/portal_config.yml"
+
+    # Single-app mode is commented out for the migrate and restored straight after. Tethys
+    # resolves STANDALONE_APP while importing the URLConf, which Django loads for the system
+    # checks that run before migrate, so it queries tethys_apps_tethysapp on a database
+    # where that table does not exist yet. Upstream guards this with `except
+    # ProgrammingError`, which is what psycopg raises for a missing table; sqlite raises
+    # OperationalError and sails straight through.
+    mkdir -p /home/tethys/ngiab/static
+    sed -i -E 's/^([[:space:]]*)(MULTIPLE_APP_MODE|STANDALONE_APP):/\1# BUILD-DISABLED \2:/' \
+        "${TETHYS_HOME}/portal_config.yml"
+    "${VIRTUAL_ENV}/bin/tethys" db migrate
+    "${VIRTUAL_ENV}/bin/tethys" db createsuperuser \
+        --pn "${PORTAL_SUPERUSER_NAME}" --pp "${PORTAL_SUPERUSER_PASSWORD}" --pe ""
+    sed -i -E 's/^([[:space:]]*)# BUILD-DISABLED (MULTIPLE_APP_MODE|STANDALONE_APP):/\1\2:/' \
+        "${TETHYS_HOME}/portal_config.yml"
+    grep -q '^[[:space:]]*MULTIPLE_APP_MODE:' "${TETHYS_HOME}/portal_config.yml"
+    "${VIRTUAL_ENV}/bin/tethys" site -f
+    "${VIRTUAL_ENV}/bin/tethys" manage collectstatic --noinput
+
+    # Fail the build rather than ship an image whose database silently landed elsewhere.
+    test -s /home/tethys/ngiab/tethys_platform.sqlite
+    echo "baked db: $(stat -c%s /home/tethys/ngiab/tethys_platform.sqlite) bytes"
+    echo "baked static: $(find /home/tethys/ngiab/static -type f | wc -l) files"
+
+    # World-readable rather than owned by uid 1000: an Apptainer image runs as whoever
+    # invoked it, so ownership inside the image means nothing and read access means
+    # everything. The database is copied out to the state directory before it is written.
+    chmod -R a+rX /home/tethys/ngiab
+
+
+Bootstrap: docker
+From: ghcr.io/aquaveo/tethys-uvx:runtime-base-a3148d5
+Stage: final
+
+%files from build
+    /opt/python /opt/python
+    /opt/conda /opt/conda
+    /opt/duckdb_extensions /opt/duckdb_extensions
+    /home/tethys/ngiab /home/tethys/ngiab
+
+%files
+    conf/portal_config.yml /config/portal_config.yml
+    conf/portal-config.d /opt/portal/portal-config.d
+    apptainer/ngiab-apptainer-run.sh /usr/local/bin/ngiab-apptainer-run.sh
+    scripts/ngiab-convert.sh /usr/local/bin/ngiab-convert.sh
+
+%post
+    set -eux
+
+    # Security floors the base image has not picked up yet, matched to the Dockerfile's
+    # runtime stage -- read the reasoning there, including why the util-linux family is
+    # upgraded while its CVEs are still unscored. Named rather than a blanket upgrade so the
+    # next person can see what was pinned up and drop it once the base moves. The Python-side
+    # equivalents (cryptography, sqlparse) are floors in pyproject.toml and arrive with the
+    # venv from the build stage.
+    apt-get update
+    apt-get install -y --no-install-recommends --only-upgrade \
+        libexpat1 \
+        libpq5 \
+        openssl \
+        libssl3t64 \
+        openssl-provider-legacy \
+        postgresql-client-17 \
+        bsdutils \
+        libblkid1 \
+        libmount1 \
+        libsmartcols1 \
+        libuuid1 \
+        login \
+        mount \
+        util-linux
+    rm -rf /var/lib/apt/lists/*
+
+    chmod 0755 /usr/local/bin/ngiab-apptainer-run.sh \
+               /usr/local/bin/ngiab-convert.sh
+    # Readable by any invoking user, since there is no fixed runtime uid.
+    chmod -R a+rX /opt/duckdb_extensions /config /opt/portal
+
+    # The base image ships /home/tethys as 0700, which is right for a container that always
+    # runs as uid 1000 and wrong for an image that runs as whoever invoked it. This was
+    # load-bearing while DEBUG was true: Django's autoreloader globbed a locale path under
+    # here and died with EACCES before serving anything. DEBUG is false now, so it is
+    # defence in depth rather than a fix -- any other read under /home/tethys by an
+    # arbitrary uid would fail the same way. The runscript keeps all writes out of here.
+    chmod -R a+rX /home/tethys
+
+%environment
+    # SQLite, not Postgres: the visualizer ships as one self-contained image. The runscript
+    # repoints TETHYS_DB_NAME at the live copy under the state directory before serving.
+    export TETHYS_DB_ENGINE=django.db.backends.sqlite3
+    export TETHYS_DB_NAME=/home/tethys/ngiab/tethys_platform.sqlite
+    export STATIC_ROOT=/home/tethys/ngiab/static
+    export TETHYS_PERSIST=/home/tethys/persist
+
+    # Defaulted rather than fixed, so `--env PORT=9000` is honoured. Note that a bare
+    # `PORT=9000 apptainer run ...` is not: Apptainer does not carry that one through, which
+    # is why the help below says APPTAINERENV_PORT. NGIAB_STATE_DIR does pass plainly,
+    # because nothing here declares it.
+    export PORT="${PORT:-8080}"
+    export TETHYS_PORT="${TETHYS_PORT:-${PORT:-8080}}"
+
+
+    export DUCKDB_HOME=/opt/duckdb_extensions
+
+    # TEEHR and DuckDB queries can run for minutes. Only matters under SERVER=gunicorn,
+    # whose 60s default would kill one mid-flight.
+    export GUNICORN_TIMEOUT=600
+    export GUNICORN_GRACEFUL_TIMEOUT=60
+
+%runscript
+    exec /usr/local/bin/ngiab-apptainer-run.sh "$@"
+
+%labels
+    org.opencontainers.image.title NGIAB Visualizer
+    org.opencontainers.image.description Visualize the outputs of model runs created by NextGen In A Box
+    org.opencontainers.image.source https://github.com/CIROH-UA/ngiab-client
+
+%help
+    NGIAB Visualizer -- a map and chart view over NextGen In A Box model output.
+
+    Run it:
+
+        apptainer run ngiab.sif
+
+    then open http://localhost:8080/ . Viewing needs no login. Uploading or deleting a run
+    does: sign in as admin / pass from the account card at the foot of the control column.
+    Those credentials are baked in, so rebuild with your own for anything shared.
+
+    Writable state (the portal database, rendered config, media, and the model runs
+    themselves) lives in ~/.ngiab_visualizer. Point NGIAB_STATE_DIR somewhere else to move
+    it -- on a cluster that usually means scratch rather than a home quota:
+
+        NGIAB_STATE_DIR=/scratch/$USER/ngiab apptainer run ngiab.sif
+
+    A run is registered by being in the runs directory, which is ngiab_visualizer inside the
+    state directory. Upload one through the web page, or drop it there beforehand -- a run
+    that has never been ingested is listed with the write_manifest command that fixes it.
+
+    To read runs that already exist elsewhere, point NGIAB_MANAGED_ROOT at a directory of
+    run directories and bind it. Apptainer binds $HOME automatically; anything outside it
+    needs an explicit bind. Read-only is enough to list and view; uploading needs write:
+
+        APPTAINERENV_NGIAB_MANAGED_ROOT=/data/ngen-runs \
+            apptainer run --bind /data/ngen-runs ngiab.sif
+
+    A TEEHR evaluation travels inside the run directory it belongs to, so it needs no bind
+    and no configuration of its own.
+
+    Change the port with APPTAINERENV_PORT=9000.

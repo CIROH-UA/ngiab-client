@@ -10,7 +10,6 @@ README.md
 node_modules
 helm
 coverage
-tests
 dist
 build
 **/__pycache__
