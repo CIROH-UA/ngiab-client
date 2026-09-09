@@ -3,7 +3,7 @@ name: build_push_dev_image
 on:
   push:
     branches:
-      - '**'
+      - main
   pull_request:
     branches:
       - 'main'
