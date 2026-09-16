@@ -112,6 +112,39 @@ def _write_troute_csv(path, feature_ids, times):
     pd.DataFrame(rows).to_csv(path, index=False)
 
 
+def _write_teehr_dataset(root, times, *, unit_name="m^3/s"):
+    """A TEEHR evaluation's joined_timeseries, in the columns TEEHR 0.6.x writes.
+
+    Only the columns this app reads are written; ``unit_name`` is among them because
+    TEEHR's join requires the primary and secondary series to share a unit.
+    """
+    dataset = os.path.join(root, "teehr", "dataset", "joined_timeseries")
+    os.makedirs(dataset, exist_ok=True)
+
+    rows = []
+    for configuration_name in ("ngen", "nwm30_retrospective"):
+        for step, moment in enumerate(times):
+            rows.append(
+                {
+                    "value_time": moment,
+                    "primary_location_id": "usgs-10154200",
+                    "secondary_location_id": "nex-100",
+                    "primary_value": round(1.0 + step * 0.1, 6),
+                    "secondary_value": round(1.1 + step * 0.1, 6),
+                    "configuration_name": configuration_name,
+                    "unit_name": unit_name,
+                    "variable_name": "streamflow_hourly_inst",
+                }
+            )
+    # Written through DuckDB, like _csv_to_parquet above: the test image ships neither
+    # pyarrow nor fastparquet, so pandas cannot write parquet here.
+    csv_path = os.path.join(dataset, "part-0.csv")
+    pd.DataFrame(rows).to_csv(csv_path, index=False)
+    _csv_to_parquet(csv_path, os.path.join(dataset, "part-0.parquet"))
+    os.remove(csv_path)
+    return dataset
+
+
 def build_mini_run(
     root,
     *,
@@ -122,6 +155,8 @@ def build_mini_run(
     narrow_last=False,
     troute="nc",
     realization=True,
+    teehr=False,
+    teehr_unit_name="m^3/s",
 ):
     """Write one NGIAB-shaped run directory and return its path."""
     root = str(root)
@@ -153,6 +188,9 @@ def build_mini_run(
         _write_troute_netcdf(os.path.join(troute_dir, "troute_output.nc"), feature_ids, times)
     if troute in ("csv", "both"):
         _write_troute_csv(os.path.join(troute_dir, "troute_output.csv"), feature_ids, times)
+
+    if teehr:
+        _write_teehr_dataset(root, times, unit_name=teehr_unit_name)
 
     if realization:
         with open(os.path.join(config_dir, "realization.json"), "w") as handle:
