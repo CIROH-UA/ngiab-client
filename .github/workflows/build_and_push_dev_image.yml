@@ -12,7 +12,7 @@ env:
   DOCKER_HUB_ORG: awiciroh
   DOCKER_REPO: tethys-ngiab
   REGISTRY_IMAGE: awiciroh/tethys-ngiab
-  IS_REMOTE_BRANCH: secrets.DOCKER_BUILDER_USERNAME == ''
+  IS_REMOTE_BRANCH: ${{ secrets.DOCKER_BUILDER_USERNAME == '' }}
 
 permissions:
   contents: read
@@ -75,7 +75,7 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          push: false
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=false
 
       - name: (Unprivileged) Export digest
         run: |
