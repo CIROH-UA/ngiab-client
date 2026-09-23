@@ -80,6 +80,8 @@ RUN apt-get update \
         libssh2-1 \
         perl \
         gzip \
+        libpcre2-8-0 \
+        libsqlite3-0 \
         libc6 \
         libexpat1 \
         libpq5 \
