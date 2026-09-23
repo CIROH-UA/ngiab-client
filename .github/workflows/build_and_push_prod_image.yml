@@ -24,7 +24,7 @@ jobs:
         platform: [linux/amd64]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -95,7 +95,7 @@ jobs:
           echo "digest=${digest_value#sha256:}" >> $GITHUB_OUTPUT
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
         with:
 
