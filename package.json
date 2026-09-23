@@ -22,5 +22,8 @@
     "flatted": "^3.4.4",
     "js-yaml": "^4.3.2",
     "nanoid": "^3.3.19"
+  },
+  "allowScripts": {
+    "puppeteer@25.5.0": true
   }
 }
