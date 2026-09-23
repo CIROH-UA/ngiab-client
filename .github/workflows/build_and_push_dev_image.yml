@@ -12,7 +12,7 @@ env:
   DOCKER_HUB_ORG: awiciroh
   DOCKER_REPO: tethys-ngiab
   REGISTRY_IMAGE: awiciroh/tethys-ngiab
-  IS_REMOTE_BRANCH: ${{ secrets.DOCKER_BUILDER_USERNAME == '' }}
+  IS_REMOTE_BRANCH: true # ${{ secrets.DOCKER_BUILDER_USERNAME == '' }}
 
 permissions:
   contents: read
@@ -36,7 +36,7 @@ jobs:
             runner: ubuntu-24.04-arm
 
     outputs:
-      do-push: ${{ !env.IS_REMOTE_BRANCH }}
+      do-push: ${{ env.IS_REMOTE_BRANCH == 'false' }}
 
     steps:
       - name: Prepare
@@ -68,32 +68,40 @@ jobs:
       # validate that the Docker image builds without requiring
       # Docker Hub credentials or pushing an image.
       - name: (Unprivileged) Build
-        if: ${{ env.IS_REMOTE_BRANCH }}
+        if: ${{ env.IS_REMOTE_BRANCH == 'true' }}
         id: build-unprivileged
         uses: docker/build-push-action@v5
         with:
           context: .
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=false
+          outputs: type=docker,name=${{ env.REGISTRY_IMAGE }}/remote-branch
 
       - name: (Unprivileged) Export digest
+        if: ${{ env.IS_REMOTE_BRANCH == 'true' }}
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build-unprivileged.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
+      
+      - name: (Unprivileged) Save tarball
+        if: ${{ env.IS_REMOTE_BRANCH == 'true' }}
+        run: |
+          mkdir -p /tmp/out
+          cd /tmp/out
+          docker save $REGISTRY_IMAGE | gzip > $PLATFORM_PAIR.tar.gz
 
       # For pull requests from local branches,
       # push a development image to DockerHub.
       - name: Login to Docker Hub
-        if: ${{ !env.IS_REMOTE_BRANCH }}
+        if: ${{ env.IS_REMOTE_BRANCH == 'false' }}
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_BUILDER_USERNAME }}
           password: ${{ secrets.DOCKER_BUILDER_TOKEN }}
 
       - name: Build and push by digest
-        if: ${{ !env.IS_REMOTE_BRANCH }}
+        if: ${{ env.IS_REMOTE_BRANCH == 'false' }}
         id: build
         uses: docker/build-push-action@v5
         with:
@@ -103,17 +111,27 @@ jobs:
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
-        if: ${{ !env.IS_REMOTE_BRANCH }}
+        if: ${{ env.IS_REMOTE_BRANCH == 'false' }}
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
+      # Upload whichever artifacts the next step needs.
+      # (For unpublished images, this means a tarball.)
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
           name: digests-${{ env.PLATFORM_PAIR }}
           path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+        
+      - name: (Unprivileged) Upload tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarball-${{ env.PLATFORM_PAIR }}
+          path: /tmp/out/*
           if-no-files-found: error
           retention-days: 1
 
@@ -140,11 +158,34 @@ jobs:
           digest_file=$(ls /tmp/digests)
           echo "digest=${digest_file}" >> $GITHUB_OUTPUT
 
+      - name: (Unprivileged) Download image tarball
+        if: ${{ env.IS_REMOTE_BRANCH == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/out
+          name: tarball-linux-amd64
+
+      - name: (Unprivileged) Load image tarball into Docker
+        if: ${{ env.IS_REMOTE_BRANCH == 'true' }}
+        run: |
+          tarball_file=$(ls /tmp/out)
+          docker load < /tmp/out/${tarball_file}
+
       - name: Login to Docker Hub
+        if: ${{ env.IS_REMOTE_BRANCH == 'false' }}
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_BUILDER_USERNAME }}
           password: ${{ secrets.DOCKER_BUILDER_TOKEN }}
+      
+      - name: Set image
+        id: set-name
+        run: |
+          if [[ IS_REMOTE_BRANCH == 'false' ]]; then
+            echo "image-name=${{ env.REGISTRY_IMAGE }}@sha256:${{ steps.amd64-digest.outputs.digest }}" >> $GITHUB_OUTPUT
+          else
+            echo "image-name=${{ env.REGISTRY_IMAGE }}@sha256:${{ steps.amd64-digest.outputs.digest }}" >> $GITHUB_OUTPUT
+          fin
 
       - name: Scan image with Grype
         id: grype-scan
