@@ -182,9 +182,9 @@ jobs:
         id: set-name
         run: |
           if [[ IS_REMOTE_BRANCH == 'false' ]]; then
-            echo "image-name=${{ env.REGISTRY_IMAGE }}@sha256:${{ steps.amd64-digest.outputs.digest }}" >> $GITHUB_OUTPUT
+            echo "image-name=${REGISTRY_IMAGE}@sha256:${{ steps.amd64-digest.outputs.digest }}" >> $GITHUB_OUTPUT
           else
-            echo "image-name=${{ env.REGISTRY_IMAGE }}@sha256:${{ steps.amd64-digest.outputs.digest }}" >> $GITHUB_OUTPUT
+            echo "image-name=${REGISTRY_IMAGE}:latest" >> $GITHUB_OUTPUT
           fi
 
       - name: Scan image with Grype
@@ -194,7 +194,7 @@ jobs:
         env:
           GRYPE_CONFIG: .github/security/.grype.yaml
         with:
-          image: ${{ env.REGISTRY_IMAGE }}@sha256:${{ steps.amd64-digest.outputs.digest }}
+          image: ${{ steps.set-name.outputs.image-name }}
           only-fixed: true
           severity-cutoff: high
           output-format: sarif
