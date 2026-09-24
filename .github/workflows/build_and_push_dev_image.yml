@@ -75,7 +75,7 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=docker,name=${{ env.REGISTRY_IMAGE }}/remote-branch
+          outputs: type=docker,name=${{ env.REGISTRY_IMAGE }}
 
       - name: (Unprivileged) Export digest
         if: ${{ env.IS_REMOTE_BRANCH == 'true' }}
