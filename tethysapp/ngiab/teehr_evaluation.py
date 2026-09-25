@@ -10,6 +10,7 @@ from typing import List
 import duckdb
 
 from . import duckdb_conn
+from .utils import unit_label
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,13 @@ def evaluation_dir(run_path, present=None):
     if present is None:
         present = os.path.isdir(os.path.join(dataset, "joined_timeseries"))
     return dataset if present else None
+
+
+def _variable_label(config_name, variable_name, units):
+    """``"<cfg> <var> (<unit>)"`` -- the shape the t-route variable list already uses."""
+    label = f"{config_name.replace('_', ' ')} {variable_name.replace('_', ' ')}"
+    units = unit_label(units)
+    return f"{label} ({units})" if units else label
 
 
 class EvaluationReader:
@@ -80,11 +88,16 @@ class EvaluationReader:
         return bool(rows)
 
     def list_configurations_for_run(self, config_name: str) -> List[dict]:
-        """``[{"value": "<cfg>-<var>", "label": "<cfg> <var>"}]``, run first then reference."""
+        """``[{"value": "<cfg>-<var>", "label": "<cfg> <var> (<unit>)"}]``.
+
+        Run configuration first, then the reference.
+        """
         try:
             rows = self._query(
-                f"SELECT DISTINCT configuration_name, variable_name FROM {self._joined()} "
+                f"SELECT configuration_name, variable_name, ANY_VALUE(unit_name) "
+                f"FROM {self._joined()} "
                 f"WHERE configuration_name IN (?, ?) "
+                f"GROUP BY configuration_name, variable_name "
                 f"ORDER BY configuration_name = ? DESC, configuration_name, variable_name",
                 [config_name, REFERENCE_CONFIGURATION, config_name],
             )
@@ -92,15 +105,15 @@ class EvaluationReader:
             logger.warning("Could not list configurations in %s: %s", self._dir, exc)
             return []
 
-        if not any(cfg == config_name for cfg, _ in rows):
+        if not any(cfg == config_name for cfg, _, _ in rows):
             return []
 
         return [
             {
                 "value": f"{cfg}-{var}",
-                "label": f"{cfg.replace('_', ' ')} {var.replace('_', ' ')}",
+                "label": _variable_label(cfg, var, unit),
             }
-            for cfg, var in rows
+            for cfg, var, unit in rows
         ]
 
     def list_location_pairs_for_run(self, config_name: str) -> List[tuple]:
