@@ -219,6 +219,10 @@ docker run --rm ngiab-visualizer:test
 Funded by CIROH through the NOAA Cooperative Agreement with The University of Alabama
 (NA22NWS4320003).
 
+## Citing this 
+
+Arpita Patel, James Halgren, Zach Wills, et al. NextGen In A Box (NGIAB): Open-Source Containerization of the NextGen Framework to Enable Community-Driven Hydrology Modeling. Environmental Modelling & Software, page 106666, August 2025. ISSN 1364-8152. doi: 10.1016/j.envsoft.2025.106666. URL https://www.sciencedirect.com/science/article/pii/S1364815225003500.
+
 ## Contribute
 
 Issues and pull requests: <https://github.com/CIROH-UA/ngiab-client>.
