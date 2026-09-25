@@ -12,6 +12,7 @@ env:
   DOCKER_HUB_ORG: awiciroh
   DOCKER_REPO: tethys-ngiab
   REGISTRY_IMAGE: awiciroh/tethys-ngiab
+  IS_REMOTE_BRANCH: true # ${{ secrets.DOCKER_BUILDER_USERNAME == '' }}
 
 permissions:
   contents: read
@@ -24,6 +25,7 @@ jobs:
   build:
     needs: [test]
     runs-on: ${{ matrix.runner }}
+
     strategy:
       fail-fast: false
       matrix:
@@ -33,6 +35,9 @@ jobs:
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
 
+    outputs:
+      do-push: ${{ env.IS_REMOTE_BRANCH == 'false' }}
+
     steps:
       - name: Prepare
         run: |
@@ -40,15 +45,13 @@ jobs:
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
 
       - name: Checkout
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@v7
         with:
-
           fetch-depth: 0
 
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY_IMAGE }}
           tags: |
@@ -56,37 +59,79 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+      # For pull requests from remote branches (per heuristic),
+      # validate that the Docker image builds without requiring
+      # Docker Hub credentials or pushing an image.
+      - name: (If unprivileged) Build
+        if: ${{ env.IS_REMOTE_BRANCH == 'true' }}
+        id: build-unprivileged
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=docker,name=${{ env.REGISTRY_IMAGE }}
+
+      - name: (If unprivileged) Export digest
+        if: ${{ env.IS_REMOTE_BRANCH == 'true' }}
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build-unprivileged.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+      
+      - name: (If unprivileged) Save tarball
+        if: ${{ env.IS_REMOTE_BRANCH == 'true' }}
+        run: |
+          mkdir -p /tmp/out
+          cd /tmp/out
+          docker save $REGISTRY_IMAGE | gzip > $PLATFORM_PAIR.tar.gz
+
+      # For pull requests from local branches,
+      # push a development image to DockerHub.
+      - name: (If privileged) Login to Docker Hub
+        if: ${{ env.IS_REMOTE_BRANCH == 'false' }}
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_BUILDER_USERNAME }}
           password: ${{ secrets.DOCKER_BUILDER_TOKEN }}
 
-      - name: Build and push by digest
+      - name: (If privileged) Build and push by digest
+        if: ${{ env.IS_REMOTE_BRANCH == 'false' }}
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
-      - name: Export digest
+      - name: (If privileged) Export digest
+        if: ${{ env.IS_REMOTE_BRANCH == 'false' }}
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
           touch "/tmp/digests/${digest#sha256:}"
 
+      # Upload whichever artifacts the next step needs.
+      # (For unpublished images, this means a tarball.)
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
           name: digests-${{ env.PLATFORM_PAIR }}
           path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+        
+      - name: (If unprivileged) Upload tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarball-${{ env.PLATFORM_PAIR }}
+          path: /tmp/out/*
           if-no-files-found: error
           retention-days: 1
 
@@ -97,10 +142,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
-            
+
       - name: Download amd64 digest
         uses: actions/download-artifact@v4
         with:
@@ -113,11 +158,34 @@ jobs:
           digest_file=$(ls /tmp/digests)
           echo "digest=${digest_file}" >> $GITHUB_OUTPUT
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+      - name: (If unprivileged) Download image tarball
+        if: ${{ env.IS_REMOTE_BRANCH == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/out
+          name: tarball-linux-amd64
+
+      - name: (If unprivileged) Load image tarball into Docker
+        if: ${{ env.IS_REMOTE_BRANCH == 'true' }}
+        run: |
+          tarball_file=$(ls /tmp/out)
+          docker load < /tmp/out/${tarball_file}
+
+      - name: (If privileged) Login to Docker Hub
+        if: ${{ env.IS_REMOTE_BRANCH == 'false' }}
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_BUILDER_USERNAME }}
           password: ${{ secrets.DOCKER_BUILDER_TOKEN }}
+      
+      - name: Set image name
+        id: set-name
+        run: |
+          if [[ IS_REMOTE_BRANCH == 'false' ]]; then
+            echo "image-name=${REGISTRY_IMAGE}@sha256:${{ steps.amd64-digest.outputs.digest }}" >> $GITHUB_OUTPUT
+          else
+            echo "image-name=${REGISTRY_IMAGE}:latest" >> $GITHUB_OUTPUT
+          fi
 
       - name: Scan image with Grype
         id: grype-scan
@@ -126,12 +194,12 @@ jobs:
         env:
           GRYPE_CONFIG: .github/security/.grype.yaml
         with:
-          image: ${{ env.REGISTRY_IMAGE }}@sha256:${{ steps.amd64-digest.outputs.digest }}
+          image: ${{ steps.set-name.outputs.image-name }}
           only-fixed: true
           severity-cutoff: high
           output-format: sarif
 
-      - name: upload Anchore scan SARIF report
+      - name: Upload Anchore scan SARIF report
         if: ${{ always() && steps.grype-scan.outputs.sarif != '' }}
         uses: github/codeql-action/upload-sarif@v4
         with:
@@ -148,9 +216,11 @@ jobs:
           exit 1
 
   merge:
+    if: needs.build.outputs.do-push
     runs-on: ubuntu-latest
     needs:
-      - scan   # <- only push/tag if scan job as a whole succeeded
+      - build
+      - scan
 
     steps:
       - name: Download digests
@@ -161,11 +231,11 @@ jobs:
           merge-multiple: true
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY_IMAGE }}
           tags: |
@@ -173,7 +243,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_BUILDER_USERNAME }}
           password: ${{ secrets.DOCKER_BUILDER_TOKEN }}
