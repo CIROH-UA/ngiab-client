@@ -72,9 +72,17 @@ CMD ["/bin/sh", "-c", "\"${VIRTUAL_ENV}/bin/python\" -m pytest -p no:cacheprovid
 # ---------------------------------------------------------------------------
 FROM ghcr.io/aquaveo/tethys-uvx:runtime-base-${TETHYS_UVX_TAG}
 
+# Dependencies from libc6 to libssh2-1 are updated to address CVEs.
+# It may become safe to remove them from here once the runtime base image is updaed.
 USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends --only-upgrade \
+        libssh2-1 \
+        perl \
+        gzip \
+        libpcre2-8-0 \
+        libsqlite3-0 \
+        libc6 \
         libexpat1 \
         libpq5 \
         openssl \
