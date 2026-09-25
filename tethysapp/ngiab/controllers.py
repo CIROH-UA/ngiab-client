@@ -37,6 +37,7 @@ from .utils import (
     run_bounds_4326,
     get_model_runs_selectable,
     get_catchment_variables,
+    get_catchment_vars,
     get_catchment_value_matrix,
     build_series_payload,
     to_epoch_seconds,
@@ -607,16 +608,19 @@ def getCatchmentTimeSeries(request):
     )
     series["label"] = f"{catchment_id}-{selected}"
 
+    variables = get_catchment_vars(list_variables)
+    axis_label = next(
+        (entry["label"] for entry in variables if entry["value"] == selected),
+        selected,
+    )
+
     return JsonResponse(
         {
             "data": [series],
-            "variables": [
-                {"value": variable, "label": variable.lower().replace("_", " ")}
-                for variable in list_variables
-            ],
+            "variables": variables,
             "variable": selected,
             "layout": {
-                "yaxis": selected,
+                "yaxis": axis_label,
                 "xaxis": "",
                 "title": "",
             },

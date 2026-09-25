@@ -695,6 +695,49 @@ def get_troute_vars(df):
     return variables
 
 
+# CFE declares the units of its own outputs in NOAA-OWP/cfe, src/bmi_cfe.c
+# (`output_var_units`, read at a349a953 -- the commit CIROH-UA/ngen@ngiab pins as its
+# extern/cfe/cfe submodule). Every CFE output is a depth in metres there, except
+# SURF_RUNOFF_SCHEME, which is a dimensionless scheme flag.
+#
+# Unlike t-route, ngen's catchment output carries no unit metadata to read, so this is
+# the one place a lookup is needed rather than a passthrough.
+_CATCHMENT_UNITS = {
+    "rain_rate": "m",
+    "giuh_runoff": "m",
+    "infiltration_excess": "m",
+    "direct_runoff": "m",
+    "nash_lateral_runoff": "m",
+    "deep_gw_to_channel_flux": "m",
+    "soil_to_gw_flux": "m",
+    "q_out": "m",
+    "potential_et": "m",
+    "actual_et": "m",
+    "gw_storage": "m",
+    "soil_storage": "m",
+    "soil_storage_change": "m",
+    "surf_runoff_scheme": "",
+    "nwm_ponded_depth": "m",
+}
+
+
+def get_catchment_vars(names):
+    """Label catchment variables the way `get_troute_vars` labels t-route ones.
+
+    One label per variable, used for both the picker entry and the chart's y-axis, so the
+    two cannot drift apart. A name with no known unit keeps the bare prettified label.
+    """
+    variables = []
+    for name in names:
+        label = str(name).lower().replace("_", " ")
+        units = _CATCHMENT_UNITS.get(str(name).lower())
+        if units:
+            label = f"{label} ({units})"
+        variables.append({"value": name, "label": label})
+
+    return variables
+
+
 def describe_troute_feature(model_run_id, feature_id):
     """Say what a T-Route feature id is, checked against the run's hydrofabric."""
     entry = _run_entry(model_run_id)
