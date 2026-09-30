@@ -12,7 +12,7 @@ env:
   DOCKER_HUB_ORG: awiciroh
   DOCKER_REPO: tethys-ngiab
   REGISTRY_IMAGE: awiciroh/tethys-ngiab
-  IS_REMOTE_BRANCH: true # ${{ secrets.DOCKER_BUILDER_USERNAME == '' }}
+  IS_REMOTE_BRANCH: ${{ secrets.DOCKER_BUILDER_USERNAME == '' }}
 
 permissions:
   contents: read
@@ -181,7 +181,7 @@ jobs:
       - name: Set image name
         id: set-name
         run: |
-          if [[ IS_REMOTE_BRANCH == 'false' ]]; then
+          if [[ $IS_REMOTE_BRANCH == 'false' ]]; then
             echo "image-name=${REGISTRY_IMAGE}@sha256:${{ steps.amd64-digest.outputs.digest }}" >> $GITHUB_OUTPUT
           else
             echo "image-name=${REGISTRY_IMAGE}:latest" >> $GITHUB_OUTPUT
