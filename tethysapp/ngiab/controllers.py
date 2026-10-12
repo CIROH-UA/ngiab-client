@@ -820,13 +820,18 @@ def getTeehrTimeSeries(request):
             "info",
             available,
         )
+    axis_label = next(
+        (entry["label"] for entry in available if entry["value"] == selected),
+        teehr_variable.title(),
+    )
+
     return JsonResponse(
         {
             "metrics": metrics,
             "data": data,
             "teehr_variables": available,
             "variable": selected,
-            "layout": {"yaxis": teehr_variable.title(), "xaxis": "", "title": ""},
+            "layout": {"yaxis": axis_label, "xaxis": "", "title": ""},
             "teehr_status": None,
             "teehr_status_severity": None,
         }

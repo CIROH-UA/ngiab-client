@@ -662,7 +662,26 @@ def parse_troute_feature_id(troute_id):
     return int(match.group()) if match else None
 
 
-_UNIT_LABELS = {"m3 s-1": "m\u00b3/s", "m s-1": "m/s"}
+_UNIT_LABELS = {
+    # CF spellings, as t-route writes them into its NetCDF metadata.
+    "m3 s-1": "m\u00b3/s",
+    "m s-1": "m/s",
+    # TEEHR spellings, as they arrive in the joined timeseries' unit_name.
+    "m^3/s": "m\u00b3/s",
+    "ft^3/s": "ft\u00b3/s",
+    "km^2": "km\u00b2",
+}
+
+
+def unit_label(units):
+    """A unit as it should be displayed, or None when there is nothing to show.
+
+    Unrecognised spellings pass through unchanged: both sources already carry a
+    human-readable unit, and guessing at one we do not know would be worse than
+    showing what the file actually says.
+    """
+    return _UNIT_LABELS.get(units, units) if units else None
+
 
 _TROUTE_VARIABLE_NOTES = {
     "nudge": "Nudge is the data-assimilation adjustment applied to flow, not a routed state."
@@ -687,9 +706,9 @@ def get_troute_vars(df):
 
         attrs = meta.get(str(name), {})
         label = str(attrs.get("long_name") or name).lower()
-        units = attrs.get("units")
+        units = unit_label(attrs.get("units"))
         if units:
-            label = f"{label} ({_UNIT_LABELS.get(units, units)})"
+            label = f"{label} ({units})"
         variables.append({"value": name, "label": label})
 
     return variables
