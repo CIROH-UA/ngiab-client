@@ -1,4 +1,4 @@
-ARG TETHYS_UVX_TAG=1505870
+ARG TETHYS_UVX_TAG=v0.1.0
 
 # ---------------------------------------------------------------------------
 # Build: install the app, then provision the SQLite DB and collect static
