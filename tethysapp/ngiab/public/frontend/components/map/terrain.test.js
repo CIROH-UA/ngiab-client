@@ -5,14 +5,17 @@ const fakeMap = () => {
   const sources = new Map();
   const layers = new Map();
   const calls = { setTerrain: [] };
+  let terrain = null;
   return {
     calls,
+    isStyleLoaded: () => true,
+    getTerrain: () => terrain,
     getSource: (id) => sources.get(id),
     addSource: (id, spec) => sources.set(id, spec),
     getLayer: (id) => layers.get(id),
     addLayer: (spec) => layers.set(spec.id, spec),
     removeLayer: (id) => layers.delete(id),
-    setTerrain: (arg) => calls.setTerrain.push(arg),
+    setTerrain: (arg) => { terrain = arg; calls.setTerrain.push(arg); }, 
   };
 };
 
@@ -56,6 +59,7 @@ describe('terrain', () => {
 
   it('removeTerrain clears the terrain', () => {
     const map = fakeMap();
+    applyTerrain(map, { url: 'https://x/t.pmtiles' });
     removeTerrain(map);
     expect(map.calls.setTerrain.at(-1)).to.equal(null);
   });
