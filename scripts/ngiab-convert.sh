@@ -22,8 +22,10 @@ set -euo pipefail
 VENV="${VIRTUAL_ENV:-/opt/conda/envs/tethys}"
 scratch=""
 
+# An if, not `[ -n "$scratch" ] && ...`: as the last command of the EXIT trap, a false test
+# would become the script's exit status, so a successful Docker conversion would exit 1.
 cleanup() {
-    [ -n "$scratch" ] && rm -rf "$scratch"
+    if [ -n "$scratch" ]; then rm -rf "$scratch"; fi
 }
 trap cleanup EXIT
 
