@@ -593,7 +593,7 @@ convert_run_outputs() {
 
     local image="${TETHYS_REPO}:${TETHYS_TAG:-latest}"
     if ! ${DOCKER_CMD} image inspect "$image" >/dev/null 2>&1; then
-        echo -e "  ${INFO_MARK} Image $image not present locally; leaving outputs as CSV."
+        echo -e "  ${WARNING_MARK} ${BYellow}Image $image not present locally; outputs stay as CSV (the run will load slower).${Color_Off}"
         return 0
     fi
 
@@ -762,7 +762,6 @@ fi
 
 print_section_header "PREPARING VISUALIZATION ENVIRONMENT"
 
-# Load TEEHR warehouse path from runTeehr.sh's config file if set. Silent when
 # unset -- the visualizer treats "no warehouse configured" as a valid state.
 
 # If visualization directory is non-empty, offer a fresh start option
@@ -775,12 +774,6 @@ if [ -n "$DATA_FOLDER_PATH" ]; then
         echo -e "${CROSS_MARK} ${BRed}Failed to copy model data. Exiting.${Color_Off}"
         exit 1
     }
-
-    prepare_model_run "$final_dir" || {
-        echo -e "${CROSS_MARK} ${BRed}Failed to prepare the model run. Exiting.${Color_Off}"
-        exit 1
-    }
-    echo -e "  ${INFO_MARK} ${BCyan}It appears in the visualizer's run picker once the portal is up.${Color_Off}"
 fi
 
 print_section_header "LAUNCHING TETHYS VISUALIZATION"
@@ -793,6 +786,14 @@ select_tethys_image_source || {
     exit 1
 }
 
+# Convert the copied run now that the chosen image is available locally
+if [ -n "$DATA_FOLDER_PATH" ]; then
+    prepare_model_run "$final_dir" || {
+        echo -e "${CROSS_MARK} ${BRed}Failed to prepare the model run. Exiting.${Color_Off}"
+        exit 1
+    }
+    echo -e "  ${INFO_MARK} ${BCyan}It appears in the visualizer's run picker once the portal is up.${Color_Off}"
+fi
 
 choose_port_to_run_tethys
 run_tethys || {
