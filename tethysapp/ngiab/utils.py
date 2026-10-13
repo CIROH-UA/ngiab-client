@@ -85,6 +85,25 @@ def _run_entry(model_run_id):
     return None
 
 
+def teehr_nexus_id(model_run_id, ngen_id):
+    """The nexus a TEEHR ngen location drains to.
+
+    TEEHR evaluates t-route's flow, so ``ngen-<n>`` names flowpath ``wb-<n>``, whose nexus
+    shares no number with it. A run whose crosswalk predates the nexus column keeps the old
+    prefix swap.
+    """
+    flowpath_id = ngen_id.replace("ngen-", "wb-", 1)
+    entry = _run_entry(model_run_id)
+    if entry is not None:
+        document = entry.get("manifest") or {}
+        nexus_id = manifest.nexus_for(
+            entry["path"], flowpath_id, document.get("version_token", "")
+        )
+        if nexus_id:
+            return nexus_id
+    return ngen_id.replace("ngen-", "nex-", 1)
+
+
 def _require_run_entry(model_run_id):
     entry = _run_entry(model_run_id)
     if entry is None:

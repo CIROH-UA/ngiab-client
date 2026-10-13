@@ -289,3 +289,33 @@ def test_catchments_are_cached_on_the_version_token(distilled):
         handle.write("Time Step,Time,RAIN_RATE\n0,2017-01-01 00:00:00,0.0\n")
     manifest.write(run, manifest.distill(run))
     assert "cat-777" in manifest.catchments(run)
+
+
+def test_crosswalk_records_each_flowpaths_nexus(mini_run_factory):
+    """A flowpath's nexus is its toid, which shares no number with the flowpath."""
+    import geopandas as gpd
+    from shapely.geometry import Point
+
+    run = mini_run_factory()
+    gpkg = os.path.join(run, "config", "mini.gpkg")
+    gpd.GeoDataFrame(
+        [
+            {"id": "wb-100", "divide_id": "cat-100", "toid": "nex-102",
+             "geometry": Point(1_500_000, 2_000_000)},
+            {"id": "wb-101", "divide_id": "cat-101", "toid": "nex-102",
+             "geometry": Point(1_501_000, 2_001_000)},
+        ],
+        crs="EPSG:5070",
+    ).to_file(gpkg, layer="flowpaths", driver="GPKG")
+
+    manifest.write(run, manifest.distill(run))
+    assert manifest.nexus_for(run, "wb-100") == "nex-102"
+    assert manifest.nexus_for(run, "wb-101") == "nex-102"
+    assert manifest.crosswalk(run) == {"wb-100": "cat-100", "wb-101": "cat-101"}
+
+
+def test_a_fabric_without_toid_has_no_nexus(distilled):
+    """The fixture fabric has no toid column: the divide pairing survives, the nexus is unknown."""
+    run, _ = distilled
+    assert manifest.crosswalk(run)["wb-100"] == "cat-100"
+    assert manifest.nexus_for(run, "wb-100") is None

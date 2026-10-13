@@ -41,6 +41,7 @@ from .utils import (
     build_series_payload,
     to_epoch_seconds,
     _DEFAULT_MAX_POINTS,
+    teehr_nexus_id,
     teehr_source,
 )
 
@@ -899,7 +900,7 @@ def getTeehrLocations(request):
         pairs = reader.list_location_pairs_for_run(config_name)
 
     locations = [
-        {"nexus_id": ngen_id.replace("ngen-", "nex-", 1), "usgs_id": usgs_id}
+        {"nexus_id": teehr_nexus_id(model_run_id, ngen_id), "usgs_id": usgs_id}
         for usgs_id, ngen_id in pairs
     ]
 

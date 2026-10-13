@@ -105,10 +105,16 @@ def _bounds(gpkg_path, layers=("divides", "nexus")):
 
 
 def _crosswalk_rows(gpkg_path):
-    """(flowpath id, divide id) pairs, read out of the GeoPackage's flowpaths table."""
+    """(flowpath id, divide id, nexus id) rows, read out of the GeoPackage's flowpaths table.
+
+    The nexus is the flowpath's ``toid``. A fabric without that column still yields the
+    flowpath-to-divide pairing, with no nexus.
+    """
     try:
         with sqlite3.connect(f"file:{gpkg_path}?mode=ro", uri=True) as connection:
-            return connection.execute("SELECT id, divide_id FROM flowpaths").fetchall()
+            columns = {row[1] for row in connection.execute("PRAGMA table_info(flowpaths)")}
+            nexus = "toid" if "toid" in columns else "NULL"
+            return connection.execute(f"SELECT id, divide_id, {nexus} FROM flowpaths").fetchall()
     except sqlite3.Error as exc:
         logger.warning("Could not read flowpaths from %s: %s", gpkg_path, exc)
         return []
@@ -346,10 +352,20 @@ def _write_crosswalk(path, rows):
     """Write the crosswalk as parquet, via DuckDB."""
     import pandas as pd
 
+    def _text(value):
+        return None if value is None else str(value)
+
     frame = pd.DataFrame(
-        [{"flowpath_id": str(a), "divide_id": None if b is None else str(b)} for a, b in rows],
-        columns=["flowpath_id", "divide_id"],
-    )
+        [
+            {
+                "flowpath_id": str(row[0]),
+                "divide_id": _text(row[1]),
+                "nexus_id": _text(row[2] if len(row) > 2 else None),
+            }
+            for row in rows
+        ],
+        columns=["flowpath_id", "divide_id", "nexus_id"],
+    ).astype({"nexus_id": "object"})
     _copy_frame_to_parquet(frame, "crosswalk_frame", path)
 
 
@@ -439,7 +455,27 @@ def crosswalk(run_path, version_token=None):
     return dict(_crosswalk_cached(run_path, _token(run_path, version_token)))
 
 
+@functools.lru_cache(maxsize=32)
+def _nexus_cached(run_path, version_token):
+    """Flowpath-to-nexus, from the crosswalk sidecar. Empty for a sidecar written before it."""
+    frame = _read_sidecar(child(run_path, CROSSWALK_SIDECAR))
+    if frame is None or "nexus_id" not in frame.columns:
+        return {}
+    return {
+        flowpath: nexus
+        for flowpath, nexus in zip(frame["flowpath_id"], frame["nexus_id"])
+        if isinstance(nexus, str) and nexus
+    }
+
+
+def nexus_for(run_path, flowpath_id, version_token=None):
+    """The nexus a flowpath drains to, or None when the run's crosswalk does not say."""
+    run_path = str(run_path).rstrip(os.sep)
+    return _nexus_cached(run_path, _token(run_path, version_token)).get(flowpath_id)
+
+
 def clear_caches():
     """Drop the sidecar caches. For tests and for a process that has just re-ingested."""
     _catchments_cached.cache_clear()
     _crosswalk_cached.cache_clear()
+    _nexus_cached.cache_clear()
