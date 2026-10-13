@@ -191,7 +191,7 @@ export class NgiabMap extends HTMLElement {
     if (!view.terrain) {
       this._appliedTerrain = false;
       this._appliedExaggeration = null;
-      removeTerrain(this._map);
+      if (wasApplied && this._map?.isStyleLoaded()) removeTerrain(this._map);
       return;
     }
     const exaggeration = catchmentsExtruded(view)

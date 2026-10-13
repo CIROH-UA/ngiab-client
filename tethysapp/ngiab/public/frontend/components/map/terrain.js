@@ -45,7 +45,7 @@ export function applyTerrain(map, { url, exaggeration = 1.4, tileSize = 512, dar
 }
 
 export function removeTerrain(map) {
-  if (!map) return;
-  map.setTerrain(null);
+  if (!map || !map.isStyleLoaded()) return;
+  if (map.getTerrain()) map.setTerrain(null);
   if (map.getLayer(HILLSHADE_LAYER)) map.removeLayer(HILLSHADE_LAYER);
 }
