@@ -189,6 +189,7 @@ export class NgiabMap extends HTMLElement {
 
   _syncTerrain(view, { force = false } = {}) {
     if (!view.terrain) {
+      const wasApplied = this._appliedTerrain;
       this._appliedTerrain = false;
       this._appliedExaggeration = null;
       if (wasApplied && this._map?.isStyleLoaded()) removeTerrain(this._map);
