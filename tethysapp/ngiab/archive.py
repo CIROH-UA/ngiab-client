@@ -25,6 +25,9 @@ REQUIRED_DIRS = ("outputs",)
 
 UNREAD_DIRS = ("forcings", "restart", "config/cat_config")
 
+CLUTTER_DIRS = ("__MACOSX",)
+CLUTTER_FILES = (".DS_Store", "Thumbs.db", "desktop.ini")
+
 
 class ArchiveRejected(ValueError):
     """The archive is malformed, unsafe, or not a model run."""
@@ -83,6 +86,60 @@ def skipped(relative, root, skip):
     return any(inside == tree or inside.startswith(f"{tree}/") for tree in skip)
 
 
+def is_clutter(relative):
+    """
+    On Mac Compress ignores unnecessary folders like __MACOSX/ and files like .DS_Store
+    """
+    parts = relative.split("/")
+    return (
+        any(part in CLUTTER_DIRS for part in parts)
+        or parts[-1] in CLUTTER_FILES
+        or parts[-1].startswith("._")
+    )
+
+
+def _within(relative, root):
+    return not root or relative == root or relative.startswith(f"{root}/")
+
+
+def _unpacks(relative, root, skip):
+    """
+    This function decides whether a file or a folder from the archive should be written to the disk or not
+    """
+    return (
+        _within(relative, root)
+        and not is_clutter(relative)
+        and not skipped(relative, root, skip)
+    )
+
+
+def _find_root(entries):
+    """
+    This function find the model run folder.
+    """
+    candidates = set()
+    for relative, _size, is_dir in entries:
+        parts = relative.split("/")
+        for depth, part in enumerate(parts):
+            if part == REQUIRED_DIRS[0] and (depth < len(parts) - 1 or is_dir):
+                candidates.add("/".join(parts[:depth]))
+                break
+
+    if not candidates:
+        raise ArchiveRejected(
+            f"No {REQUIRED_DIRS[0]}/ directory in the archive, so there is nothing to plot."
+        )
+
+    if len(candidates) > 1:
+        #  display the multiple outputs found in the archive
+        found = sorted(posixpath.join(root, REQUIRED_DIRS[0]) for root in candidates)
+        raise ArchiveRejected(
+            f"The archive holds more than one outputs/ directory ({', '.join(found)}). "
+            "Upload one run per archive."
+        )
+    return candidates.pop()
+
+
 def usable_bytes(destination):
     """How much this filesystem can absorb, or None when it cannot be measured.
 
@@ -137,7 +194,6 @@ def inspect(path, *, max_bytes=DEFAULT_MAX_BYTES, max_members=DEFAULT_MAX_MEMBER
     """
     handle, members, kind = open_archive(path)
     entries = []
-    roots = set()
 
     try:
         for name, size, is_dir, is_special in members(handle):
@@ -158,19 +214,16 @@ def inspect(path, *, max_bytes=DEFAULT_MAX_BYTES, max_members=DEFAULT_MAX_MEMBER
                 raise ArchiveRejected(
                     f"The archive holds more than {max_members} entries."
                 )
-            head = relative.split("/")[0]
-            if "/" in relative or is_dir:
-                roots.add(head)
     finally:
         handle.close()
 
     if not entries:
         raise ArchiveRejected("The archive is empty.")
 
-    root = roots.pop() if len(roots) == 1 else ""
+    root = _find_root([entry for entry in entries if not is_clutter(entry[0])])
 
     declared = sum(
-        size for relative, size, _is_dir in entries if not skipped(relative, root, skip)
+        size for relative, size, _is_dir in entries if _unpacks(relative, root, skip)
     )
     if declared > max_bytes:
         raise ArchiveRejected(_too_large(max_bytes, limited_by_disk))
@@ -182,7 +235,10 @@ def inspect(path, *, max_bytes=DEFAULT_MAX_BYTES, max_members=DEFAULT_MAX_MEMBER
 def _require_run_shape(entries, root):
     """Refuse an archive that is not a model run, naming what is missing."""
     prefix = f"{root}/" if root else ""
-    names = {name[len(prefix):] for name, _, _ in entries if name.startswith(prefix)}
+    names = {
+        name[len(prefix):] for name, _, _ in entries
+        if name.startswith(prefix) and not is_clutter(name)
+    }
 
     has_realization = any(
         name == REALIZATION or name.endswith(f"/{REALIZATION}") for name in names
@@ -192,11 +248,6 @@ def _require_run_shape(entries, root):
             f"No {REALIZATION} in the archive, so this does not look like a model run. "
             "Archive the run directory itself, the one holding config/ and outputs/."
         )
-    for required in REQUIRED_DIRS:
-        if not any(name == required or name.startswith(f"{required}/") for name in names):
-            raise ArchiveRejected(
-                f"No {required}/ directory in the archive, so there is nothing to plot."
-            )
 
 
 def extract(path, destination, *, max_bytes=DEFAULT_MAX_BYTES,
@@ -240,7 +291,7 @@ def _wanted(handle, root, skip):
     """The tar members to unpack, leaving out the trees the caller does not want."""
     for info in handle.getmembers():
         relative = _normalise(info.name)
-        if relative is None or skipped(relative, root, skip):
+        if relative is None or not _unpacks(relative, root, skip):
             continue
         yield info
 
@@ -253,7 +304,7 @@ def _extract_zip(handle, destination, real_destination, max_bytes, limited_by_di
         relative = _normalise(info.filename)
         if relative is None:
             raise ArchiveRejected(f"Unsafe path in archive: {info.filename!r}")
-        if skipped(relative, root, skip):
+        if not _unpacks(relative, root, skip):
             continue
 
         target = os.path.join(destination, relative)
