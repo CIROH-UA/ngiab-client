@@ -77,6 +77,8 @@ FROM ghcr.io/aquaveo/tethys-uvx:runtime-base-${TETHYS_UVX_TAG}
 USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends --only-upgrade \
+        curl \
+        libcurl4t64 \
         libssh2-1 \
         perl \
         gzip \
