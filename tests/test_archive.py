@@ -372,3 +372,50 @@ def test_a_tree_whose_name_only_starts_the_same_is_kept(tmp_path):
 
     assert os.path.isfile(os.path.join(unpacked, "config", "cat_config_notes", "readme.txt"))
     assert os.path.isfile(os.path.join(unpacked, "forcings_summary.txt"))
+
+
+def _finder_zip_files():
+    """builds contents of zip with three junk entries"""
+    files = _run_files()
+    files["__MACOSX/myrun/config/._realization.json"] = b"\x00\x05\x16\x07"
+    files["__MACOSX/myrun/outputs/ngen/._cat-100.csv"] = b"\x00\x05\x16\x07"
+    files["myrun/.DS_Store"] = b"\x00\x00\x00\x01Bud1"
+    return files
+
+
+def test_a_finder_zip_is_accepted(tmp_path):
+    root, _ = archive.inspect(write_zip(tmp_path / "a.zip", _finder_zip_files()))
+    assert root == "myrun"
+
+
+def test_a_finder_zip_unpacks_the_run_and_none_of_the_clutter(tmp_path):
+    """makes sure only the run folder is returned"""
+    destination = tmp_path / "dest"
+    unpacked = archive.extract(
+        write_zip(tmp_path / "a.zip", _finder_zip_files()), str(destination)
+    )
+
+    assert unpacked == os.path.join(os.path.realpath(destination), "myrun")
+    assert os.path.isfile(os.path.join(unpacked, "outputs", "ngen", "cat-100.csv"))
+    assert not os.path.exists(destination / "__MACOSX")
+    assert not os.path.exists(os.path.join(unpacked, ".DS_Store"))
+
+
+def test_a_finder_zip_still_has_its_unread_trees_skipped(tmp_path):
+    """makes sure it skips the big.nc file"""
+    files = _finder_zip_files()
+    files["myrun/forcings/big.nc"] = b"0" * 200_000
+    path = write_zip(tmp_path / "a.zip", files)
+
+    archive.inspect(path, max_bytes=50_000, skip=archive.UNREAD_DIRS)
+    unpacked = archive.extract(path, str(tmp_path / "dest"), skip=archive.UNREAD_DIRS)
+    assert not os.path.exists(os.path.join(unpacked, "forcings"))
+
+
+def test_appledouble_files_inside_the_run_are_not_unpacked(tmp_path):
+    """test if ._ junk files are left out"""
+    files = _run_files()
+    files["myrun/outputs/ngen/._cat-100.csv"] = b"\x00\x05\x16\x07"
+    unpacked = archive.extract(write_tar(tmp_path / "a.tar", files), str(tmp_path / "d"))
+
+    assert os.listdir(os.path.join(unpacked, "outputs", "ngen")) == ["cat-100.csv"]
